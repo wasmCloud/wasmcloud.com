@@ -27,4 +27,6 @@ services:
 ---
 
 ## Contact **Us**
-The Wasmcloud team would love to hear from you!  Drop us note here, join our weekly community meeting, catch up on our Youtube Channel, find us on social media, or come hang out on Slack!
+The Wasmcloud team would love to hear from you!  Drop us note here, join our weekly community meeting, catch up on our Youtube Channel, find us on social media, or come hang out on Slack! 
+
+{{< github_follow_button "wasmcloud" >}} {{< github_star_button "wasmcloud" "wasmcloud" "true" >}}
