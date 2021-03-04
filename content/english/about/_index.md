@@ -1,53 +1,61 @@
 ---
 title : "About Us"
-description : "this is meta description"
+description : "All about wasmcloud"
 draft : false
+
+# Wonderful inspiration: https://www.clearvoice.com/blog/difference-between-mission-vision-statement-examples/
 
 ################## Mission ###############
 mission:
   enable : true
-  title : "Our mission is to <strong>empower businesses With Tools</strong>"
+  title : "Our mission is to <strong>revolutionize</strong> the way developers to build, operate, and mantain microservices.</strong>"
   image : "images/about/02.jpg"
-  content : "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed. At vero eos et accusam et justo duo dolores"
+  content : "Wasmcloud is a revolutionary approach to development leveraging an actor model, pluggable capabilities, a built-in interconnected lattice, and WebAssembly to deliver a simple, boilerplate free developer experience."
   bulletpoints:
-  - "Habit building in essential steps choose habit Good Things"
-  - "Get an overview of Habit Calendars admiral general."
-  - "Start building habit with Habitify on platform to new"
+  - "A stateless, immutable development model enables both dynamic and horizontal on-demand scaling."
+  - "Incredibly secure.  Wasm sandboxed, deny-by-default capability model is enhanced through cryptographically enhanced provenance chains."
+  - "Performant and portable execution with your choice of either JIT'd or interpreted WebAssembly runtimes."
+  - "Lattice - a self-forming, self-healing mesh network provides a unified, flatted topology across any number of disparate environments, clouds, browsers, or hardware."
+  
 
 ################## Funfacts ###############
 funfacts:
   enable : true
   funfacts_item:
-  - name : "Launched in April of"
-    count : "2015"
+  - name : "Launched in June of"
+    count : "2019"
     extension : ""
     
-  - name : "Our product powers"
-    count : "1000"
+  - name : "Active developers"
+    count : "30"
     extension : "+"
     
-  - name : "served customers"
-    count : "15"
-    extension : "M+"
+  - name : "pre-built capability providers"
+    count : "10"
+    extension : ""
     
-  - name : "Made by hand in"
-    count : "250"
-    extension : "+"
+  - name : "First-party Interfaces"
+    count : "3"
+    extension : ""
 
 
 ################## vision ###############
 vision:
   enable : true
-  title : "What Are The Main <strong>Vision Of Company?</strong>"
+  title : "Our vision: To be the most developer-centric project, where our community can rapidly design, deploy, and maintain secure scalable microservices."
   image : "images/about/03.jpg"
-  content : "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt
-          ut labore et dolore magna aliquyam erat sed. At vero eos et accusam et justo duo dolores et ea rebum. Stet
-          clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet orem ipsum dolor sit amet"
+  content : "To build the <strong>best</strong> application runtime we believe that the best ideas, the best implementations, and ultimately the winners of tomorrow are those products that are imagined, designed, built, and tested against the most diverse and inclusive set of opinions, concepts, and scenarios.  To that end we believe in adopting the behaviors, principles, and values of an open community to encourage broad types of participation."
+  #bulletpoints:
+  #- "Defaulting to having documented discussion in the clear where others may reference and refer to them."
+  #- "Investing in clear documentation, request for comments, and issue grooming essential to welcoming diverse and incluse participation."
+  #- "Documenting key technical decisions via an architectural decision log."
+  #- "Providing multiple channels of recorded participation including chat, regular weekly meetings, and social media."
+  #- "Creating and mantaining a clear set of onboarding paths welcoming users of all levels."
 
 
 ############### Achivement ###############
 achivement:
-  enable : true
+  enable : false
   title : "Average yearly growth rate **across our clients We able to achive**"
   content : "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed. At vero eos et"
   funfacts:
@@ -80,7 +88,7 @@ achivement:
 
 ############### Featured testimonial ###############
 featured_testimonial:
-  enable : true
+  enable : false
   name : "Marsh Angela Costa"
   designation : "CEO, Trello"
   quote : "“Copper gives us the ease to have people hop in where they need to, to get to a customer resolution really quickly.”"
