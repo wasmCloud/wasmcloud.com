@@ -1,6 +1,6 @@
 ---
 title : "Terms & Conditions"
-date: 2021-03-4T15:40:24+06:00
+date: 2021-02-03T14:15:59-06:00
 description : "Wasmcloud Terms & Conditions"
 draft : false
 ---

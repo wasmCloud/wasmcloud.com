@@ -1,6 +1,6 @@
 ---
 title : "Privacy Policy"
-date: 2021-03-04T15:40:24+06:00
+date: 2021-02-03T14:15:59-06:00
 description : "Wasmcloud Privacy Policy"
 draft : false
 ---
