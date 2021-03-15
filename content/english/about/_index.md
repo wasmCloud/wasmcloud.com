@@ -9,7 +9,7 @@ draft : false
 mission:
   enable : true
   title : "Our mission is to <strong>revolutionize</strong> the way developers to build, operate, and mantain microservices.</strong>"
-  image : "images/about/02.jpg"
+  image : "images/about/microservices-clipart.png"
   content : "Wasmcloud is a revolutionary approach to development leveraging an actor model, pluggable capabilities, a built-in interconnected lattice, and WebAssembly to deliver a simple, boilerplate free developer experience."
   bulletpoints:
   - "A stateless, immutable development model enables both dynamic and horizontal on-demand scaling."
@@ -43,7 +43,7 @@ funfacts:
 vision:
   enable : true
   title : "Our vision: To be the most developer-centric project, where our community can rapidly design, deploy, and maintain secure scalable microservices."
-  image : "images/about/03.jpg"
+  image : "images/about/developers.png"
   content : "To build the <strong>best</strong> application runtime we believe that the best ideas, the best implementations, and ultimately the winners of tomorrow are those products that are imagined, designed, built, and tested against the most diverse and inclusive set of opinions, concepts, and scenarios.  To that end we believe in adopting the behaviors, principles, and values of an open community to encourage broad types of participation."
   #bulletpoints:
   #- "Defaulting to having documented discussion in the clear where others may reference and refer to them."
