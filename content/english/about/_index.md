@@ -13,9 +13,9 @@ mission:
   content : "Wasmcloud is a revolutionary approach to development leveraging an actor model, pluggable capabilities, a built-in interconnected lattice, and WebAssembly to deliver a simple, boilerplate free developer experience."
   bulletpoints:
   - "A stateless, immutable development model enables both dynamic and horizontal on-demand scaling."
-  - "Incredibly secure.  Wasm sandboxed, deny-by-default capability model is enhanced through cryptographically enhanced provenance chains."
+  - "Incredibly secure.  Wasm's sandboxed, deny-by-default capability model is enhanced through cryptographically enhanced provenance chains."
   - "Performant and portable execution with your choice of either JIT'd or interpreted WebAssembly runtimes."
-  - "Lattice - a self-forming, self-healing mesh network provides a unified, flatted topology across any number of disparate environments, clouds, browsers, or hardware."
+  - "Lattice - a self-forming, self-healing mesh network provides a unified, flattened topology across any number of disparate environments, clouds, browsers, or hardware."
   
 
 ################## Funfacts ###############
