@@ -34,7 +34,7 @@ funfacts:
     count : "10"
     extension : ""
     
-  - name : "First-party Interfaces"
+  - name : "Supported Languages"
     count : "3"
     extension : ""
 
