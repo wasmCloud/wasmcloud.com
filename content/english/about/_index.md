@@ -8,7 +8,7 @@ draft : false
 ################## Mission ###############
 mission:
   enable : true
-  title : "Our mission is to <strong>revolutionize</strong> the way developers to build, operate, and mantain microservices.</strong>"
+  title : "Our mission is to <strong>revolutionize</strong> the way developers build, operate, and mantain microservices.</strong>"
   image : "images/about/microservices-clipart.png"
   content : "Wasmcloud is a revolutionary approach to development leveraging an actor model, pluggable capabilities, a built-in interconnected lattice, and WebAssembly to deliver a simple, boilerplate free developer experience."
   bulletpoints:
