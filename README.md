@@ -1,5 +1,5 @@
 # wasmCloud.com
-2021 website &amp; landing pages for project
+2022 website &amp; landing pages for project
 
 
 # Project Status
