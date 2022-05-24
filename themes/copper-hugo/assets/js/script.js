@@ -9,7 +9,7 @@
 		}
 		setTimeout(function () {
 			preLoader();
-		}, 600);
+		}, 0);
 	});
 
 	// counterUp
@@ -100,15 +100,10 @@
 	});
 
 	// aos scroll-animation Init
-	function aosAnim() {
-		AOS.init({
-			duration: 600,
-			once: true
-		});
-	}
-	setTimeout(function () {
-		aosAnim();
-	}, 1700);
+	AOS.init({
+		duration: 500,
+		once: true
+	});
 
 	$(document).ready(function () {
 
@@ -243,35 +238,35 @@
 				mobileFirst: true,
 				slidesToScroll: 1,
 				responsive: [{
-						breakpoint: 1200,
-						settings: {
-							slidesToShow: 6
-						}
-					},
-					{
-						breakpoint: 991,
-						settings: {
-							slidesToShow: 5
-						}
-					},
-					{
-						breakpoint: 767,
-						settings: {
-							slidesToShow: 4
-						}
-					},
-					{
-						breakpoint: 480,
-						settings: {
-							slidesToShow: 3
-						}
-					},
-					{
-						breakpoint: 0,
-						settings: {
-							slidesToShow: 2
-						}
+					breakpoint: 1200,
+					settings: {
+						slidesToShow: 6
 					}
+				},
+				{
+					breakpoint: 991,
+					settings: {
+						slidesToShow: 5
+					}
+				},
+				{
+					breakpoint: 767,
+					settings: {
+						slidesToShow: 4
+					}
+				},
+				{
+					breakpoint: 480,
+					settings: {
+						slidesToShow: 3
+					}
+				},
+				{
+					breakpoint: 0,
+					settings: {
+						slidesToShow: 2
+					}
+				}
 				]
 			});
 		}
@@ -287,17 +282,17 @@
 				slidesToShow: 3,
 				slidesToScroll: 1,
 				responsive: [{
-						breakpoint: 991,
-						settings: {
-							slidesToShow: 2
-						}
-					},
-					{
-						breakpoint: 767,
-						settings: {
-							slidesToShow: 1
-						}
+					breakpoint: 991,
+					settings: {
+						slidesToShow: 2
 					}
+				},
+				{
+					breakpoint: 767,
+					settings: {
+						slidesToShow: 1
+					}
+				}
 				]
 			});
 		}
