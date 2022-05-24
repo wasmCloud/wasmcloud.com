@@ -1,9 +1,5 @@
 ---
 title : "Blog"
-description : "this is meta description"
+description : "Blog posts about wasmCloud, WebAssembly, and all things in between"
 draft : false
 ---
-
-## Find A **Source Of Knowledge**
-
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat sed.
