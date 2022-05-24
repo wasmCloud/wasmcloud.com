@@ -22,9 +22,9 @@ Prerequisites
 
 Today we'll be using a couple of tools for this tutorial:
 
-*   A [Rust](https://www.rust-lang.org/tools/install) toolchain to build actors
+*   A <u>[Rust](https://www.rust-lang.org/tools/install)</u> toolchain to build actors
     *   Make sure to add wasm32 as a target with `rustup target add wasm32-unknown-unknown`
-*   [wash](https://wasmcloud.dev/overview/installation/#install-wash), the wasmCloud shell, at least `v0.11.0`
+*   <u>[wash](https://wasmcloud.dev/overview/installation/#install-wash)</u>, the wasmCloud shell, at least `v0.11.0`
 
 Pushing an actor to GitHub packages
 -----------------------------------
@@ -35,7 +35,7 @@ To start, let's go ahead and generate a new wasmCloud actor project from the `he
 wash new actor hello
 ```
 
-Once the project is generated, `cd hello` into the project. There, you can run `cargo build --release` build your actor module. The last step before we can push it to GitHub is to [sign](https://wasmcloud.dev/app-dev/std-caps/#sign-the-actor) the actor with embedded claims. The following command will sign your actor and allow it to access the HTTPServer capability:
+Once the project is generated, `cd hello` into the project. There, you can run `cargo build --release` build your actor module. The last step before we can push it to GitHub is to <u>[sign](https://wasmcloud.dev/app-dev/std-caps/#sign-the-actor)</u> the actor with embedded claims. The following command will sign your actor and allow it to access the HTTPServer capability:
 
 ```bash
 wash claims sign target/wasm32-unknown-unknown/release/hello.wasm --http_server --name Hello
@@ -65,7 +65,7 @@ Your output should be something like this, just with different `Account` and `Mo
 
   
 
-Now that we've built and signed your actor, let's push it to GitHub! To do this, you'll need a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) with the `write:packages` capability. Refer to the link for instructions on how to create this personal access token, and feel free to tweak the other parameters to your liking.
+Now that we've built and signed your actor, let's push it to GitHub! To do this, you'll need a <u>[personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)</u> with the `write:packages` capability. Refer to the link for instructions on how to create this personal access token, and feel free to tweak the other parameters to your liking.
 
 ![](../../images/blogs/ghcr-actions/new-pat.png)
 
@@ -135,10 +135,10 @@ For the `.github/workflows/release.yml` action, we need to configure three repos
 
 Under your repository settings, head to the `Secrets` dropdown and click `Actions` . Here we can configure the following secrets for use in this repository.
 
-| **name** | **value** |
+| <div style="width:175px">**name**</div> | **value** |
 | ---| --- |
-| WASH\_ISSUER\_KEY | Can be found under `$HOME/.wash/keys` with the form of `<your_username>_account.nk`. Copy the contents of this file, a 56 character [NKey](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth) starting with `SA`, into the value section. |
-| WASH\_SUBJECT\_KEY | Can be found under `$HOME/.wash/keys/hello_module.nk`. Copy the contents of this file, a 56 character [NKey](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth) starting with `SM`, into the value section. |
+| WASH\_ISSUER\_KEY | Can be found under `$HOME/.wash/keys` with the form of `<your_username>_account.nk`. Copy the contents of this file, a 56 character <u>[NKey](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth)</u> starting with `SA`, into the value section. |
+| WASH\_SUBJECT\_KEY | Can be found under `$HOME/.wash/keys/hello_module.nk`. Copy the contents of this file, a 56 character <u>[NKey](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth)</u> starting with `SM`, into the value section. |
 | WASMCLOUD\_PAT | Your personal access token that you previously used for `WASH_REG_PASSWORD` |
 
 ![](../../images/blogs/ghcr-actions/required-secrets.png)
@@ -164,4 +164,4 @@ Today we walked through the setup process to configure a GitHub repository to au
 What's next?
 ------------
 
-Now that your `hello` actor is published to a public OCI registry, you can follow our [run actor](https://wasmcloud.dev/app-dev/create-actor/run/) tutorial with the OCI reference instead of uploading a local file. If you're new to wasmCloud, check out our documentation for helpful information about [actors](https://wasmcloud.dev/reference/host-runtime/actors/), our [security model](https://wasmcloud.dev/reference/host-runtime/security/), and more. Feedback on this process is welcome and encouraged on our [project-templates](https://github.com/wasmcloud/project-templates) repo; and to stay involved you can join our [slack](https://slack.wasmcloud.com/).
+Now that your `hello` actor is published to a public OCI registry, you can follow our <u>[run actor](https://wasmcloud.dev/app-dev/create-actor/run/)</u> tutorial with the OCI reference instead of uploading a local file. If you're new to wasmCloud, check out our documentation for helpful information about <u>[actors](https://wasmcloud.dev/reference/host-runtime/actors/)</u>, our <u>[security model](https://wasmcloud.dev/reference/host-runtime/security/)</u>, and more. Feedback on this process is welcome and encouraged on our <u>[project-templates](https://github.com/wasmcloud/project-templates)</u> repo; and to stay involved you can join our <u>[slack](https://slack.wasmcloud.com/)</u>.
