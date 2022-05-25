@@ -1,10 +1,10 @@
 ---
-title : "wasmCloud Capabilities are Algebraic Effects for WebAssembly Functions"
+title : "wasmCloud Capabilities are Managed Algebraic Effects for WebAssembly Functions"
 image : "images/blogs/algebra.jpg"
-date: 2022-05-24T9:00:00-04:00
+date: 2022-05-25T9:00:00-04:00
 author: "Kevin Hoffman"
 author_profile: "https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/"
-description : "wasmCloud Capabilities are a distributed implementation of algebraic effects"
+description : "wasmCloud Capabilities are a managed, distributed implementation of algebraic effects"
 categories: ["webassembly", "wasmcloud"]
 draft : false
 ---
