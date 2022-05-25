@@ -43,7 +43,7 @@ A lot of us are used to patterns like (micro)services, abstractions, anti-corrup
 
 In a traditional object-oriented language or framework, we might treat each of these "effect providers" as an interface and then use something like dependency injection to shunt in an implementation for the effect at runtime (and presumably shunt in a mock during test time).
 
-In wasmCloud, we manage algebraic effects through [capability providers](https://wasmcloud.dev/reference/host-runtime/capabilities/). Here the capability provider, as seen by the WebAssembly module ([actor](https://wasmcloud.dev/reference/host-runtime/actors/)), is just an abstraction. It's a versioned contract through which the WebAssembly function gets its effects.
+In wasmCloud, we manage algebraic effects through <u>[capability providers](https://wasmcloud.dev/reference/host-runtime/capabilities/)</u>. Here the capability provider, as seen by the WebAssembly module (<u>[actor](https://wasmcloud.dev/reference/host-runtime/actors/)</u>), is just an abstraction. It's a versioned contract through which the WebAssembly function gets its effects.
 
 The host runtime is responsible for providing an implementation for those effects or effect providers. This implementation is hot-swappable and dynamically configurable. This means that in our preceding international withdrawal example, we could provide a "test market" at unit test time and then a real connection to the market service when running in production. We could also configure the market connection so it could be "real", but point to a different service in staging than in production.
 
@@ -53,8 +53,8 @@ Algebraic effects don't need to be big, high-level concepts like database or net
 Logger.debug("Performing international withdrawal")
 ```
 
-wasmCloud takes these algebraic effects even further by requiring each of our WebAssembly modules to be [cryptographically signed](https://wasmcloud.dev/reference/host-runtime/security/) with the explicit list of capabilities it can use (effects it can produce). 
+wasmCloud takes these algebraic effects even further by requiring each of our WebAssembly modules to be <u>[cryptographically signed](https://wasmcloud.dev/reference/host-runtime/security/)</u> with the explicit list of capabilities it can use (effects it can produce). 
 
 Ultimately what we've done is provided a means to maintain portable function purity in WebAssembly modules while allowing for all algebraic effects to not only be testable, but distributed, hot-swappable, and dynamically scalable across a flat topology system comprised of multiple disparate environments.
 
-If you're interested in learning more about capabilities and seeing them in action, take a look at our [examples](https://github.com/wasmcloud/examples/) repository.
+If you're interested in learning more about capabilities and seeing them in action, take a look at our <u>[examples](https://github.com/wasmcloud/examples/)</u> repository.
