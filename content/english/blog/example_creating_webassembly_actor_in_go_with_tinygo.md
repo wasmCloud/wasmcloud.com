@@ -5,7 +5,7 @@ date: 2022-05-25T9:00:00-04:00
 author: "Kevin Hoffman"
 author_profile: "https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/"
 description : "A walkthrough of creating a TinyGo wasmCloud actor"
-categories: ["tinygo", "webassembly", "wasmcloud"]
+categories: ["tinygo", "webassembly", "wasmcloud", "go", "example"]
 draft : false
 ---
 
