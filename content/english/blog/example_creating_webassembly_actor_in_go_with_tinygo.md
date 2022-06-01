@@ -1,7 +1,7 @@
 ---
 title : "Building Portable, Scalable Components with TinyGo and wasmCloud"
 image : "images/tinygo-logo.png"
-date: 2022-05-25T9:00:00-04:00
+date: 2022-06-01T9:00:00-04:00
 author: "Kevin Hoffman"
 author_profile: "https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/"
 description : "A walkthrough of creating a TinyGo wasmCloud actor"
@@ -9,7 +9,7 @@ categories: ["tinygo", "webassembly", "wasmcloud", "go", "example"]
 draft : false
 ---
 
-[TinyGo](https://tinygo.org) is _"a Go compiler for small places"_. It is a language designed specifically to work on embedded systems and WebAssembly. If you squint hard enough, you can almost imagine that WebAssembly is a form of embedded system (it's embedded in a host runtime).
+<u>[TinyGo](https://tinygo.org)</u> is _"a Go compiler for small places"_. It is a language designed specifically to work on embedded systems and WebAssembly. If you squint hard enough, you can almost imagine that WebAssembly is a form of embedded system (it's embedded in a host runtime).
 
 One of the core tenets of wasmCloud has always been that we embrace the specification without doing anything proprietary. In other words, anyone who knows the "<u>[wasmCloud ABI](https://wasmcloud.dev/reference/wasmbus/ffi/)</u>" can create actors in any language that compiles to freestanding WebAssembly. While this is technically true, it's certainly a lot easier when we have an easy SDK and code generation support for a language. Using our SDKs gives you a more friendly library while helping insulate your code from changes to the underlying WebAssembly spec.
 
@@ -30,7 +30,7 @@ I'm going to call this new project `kvcounter` because, for this blog post, we'r
 
 This is the actor we get "out of the box":
 
-```
+```go
 package main
 
 import (
@@ -70,7 +70,7 @@ go get github.com/wasmcloud/interfaces/keyvalue/tinygo
 
 This will modify our `go.mod` file to contain the new interface. Now let's create a new version of the `HandleRequest` function:
 
-```
+```go
 func (e *Kvcounter) HandleRequest(
 	ctx *actor.Context, 
 	req httpserver.HttpRequest) (*httpserver.HttpResponse, error) {
@@ -125,7 +125,7 @@ To get the preceding output, I typically run the following command (though use c
 ```
 wasm2wat build/kvcounter_s.wasm| grep import
 ```
-The `wasm2wat` binary is included in the [wabt](https://github.com/WebAssembly/wabt) toolkit.
+The `wasm2wat` binary is included in the <u>[wabt](https://github.com/WebAssembly/wabt)</u> toolkit.
 
 There are still quite a few places in TinyGo where importing a certain package will trigger the use of the `syscall/js` package. Once this package is imported, the host runtime will then _require_ the use of these JavaScript host shims and we then immediately lose all of our portability benefits.
 
