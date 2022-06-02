@@ -16,7 +16,6 @@ mission:
   - "Incredibly secure.  Wasm's sandboxed, deny-by-default capability model is enhanced through cryptographically enhanced provenance chains."
   - "Performant and portable execution with your choice of either JIT'd or interpreted WebAssembly runtimes."
   - "Lattice - a self-forming, self-healing mesh network provides a unified, flattened topology across any number of disparate environments, clouds, browsers, or hardware."
-  
 
 ################## Funfacts ###############
 funfacts:
