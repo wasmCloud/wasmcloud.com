@@ -19,7 +19,7 @@ So, by the definition, as soon as we got two WebAssembly modules talking to each
 
 # How we got to NATS
 
-Back in the 0.18.0 days of wasmCloud we supported local host process calls which allowed developers to avoid installing NATS. Now, all wasmCloud hosts run atop NATS as a networking infrastructure that we call a [lattice](https://wasmcloud.dev/reference/lattice/). We've taken a stance "compatible with, but not dependent upon" for as much as possible (Kubernetes, Docker, bare metal, IoT, nomad) so this is a significant choice, and today you'll see the reasons why.
+Back in the 0.18.0 days of wasmCloud we supported local host process calls which allowed developers to avoid installing NATS. Now, all wasmCloud hosts run atop NATS as a networking infrastructure that we call a [lattice](https://wasmcloud.dev/reference/lattice/). We've taken a stance *"compatible with, but not dependent upon"* for as much as possible (Kubernetes, Docker, bare metal, IoT, nomad) so this is a significant choice, and today you'll see the reasons why.
 
   
 
