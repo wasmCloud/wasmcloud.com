@@ -4,8 +4,8 @@ image : "images/blogs/ngs-global.png"
 date: 2022-06-29T9:00:00-04:00
 author: "Brooks Townsend"
 author_profile: "https://linkedin.com/in/brooks-townsend"
-description : "See the simplicity of taking a local wasmCloud host to being globally distributed"
-categories: ["webassembly", "wasmcloud", "nats", "distributed"]
+description : "Taking a local wasmCloud lattice to globally distributed with NATS and NGS"
+categories: ["webassembly", "wasmcloud", "nats", "distributed", "lattice"]
 draft : false
 ---
 
