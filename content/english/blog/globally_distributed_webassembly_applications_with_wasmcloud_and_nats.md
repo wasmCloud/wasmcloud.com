@@ -27,7 +27,7 @@ We're going to do a brief introduction on the power of NATS, talk about how wasm
 
   
 
-# NATS, Leaf Nodes, and NGS (oh my!)
+# NATS, Leaf Nodes, and NGS
 
 [NATS](https://nats.io/) describes itself as "Connective Technology for Adaptive Edge & Distributed Systems", which does as good of a job as you can to describe such a far-reaching technology. At its base level, NATS enables pub-sub and request-reply messaging on [subjects](https://docs.nats.io/nats-concepts/subjects). You run the NATS server binary, then connect clients to it over a TCP socket [^1] and can publish messages to any other client subscribed on a the same subject. NATS also includes an optional distributed persistence system called [Jetstream](https://docs.nats.io/nats-concepts/jetstream) and a fully-featured authn/authz [security](https://docs.nats.io/nats-concepts/security) system for additional reliability and configuration. There are plenty of features that NATS offers that are out of scope for this guide, but the NATS [documentation](https://docs.nats.io/) is a great place to find those. To sum it up, when you adopt NATS, you dramatically simplify your architecture and the number of tools you need to worry about.
 
