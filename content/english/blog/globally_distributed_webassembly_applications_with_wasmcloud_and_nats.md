@@ -1,10 +1,10 @@
 ---
-title : "Going Global with wasmCloud and NATS"
+title : "Globally Distributed WebAssembly Applications with wasmCloud and NATS"
 image : "images/blogs/ngs-global.png"
 date: 2022-06-29T9:00:00-04:00
 author: "Brooks Townsend"
 author_profile: "https://linkedin.com/in/brooks-townsend"
-description : "Taking a local wasmCloud lattice to globally distributed with NATS and NGS"
+description : "Taking a wasmCloud lattice from local to globally distributed with NATS and NGS"
 categories: ["webassembly", "wasmcloud", "nats", "distributed", "lattice"]
 draft : false
 ---
@@ -241,7 +241,7 @@ You now have a running wasmCloud host using NGS as the lattice infrastructure! N
 We can continue by deploying our ngs application from the examples repository which consists of: our DogsAndCats actor, a capability provider that implements the `wasmcloud:httpserver` contract and a capability provider that implements the `wasmcloud:httpclient` contract, both of which we provide as wasmCloud first-party providers but could be swapped to any other implementation at runtime.
 
 ```bash
-wash ctl start actor wasmcloud.azurecr.io/dogsandcats:0.1.0
+wash ctl start actor wasmcloud.azurecr.io/dogs-and-cats:0.1.0
 wash ctl link put MCUCZ7KMLQBRRWAREIBQKTJ64MMQ5YKEGTCRGPPV47N4R72W2SU3EYMU VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver ADDRESS=0.0.0.0:8081
 wash ctl link put MCUCZ7KMLQBRRWAREIBQKTJ64MMQ5YKEGTCRGPPV47N4R72W2SU3EYMU VCCVLH4XWGI3SGARFNYKYT2A32SUYA2KVAIV2U2Q34DQA7WWJPFRKIKM wasmcloud:httpclient
 wash ctl start provider wasmcloud.azurecr.io/httpserver:0.15.0
@@ -340,13 +340,13 @@ You should see a similar dump of logs, but notably you should see that you are c
 
 And now, on your local machine, check out [http://localhost:4000](http://localhost:4000). You should see your DogsAndCats resources and additionally under your **Host Info** section you'll see two hosts:
 
-**TODO: screenshot with real actor ID**
+![](../../images/blogs/ngs-global/dashboard.png)
 
 We can go ahead and schedule a few extra replicas of the DogsAndCats actor on the cloud host and an HTTPClient provider using `wash` or by using the dashboard.
 
 ```bash
 # The constraint flag ensures we start on a host with that label
-wash ctl start actor wasmcloud.azurecr.io/dogsandcats:0.1.0 --constraint machine=second
+wash ctl start actor wasmcloud.azurecr.io/dogs-and-cats:0.1.0 --constraint machine=second
 wash ctl start provider wasmcloud.azurecr.io/httpclient:0.4.0 --constraint machine=second
 ```
 
