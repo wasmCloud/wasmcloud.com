@@ -40,7 +40,7 @@ At the **engine** and **specification** level, there should be no issues around 
 ## Application-Level Choice
 Today, the choice of application or application platform to support WebAssembly modules is extremely limited. In addition to the lack of choice variety, each choice requires a _total embrace_ and **_lock_** into a particular vendor's environment, SDK, tool chain, and so on.
 
-In the current ecosystem, if you want edge functions written in WebAssembly, you'll have to use _Fastly_ or _CloudFlare_'s SDK. If you want workflows to chain WebAssembly functions, you'll need to use _Atmo_'s SDK. If you want self-contained, freestanding microservices written in WebAssembly, you could use the _Spin_ SDK. If you want portable distributed actors loosely coupled to capability contracts, you may want to use the _wasmCloud_ SDK.
+In the current ecosystem, if you want edge functions written in WebAssembly, you'll have to use _Fastly_ or _CloudFlare_'s SDK. If you want workflows to chain WebAssembly functions, you'll need to use Suborbital's _Extension Engine_'s SDK. If you want self-contained, freestanding microservices written in WebAssembly, you could use the _Spin_ SDK. If you want portable distributed actors loosely coupled to capability contracts, you may want to use the _wasmCloud_ SDK.
 
 ## Embracing the Road to Ubiquity
 As the WebAssembly community and ecosystem moves forward, we plan on continuing to move at the vanguard of this momentum, so that we're adapting our foundations to incorporate new power, features, and flexibility as it becomes available and more mature.
