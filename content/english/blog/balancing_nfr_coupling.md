@@ -1,7 +1,7 @@
 ---
 title : "Using Capabilities to Decouple Non-Functional Requirements"
 image : "images/blogs/train_coupling.jpg"
-date: 2022-10-03T9:00:00-04:00
+date: 2022-10-04T9:00:00-04:00
 author: "Kevin Hoffman"
 author_profile: "https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/"
 description : "A look at the motivation and design behind loosely coupling services for actors"
