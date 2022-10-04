@@ -33,8 +33,8 @@ By way of example, let's examine the anatomy of a fairly commonplace microservic
 * Secure access to the HTTP endpoint via reverse proxy
 * Emit open telemetry spans and traces
 * Support and expose a prometheus metrics endpoint
-* Use _(insert name)_ HTTP server library
-* Use _(insert name)_ SSL tools
+* Use _(your favorite)_ HTTP server library
+* Use _(your favorite)_ SSL tools
 * Secure access to the service via bearer token
 
 The amount of work required is definitely skewed toward the NFR end of the scale. With most of today's traditional development tools and ecosystems, every deployment artifact bundles the solution to functional requirements with _just one_ of the many solutions to the non-functional requirements _at build time_.
@@ -53,13 +53,15 @@ When we separate the functional and non-functional requirements across specific 
 
 If we own our dependencies, and the implementation of a contract is _not_ a tightly coupled dependency, then we can finally say that, as developers, we don't own the non-functional requirements. NFRs are still mandatory, still important, and still have to be dealt with. However, if our _unit of deployment_ doesn't own them, then they are free to change, update, and move on their own cadence, _for their own reasons_.
 
+## wasmCloud, NFRs, and Capabilities
+
 All of this lead-up and background hopefully explains why wasmCloud has chosen the abstractions we've chosen. We know that if we write a microservice that requires access to an **S3** bucket, it's going to be a huge pain to work with locally (even with tools like _minio_). The functional requirements of my code are "store this data in a blob store". Why should we be forced to decide on S3 and then live with that decision for the lifetime of the component? 
 
-By implementing a contract like the one we have for `wasmcloud:blobstore`, and writing code against that contract, wasmCloud actors can interact with files on disk during the local developer iteration cycle, some other abstraction during automated tests, and then maybe real S3 buckets in production. The important thing is that the code no longer owns the choice of S3, or the configuration thereof.
+By implementing a contract like the one we have for `wasmcloud:blobstore`, and writing code against that contract, wasmCloud actors can interact with files on disk during the local developer iteration cycle, some other abstraction during automated tests, and then real S3 buckets in production. The important thing is that the code no longer owns the choice of S3, or the configuration thereof.
 
 WebAssembly's enforced hard boundary between the guest and the host mandates that developers choose where their code ends and the host-provided functionality begins. By forcing us to draw this line for real rather than have this line be something that is either implicitly or accidentally drawn (and subsequently violated), we can actually turn this so-called limitation into an advantage and build highly composable, distributed components that have _just the right_ amount of coupling with the components that satisfy their non-functional requirements.
 
-To see how wasmCloud has leveraged this kind of NFR decoupling, check out our documentation on [capability providers](https://wasmcloud.dev/app-dev/std-caps/).
+To see how wasmCloud has leveraged this kind of NFR decoupling, check out our documentation on [capability providers](https://wasmcloud.dev/app-dev/std-caps/). For an example of us demonstrating hot-swapping between a file system and S3 live, at runtime, without a recompile or redeploy, check out this [wasmCloud community meeting](https://youtu.be/s_Y-ISP58qk?t=522).
 
 Today wasmCloud uses the Smithy DSL to define and describe these contracts. When we started, we had to fend for ourselves when it came to contracts and code generation. Hopefully soon, when the [component model](../webassembly_components_and_wasmcloud_actors_a_glimpse_of_the_future) becomes more of a real thing, we'll be able to take our contracts and turn them into component specifications that will work in wasmCloud _or anywhere else_ that supports components. 
 
