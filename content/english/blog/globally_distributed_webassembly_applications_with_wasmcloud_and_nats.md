@@ -1,8 +1,7 @@
 ---
 title: "Globally Distributed WebAssembly Applications with wasmCloud and NATS"
 image: "images/blogs/ngs-global.png"
-# TODO: Set to Oct 11
-date: 2022-10-02T9:00:00-04:00
+date: 2022-10-18T9:00:00-04:00
 author: "Brooks Townsend"
 author_profile: "https://linkedin.com/in/brooks-townsend"
 description: "Taking a wasmCloud lattice from local to globally distributed with NATS and NGS"
