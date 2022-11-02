@@ -1,12 +1,12 @@
 ---
-title : "Globally Distributed WebAssembly Applications with wasmCloud and NATS"
-image : "images/blogs/ngs-global.png"
-date: 2022-06-30T9:00:00-04:00
+title: "Globally Distributed WebAssembly Applications with wasmCloud and NATS"
+image: "images/blogs/ngs-global.png"
+date: 2022-10-18T9:00:00-04:00
 author: "Brooks Townsend"
 author_profile: "https://linkedin.com/in/brooks-townsend"
-description : "Taking a wasmCloud lattice from local to globally distributed with NATS and NGS"
+description: "Taking a wasmCloud lattice from local to globally distributed with NATS and NGS"
 categories: ["webassembly", "wasmcloud", "nats", "distributed", "lattice"]
-draft : false
+draft: false
 ---
 
 The first claim we make about wasmCloud on our documentation site is: "wasmCloud is a distributed platform..." The best definition I could find, on [Wikipedia](https://en.wikipedia.org/wiki/Distributed_computing) of course, is:
@@ -19,27 +19,17 @@ So, by the definition, as soon as we got two WebAssembly modules talking to each
 
 # How we got to NATS
 
-Back in the 0.18.0 days of wasmCloud we supported local host process calls which allowed developers to avoid installing NATS. Now, all wasmCloud hosts run atop NATS as a networking infrastructure that we call a [lattice](https://wasmcloud.dev/reference/lattice/). We've taken a stance *"compatible with, but not dependent upon"* for as much as possible (Kubernetes, Docker, bare metal, IoT, nomad) so this is a significant choice, and today you'll see the reasons why.
-
-  
+Back in the 0.18.0 days of wasmCloud we supported local host process calls which allowed developers to avoid installing NATS. Now, all wasmCloud hosts run atop NATS as a networking infrastructure that we call a [lattice](https://wasmcloud.dev/reference/lattice/). We've taken a stance _"compatible with, but not dependent upon"_ for as much as possible (Kubernetes, Docker, bare metal, IoT, nomad) so this is a significant choice, and today you'll see the reasons why.
 
 We're going to do a brief introduction on the power of NATS, talk about how wasmCloud uses it, and then get into configuring it to connect wasmCloud compute anywhere.
-
-  
 
 # NATS, Leaf Nodes, and NGS
 
 [NATS](https://nats.io/) describes itself as "Connective Technology for Adaptive Edge & Distributed Systems", which does as good of a job as you can to describe such a far-reaching technology. At its base level, NATS enables pub-sub and request-reply messaging on [subjects](https://docs.nats.io/nats-concepts/subjects). You run the NATS server binary, then connect clients to it over a TCP socket [^1] and can publish messages to any other client subscribed on a the same subject. NATS also includes an optional distributed persistence system called [Jetstream](https://docs.nats.io/nats-concepts/jetstream) and a fully-featured authn/authz [security](https://docs.nats.io/nats-concepts/security) system for additional reliability and configuration. There are plenty of features that NATS offers that are out of scope for this guide, but the NATS [documentation](https://docs.nats.io/) is a great place to find those. To sum it up, when you adopt NATS, you dramatically simplify your architecture and the number of tools you need to worry about.
 
-  
-
 A [Leaf Node](https://docs.nats.io/running-a-nats-service/configuration/leafnodes) _extends_ a centralized NATS infrastructure with a local NATS server, allowing you to perform additional authentication steps, route messages locally until they need to be delivered to the central infrastructure. This mechanism is not only efficient, it even allows messages to still flow during network disconnects by continuing to deliver messages locally without an upstream connection. We'll be using a Leaf Node today to extend [NGS](https://synadia.com/ngs), the NATS Global Service by [Synadia](https://synadia.com/), which is a NATS supercluster with connection points on the edge, providing low latency worldwide.
 
-  
-
 [^1]: NATS also accepts [connections](https://docs.nats.io/nats-concepts/connectivity) over TLS, WebSockets, and MQTT
-
-  
 
 # wasmCloud and NATS
 
@@ -49,14 +39,16 @@ wasmCloud uses NATS in a multitude of ways. To name a few:
 2.  Jetstream to persist link definitions and claims so that they are durable and automatically delivered to new wasmCloud hosts joining an existing lattice
 3.  Communication with a wasmCloud configuration service and the soon-to-come application deployment manager ([wadm](https://github.com/wasmCloud/wadm))
 
-  
-
 # Gathering Prerequisites
+
+{{< aside >}}
+⚠️ This post was updated on **11 Oct 2022** to include new conveniences like the `wash up` command. This requires at least `v0.12.0` and removes the need to install NATS or the wasmCloud host runtime manually.
+{{< /aside >}}
 
 This example requires a few prerequisites:
 
-*   The components in the wasmCloud [installation guide](https://wasmcloud.dev/overview/installation/), which includes `wash` , the wasmCloud host runtime, and the `nats-server` binary.
-*   NATS account credentials to access NGS (we'll walk through this below)
+- The wasmCloud Shell, aka `wash`, from the wasmCloud [installation guide](https://wasmcloud.dev/overview/installation/). If you already have `wash` installed, use `wash --version` to ensure you have version `v0.12.0` or newer
+- NATS account credentials to access NGS (we'll walk through this below)
 
 We're also going to use a few files from the aptly named [ngs](https://github.com/wasmCloud/examples/tree/main/ngs) folder in our examples repository to deploy a Wasm microservice (we call this an [actor](https://wasmcloud.dev/reference/host-runtime/actors/)) that securely fetches a random image of a cat or a dog. Later on we're going to use some files in this folder, you can either clone this repository or just copy and paste as we go along.
 
@@ -65,8 +57,6 @@ To help illustrate the architecture of our application, take a look at this diag
 ![](../../images/blogs/ngs-global/excalidraw.png)
 
 We'll have wasmCloud running both locally and in the cloud (or just on another machine), and we'll be spreading compute across these two wasmCloud hosts. Don't worry, you won't have to look up your local IP address or expose any ports, NATS makes distributed computing a breeze.
-
-  
 
 The first step will be to get yourself a set of NGS credentials. Navigate to [https://app.ngs.global](https://app.ngs.global) and select "Try It Out" under **Free**.
 ![](../../images/blogs/ngs-global/ngs-signup.png)
@@ -80,8 +70,6 @@ Proceed through the dialogues to sign in through your email until you reach the 
 ![](../../images/blogs/ngs-global/ngs-curl.png)
 
 {{< aside >}}**NOTE**:️ The 58 character key starting with `SA` is a secret (S) key for an account (A). You'll want to avoid sharing this value on Twitter or anywhere else public.{{< /aside >}}
-
-  
 
 Head back to your terminal and paste in that `curl` command. You'll see some output regarding the NATS install process, but all you really need is the last couple of lines:
 
@@ -105,138 +93,72 @@ $ nats req ngs.echo 'Anyone out there?'
 [Ohio, US]: "Anyone out there?"
 ```
 
-  
-
 # Running DogsAndCats on your Local Machine
 
 Now that you have walked through the wasmCloud installation guide and have valid NGS credentials, we're ready to take wasmCloud global!
 
-  
-
 To start, let's get NATS, wasmCloud, and the DogsAndCats example running on our local machine. This is what you can think of as the local development setup for wasmCloud but instead of using a standalone NATS server we'll be using a leaf node that connects to NGS.
 
-  
-
-Go ahead and download [core.cfg](https://github.com/wasmCloud/examples/tree/main/ngs/core.cfg) to the same directory that you installed wasmCloud. Then, copy the `Credentials` file that you saw in the NGS install output to that directory as well. If you named your account `wasmcloud` like above, then you can copy it with this command (assuming you're in the wasmCloud install directory):
+Go ahead and locate the `Credentials` file that you saw in the NGS install output to that directory as well. If you named your account `wasmcloud` like above, then it will be located under a folder called `.nkeys` in your **HOME** directory.
 
 ```bash
-cp ~/.nkeys/creds/synadia/wasmcloud/default.creds ./
+cat ~/.nkeys/creds/synadia/wasmcloud/default.creds
+-----BEGIN NATS USER JWT-----
+eyJ0...elided
+------END NATS USER JWT------
+
+************************* IMPORTANT *************************
+NKEY Seed printed below can be used to sign and prove identity.
+NKEYs are sensitive and should be treated as secrets.
+
+-----BEGIN USER NKEY SEED-----
+SU...elided
+------END USER NKEY SEED------
+
+*************************************************************
 ```
 
-Your filesystem should look like this:
+Here, we'll use `wash up` to launch a NATS leaf node connected over TLS to NGS and a wasmCloud host connected to that leaf node. We're going to use the account credentials you just generated to authenticate, and the wasmCloud logs will print directly to the terminal. To do so, we can specify the NGS address as the remote URL and your account credentials as the NATS credsfile:
 
 ```bash
-~/github.com/wasmcloud/examples/ngs/wasmcloud ➜ ls -lah
-Permissions Size User   Date Modified Name
-drwxr-xr-x     - brooks 27 Jun 15:50  bin
-.rw-r--r--   175 brooks 27 Jun 15:48  core.cfg
-.rw-------   977 brooks 27 Jun 15:55  default.creds
-drwxr-xr-x     - brooks 27 Jun 15:50  erts-12.3.1
-drwxr-xr-x     - brooks 27 Jun 15:50  lib
-drwxr-xr-x     - brooks 27 Jun 15:50  releases
+wash up --nats-remote-url tls://connect.ngs.global --nats-credsfile ~/.nkeys/creds/synadia/wasmcloud/default.creds
 ```
-
-Taking a look at the NATS config, you'll see that we're starting a leaf node with the Jetstream domain `core` and will connect over TLS using your account credentials:
-
-```go
-jetstream {
-    domain=core
-}
-leafnodes {
-    remotes = [ 
-        { 
-          url: "tls://connect.ngs.global"
-          credentials: "./default.creds"
-        }
-    ]
-}
-```
-
-You can run NATS with the simple one-liner:
-
-```bash
-nats-server --config core.cfg
-```
-
-You'll see some output including some sweet ASCII art, Jetstream information, and additional information around Jetstream domain mappings [^2]. I've omitted the timestamps for better rendering on this post but they should show for you before each log.
-
-  
-
-```plain
-Starting nats-server
-  Version:  2.8.4
-  Git:      [not set]
-  Name:     NC4QUMEPGQQYZY3UOTN6TNKHCYV67Q7O7NRNMJR37IGQKGZ4MNXCLJUE
-  Node:     1TtKtTGV
-  ID:       NC4QUMEPGQQYZY3UOTN6TNKHCYV67Q7O7NRNMJR37IGQKGZ4MNXCLJUE
-Using configuration file: core.cfg
-Starting JetStream
-    _ ___ _____ ___ _____ ___ ___   _   __  __
- _ | | __|_   _/ __|_   _| _ \ __| /_\ |  \/  |
-| || | _|  | | \__ \ | | |   / _| / _ \| |\/| |
- \__/|___| |_| |___/ |_| |_|_\___/_/ \_\_|  |_|
-
-         https://docs.nats.io/jetstream
-
----------------- JETSTREAM ----------------
-  Max Memory:      12.00 GB
-  Max Storage:     281.11 GB
-  Store Directory: "/var/folders/nz/dl25872x06x5k8bl6cz1rt5c0000gn/T/nats/jetstream"
-  Domain:          core
--------------------------------------------
-Listening for client connections on 0.0.0.0:4222
-Server is ready
-3.19.121.231:7422 - lid:4 - Leafnode connection created for account: $G 
-3.19.121.231:7422 - lid:4 - JetStream Not Extended, adding deny [$JS.API.> $KV.> $OBJ.>] for account "$G"
-3.19.121.231:7422 - lid:4 - Adding JetStream Domain Mapping "$JS.core.API.META.>" -> $JS.API.META.> to account "$G"
-3.19.121.231:7422 - lid:4 - Adding JetStream Domain Mapping "$JS.core.API.SERVER.>" -> $JS.API.SERVER.> to account "$G"
-...
-```
-
-Now, launch a separate terminal window and use it to launch wasmCloud with the `core` jetstream domain:
-
-```bash
-WASMCLOUD_JS_DOMAIN=core ./bin/wasmcloud_host foreground
-```
-{{< aside >}}If you're on **Windows**, you can run this same command with the Powershell environment syntax:
-```powershell
-$env:WASMCLOUD_JS_DOMAIN='core'; .\bin\wasmcloud_host foreground
-```
-{{< /aside >}}
 
 You should see output like the following:
+
 ```plain
-17:13:01.549 [info] Using JetStream domain: core
-17:13:02.717 [info] Wrote "./host_config.json"
-17:13:02.719 [info] Wrote "/Users/brooks/.wash/host_config.json"
-17:13:02.722 [info] Connecting to control interface NATS without authentication
-17:13:02.722 [info] Connecting to lattice rpc NATS without authentication
-17:13:02.723 [info] Host NAWSYD7S4G5HUQ4T5BW2UR3ARYAPNW2W2KNHDRMXTJFKGBNAK6UPMVII (winter-feather-2030) started.
-17:13:02.724 [info] Valid cluster signers: CBPH74Z2PH62PJ5QWVKMJKI22EV4O2IRHKVULDZBAO35CUP6V67FXPTH
-17:13:02.724 [warning] WARNING. You are using an ad hoc generated cluster seed.
+🏃 Running in interactive mode, your host is running at http://localhost:4000
+🚪 Press `CTRL+c` at any time to exit
+11:37:41.559 [info] Wrote "./host_config.json"
+11:37:41.560 [info] Wrote "/Users/brooks/.wash/host_config.json"
+11:37:41.560 [info] Connecting to control interface NATS without authentication
+11:37:41.560 [info] Connecting to lattice rpc NATS without authentication
+11:37:41.560 [info] Host NATWVDH3WZHYQQG3GFXPGRW5IAF5O4YCTMZ66LIM2WRSIVRDOTMIWN5Y (morning-moon-3881) started.
+11:37:41.560 [info] Valid cluster signers: CD263EGQIG4DKCZAYV6ZMDAX3LOV4PKEGNCZF2THIYONC7W4CAXELVZZ
+11:37:41.560 [warning] WARNING. You are using an ad hoc generated cluster seed.
 For any other host or CLI tool to communicate with this host,
 you MUST copy the following seed key and use it as the value
 of the WASMCLOUD_CLUSTER_SEED environment variable:
 
-SCAKOR4ZZR7DKEHEZ47TFAODPHTHPUGQST4A4IN2OD55WD7IHMWWKGOGMY
+SCAGI4US72YWQT6TAJBCK77XSOAJMWI5PCG5MICC3FWNRFQLHE53BEZIFU
 
 You must also ensure the following cluster signer is in the list of valid
 signers for any new host you start:
 
-CBPH74Z2PH62PJ5QWVKMJKI22EV4O2IRHKVULDZBAO35CUP6V67FXPTH
+CD263EGQIG4DKCZAYV6ZMDAX3LOV4PKEGNCZF2THIYONC7W4CAXELVZZ
 
 
-17:13:02.803 [info] Started wasmCloud OTP Host Runtime
-17:13:02.805 [info] Running WasmcloudHostWeb.Endpoint with cowboy 2.9.0 at :::4000 (http)
-17:13:02.807 [info] Access WasmcloudHostWeb.Endpoint at http://localhost:4000
-17:13:02.907 [info] Lattice cache stream created or verified as existing (0 consumers).
-17:13:02.907 [info] Attempting to create ephemeral consumer (cache loader)
-17:13:02.912 [info] Created ephemeral consumer for lattice cache loader
+11:37:41.564 [info] Started wasmCloud OTP Host Runtime
+11:37:41.566 [info] Running WasmcloudHostWeb.Endpoint with cowboy 2.9.0 at 0.0.0.0:4000 (http)
+11:37:41.567 [info] Access WasmcloudHostWeb.Endpoint at http://localhost:4000
+11:37:41.665 [info] Lattice cache stream created or verified as existing (0 consumers).
+11:37:41.665 [info] Attempting to create ephemeral consumer (cache loader)
+11:37:41.667 [info] Created ephemeral consumer for lattice cache loader
 ```
 
-You now have a running wasmCloud host using NGS as the lattice infrastructure! Note that in this same directory there is now a `host_config.json` file which contains all of the configuration values we used to launch this host. We'll come back to that file a little later.
+From this command output, go ahead and save your 58 character cluster seed starting with **SC** (it will be different than the seed in the sample output above). We're going to use it again later.
 
-  
+You now have a running wasmCloud host using NGS as the lattice infrastructure! Even though we're connected to NGS, our leaf node is smart enough to always route traffic locally if possible, saving the overhead of a remote network hop. This is key for enabling wasmCloud to function even if you lose connectivity to NGS briefly, all actors and providers on a host will continue as if nothing happened.
 
 We can continue by deploying our ngs application from the examples repository which consists of: our DogsAndCats actor, a capability provider that implements the `wasmcloud:httpserver` contract and a capability provider that implements the `wasmcloud:httpclient` contract, both of which we provide as wasmCloud first-party providers but could be swapped to any other implementation at runtime.
 
@@ -250,87 +172,27 @@ wash ctl start provider wasmcloud.azurecr.io/httpclient:0.4.0
 
 Once everything completes, check out a pet picture at [http://127.0.0.1:8081](http://127.0.0.1:8081)! You can refresh to your heart's desire to see pictures of cats and dogs, and you've deployed your application on wasmCloud.
 
-  
-
 [^2]: When using Jetstream domains, NATS maps some internally used topics to use the topic specific to that Jetstream domain. At the wasmCloud level, this would enable you to reuse the same NATS infrastructure on completely different domains and lattice prefixes for multi-tenancy, but it's not necessary to know these details for today's example.
-
-  
 
 # Turning the Knob from Local to Global
 
-For this step you're going to need another computer. This can be a Cloud VM, a Docker container, or even your friends laptop. The architecture can be x86\_64 or aarch64, and the operating system can be Macos, Windows, or Linux. The instructions are all the same regardless of your choice (thanks WebAssembly!) For today, I chose to do this on a Google Cloud Platform e2 micro instance which is included in their [free](https://cloud.google.com/free) tier.
+For this step you're going to need another computer. This can be a Cloud VM, a Docker container, or even your friends laptop. The architecture can be x86_64 or aarch64, and the operating system can be Macos, Windows, or Linux. The instructions are all the same regardless of your choice (thanks WebAssembly!) For today, I chose to do this on a Google Cloud Platform e2 micro instance which is included in their [free](https://cloud.google.com/free) tier.
 
-  
-
-You'll want to get terminal access to to your new machine and then follow the wasmCloud [installation guide](https://wasmcloud.dev/overview/installation/) to download `nats-server` and the wasmCloud host. You don't need `wash` installed on that machine. Once you've done that, upload (copy/paste) the following files up to your second machine:
-
-### **extender.cfg**
-
-Found [here](https://github.com/wasmCloud/examples/tree/main/ngs/extender.cfg), this config looks like:
-
-```go
-jetstream {
-    domain=extender
-}
-leafnodes {
-    remotes = [ 
-        { 
-          url: "tls://connect.ngs.global"
-          credentials: "./default.creds"
-        }
-    ]
-}
-```
+You'll want to get terminal access to to your new machine and then follow the wasmCloud [installation guide](https://wasmcloud.dev/overview/installation/) `wash` as you did before. You'll need a few pieces of information to ensure this host can properly join your lattice:
 
 ### **default.creds**
 
-This is the same set of credentials you used in the previous step, located under `~/.nkeys/creds/synadia/wasmcloud/default.creds` if your account name is `wasmcloud`.
+This is the same set of credentials you used in the previous step, located under `~/.nkeys/creds/synadia/wasmcloud/default.creds` if your account name is `wasmcloud`. The values contained inside of the credsfile can be supplied manually to connect, but for simplicity we recommend just copying it over to your second machine.
 
-  
+### **Cluster Seed**
 
-### **host\_config.json**
+wasmCloud uses a cluster seed to sign and verify each invocation (e.g. `HttpServer.HandleRequest`) in wasmCloud. This is a part of wasmCloud's [zero-trust security model](https://wasmcloud.dev/app-dev/secure/clusterkeys/) and any invocations that aren't signed with a verified issuer (e.g. from an unknown host) will be denied before it even reaches the actor / provider. This can be found in the output of your `wash up` command that you ran earlier as the 58 character seed starting with **SC**.
 
-This was automatically created for you once you launched the host on your local machine. This file contains a few different values that are important for running multiple wasmCloud hosts in the same lattices:
-
-1.  `js_domain` to ensure all hosts are registering consumers for the same Jetstream domain
-2.  `lattice_prefix` to ensure all actors and providers subscribe to the same topics
-3.  `cluster_seed` & `cluster_issuers` to sign and verify each invocation in wasmCloud. This is required as wasmCloud operates with a [zero-trust security model](https://wasmcloud.dev/app-dev/secure/clusterkeys/) and any invocations that aren't signed with a verified issuer will be denied before it even reaches the actor / provider.
-
-  
-
-Once you've copied over your files, your file tree should look something like this:
+Other than that, both hosts will use the default values from `wash up` like the JetStream domain (core) and lattice prefix (default). You can run the following command to launch your second host, which specifies a label, the cluster seed, and a separate JetStream domain for the _leaf node_ to allow your locally launched host to remain as the "primary" node:
 
 ```bash
-brooks@instance-2:~/wasmcloud$ ls -lah
-total 12M
-drwxr-xr-x  6 brooks brooks 4.0K Jun 29 15:35 .
-drwxr-xr-x  6 brooks brooks 4.0K Jun 29 15:34 ..
-drwxr-xr-x  2 brooks brooks 4.0K Jun 29 15:32 bin
--rw-r--r--  1 brooks brooks  978 Jun 29 15:35 default.creds
-drwxr-xr-x  8 brooks brooks 4.0K Jun 29 15:32 erts-12.3.2
--rw-r--r--  1 brooks brooks  176 Jun 29 15:35 extender.cfg
--rw-r--r--  1 brooks brooks  590 Jun 29 15:35 host_config.json
-drwxr-xr-x 63 brooks brooks 4.0K Jun 29 15:32 lib
--rwxr-xr-x  1 brooks brooks  12M Jun 29 15:35 nats-server
-drwxr-xr-x  3 brooks brooks 4.0K Jun 29 15:32 releases
+HOST_machine=second wash up --nats-remote-url tls://connect.ngs.global --nats-credsfile ./default.creds --cluster-seed SCAGI4US72YWQT6TAJBCK77XSOAJMWI5PCG5MICC3FWNRFQLHE53BEZIFU --nats-js-domain extender --wasmcloud-js-domain core
 ```
-
-We can now start NATS in the background so that you don't need to `ssh` again:
-
-```bash
-nats-server --config extender.cfg 2> nats_logs.txt
-```
-
-And then your wasmCloud host (with a label so we can easily differentiate it):
-
-```bash
-HOST_machine=second ./bin/wasmcloud_host foreground
-```
-{{< aside >}}If you're on **Windows**, you can run this same command with the Powershell environment syntax:
-```powershell
-$env:HOST_machine='second'; .\bin\wasmcloud_host foreground
-```
-{{< /aside >}}
 
 You should see a similar dump of logs, but notably you should see that you are connecting to a stream with one consumer (your local machine)
 
@@ -342,7 +204,7 @@ And now, on your local machine, check out [http://localhost:4000](http://localho
 
 ![](../../images/blogs/ngs-global/dashboard.png)
 
-We can go ahead and schedule a few extra replicas of the DogsAndCats actor on the cloud host and an HTTPClient provider using `wash` or by using the dashboard.
+We can go ahead and schedule a few extra replicas of the DogsAndCats actor on the cloud host and an HTTPClient provider using `wash` or by using the dashboard. These commands can be run with `wash` on either machine, the result is the same!
 
 ```bash
 # The constraint flag ensures we start on a host with that label
@@ -359,6 +221,5 @@ In this guide we used NGS and NATS Leaf Nodes to connect two wasmCloud hosts; on
 We used the NGS free tier to simplify the infrastructure setup, though it's worth noting that NGS is not a required component of this architecture. You can replace NGS with any NATS [cluster](https://docs.nats.io/running-a-nats-service/configuration/clustering) and the result is the same, there's no required cost to connect more than two hosts together.
 
 If you'd like to see the next level of this NGS + Leaf Node setup with wasmCloud, check out [Disrupting the Downtime Continuum](https://www.youtube.com/watch?v=wjwKmq16shI) the talk Taylor and I gave last KubeCon EU where we used these instructions with one more leaf node and demonstrated live fail over between clouds with wasmCloud.
-  
 
 We're looking forward to seeing what you can do with this guide! If you give this a try and do something awesome or need any assistance, join our community [Slack](https://slack.wasmcloud.com/) or open an issue on our wasmCloud [repository](https://github.com/wasmCloud/wasmCloud).
