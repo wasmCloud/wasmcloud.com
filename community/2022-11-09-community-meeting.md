@@ -9,6 +9,7 @@ tags: [community, meeting]
 ### Agenda
 
 - Demonstrate new docusaurus homepage with blogs and documentation
+- Demonstrate `wash down`, cleanup counterpart to `wash up`
 - Discuss agenda and community meeting notes
 - Revisiting project-template GitHub Actions for monorepo development with @Stephen Andary
 
