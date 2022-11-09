@@ -10,7 +10,7 @@ tags: [community, meeting]
 
 - Demonstrate new docusaurus homepage with blogs and documentation
 - Discuss agenda and community meeting notes
--
+- Revisiting project-template GitHub Actions for monorepo development with @Stephen Andary
 
 <!--truncate-->
 
