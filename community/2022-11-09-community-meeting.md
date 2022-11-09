@@ -8,7 +8,9 @@ tags: [community, meeting]
 
 ### Agenda
 
-- Discuss and review new homepage
+- Demonstrate new docusaurus homepage with blogs and documentation
+- Discuss agenda and community meeting notes
+-
 
 <!--truncate-->
 
