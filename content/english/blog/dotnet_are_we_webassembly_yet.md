@@ -95,7 +95,7 @@ dotnet build
 The first important (and very promising) thing is that we're creating a _regular_ console application. We can't see node.js or any JavaScript from where we're standing, so we're off to a good start. It's worth pointing out that, at least on my Mac, the compiled output from hello world is `9MB`. Compared to Rust's average of `1MB` and smaller, that seems positively enormous. I also didn't see any size shrink between Release and Debug, but the WASI SDK is still experimental, so I suspect this will shrink over time.
 
 {{< aside >}}
-ℹ️ One more thing before moving on. It is important to note that the way this stuff works is that the entire .NET Framework core and its runtime is embedded into the `.wasm` module (you can actually see the `dll`s crammed into a `data` section if you open the file up). So while we can expect things to get smaller and more optimized over time, I don't think we'll ever see .NET `.wasm` files approach the smaller relative size of Rust and Zig binaries because those languages don't require a garbage collector, etc.
+ℹ️ One more thing before moving on. It is important to note that the way this stuff works is that the entire .NET Framework core and its runtime is embedded into the `.wasm` module (you can actually see the `dll`s crammed into a `data` section if you open the file up). So while we can expect things to get smaller and more optimized over time, how small things ultimately end up has a lot to do with how the garbage collection specification gets implemented in WebAssembly and where optimization efforts are focused.
 {{< /aside >}}
 
 In the interest of exploration, I wonder what happens when we try and do `dotnet run` (I'm assuming it should run like any other console/stdio-based WASI module).
