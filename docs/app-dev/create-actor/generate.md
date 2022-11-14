@@ -21,6 +21,7 @@ Note the two lines near the top of the source code file:
 use wasmbus_rpc::actor::prelude::*;
 use wasmcloud_interface_httpserver::{HttpRequest, HttpResponse, HttpServer, HttpServerReceiver};
 ```
+
 This shows us that we're using a core wasmCloud crate called `wasmbus_rpc` and we've also declared a dependency on the `wasmcloud_interface_httpserver` crate. By convention, all first-party wasmCloud interface crates begin with `wasmcloud_interface`.
 
 Just below that, you'll see:
@@ -34,6 +35,7 @@ struct HelloActor {}
 `HelloActor` is the name of your actor - if you chose a different project name, the actor name will include your project name.
 
 The two lines above the actor name invoke Rust macros that generate - at compile time - nearly all of the scaffolding needed to build an actor. The `HealthResponder` term generates a function that automatically responds to health check queries from the wasmCloud host. The `#[services(...)]` line declares the services ('traits', in Rust) that your actor implements, and generates message handling code for those interfaces. All actors implement the `Actor` interface. The `HttpServer` entry declares that the actor will also implement that interface, and requires an implementation of that trait's method: `handle_request`.
+
 ```rust
 #[async_trait]
 impl HttpServer for HelloActor {
@@ -63,6 +65,10 @@ Within the `handle_request` method, the actor receives the HTTP request, and ret
 {{% tab "TinyGo" %}}
 wasmCloud introduced support for generating a TinyGo project in wash `v0.11.0`. We will create an actor that accepts an HTTP request and responds with "Hello World". To create your new actor project, change to the directory where you want the project to be created, and enter the command below. The last term on the command `hello` is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
 
+:::caution
+Due to special opcodes that are introduced in later versions of TinyGo, ensure that you're using TinyGo version 23 and Go 1.18 for an optimal experience. If you get the error message `Wasm Element error: Unknown opcode 252`, this is likely the root cause.
+:::
+
 ```shell
 wash new actor hello --template-name echo-tinygo
 ```
@@ -75,6 +81,7 @@ import (
 	"github.com/wasmcloud/interfaces/httpserver/tinygo"
 )
 ```
+
 This shows us that we're using a core wasmCloud package called `actor-tinygo` and we've also declared a dependency on the `interfaces/httpserver/tinygo` package. All first-party wasmCloud interface packages have this naming convention.
 
 Just below that, you'll see:

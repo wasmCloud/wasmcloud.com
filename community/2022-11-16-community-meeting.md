@@ -6,8 +6,8 @@ tags: [community, meeting]
 
 ### Agenda
 
+- (Demo) `wash up` allowing multiple wasmCloud hosts
 - Discuss .NET WebAssembly ecosystem status
--
 
 <!--truncate-->
 
