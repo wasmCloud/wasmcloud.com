@@ -1,9 +1,12 @@
 ---
 title: "Running the actor"
 date: 2018-12-29T10:00:00+00:00
-weight: 5
+sidebar_position: 5
 draft: false
 ---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
 
 In [Getting started](/docs/getting-started.mdx) you ran an actor from the dashboard UI. Now, we're going to start the actor "the long way" so that you can get a feel for all of the moving parts of the process. Our tooling documentation should help you get actors started more easily, once you've been through this guide.
 
@@ -35,8 +38,8 @@ With both the provider and the actor running, the next step is to _link_ the two
 
 Once you've got the actor's public key, you can export a `HELLO_ACTOR_ID` environment variable with that value and copy-and-paste the link command:
 
-{{% tabs %}}
-{{% tab "Unix" %}}
+<Tabs>
+<TabItem value="unix" label="Unix" default>
 
 ```shell
 # Paste your actor ID after the `=` below (with no space after the `=`)
@@ -47,8 +50,8 @@ export HELLO_ACTOR_ID=
 wash ctl link put ${HELLO_ACTOR_ID} VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver address=0.0.0.0:8087
 ```
 
-{{% /tab %}}
-{{% tab "Windows Powershell" %}}
+  </TabItem>
+  <TabItem value="powershell" label="Powershell" default>
 
 ```powershell
 # Paste your actor ID after the `=` below (with a space after the `=`)
@@ -59,8 +62,8 @@ $env:HELLO_ACTOR_ID =
 wash ctl link put $env:HELLO_ACTOR_ID VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver address=0.0.0.0:8087
 ```
 
-{{% /tab %}}
-{{% /tabs %}}
+  </TabItem>
+</Tabs>
 
 At this point your HTTP server capability provider has been notified that a link definition was created, and it started the corresponding web server listening on port `8087`. You can now hit that endpoint and exercise the code you just wrote:
 

@@ -1,7 +1,7 @@
 ---
 title: "Calling the provider from an actor"
 date: 2018-12-29T11:02:05+06:00
-weight: 9
+sidebar_position: 9
 draft: false
 ---
 
@@ -13,11 +13,11 @@ There are a couple of different approaches here, with their own pros and cons.
 
 We could create a new actor called `PaymentsActor` that links to an HTTP server capability provider, offering up a RESTful interface like this:
 
-| URI | Method | Description |
-| :--- | :--- | :--- |
-| `/methods` | GET | Retrieve payment methods for current user |
-| `/auth` | POST | Attempt to authorize a payment |
-| `/pay` | POST | Complete a previously authorized payment |
+| URI        | Method | Description                               |
+| :--------- | :----- | :---------------------------------------- |
+| `/methods` | GET    | Retrieve payment methods for current user |
+| `/auth`    | POST   | Attempt to authorize a payment            |
+| `/pay`     | POST   | Complete a previously authorized payment  |
 
 On the surface, this seems like a decent idea. What's wrong with it? The main problem is we haven't actually added any value. Instead, we've just created a proxy (or _facade_ or _pass-through_ depending on which phrase you like most) for the payments provider. This has the net effect of requiring that any consumer of this actor needs to be aware of the authorize-then-pay-with-valid-token order of operations of the payments provider contract.
 
@@ -64,7 +64,8 @@ async fn checkout(&self, ctx: &Context, order: &Order) -> RpcResult<()> {
 
 In the preceding sample, any (authorized) actor could simply perform an actor-to-actor invocation using the shared actor interface in the `commerce` crate to trigger a shopping cart checkout, which in turn makes use of the payment capability provider, all without any actor developer ever having to know how payments are processed in production, and, even better, allowing actor developers to simulate arbitrary payment environments for unit tests, acceptance tests, and feedback loop/REPL experimentation on their workstation.
 
-#### ⚠️  Note
+:::caution
 Make sure your actor is signed by adding `wasmcloud:examples:payments` to the CLAIMS declaration in the actor project's Makefile, or your actor(s) will not be authorized to link with or communicate with the provider we wrote.
+:::
 
 [^1]: _better_ is of course, subjective. Your needs and mileage may vary.

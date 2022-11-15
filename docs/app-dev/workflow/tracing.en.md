@@ -1,16 +1,16 @@
 ---
 title: "OpenTelemetry Tracing"
 date: 2022-07-11T09:02:05+06:00
-weight: 2
+sidebar_position: 2
 draft: false
 ---
 
 Support for exporting traces was added in version `0.55.0` of the wasmCloud host. This can be _extremely_ useful for debugging, benchmarking, and developing wasmCloud applications due to the highly distributed nature of wasmCloud. If you haven't used [OpenTelemetry](https://opentelemetry.io/)(OTEL) before, the [Distributed Traces](https://opentelemetry.io/docs/concepts/observability-primer/#distributed-traces) section of the OTEL documentation is useful for prerequisite knowledge.
 
 The most applicable bit is:
-{{< aside >}}
+:::note
 A **Distributed Trace**, more commonly known as a **Trace**, records the paths taken by requests (made by an application or end-user) as they propagate through multi-service architectures, like microservice and serverless applications.
-{{< /aside>}}
+:::
 
 As of [wasmbus-rpc v0.9](https://crates.io/crates/wasmbus-rpc) the feature `otel` can be enabled for any capability providers. Once enabled functions can be instrumented to provide traces through your custom provider. wasmCloud first-party providers already have this feature enabled and functions instrumented, and actors do not need to do any additional work to take advantage of OTEL.
 

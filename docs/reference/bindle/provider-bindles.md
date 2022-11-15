@@ -1,7 +1,7 @@
 ---
 title: "Creating a Bindle for a Provider"
 date: 2021-12-29T11:02:05+06:00
-weight: 3
+sidebar_position: 3
 draft: false
 ---
 
@@ -103,14 +103,14 @@ size = 1191
 memberOf = ["jwt"]
 ```
 
-NOTE: The group names and the `parcel.label.feature.wasmcloud` feature are REQUIRED for use in
-wasmCloud
+:::caution
+The group names and the `parcel.label.feature.wasmcloud` feature are REQUIRED for use in wasmCloud
+:::
 
 ## Adding groups
 
 At the very end of the `invoice.toml`, you'll need to actually define the two groups the parcels are
 referring to. This content can be copy/pasted verbatim:
-
 
 ```toml
 [[group]]
@@ -137,7 +137,7 @@ docs](https://github.com/deislabs/bindle/blob/main/docs/signing-spec.md).
 The first thing you'll need to push is your invoice:
 
 ```console
-$ bindle push-invoice invoice.toml 
+$ bindle push-invoice invoice.toml
 Invoice wasmcloud.dev/httpserver/0.14.7 created
 ```
 
@@ -148,13 +148,13 @@ Once pushed, you can push all your binary files like so (assuming all of your bi
 extension of `.bin`):
 
 ```console
-$ ls subdir/*.bin | xargs -I {} bindle push-file wasmcloud.dev/httpserver/0.14.7 {} 
+$ ls subdir/*.bin | xargs -I {} bindle push-file wasmcloud.dev/httpserver/0.14.7 {}
 ```
 
 Then you can push the claims:
 
 ```console
-$ bindle push-file wasmcloud.dev/httpserver/0.14.7 subdir/claims.jwt 
+$ bindle push-file wasmcloud.dev/httpserver/0.14.7 subdir/claims.jwt
 ```
 
 Whew! You made it!

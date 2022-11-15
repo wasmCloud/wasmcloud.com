@@ -1,13 +1,14 @@
 ---
 title: "Testing the actor (Rust)"
 date: 2018-12-29T10:00:00+00:00
-weight: 8
+sidebar_position: 8
 draft: false
 ---
 
 Now that your actor project is generated we can write a simple unit test to verify its functionality. We want to ensure that our logic to parse the query string for a name and return `Hello <name>` is correct.
 
 Right now, our actor is laid out in a way that is difficult to test properly. Let's look at the function signature inside of the `impl` block:
+
 ```rust
 async fn handle_request(
     &self,
@@ -58,6 +59,7 @@ fn handle_http_request(req: &HttpRequest) -> std::result::Result<HttpResponse, R
 ```
 
 Moving the bulk of our business logic to a synchronous, stateless function makes it much easier to test. Now that we've done the above refactor, we can paste the following code at the bottom of the file:
+
 ```rust
 #[cfg(test)]
 mod test {
@@ -92,28 +94,30 @@ This test `can_handle_request` constructs an `HttpRequest` object and passes it 
 
 To run this test, use the following command:
 
-{{% tabs %}}
-{{% tab "Unix" %}}
+<Tabs>
+  <TabItem value="unix" label="Unix" default>
 
 ```shell
 # Override wasm32-unknown-unknown with default rustc target
 cargo test --target=$(rustc -vV | awk '/host:/ {print $2}')
 ```
 
-{{% /tab %}}
-{{% tab "Windows" %}}
+  </TabItem>
+  <TabItem value="windows" label="Windows" default>
 
 ```powershell
 # Override wasm32-unknown-unknown with default rustc target
 cargo test --target=$(rustc -vV | Select-String "host" | Out-String | ForEach-Object { $_.Split(':')[1] })
 ```
 
-{{% /tab %}}
-{{% tab "Other" %}}
+  </TabItem>
+  <TabItem value="other" label="Other" default>
 Running this test requires you to override the default `wasm32-unknown-unknown` target that is used to build actor WebAssembly modules. You can find your default target by running `rustc -vV` and looking for the `host:` entry, or by running `rustup default` and removing `stable-` or `nightly-` from the output.
+
 ```shell
 # e.g. cargo test --target=x86_64-unknown-linux-gnu
 cargo test --target=<your_native_target>
 ```
-{{% /tab %}}
-{{% /tabs %}}
+
+  </TabItem>
+</Tabs>

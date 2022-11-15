@@ -1,35 +1,38 @@
 ---
 title: "Customizing the actor"
 date: 2018-12-29T09:00:00+00:00
-weight: 6
+sidebar_position: 6
 draft: false
 ---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
 
 ### Prerequisites
 
 To use the hot reloading feature you'll need to install one more [utility](https://github.com/falood/file_system#system-support) to ensure the host can monitor your actor file for changes. The following instructions for your operating system will ensure you are ready for the next section.
 
-{{% tabs %}}
-{{% tab "Ubuntu/Debian" %}}
+<Tabs>
+  <TabItem value="ubuntudebian" label="Ubuntu/Debian" default>
 
 ```shell
 apt-get install inotify-tools
 ```
 
-{{% /tab %}}
-{{% tab "Fedora" %}}
+  </TabItem>
+  <TabItem value="fedora" label="Fedora" default>
 
 ```shell
 yum install inotify-tools
 ```
 
-{{% /tab %}}
-{{% tab "Linux" %}}
+  </TabItem>
+  <TabItem value="other" label="Other Linux" default>
 
 Refer to https://github.com/inotify-tools/inotify-tools/wiki#inotify-tools to find your package manager of choice's instructions
 
-{{% /tab %}}
-{{% tab "MacOS" %}}
+  </TabItem>
+  <TabItem value="macos" label="Macos" default>
 
 Ensure you've run `xcode-select --install` which installs all necessary tools. You'll get the following message if you've already run this command:
 
@@ -37,18 +40,18 @@ Ensure you've run `xcode-select --install` which installs all necessary tools. Y
 xcode-select: error: command line tools are already installed, use "Software Update" to install updates
 ```
 
-{{% /tab %}}
-{{% tab "Windows" %}}
+  </TabItem>
+  <TabItem value="windows" label="Windows" default>
 
 Refer to https://github.com/thekid/inotify-win#inotify-win for Windows instructions.
 
-{{% /tab %}}
-{{% tab "Docker" %}}
+  </TabItem>
+  <TabItem value="docker" label="Docker" default>
 
 We don't currently recommend hot reloading with Docker as the container filesystem is not the same as your development machine's filesystem. Technically this could be accomplished with a filesystem mount, though this introduces a few variables and we highly recommend using local development with [wash](/docs/installation.mdx) instead.
 
-{{% /tab %}}
-{{% /tabs %}}
+  </TabItem>
+</Tabs>
 
 ### Setting up Hot Reloading
 

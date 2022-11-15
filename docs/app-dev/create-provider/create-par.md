@@ -1,7 +1,7 @@
 ---
 title: "Creating a provider archive"
 date: 2018-12-29T11:02:05+06:00
-weight: 8
+sidebar_position: 8
 draft: false
 ---
 
@@ -25,9 +25,10 @@ If you'd like to use alternative keys, you can supply them as a flag.
 Successfully created archive build/fakepay_provider.par.gz
 ```
 
-#### ⚠️ Note
+:::caution
 
 The `wash` command creates a private issuer _seed key_ if there isn't one already. Additionally, it generates a _seed key_ for the provider archive itself, and stores it in a file called `fakepay_provider_service.nk`. The `wash` CLI will continue to re-use these keys for signing future versions of this provider archive - Keep all keys secret - they are used by the lattice to know that updates were created by the same author as the original When you move your provider to production you will want to pass explicit paths to the signing keys so that you can control the `issuer` and `subject` fields of the embedded token.
+:::
 
 We can use `wash` to inspect a provider archive as well (primary key has been truncated to fit documentation):
 

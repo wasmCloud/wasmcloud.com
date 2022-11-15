@@ -54,7 +54,7 @@ export default [
   },
   {
     path: '/community',
-    component: ComponentCreator('/community', '821'),
+    component: ComponentCreator('/community', '47c'),
     exact: true
   },
   {
@@ -65,6 +65,11 @@ export default [
   {
     path: '/community/2022/11/09/community-meeting',
     component: ComponentCreator('/community/2022/11/09/community-meeting', '566'),
+    exact: true
+  },
+  {
+    path: '/community/2022/11/16/community-meeting',
+    component: ComponentCreator('/community/2022/11/16/community-meeting', 'e1f'),
     exact: true
   },
   {
@@ -79,12 +84,12 @@ export default [
   },
   {
     path: '/community/tags/community',
-    component: ComponentCreator('/community/tags/community', '458'),
+    component: ComponentCreator('/community/tags/community', '449'),
     exact: true
   },
   {
     path: '/community/tags/meeting',
-    component: ComponentCreator('/community/tags/meeting', '251'),
+    component: ComponentCreator('/community/tags/meeting', '5c3'),
     exact: true
   },
   {
@@ -104,23 +109,29 @@ export default [
   },
   {
     path: '/docs',
-    component: ComponentCreator('/docs', '932'),
+    component: ComponentCreator('/docs', '353'),
     routes: [
       {
         path: '/docs/app-dev/',
-        component: ComponentCreator('/docs/app-dev/', '28b'),
+        component: ComponentCreator('/docs/app-dev/', '4b9'),
         exact: true,
         sidebar: "defaultSidebar"
       },
       {
         path: '/docs/app-dev/a2a/',
-        component: ComponentCreator('/docs/app-dev/a2a/', '47a'),
+        component: ComponentCreator('/docs/app-dev/a2a/', 'dc7'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/app-dev/create-actor/',
+        component: ComponentCreator('/docs/app-dev/create-actor/', '1ca'),
         exact: true,
         sidebar: "defaultSidebar"
       },
       {
         path: '/docs/app-dev/create-actor/generate',
-        component: ComponentCreator('/docs/app-dev/create-actor/generate', 'a85'),
+        component: ComponentCreator('/docs/app-dev/create-actor/generate', 'cc7'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -144,7 +155,7 @@ export default [
       },
       {
         path: '/docs/app-dev/create-provider/',
-        component: ComponentCreator('/docs/app-dev/create-provider/', '2f3'),
+        component: ComponentCreator('/docs/app-dev/create-provider/', '405'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -179,20 +190,32 @@ export default [
         sidebar: "defaultSidebar"
       },
       {
-        path: '/docs/app-dev/debugging/actors.en',
-        component: ComponentCreator('/docs/app-dev/debugging/actors.en', 'f23'),
+        path: '/docs/app-dev/debugging/',
+        component: ComponentCreator('/docs/app-dev/debugging/', '50b'),
         exact: true,
         sidebar: "defaultSidebar"
       },
       {
-        path: '/docs/app-dev/debugging/host.en',
-        component: ComponentCreator('/docs/app-dev/debugging/host.en', '628'),
+        path: '/docs/app-dev/debugging/actors',
+        component: ComponentCreator('/docs/app-dev/debugging/actors', '7e7'),
         exact: true,
         sidebar: "defaultSidebar"
       },
       {
-        path: '/docs/app-dev/debugging/providers.en',
-        component: ComponentCreator('/docs/app-dev/debugging/providers.en', '114'),
+        path: '/docs/app-dev/debugging/host',
+        component: ComponentCreator('/docs/app-dev/debugging/host', 'fc5'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/app-dev/debugging/providers',
+        component: ComponentCreator('/docs/app-dev/debugging/providers', 'e6b'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/app-dev/secure/',
+        component: ComponentCreator('/docs/app-dev/secure/', '9a4'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -216,7 +239,7 @@ export default [
       },
       {
         path: '/docs/app-dev/workflow/',
-        component: ComponentCreator('/docs/app-dev/workflow/', 'd36'),
+        component: ComponentCreator('/docs/app-dev/workflow/', 'd41'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -227,20 +250,8 @@ export default [
         sidebar: "defaultSidebar"
       },
       {
-        path: '/docs/category/app-development',
-        component: ComponentCreator('/docs/category/app-development', '0f8'),
-        exact: true,
-        sidebar: "defaultSidebar"
-      },
-      {
-        path: '/docs/category/bindle',
-        component: ComponentCreator('/docs/category/bindle', '729'),
-        exact: true,
-        sidebar: "defaultSidebar"
-      },
-      {
-        path: '/docs/category/host-runtime',
-        component: ComponentCreator('/docs/category/host-runtime', '271'),
+        path: '/docs/category/alternate-install-methods',
+        component: ComponentCreator('/docs/category/alternate-install-methods', 'dc1'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -264,7 +275,7 @@ export default [
       },
       {
         path: '/docs/interfaces/',
-        component: ComponentCreator('/docs/interfaces/', '910'),
+        component: ComponentCreator('/docs/interfaces/', '9fe'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -288,7 +299,7 @@ export default [
       },
       {
         path: '/docs/interfaces/tips/',
-        component: ComponentCreator('/docs/interfaces/tips/', '50d'),
+        component: ComponentCreator('/docs/interfaces/tips/', '925'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -335,20 +346,20 @@ export default [
         sidebar: "defaultSidebar"
       },
       {
-        path: '/docs/overview/installation/install-with-docker',
-        component: ComponentCreator('/docs/overview/installation/install-with-docker', 'bfd'),
-        exact: true,
-        sidebar: "defaultSidebar"
-      },
-      {
-        path: '/docs/overview/installation/manual-install',
-        component: ComponentCreator('/docs/overview/installation/manual-install', 'f82'),
-        exact: true,
-        sidebar: "defaultSidebar"
-      },
-      {
         path: '/docs/platform-builder/',
-        component: ComponentCreator('/docs/platform-builder/', '29b'),
+        component: ComponentCreator('/docs/platform-builder/', 'e6e'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/platform-builder/bare-metal/',
+        component: ComponentCreator('/docs/platform-builder/bare-metal/', '8fc'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/platform-builder/custom-host/',
+        component: ComponentCreator('/docs/platform-builder/custom-host/', '51b'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -359,8 +370,50 @@ export default [
         sidebar: "defaultSidebar"
       },
       {
+        path: '/docs/platform-builder/docker/',
+        component: ComponentCreator('/docs/platform-builder/docker/', '4e9'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/platform-builder/k8s/',
+        component: ComponentCreator('/docs/platform-builder/k8s/', '14d'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/platform-builder/lattice-deploy/',
+        component: ComponentCreator('/docs/platform-builder/lattice-deploy/', '2da'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
         path: '/docs/platform-builder/oci/',
-        component: ComponentCreator('/docs/platform-builder/oci/', '9a0'),
+        component: ComponentCreator('/docs/platform-builder/oci/', '834'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/platform-builder/openfaas/',
+        component: ComponentCreator('/docs/platform-builder/openfaas/', 'cc2'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/reference/alternate-install-methods/install-with-docker',
+        component: ComponentCreator('/docs/reference/alternate-install-methods/install-with-docker', 'cee'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/reference/alternate-install-methods/manual-install',
+        component: ComponentCreator('/docs/reference/alternate-install-methods/manual-install', 'ab0'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/reference/bindle/',
+        component: ComponentCreator('/docs/reference/bindle/', '561'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -384,7 +437,7 @@ export default [
       },
       {
         path: '/docs/reference/host-runtime/',
-        component: ComponentCreator('/docs/reference/host-runtime/', '3f9'),
+        component: ComponentCreator('/docs/reference/host-runtime/', 'a80'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -456,7 +509,7 @@ export default [
       },
       {
         path: '/docs/reference/lattice-protocols/',
-        component: ComponentCreator('/docs/reference/lattice-protocols/', '3eb'),
+        component: ComponentCreator('/docs/reference/lattice-protocols/', '906'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -480,7 +533,7 @@ export default [
       },
       {
         path: '/docs/reference/lattice/',
-        component: ComponentCreator('/docs/reference/lattice/', '1e8'),
+        component: ComponentCreator('/docs/reference/lattice/', '0aa'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -527,6 +580,24 @@ export default [
         sidebar: "defaultSidebar"
       },
       {
+        path: '/docs/reference/official-oci/',
+        component: ComponentCreator('/docs/reference/official-oci/', 'eaa'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/reference/refapps/',
+        component: ComponentCreator('/docs/reference/refapps/', 'a23'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
+        path: '/docs/reference/wadm/',
+        component: ComponentCreator('/docs/reference/wadm/', '974'),
+        exact: true,
+        sidebar: "defaultSidebar"
+      },
+      {
         path: '/docs/reference/wadm/api',
         component: ComponentCreator('/docs/reference/wadm/api', 'b61'),
         exact: true,
@@ -552,7 +623,7 @@ export default [
       },
       {
         path: '/docs/reference/wash/',
-        component: ComponentCreator('/docs/reference/wash/', '909'),
+        component: ComponentCreator('/docs/reference/wash/', '72b'),
         exact: true,
         sidebar: "defaultSidebar"
       },
@@ -564,7 +635,7 @@ export default [
       },
       {
         path: '/docs/reference/wasmbus/',
-        component: ComponentCreator('/docs/reference/wasmbus/', '847'),
+        component: ComponentCreator('/docs/reference/wasmbus/', '431'),
         exact: true,
         sidebar: "defaultSidebar"
       },

@@ -1,7 +1,7 @@
 ---
 title: "Combining capabilities"
 date: 2018-12-29T11:02:05+06:00
-weight: 4
+sidebar_position: 4
 draft: false
 ---
 
@@ -19,7 +19,7 @@ Let's take a look at how little code it takes to interact with a robust key-valu
 #[async_trait]
 impl HttpServer for KvCounterActor {
   async fn handle_request(
-    &self, 
+    &self,
     ctx: &Context,
     req: &HttpRequest) -> RpcResult<HttpResponse> {
 
@@ -34,7 +34,7 @@ impl HttpServer for KvCounterActor {
         .unwrap_or(1);
 
     // increment the value in kv and send response in json
-    let (body, status_code) = 
+    let (body, status_code) =
         match increment_counter(ctx, key, amount).await {
             Ok(v) => (json!({ "counter": v }).to_string(), 200),
             // if we caught an error, return it to client

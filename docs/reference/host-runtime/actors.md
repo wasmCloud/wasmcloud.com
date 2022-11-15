@@ -1,7 +1,7 @@
 ---
 title: "Actors"
 date: 2018-12-29T11:02:05+06:00
-weight: 4
+sidebar_position: 4
 draft: false
 ---
 

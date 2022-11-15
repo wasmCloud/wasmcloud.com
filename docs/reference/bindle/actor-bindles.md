@@ -1,7 +1,7 @@
 ---
 title: "Creating a Bindle for an Actor"
 date: 2021-12-29T11:02:05+06:00
-weight: 4
+sidebar_position: 4
 draft: false
 ---
 
@@ -76,11 +76,10 @@ that for real use cases (basically if you are doing anything outside of simple t
 sign the invoice using `bindle sign`. More information on signing can be found in the [Bindle
 docs](https://github.com/deislabs/bindle/blob/main/docs/signing-spec.md).
 
-
 The first thing you'll need to push is your invoice:
 
 ```console
-$ bindle push-invoice invoice.toml 
+$ bindle push-invoice invoice.toml
 Invoice wasmcloud.dev/echo/0.3.2 created
 ```
 
@@ -88,7 +87,7 @@ You'll want to copy the bindle ID (`wasmcloud.dev/echo/0.3.2`) from above to use
 to push the actor:
 
 ```console
-$ bindle push-file wasmcloud.dev/echo/0.3.2 build/echo_s.wasm 
+$ bindle push-file wasmcloud.dev/echo/0.3.2 build/echo_s.wasm
 ```
 
 Whew! You made it!

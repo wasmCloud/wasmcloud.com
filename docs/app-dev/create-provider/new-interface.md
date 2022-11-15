@@ -1,7 +1,7 @@
 ---
 title: "Creating an interface"
 date: 2018-12-29T11:02:05+06:00
-weight: 6
+sidebar_position: 6
 draft: false
 ---
 
@@ -15,7 +15,7 @@ When designing our interface for the payments capability, we need to clearly def
 
 - **AuthorizePayment** - Validates that a potential payment transaction can go through. If this succeeds then we should assume it is safe to complete a payment. Payments _cannot_ be completed without getting a validation code (in other words, all payments must be pre-authorized).
 - **CompletePayment** - Completes a previously authorized payment. This operation requires the "authorization code" from a successful authorization operation.
-- **GetPaymentMethods** - Retrieves an _opaque_ list of payment methods, which is a list of customer-facing method names and the _[tokens](https://en.wikipedia.org/wiki/Tokenization_(data*security))* belonging to that payment method. You could think of this list as a previously saved list of payment methods stored in a "wallet". A payment method _token_ is required to authorize and subsequently complete a payment transaction. A customer may have stored multiple tokens in their wallet with familiar labels such as "family credit card", "business account", etc.
+- **GetPaymentMethods** - Retrieves an _opaque_ list of payment methods, which is a list of customer-facing method names and the [tokens](<https://en.wikipedia.org/wiki/Tokenization_(data*security)>) belonging to that payment method. You could think of this list as a previously saved list of payment methods stored in a "wallet". A payment method _token_ is required to authorize and subsequently complete a payment transaction. A customer may have stored multiple tokens in their wallet with familiar labels such as "family credit card", "business account", etc.
 
 Now let's take a look at the data payloads that might be used with these methods. Again, keep in mind that this is an example use case: a real implementation is likely to have far more detail.
 

@@ -1,7 +1,7 @@
 ---
 title: "Using standard capabilities"
 date: 2018-12-29T11:02:05+06:00
-weight: 3
+sidebar_position: 3
 draft: false
 ---
 
@@ -38,6 +38,7 @@ Using the wasmCloud Makefiles (which you can get from a project in the [examples
 ```make
 CLAIMS = wasmcloud:httpserver
 ```
+
 Whenever you type `make`, the Makefile's rules execute the command `wash claims sign ...` to sign the actor module.
 
 You can use the command `wash claims inspect` to show the capability claims of a signed actor.

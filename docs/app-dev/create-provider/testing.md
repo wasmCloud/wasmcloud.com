@@ -1,7 +1,7 @@
 ---
 title: "Testing the new provider"
 date: 2018-12-29T11:02:05+06:00
-weight: 10
+sidebar_position: 10
 draft: false
 ---
 

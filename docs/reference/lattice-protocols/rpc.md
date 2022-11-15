@@ -1,7 +1,7 @@
 ---
 title: "RPC"
 date: 2018-12-29T11:02:05+06:00
-weight: 2
+sidebar_position: 2
 draft: false
 ---
 
@@ -10,9 +10,9 @@ is enabled, participants in lattice RPC must conform to a set of standards in or
 
 Lattice RPC supports the following interaction modes:
 
-* Actor-to-Actor
-* Actor-to-Provider
-* Provider-to-Actor
+- Actor-to-Actor
+- Actor-to-Provider
+- Provider-to-Actor
 
 ℹ️ All RPC interactions take place on a NATS client connection that is separate from the control interface for security reasons. All requests and replies on the RPC connection are serialized via [message pack](https://msgpack.org/index.html).
 
@@ -22,8 +22,9 @@ All RPC interactions within the lattice involve sending an `Invocation` and rece
 if the operation is "fire and forget", the `InvocationResponse` is required to indicate a successful acknowledgement of the invocation.
 
 Because these structures are used in multiple places by multiple languages, you can find them in different places throughout the code base. Here are a couple of locations:
-* The Smithy [Interface](https://github.com/wasmCloud/interfaces/blob/main/core/wasmcloud-core.smithy#L143) - smithy models are considered authoritative as language-specific implementations should be generated from these IDL models.
-* The [wasmCloud OTP Host Runtime](https://github.com/wasmCloud/wasmcloud-otp/blob/main/host_core/native/hostcore_wasmcloud_native/src/inv.rs#L23) - There is a Rust implementation of the `Invocation` and `InvocationResponse` structs used by the host.
+
+- The Smithy [Interface](https://github.com/wasmCloud/interfaces/blob/main/core/wasmcloud-core.smithy#L143) - smithy models are considered authoritative as language-specific implementations should be generated from these IDL models.
+- The [wasmCloud OTP Host Runtime](https://github.com/wasmCloud/wasmcloud-otp/blob/main/host_core/native/hostcore_wasmcloud_native/src/inv.rs#L23) - There is a Rust implementation of the `Invocation` and `InvocationResponse` structs used by the host.
 
 The following is a description of the fields on an `Invocation`:
 | Field | Type | Description |
@@ -33,7 +34,7 @@ The following is a description of the fields on an `Invocation`:
 | `target` | `WasmCloudEntity` | The intended recipient of the invocation. |
 | `operation` | `String` | The operation string of this invocation, e.g. `HttpServer.HandleRequest` or `Messaging.DeliverMessage` |
 | `msg` | `Bytes` | The raw bytes of the message. |
-| `encoded_claims` | String |  A signed, encoded JSON Web Token (JWT) containing the claims for this invocation. These claims include a hash of the invocation itself. |
+| `encoded_claims` | String | A signed, encoded JSON Web Token (JWT) containing the claims for this invocation. These claims include a hash of the invocation itself. |
 | `host_id` | String | The _public key_ of host from which the invocation originated. |
 
 These are the fields on the `WasmCloudEntity` structure:
@@ -46,6 +47,7 @@ These are the fields on the `WasmCloudEntity` structure:
 ### Invocation Claims
 
 Lattice RPC enforces a measure of security in RPC calls over and above the security required to obtain a NATS connection. Each `Invocation` contains an `invocation_claims` field. This field is a _signed_ and encoded JSON Web Token (JWT). A **cluster seed** is used to sign the invocation claims. Invocation claims include a **hash** which is used to verify that the invocation data has not been tampered with. This hash includes the following fields (hashed in this order):
+
 1. `origin_url` - A URL-encoded version of a `WasmCloudEntity` indicating the origin
 1. `target_url` - A URL-encoded version of a `WasmCloudEntity` indicating the target
 1. `operation` - The operation string
@@ -90,9 +92,9 @@ The link names allow multiple instances of the same capability provider to be st
 
 Capability providers must also subscribe to topics that contain messages indicating the addition and removal of link definitions. For security reasons, providers are only ever notified of link definitions that pertain to them. The following topics are mandatory subscriptions for providers to handle link definitions:
 
-* `wasmbus.rpc.{prefix}.{public_key}.{link_name}.linkdefs.put` - Adds a link definition. The payload on this subject (remember all RPC payloads are _message pack_) is the `LinkDefinition` struct which you can find in the [core interface](https://wasmcloud.github.io/interfaces/html/org_wasmcloud_core.html#link_definition).
-* `wasmbus.rpc.{prefix}.{public_key}.{link_name}.linkdefs.del` - Deletes a link definition. The payload on this subject is also a `LinkDefinition` struct.
+- `wasmbus.rpc.{prefix}.{public_key}.{link_name}.linkdefs.put` - Adds a link definition. The payload on this subject (remember all RPC payloads are _message pack_) is the `LinkDefinition` struct which you can find in the [core interface](https://wasmcloud.github.io/interfaces/html/org_wasmcloud_core.html#link_definition).
+- `wasmbus.rpc.{prefix}.{public_key}.{link_name}.linkdefs.del` - Deletes a link definition. The payload on this subject is also a `LinkDefinition` struct.
 
 Lastly, capability providers must subscribe to (and respond on) the following health check topic. Providers that do not properly respond on this topic will be flagged as "unhealthy" by the system. While the host runtime may not take action, other external entities could use this information to terminate the provider.
 
-* `wasmbus.rpc.{prefix}.{public_key}.{link_name}.health`
+- `wasmbus.rpc.{prefix}.{public_key}.{link_name}.health`

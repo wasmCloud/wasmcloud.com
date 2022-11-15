@@ -1,20 +1,20 @@
 ---
 title: "Host Configuration"
 date: 2022-07-29
-weight: 10
+sidebar_position: 10
 draft: false
 ---
 
-The wasmcloud host is configured by environment variables, which can be set in the environment or `.env` files. 
-Real environment variables take precedence over values found in `.env` files. 
+The wasmcloud host is configured by environment variables, which can be set in the environment or `.env` files.
+Real environment variables take precedence over values found in `.env` files.
 Some of the values contain secrets and should be protected accordingly.
 
 The following sources of environment variables will be considered:
 
-* `.env`
-* `.env.local`
-* `.env.[dev|test|prod]`
-* `.env.[dev|test|prod].local`
+- `.env`
+- `.env.local`
+- `.env.[dev|test|prod]`
+- `.env.[dev|test|prod].local`
 
 As mentioned, any environment variable supplied at runtime will override variables supplied in any `.env` file. Best practice suggests that developers use the `.local` files to represent their local workstation environments and to not check those files into source control.
 
@@ -26,7 +26,7 @@ Environment variables and `.env` files are combined to create a **host configura
 These variables can be set in your shell environment to configure a host. After your first time launching a host, these variables are also available for modification in `host_config.json` as mentioned above, mostly under the same name without the `WASMCLOUD_` prefix.
 
 | _Environment variable name_                                                                                        | _Description_                                                                                                                                                                                                                                                                                                                                                                                |
-|:-------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| :----------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `WASMCLOUD_LATTICE_PREFIX`                                                                                         | A lattice prefix is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices. If not specified, the lattice prefix is "default". See [Character sets](../lattice-protocols/prefix/#character-sets) for the characters that may be used in lattice prefix names.                                                              |
 | `WASMCLOUD_RPC_HOST`<br/>`WASMCLOUD_RPC_PORT`<br/>`WASMCLOUD_RPC_SEED`<br/>`WASMCLOUD_RPC_JWT`                     | Configuration for the NATS client connection used for incoming RPC messages to the host. `HOST` is an ip address or dns name, with default `127.0.0.1`. `PORT` is the port number with default `4222`. `SEED` and `JWT` are used for authenticated connections and can be obtained from the `.creds` file generated with `nsc generate creds`.                                               |
 | `WASMCLOUD_RPC_TIMEOUT_MS`                                                                                         | Timeout in milliseconds for all RPC calls. The default value is 2000 ms (2 seconds). (Due to a [current limitation](https://github.com/wasmCloud/wasmcloud-otp/issues/397), the maximum value of this timeout is effectively 5000).                                                                                                                                                          |
@@ -42,8 +42,7 @@ These variables can be set in your shell environment to configure a host. After 
 | `WASMCLOUD_STRUCTURED_LOGGING_ENABLED` <br/><br/> `WASMCLOUD_STRUCTURED_LOG_LEVEL`                                 | Enable JSON structured logging from the wasmcloud host. (default `false`). <br/>If enabled, the `LOG_LEVEL` controls the verbosity of these logs. Choose from `error`, `warn`, `info`, or `debug`. Defaults level is `info`.                                                                                                                                                                 |
 | `OCI_REGISTRY` <br/> `OCI_REGISTRY_USER` <br/> `OCI_REGISTRY_PASSWORD`                                             | Specifies a URL, and user/passord authentication for an OCI registry. Defaults are "" (none).                                                                                                                                                                                                                                                                                                |
 
-
 ### Character sets
 
-A __lattice prefix__ is composed of one or more of the following characters: `A-Za-z_-` (upper- and lower- case ascii letters, digits, dash, and underscore). Spaces, periods, non-ascii characters, and non-printable ascii characters are specifically not allowed.
+A **lattice prefix** is composed of one or more of the following characters: `A-Za-z_-` (upper- and lower- case ascii letters, digits, dash, and underscore). Spaces, periods, non-ascii characters, and non-printable ascii characters are specifically not allowed.
 We recommended that lattice prefix names be limited to the characters listed above for maximum compatibility with future wasmcloud protocols.

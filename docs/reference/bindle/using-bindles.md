@@ -1,7 +1,7 @@
 ---
 title: "Using Bindle with wasmCloud"
 date: 2021-12-29T11:02:05+06:00
-weight: 2
+sidebar_position: 2
 draft: false
 ---
 

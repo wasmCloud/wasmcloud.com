@@ -1,16 +1,16 @@
 ---
 title: "API Reference"
 date: 2018-12-29T11:02:05+06:00
-weight: 4
+sidebar_position: 4
 draft: false
 description: "wadm API Specification"
 ---
 
 The normal way to interact with a `wadm` installation (which could be a single server or a cluster) is through the [wash](/docs/reference/wash) command-line tool. However, if you are planning on creating your own integration or writing a non-Rust language binding, then this reference will help.
 
-### ⚠️ Caution
-
+:::caution
 _wadm and its corresponding API are under active development_. Many components are not yet written at all. This document serves as a means to solicit feedback and collaborate on API design and will likely change multiple times.
+:::
 
 A wadm cluster will use a single connection (and therefore set of credentials) for the API server. This allows a wadm cluster to use a security context for the API server that is different from the context used for remotely controlling lattices. This is important so you can plan how you access the wadm API separately from how wadm accesses relevant lattices.
 

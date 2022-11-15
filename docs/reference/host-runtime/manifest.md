@@ -1,7 +1,7 @@
 ---
 title: "Host Manifests"
 date: 2018-12-29T11:02:05+06:00
-weight: 9
+sidebar_position: 9
 draft: false
 ---
 
@@ -9,10 +9,10 @@ A _host manifest_ contains a list of actors and providers that you would like to
 
 The following describes the contents of a host manifest:
 
-* `actors` - This section contains a list (yaml or json `array`) of actor _references_. An actor reference in a host manifest _must_ be the OCI image reference URL of the actor as stored in an OCI registry. This section is mandatory, so if you do not wish to start any actors, supply the format equivalent of an empty list/array. Since the target host could be anywhere, the only way for that remote host to reliably locate your actor is through an OCI reference.
-* `capabilities` - This section contains a list of capability provider _descriptions_. A capability provider description is a structure that provides the minimal amount of information required for the wasmCloud host to load and start a capability provider. Capability descriptions contain the following fields:
-  * `image_ref` - This is a required field that contains the OCI image reference of a capability provider. If you want to launch a local capability provider via manifest, then you'll have to ensure that it's stored in a local registry and you provide the local registry URL.
-  * `link_name` - This field is optional and contains the name of the provider as a target for links. If you leave this value out of the manifest, wasmCloud will use the default link name of `default`.  This field is only necessary to distinguish between two configurations of the same provider. 
+- `actors` - This section contains a list (yaml or json `array`) of actor _references_. An actor reference in a host manifest _must_ be the OCI image reference URL of the actor as stored in an OCI registry. This section is mandatory, so if you do not wish to start any actors, supply the format equivalent of an empty list/array. Since the target host could be anywhere, the only way for that remote host to reliably locate your actor is through an OCI reference.
+- `capabilities` - This section contains a list of capability provider _descriptions_. A capability provider description is a structure that provides the minimal amount of information required for the wasmCloud host to load and start a capability provider. Capability descriptions contain the following fields:
+  - `image_ref` - This is a required field that contains the OCI image reference of a capability provider. If you want to launch a local capability provider via manifest, then you'll have to ensure that it's stored in a local registry and you provide the local registry URL.
+  - `link_name` - This field is optional and contains the name of the provider as a target for links. If you leave this value out of the manifest, wasmCloud will use the default link name of `default`. This field is only necessary to distinguish between two configurations of the same provider.
 
 ### Applying a Host Manifest
 
@@ -35,12 +35,12 @@ The following is an example manifest that describes a subset of functionality co
 ```yaml
 ---
 actors:
-    - wasmcloud.azurecr.io/echo:0.3.4    
+  - wasmcloud.azurecr.io/echo:0.3.4
 capabilities:
-    - image_ref: wasmcloud.azurecr.io/nats:0.14.0
-      link_name: frontend
-    - image_ref: wasmcloud.azurecr.io/nats:0.14.0
-      link_name: backend 
+  - image_ref: wasmcloud.azurecr.io/nats:0.14.0
+    link_name: frontend
+  - image_ref: wasmcloud.azurecr.io/nats:0.14.0
+    link_name: backend
 ```
 
 Remember that the providers won't actually be "active" until you've supplied the appropriate link definitions. You can supply them either before or after you apply the manifest.

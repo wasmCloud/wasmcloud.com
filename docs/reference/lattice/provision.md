@@ -1,7 +1,7 @@
 ---
 title: "Provisioning and Managing"
 date: 2018-12-29T11:02:05+06:00
-weight: 13
+sidebar_position: 13
 draft: false
 ---
 

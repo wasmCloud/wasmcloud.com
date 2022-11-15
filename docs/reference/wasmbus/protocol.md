@@ -1,7 +1,7 @@
 ---
 title: "The wasmbus Protocol"
 date: 2018-12-29T11:02:05+06:00
-weight: 6
+sidebar_position: 6
 draft: false
 ---
 

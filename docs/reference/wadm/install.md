@@ -1,7 +1,7 @@
 ---
 title: "Installation"
 date: 2022-09-0811:02:05+06:00
-weight: 1
+sidebar_position: 1
 draft: false
 ---
 

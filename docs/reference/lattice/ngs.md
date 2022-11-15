@@ -1,7 +1,7 @@
 ---
 title: "NGS as an infrastructure bridge"
 date: 2018-12-29T11:02:05+06:00
-weight: 9
+sidebar_position: 9
 draft: false
 ---
 

@@ -1,11 +1,12 @@
 ---
 title: "Running the Host"
 date: 2018-12-29T11:02:05+06:00
-weight: 11
+sidebar_position: 11
 draft: false
 ---
 
 The wasmCloud host runtime is an [Elixir mix release](https://hexdocs.pm/mix/Mix.Tasks.Release.html) that includes various scripts for running and managing an application. By running `bin/wasmcloud_host`, you'll see a variety of commands and options:
+
 ```plain
 ./bin/wasmcloud_host
 Usage: wasmcloud_host COMMAND [ARGS]
@@ -24,6 +25,7 @@ The known commands are:
     pid            Prints the operating system PID of the running system via a remote command
     version        Prints the release name and version to be booted
 ```
+
 There are a variety of commands and options to get used to here, we generally only focus on the commands that manage starting, stopping, and debugging a wasmCloud application.
 
 - To start the host running in the current terminal, which is recommended to easily view logs, you can use `start`
@@ -39,14 +41,17 @@ There are a variety of commands and options to get used to here, we generally on
   ```
 
   and stop it with
+
   ```bash
   bin/wasmcloud_host stop
   ```
+
   or restart it with
+
   ```bash
   bin/wasmcloud_host restart
   ```
-  
+
   If you choose this option, host logs will be located under `tmp/log` and can be viewed with:
 
   ```bash

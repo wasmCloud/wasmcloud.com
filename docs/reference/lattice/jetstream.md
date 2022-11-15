@@ -1,7 +1,7 @@
 ---
 title: "Configuring JetStream"
 date: 2018-12-29T11:02:05+06:00
-weight: 10
+sidebar_position: 10
 draft: false
 ---
 
@@ -13,9 +13,9 @@ The wasmCloud lattice uses a JetStream [stream](https://docs.nats.io/jetstream/c
 - Link Definitions
 - OCI References - a mapping between OCI URLs and public keys
 
-#### ⚠️ Warning
-
+:::caution
 It is _highly_ recommend that developers _never_ interact with the stream contents/topics directly, and instead use the various operations available on the lattice control interface in order to ensure reliability and stability of the stream contents. In other words, do not directly publish messages _or_ subscribe to `lc.{prefix}.>`.
+:::
 
 ### Default behavior
 
