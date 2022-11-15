@@ -9,6 +9,7 @@ tags: [community, meeting]
 - (Demo) `wash up` allowing multiple wasmCloud hosts
 - Discuss .NET WebAssembly ecosystem status
 - wash-lib and "the great refactor" to a reusable and consumable wash
+- Moving to `wit` from smithy, migration discussion
 
 <!--truncate-->
 
