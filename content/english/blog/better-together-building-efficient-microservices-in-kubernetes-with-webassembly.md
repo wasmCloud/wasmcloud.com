@@ -3,7 +3,7 @@ title: "Better Together: Building Efficient Microservices in Kubernetes using We
 image: "images/blogs/adobe-kubernetes/header.png"
 date: 2022-11-17T11:00:00-05:00
 author: "Sean Isom and Colin Murphy, Adobe"
-description: "Bringing two major CNCF projects together – WebAssembly and Kubernetes – promises greater agility and major efficiencies"
+description: "Bringing two major CNCF projects together – wasmCloud and Kubernetes – promises greater agility and major efficiencies"
 categories: ["webassembly", "wasmcloud", "kubernetes", "Cloud Native", "CNCF"]
 draft: false
 ---
