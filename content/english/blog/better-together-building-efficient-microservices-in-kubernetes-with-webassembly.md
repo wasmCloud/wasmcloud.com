@@ -1,8 +1,7 @@
 ---
 title: "Better Together: Building Efficient Microservices in Kubernetes using WebAssembly"
-#TODO: hijack cncf thing
-# image : "images/blogs/adobe-kubernetes/header"
-date: 2022-11-16T6:00:00-05:00
+image: "images/blogs/adobe-kubernetes/header.png"
+date: 2022-11-17T11:00:00-05:00
 author: "Sean Isom and Colin Murphy, Adobe"
 description: "Bringing two major CNCF projects together – WebAssembly and Kubernetes – promises greater agility and major efficiencies"
 categories: ["webassembly", "wasmcloud", "kubernetes", "Cloud Native", "CNCF"]
@@ -149,3 +148,5 @@ We’re excited to share more soon. The entire service’s code is ported pendin
 # In Summary
 
 A major advantage of WebAssembly on the backend is that it can securely enable high performance and efficiency, while still being compatible with Kubernetes. So, in a case like ours, where we have huge investments in Kubernetes operations, compliance, and automation, we can integrate WebAssembly directly into our existing infrastructure. We can take advantage of new technologies today whilst understanding that the future may look completely different.
+
+[_Originally posted on the Cloud Native Computing Foundation blog_](https://www.cncf.io/blog/2022/11/17/better-together-a-kubernetes-and-wasm-case-study/)
