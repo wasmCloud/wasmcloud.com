@@ -57,9 +57,9 @@ Normally, you can follow the single step in the documentation for installing was
 
 ```yaml
 wasmcloud:
-enableApplierSupport: true
-customLabels:
-wasmcloud.dev/route-to: "true"
+  enableApplierSupport: true
+  customLabels:
+    wasmcloud.dev/route-to: "true"
 ```
 
 Then you can deploy via helm (with your choice of RELEASE_NAME)
