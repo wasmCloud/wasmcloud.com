@@ -3,6 +3,41 @@ import ComponentCreator from '@docusaurus/ComponentCreator';
 
 export default [
   {
+    path: '/__docusaurus/debug',
+    component: ComponentCreator('/__docusaurus/debug', 'a2a'),
+    exact: true
+  },
+  {
+    path: '/__docusaurus/debug/config',
+    component: ComponentCreator('/__docusaurus/debug/config', 'a66'),
+    exact: true
+  },
+  {
+    path: '/__docusaurus/debug/content',
+    component: ComponentCreator('/__docusaurus/debug/content', '9ad'),
+    exact: true
+  },
+  {
+    path: '/__docusaurus/debug/globalData',
+    component: ComponentCreator('/__docusaurus/debug/globalData', '688'),
+    exact: true
+  },
+  {
+    path: '/__docusaurus/debug/metadata',
+    component: ComponentCreator('/__docusaurus/debug/metadata', 'd57'),
+    exact: true
+  },
+  {
+    path: '/__docusaurus/debug/registry',
+    component: ComponentCreator('/__docusaurus/debug/registry', '4da'),
+    exact: true
+  },
+  {
+    path: '/__docusaurus/debug/routes',
+    component: ComponentCreator('/__docusaurus/debug/routes', '6c6'),
+    exact: true
+  },
+  {
     path: '/blog',
     component: ComponentCreator('/blog', 'fad'),
     exact: true
@@ -54,7 +89,7 @@ export default [
   },
   {
     path: '/community',
-    component: ComponentCreator('/community', '47c'),
+    component: ComponentCreator('/community', '435'),
     exact: true
   },
   {
@@ -73,6 +108,16 @@ export default [
     exact: true
   },
   {
+    path: '/community/2022/11/23/community-meeting',
+    component: ComponentCreator('/community/2022/11/23/community-meeting', '052'),
+    exact: true
+  },
+  {
+    path: '/community/2022/11/29/community-meeting',
+    component: ComponentCreator('/community/2022/11/29/community-meeting', '556'),
+    exact: true
+  },
+  {
     path: '/community/archive',
     component: ComponentCreator('/community/archive', '23c'),
     exact: true
@@ -84,12 +129,12 @@ export default [
   },
   {
     path: '/community/tags/community',
-    component: ComponentCreator('/community/tags/community', '449'),
+    component: ComponentCreator('/community/tags/community', '64c'),
     exact: true
   },
   {
     path: '/community/tags/meeting',
-    component: ComponentCreator('/community/tags/meeting', '5c3'),
+    component: ComponentCreator('/community/tags/meeting', '2af'),
     exact: true
   },
   {
