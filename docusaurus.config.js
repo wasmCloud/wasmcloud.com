@@ -104,7 +104,7 @@ const config = {
             ],
           },
           {
-            title: 'Social & More',
+            title: 'Social',
             items: [
               {
                 label: 'Twitter',
@@ -115,6 +115,15 @@ const config = {
                 href: 'https://www.linkedin.com/company/wasmCloud/',
               },
               {
+                label: 'YouTube',
+                href: 'https://www.youtube.com/wasmcloud',
+              },
+            ],
+          },
+          {
+            title: 'Legal',
+            items: [
+              {
                 label: 'Privacy Policy',
                 to: '/privacy-policy',
               },
@@ -123,7 +132,7 @@ const config = {
                 to: '/terms-conditions',
               },
             ],
-          },
+          }
         ],
         copyright: `Copyright © ${new Date().getFullYear()} wasmCloud LLC. All rights reserved. The Linux Foundation has registered trademarks and uses trademarks. For a list of trademarks of The Linux Foundation, please see our Trademark Usage page: https://www.linuxfoundation.org/trademark-usage. Built with Docusaurus.`,
       },

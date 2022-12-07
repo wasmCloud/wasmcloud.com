@@ -5,7 +5,7 @@ import styles from './styles.module.css';
 const FeatureList = [
   {
     title: 'Pleasantly Portable',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    Image: '/img/features/cloud.png',
     description: (
       <>
         wasmCloud provides a WebAssembly application runtime so you can run your applications everywhere - servers, clients, hosts, IOS, web browsers, IOT or where ever WebAssembly executes.
@@ -14,7 +14,7 @@ const FeatureList = [
   },
   {
     title: 'Completely Connected',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    Image: '/img/features/connected.png',
     description: (
       <>
         wasmCloud comes out of the box bundled with Lattice - a self-forming, self-healing mesh network that provides a unified, flattened topology across any number of disparate environments, clouds, browsers, or even hardware. No firewalls. No port forwarding. It just works.
@@ -23,7 +23,7 @@ const FeatureList = [
   },
   {
     title: 'Securely Scalable',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    Image: '/img/features/secure.png',
     description: (
       <>
         wasmCloud embraces a deny by default paradigm - actors are only permitted to access capabilities they have been explicity granted permission to leverage. With wasmCloud, ALL code is untrusted code.
@@ -32,11 +32,11 @@ const FeatureList = [
   },
 ];
 
-function Feature({ Svg, title, description }) {
+function Feature({ Image, title, description }) {
   return (
     <div className={clsx('col col--4')}>
       <div className="text--center">
-        <Svg className={styles.featureSvg} role="img" />
+        <img src={Image} />
       </div>
       <div className="text--center padding-horiz--md">
         <h3>{title}</h3>
