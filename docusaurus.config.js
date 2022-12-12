@@ -13,6 +13,14 @@ const config = {
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/favicon.ico',
+  // Hubspot
+  scripts: [
+    {
+      src: `//js.hs-scripts.com/${process.env.HUBSPOT_ID}.js`,
+      defer: true,
+      async: true
+    },
+  ],
 
   // Even if you don't use internalization, you can use this field to set useful
   // metadata like html lang. For example, if your site is Chinese, you may want
@@ -50,6 +58,13 @@ const config = {
         blogTitle: 'wasmCloud Community Content',
         blogDescription: 'wasmCloud community meetings notes, announcements, and agendas',
         blogSidebarTitle: 'Community Meetings',
+      },
+    ],
+    [
+      '@docusaurus/plugin-google-analytics',
+      {
+        trackingID: process.env.GOOGLE_ANALYTICS_ID || "localdev",
+        anonymizeIP: true,
       },
     ],
   ],
