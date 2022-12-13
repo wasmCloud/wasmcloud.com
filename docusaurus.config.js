@@ -136,7 +136,7 @@ const config = {
             ],
           },
           {
-            title: 'Legal',
+            title: 'Legal & Mail',
             items: [
               {
                 label: 'Privacy Policy',
@@ -145,6 +145,10 @@ const config = {
               {
                 label: 'Terms and Conditions',
                 to: '/terms-conditions',
+              },
+              {
+                label: 'Contact & Mailing List',
+                to: '/contact',
               },
             ],
           }
