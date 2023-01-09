@@ -39,11 +39,11 @@ $env:WASMCLOUD_OCI_ALLOWED_INSECURE = localhost:5000
   </TabItem>
   <TabItem value="docker" label="Docker">
 
-It's recommended to modify our [sample Docker Compose file](https://raw.githubusercontent.com/wasmCloud/examples/main/docker/docker-compose.yml) to include this variable on the `wasmcloud_host` container. Like so:
-
-:::warn
+:::caution
 When accessing the local registry from _within_ the docker compose network, you should use `registry:5000` instead of `localhost:5000`. Even though port 5000 is available for you on your local machine to interact with the registry, networking works differently within a compose network and you should use the name of the container instead of localhost. We do the same thing with `nats`, as you can see below.
 :::
+
+It's recommended to modify our [sample Docker Compose file](https://raw.githubusercontent.com/wasmCloud/examples/main/docker/docker-compose.yml) to include this variable on the `wasmcloud_host` container. Like so:
 
 ```yaml
 wasmcloud:
