@@ -9,7 +9,7 @@ tags: [community, meeting]
 - (DEMO) wasmCloud `wazero` Go host runtime from Jordan
 - (DEMO) `wash` 0.14.0 official release overview
 - `wasmCloud` v0.60.0-rc.1 release & release candidate discussion
-- `wascap` 0.9.0 signed modules and compatibility
+- `wascap` 0.9.2 signed modules and compatibility
 
 <!--truncate-->
 
