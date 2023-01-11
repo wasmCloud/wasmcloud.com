@@ -26,6 +26,7 @@ import ReactPlayer from 'react-player/youtube';
 - Went over the wasmCloud `v0.60.0-rc.1` release which included large changes to the supervision tree (internal) and the mechanism of storing link definitions in a NATS key-value bucket. This is a critical breaking change and the release candidate is to allow for more in-depth integration testing before the official release
 - Went over the wash `v0.14.0` release and the migration of functionality to `wash-lib`
 - Whiteboarded some high level points on the many levels of security that applications on wasmCloud go through, with an end goal of putting the output in the wasmCloud documentation
+  ![wasmCloud security brainstorm sticky diagram](./images/2023-01-11-security_brainstorm.png)
 
 ### Recording
 
