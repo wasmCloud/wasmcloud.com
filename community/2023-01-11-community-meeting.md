@@ -10,6 +10,7 @@ tags: [community, meeting]
 - (DEMO) `wash` 0.14.0 official release overview
 - `wasmCloud` v0.60.0-rc.1 release & release candidate discussion
 - `wascap` 0.9.2 signed modules and compatibility
+- Security overview of wasmCloud
 
 <!--truncate-->
 
