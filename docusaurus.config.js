@@ -72,6 +72,7 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      image: "img/wasmcloud_icon.png",
       navbar: {
         title: 'wasmCloud',
         logo: {
