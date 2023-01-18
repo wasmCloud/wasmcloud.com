@@ -1,8 +1,8 @@
 ---
-title: 2023-01-17 Community Meeting
+title: 2023-01-18 Community Meeting
 authors: [brooks]
 tags: [community, meeting]
-description: Agenda, notes, and recording for the 2023-01-17 community meeting
+description: Agenda, notes, and recording for the 2023-01-18 community meeting
 ---
 
 ### Agenda
