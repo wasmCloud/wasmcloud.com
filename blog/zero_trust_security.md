@@ -21,7 +21,7 @@ runtime, capability, and cluster levels.
 
 I thought it might be a good idea to provide a recap and distillation of the material from the conference talk here. As we continue to preach, WebAssembly is far more than just another tool for building applications that run in the browser. We all firmly believe that it is a next-generation enabling technology for the cloud, the edge, and everywhere in between.
 
-The exploration of the ways in which WebAssembly is perfect for zero trust security environments is a journey. This journey starts at the lowest level, the module (e.g. the `.wasm` file itself), and continues to higher abstractions through the runtime and all the way out to wasmCloud lattices for cluster security. In this blog post, we'll go through that journey
+The exploration of the ways in which WebAssembly is perfect for zero trust security environments is a journey. This journey starts at the lowest level, the module (e.g. the `.wasm` file itself), and continues to higher abstractions through the runtime and all the way out to wasmCloud lattices for cluster security. In this blog post, we'll go through that journey.
 
 ![module security](/images/blogs/ztsec/zt1.png)
 
