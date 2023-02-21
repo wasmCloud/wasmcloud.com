@@ -40,7 +40,9 @@ The WASI extension to the specification allows modules to do a few more things t
 ![capability security](/images/blogs/ztsec/zt2.png)
 
 ### Capability Security
-Once we get above the basic runtime level (we also often call this the "engine" level), we have wasmCloud (which uses an engine/runtime internally) and our ability to securely and dynamically bind capabilities to actors. With wasmCloud, we use signed JSON Web Tokens ([JWT](https://jwt.io)) embedded directly in the module. This allows us to verify the permissions of a module without consulting a central authority that can be spoofed or compromised. This means that we can still make informed decisions about what an actor can or cannot do in offline or constrained environments or during network partition events.
+Once we get above the basic runtime level (we also often call this the "engine" level), we have wasmCloud (which uses an engine/runtime internally) and our ability to securely and dynamically bind capabilities to actors. WasmCloud makes it possible to build _real_ applications using WebAssembly that are far more production-ready and secure than WASI "applications". 
+
+With wasmCloud, we use signed JSON Web Tokens ([JWT](https://jwt.io)) embedded directly in the module. This allows us to verify the permissions of a module without consulting a central authority that can be spoofed or compromised. This means that we can still make informed decisions about what an actor can or cannot do in offline or constrained environments or during network partition events.
  
 Actors are signed with identifiers for the capability contracts to which they have been granted access, like `HTTP Server`, `Message Subscriber`, or `Key Value Store`. These capabilities are abstract contracts, the implementations for which are linked at runtime. You can use mock, test, or lightweight implementations when going through your inner development loop on your workstation and then swap to different implementations in higher environments, all without having to rebuild or redeploy your actors.
 
