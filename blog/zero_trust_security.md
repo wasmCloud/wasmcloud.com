@@ -1,7 +1,7 @@
 ---
 title: "Zero Trust Distributed Computing with WebAssembly and wasmCloud"
 image: "/img/zero-trust-b_w.jpg"
-date: 2023-02-09T9:00:00-04:00
+date: 2023-02-21T9:00:00-04:00
 author: "Kevin Hoffman"
 author_profile: "https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/"
 description: "A look at how WebAssembly supports zero trust computing from the bottom to the top of the stack"
@@ -26,9 +26,9 @@ The exploration of the ways in which WebAssembly is perfect for zero trust secur
 ![module security](/images/blogs/ztsec/zt1.png)
 
 ### Module Security
-We start our journey at the bottom of the abstraction stack: modules. At the lowest level of the wasm virtual machine, there are a number of innovative and powerful security measures. WebAssembly code can't be exploited via RCE (Remote Code Execution) that is often enabled through buffer overrun attacks. This comes from the innate inability to form arbitrary pointers to locations in memory for execution. Code and data remain distinct, so you can't fool a wasm VM into executing data. Further, module security prevents you from jumping or branching to a location that didn't exist when the module started. And of course, WebAssembly is entirely sandboxed, so access to host memory from inside the module is forbidden, with communication limited to shared access to a block of isolated linear memory.
+We start our journey at the bottom of the abstraction stack: modules. At the lowest level of the wasm virtual machine, there are a number of innovative and powerful security measures. WebAssembly code can't be exploited via RCE (Remote Code Execution) that is often enabled through buffer overrun attacks. This comes from the innate inability to form arbitrary pointers to locations in memory for execution. Code and data remain distinct, so you can't fool a Wasm VM into executing data. Further, module security prevents you from jumping or branching to a location that didn't exist when the module started. And of course, WebAssembly is entirely sandboxed, so access to host memory from inside the module is forbidden, with communication limited to shared access to a block of isolated linear memory.
 
-The important thing to remember about WebAssembly module security is that they intrinsically stop an entire swath of potential attack vectors. Rather than having to detect intrusions after they happen, WebAssembly can make many types of intrusions physically impossible.
+The important thing to remember about WebAssembly module security is that they intrinsically stop an entire swath of potential attack vectors. Rather than having to detect intrusions after they happen, WebAssembly can make many types of intrusions physically impossible because the bytecode doesn't even have instructions to talk to system resources or branch to code pretending to be data.
 
 ### Runtime Security
 As we move up the abstraction level we leave the raw WebAssembly file behind and now look at the applications and libraries responsible for low-level execution of those modules: _runtimes_. In this category of runtime you find tools like [wasmtime](https://wasmtime.dev/), [wasm3](https://github.com/wasm3/wasm3), [wasm edge](https://wasmedge.org/), as well as the proprietary engines used by FaaS/edge providers like Fastly.
@@ -44,12 +44,12 @@ Once we get above the basic runtime level (we also often call this the "engine" 
  
 Actors are signed with identifiers for the capability contracts to which they have been granted access, like `HTTP Server`, `Message Subscriber`, or `Key Value Store`. These capabilities are abstract contracts, the implementations for which are linked at runtime. You can use mock, test, or lightweight implementations when going through your inner development loop on your workstation and then swap to different implementations in higher environments, all without having to rebuild or redeploy your actors.
 
-Because actors are cryptographically signed, we can also subject actors to policies that utilize metadata like the issuer of the module, its expiration date, its "not valid before" date, and much more. We can use policies like this to only allow actors from a certain set of trusted issuers, split the issuers allowed for production and dev/test, and any number of other additional security measures.
+Because actors are cryptographically signed with [ed25519 keys](https://wasmcloud.com/docs/reference/host-runtime/security#managing-keys), we can also subject actors to policies that utilize metadata like the issuer of the module, its expiration date, its "not valid before" date, and much more. We can use policies like this to only allow actors from a certain set of trusted issuers, split the issuers allowed for production and dev/test, and any number of other additional security measures.
 
 ### Cluster Security
-As we continue moving up the abstraction level from a single wasmCloud host, next we can look at a cluster of wasmCloud hosts known as a _lattice_. In a lattice, only those hosts that have been authorized to communicate with the cluster can do so, and invocations from invalid issuers or from spoofed senders or MITM (man-in-the-middle) attackers can all be rejected.
+As we continue moving up the abstraction level from a single wasmCloud host, next we can look at a cluster of wasmCloud hosts known as a _[lattice](https://wasmcloud.com/docs/reference/lattice/)_. In a lattice, only those hosts that have been authorized to communicate with the cluster can do so, and invocations from invalid issuers or from spoofed senders or MITM (man-in-the-middle) attackers can all be rejected.
 
-To accomplish this, each host in a wasmCloud cluster generates its own unique identity key pair, but is also given a _cluster signing key_. This key is used to sign invocations to actors and providers elsewhere on the cluster. These remote hosts receiving those calls can then verify the issuer of that invocation, as well as whether the invocation's bytes have been tampered with.
+To accomplish this, each host in a wasmCloud cluster generates its own unique identity key pair, but is also given a _[cluster signing key](https://wasmcloud.com/docs/app-dev/secure/clusterkeys#zero-trust-invocations)_. This key is used to sign invocations to actors and providers elsewhere on the cluster. These remote hosts receiving those calls can then verify the issuer of that invocation, as well as whether the invocation's bytes have been tampered with.
 
 Since each host is given a signing key and a list of public keys to trust, the system is resilient to most forms of intrusion. As each host signs every invocation is issues, other hosts can verify if the invocation came from the entity that claims to have sent it. 
 
