@@ -1,7 +1,7 @@
 ---
 title: "Zero Trust Distributed Computing with WebAssembly and wasmCloud"
 image: "/img/zero-trust-b_w.jpg"
-date: 2023-02-21T9:00:00-04:00
+date: 2023-02-22T9:00:00-04:00
 author: "Kevin Hoffman"
 author_profile: "https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/"
 description: "A look at how WebAssembly supports zero trust computing from the bottom to the top of the stack"
@@ -40,7 +40,7 @@ The WASI extension to the specification allows modules to do a few more things t
 ![capability security](/images/blogs/ztsec/zt2.png)
 
 ### Capability Security
-Once we get above the basic runtime level (we also often call this the "engine" level), we have wasmCloud (which uses an engine/runtime internally) and our ability to securely and dynamically bind capabilities to actors. WasmCloud makes it possible to build _real_ applications using WebAssembly that are far more production-ready and secure than WASI "applications". 
+Once we get above the basic runtime level (we also often call this the "engine" level), we have wasmCloud (which uses an engine/runtime internally) and our ability to securely and dynamically bind capabilities to actors. WasmCloud makes it possible to build _real_ applications using WebAssembly that are far more production-ready and secure than freestanding WASI-enabled modules. 
 
 With wasmCloud, we use signed JSON Web Tokens ([JWT](https://jwt.io)) embedded directly in the module. This allows us to verify the permissions of a module without consulting a central authority that can be spoofed or compromised. This means that we can still make informed decisions about what an actor can or cannot do in offline or constrained environments or during network partition events.
  
