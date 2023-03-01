@@ -10,7 +10,7 @@ import ReactPlayer from 'react-player/youtube';
 ### Agenda
 - (DEMO) cargo nextest and `wash` integration tests
 - (DEMO) washboard error handling
-- GitHub project overview in wasmCloud
+- wadm RFC - Addressing comments and requesting more feedback
 
 <!--truncate-->
 
