@@ -20,10 +20,9 @@ import ReactPlayer from 'react-player/youtube';
   - could add some friction in terms of new contributors to install that test runner
   - we've noticed a ton of flakes in PRs that depend on network/IO lately in wash
   - nextest does not run serial tests in the way we do with cargo test, which is a small difference. Instead, we can just add serial tests to a test-group with nextest
-  - Roman: Consider constraining nextest to CI, and fix the tests that are flaky
-  - Frustrating to have two tools, the difference between cargo test/nextest could be more frictionful
+  - Roman: Consider constraining nextest to CI, and fix the tests that are flaky, so that we can both take advantage of a better test runner and keep our tests well architected
   - Frank: How common is nextest in other communities / projects?
-    - Matt: Well supported but as far as I know, not super duper well
+    - Matt: Well supported and fairly popular, but not present in the most popular projects as far as I know
   - Keep going forward keeping in mind adding another tool is a small barrier and we should make adding the nextest tool as simple as possible
 - washboard error handling
   - Brooks showed a short and sweet demo of a recent PR to the wasmCloud host: [https://github.com/wasmCloud/wasmcloud-otp/pull/553](https://github.com/wasmCloud/wasmcloud-otp/pull/553) by vados-cosmonic
