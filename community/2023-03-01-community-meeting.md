@@ -15,9 +15,24 @@ import ReactPlayer from 'react-player/youtube';
 <!--truncate-->
 
 ### Meeting Notes
-- 
+- Welcome to two new community members, Chuck Fair and Frank Schaffa!
+- cargo nextest is a tool for quicker, more reproducible tests
+  - could add some friction in terms of new contributors to install that test runner
+  - we've noticed a ton of flakes in PRs that depend on network/IO lately in wash
+  - nextest does not run serial tests in the way we do with cargo test, which is a small difference. Instead, we can just add serial tests to a test-group with nextest
+  - Roman: Consider constraining nextest to CI, and fix the tests that are flaky
+  - Frustrating to have two tools, the difference between cargo test/nextest could be more frictionful
+  - Frank: How common is nextest in other communities / projects?
+    - Matt: Well supported but as far as I know, not super duper well
+  - Keep going forward keeping in mind adding another tool is a small barrier and we should make adding the nextest tool as simple as possible
+- washboard error handling
+  - Brooks showed a short and sweet demo of a recent PR to the wasmCloud host: [https://github.com/wasmCloud/wasmcloud-otp/pull/553](https://github.com/wasmCloud/wasmcloud-otp/pull/553) by vados-cosmonic
+  - Essentially there are a few places in the wasmCloud dashboard that have placeholders for error messages but we opt to put them in the console instead. As we move forward with a better UX for the dashboard, we'll be looking for opportunities to surface these errors in the UI
+- wadm RFC
+  - After some great discussion on distributed systems in the wadm RFC: [https://github.com/wasmCloud/wadm/issues/40](https://github.com/wasmCloud/wadm/issues/40), we sought to leave room for a little more discussion
+  - By the next community call we plan to solicit feedback, comments, and questions, before turning this RFC into a set of tasks in a project
+  - General discussion followed, see the recording to catch up
 
 ### Recording
 
-Recording will be posted shortly after the call.
-
+<ReactPlayer url='https://www.youtube.com/watch?v=gksQ46h3Khg' controls />
