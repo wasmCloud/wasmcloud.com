@@ -24,7 +24,7 @@ import ReactPlayer from 'react-player/youtube';
 	- Triage: Figuring out priority and work needed
 	- Discussion: Maintainers have seen the issue but still discussing from triage
 	- Todo: Task is assigned to a project and assigned at least a priority of "soon". At this step, anyone in the community should feel empowered to take this work if it's interesting to them
-- Feel free to give us feedback on how we
+- Feedback welcome!
 #### wasmCloud Rust common library
 - currently we use an Elixir library that wraps a Rust NIF that uses wasmtime under the hood
 - There are really interesting things going on in wasmtime, new specs being implemented, and new experimental features. We want to be able to really iterate quickly on these and that requires working directly in Rust that we can work with directly tailored to wasmCloud users.
