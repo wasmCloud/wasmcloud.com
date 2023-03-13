@@ -10,6 +10,7 @@ import ReactPlayer from 'react-player/youtube';
 ### Agenda
 - DEMO: Link definitions & link names: their meaning, usage, and some powerful things you can do 
 - WASI wasmCloud component update with Bailey
+- Proper use of wasmCloud github projects with Taylor 
 - SCALE 20x recap + recordings
 - Hackathon progress / callouts
 
