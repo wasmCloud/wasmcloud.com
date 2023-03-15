@@ -20,3 +20,5 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Recording
 Recording is being uploaded to YouTube and will be displayed promptly
+
+<ReactPlayer url="https://youtu.be/1wXDKORz1pg" controls />
