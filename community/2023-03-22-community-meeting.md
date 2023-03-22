@@ -11,7 +11,7 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 General note: this meeting is going to be light with a good portion of the core maintainers away at Wasm I/O or traveling. Nonetheless, very exciting updates!
-- v0.62.0 update with wasmcloud, wasm components, and wasmtime
+- v0.62.0 release candidates, libwasmcloud NIF
 
 <!--truncate-->
 
