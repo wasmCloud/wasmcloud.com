@@ -17,6 +17,7 @@ import ReactPlayer from 'react-player/youtube';
   - wasmCloud hosts
   - Language support
   - Release roadmap
+- (DEMO) Cosmonic Concordance - an open sourced framework for building event sourced systems with wasmCloud
 
 <!--truncate-->
 
