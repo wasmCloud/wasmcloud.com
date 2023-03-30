@@ -1,11 +1,15 @@
 ---
 slug: all-the-clouds-a-stage-webassembly-actor
-title: All the Cloud's a Stage, and WebAssembly Modules Mere Actors
-date: 2023-03-30T09:00:00+05:00
+title: "All the Cloud's a Stage, and WebAssembly Modules Mere Actors"
 image: "/img/child_actor.jpg"
+date: 2023-03-30T09:00:00+05:00
 author: "Kevin Hoffman"
-tags: ["actor", "wasmcloud", "webassembly", "cloud"]
+author_profile: "https://twitter.com/autodidaddict"
+description: "An overview on the actor model with a focus on WebAssembly"
+draft: false
 ---
+
+![child actor image](/img/child_actor.jpg)
 
 The actor model is a model for concurrent computation originally developed in 1973. This classic definition says that in response to a message, an actor may:
 
@@ -56,4 +60,4 @@ The latter of what I just described is pure business logic that remains pure reg
 
 Infrastructure is the dynamic runtime shape of my environment that my actors should not know about. This view may be controversial, but I firmly believe that separating my business logic from my supervision tree is crucial to being able to easily, securely, and reliably build distributed applications.
 
-Call to action here - Curious about [wasmCloud](https://wasmcloud.com/docs/intro) click to get started.
+Check out our [documentation](/docs/intro) to get started with wasmCloud.
