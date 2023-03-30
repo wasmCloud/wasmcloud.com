@@ -59,8 +59,8 @@ We stitched together wasi, KV, business logic (ping pong) and then we have the a
 - Open sourcing the event-sourcing interface, contract, and capability provider that Cosmonic uses to run its platform backend
 - An event-sourced app is a derivation of the events that occurred in the past. Components are aggregates - representing instances of entities (domain-driven design definition).
 - Aggregates validate commands and emit events.
-- In this demo we show how event sourcing is particularly useful for maintaining bank accounts or ledgers.
-- We're called our event sourcing project Concordance - you can view resources [here](https://github.com/cosmonic/concordance/tree/main).
+- In this demo, we show how you can apply event sourcing techniques to a banking model
+- We've called our event sourcing project Concordance - you can view resources [here](https://github.com/cosmonic/concordance/tree/main).
 - If you're looking to build an application using an event-sourced framework, wasmCloud is now a perfect platform to do so
 - Kevin will be presenting this innovation at KubeCon - join him live or on-demand on Friday 21st at 11.55am - 12.30pm CEST details here - https://kccnceu2023.sched.com/event/1Hycy
 
