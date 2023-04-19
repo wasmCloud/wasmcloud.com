@@ -61,13 +61,9 @@ Let's start by scaling down our `hello` actor if it's still running from a previ
 
 ![scaledown](./scaledown.png)
 
-Now, let's start the actor again using the "Start Actor" dropdown, but this time let's use the _From File (Hot Reload)_ option. You'll be required to supply the absolute path [^1] to your actor file, and you can choose a number of replicas to start as well. Luckily, we have an easy way for you to get the absolute path of your actor. Simply navigate to your actor project directory and run:
+Now, let's start the actor again using the "Start Actor" dropdown, but this time let's use the _From File (Hot Reload)_ option. You'll be required to supply the absolute path [^1] to your actor file, and you can choose a number of replicas to start as well.
 
-```shell
-make target-path-abs
-```
-
-Copy the path printed by this command into the and enter it in the _Start Actor_ form along with any number of replicas, and hit submit.
+Enter the absolute path in the _Start Actor_ form along with any number of replicas, and hit submit.
 
 ![starthotreload](./starthotreload.png)
 
