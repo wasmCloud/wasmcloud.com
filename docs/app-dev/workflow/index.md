@@ -18,12 +18,12 @@ Once you've established a dependency on a library that exposes the interface abs
 The developer's _iteration loop_ for building an actor looks something like this:
 
 1. Make code changes
-1. Compile and sign the WebAssembly module, creating a `_s.wasm` file (using `make` in an actor project)
+1. Compile and sign the WebAssembly module, creating a `_s.wasm` file (using `wash build` in an actor project)
 1. Test the module
    1. In the wasmCloud web dashboard
       1. Use the _From File (Hot reload)_ form to automatically watch actor files for changes
       1. Script `wash call` commands to invoke the actor
-      1. Modify your actor code, run `make` to recompile and re-sign the actor, repeat the above step
+      1. Modify your actor code, run `wash build` to recompile and re-sign the actor, repeat the above step
    1. Leverage the `wasmcloud:testing` interface and the [test provider](https://github.com/wasmCloud/wasmcloud-test)
 1. _Repeat_
 

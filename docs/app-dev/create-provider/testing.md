@@ -15,8 +15,7 @@ A second method for testing a provider is to run it in a realistic environment, 
 
 2. Upload the newly-created _provider archive_ to the local OCI registry (You can use `wash reg push ...`, or if you have one of the provider project Makefiles, `make push`) `make start` to start it.
 
-3. Upload an actor that utilizes the provider to the local OCI registry (`make` and `make push` from the actor source folder to compile it, sign it, and push it to the registry), An example of doing this can be found in [Running the actor](../create-actor/run/#launch-the-actor). `make start` to start it.
-   .
+3. Upload an actor that utilizes the provider to the local OCI registry (`wash build` from the actor source folder to compile it, sign it, and then use `wash reg push` to upload it to the registry). Then, use `wash ctl start` to start the actor from the local registry.
 4. Link the actor with `wash ctl link` [on the command line](/docs/app-dev/create-actor/run/#add-a-link-definition) or via the dashboard web UI. For the fakepay provider, no extra configuration parameters values are required for the link command. Note that even if you don't supply configuration values, an actor must be linked to a provider, and be signed with sufficient claims, before it can communicate with the provider.
 
 5. Invoke the actor by sending a JSON payload, either on the command line with `wash call actor -o json --data input.json` or the dashboard UI. The method name invoked, and the parameters in input.json must exactly match the interface implemented by your actor. In the previous section we used `CheckoutRequest` that might have a JSON body as follows:

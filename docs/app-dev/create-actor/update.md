@@ -109,7 +109,7 @@ The new parameter that selects the greeting will be called `msg`. If msg is "hel
 
 In `src/lib.rs`, replace handle_request with the code above. Since we aren't releasing a new version of the actor yet, we don't need to change the version number in `Cargo.toml`.
 
-Run `make` to build the actor and re-sign it. The host replaces all running instances of the actor with the new version, thanks to the hot reload feature, and re-links them with the HttpServer capability provider using the link parameters already provided. It is not necessary to re-issue a link command.
+Run `wash build` to build the actor and re-sign it. The host replaces all running instances of the actor with the new version, thanks to the hot reload feature, and re-links them with the HttpServer capability provider using the link parameters already provided. It is not necessary to re-issue a link command.
 
 Let's try out the new actor:
 

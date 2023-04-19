@@ -140,10 +140,11 @@ There are still quite a few places in TinyGo where importing a certain package w
 
 TinyGo is rapidly plugging these holes and providing packages that don't require a JavaScript host runtime, but we still need to watch out for things like this. To keep this example simple rather than hunting for an alternative JSON encoder, we just created a string that contains valid JSON.
 
-Now, just like any other wasmCloud actor, we can modify the `CLAIMS` variable in the actor's `Makefile` to contain both the HTTP server contract and the Key-Value contract:
+Now, just like any other wasmCloud actor, we can modify the `claims` variable in the actor's `wasmcloud.toml` to contain both the HTTP server contract and the Key-Value contract:
 
 ```
-CLAIMS   = --http_server --keyvalue
+[actor]
+claims = ["wasmcloud:httpserver", "wasmcloud:keyvalue"]
 ```
 
 With our new TinyGo actor in hand, we can start the actor, start two capability providers (HTTP and Key-Value), provide a link definition, and finally curl the running endpoint:

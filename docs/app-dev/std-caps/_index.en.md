@@ -31,14 +31,13 @@ use wasmcloud_interface_keyvalue::*;
 
 ### Sign the actor
 
-Before an actor can use a capability provider, it needs to be signed with the capability id. The signing process takes a WebAssembly file (with `.wasm` extension), generates a JWT containing the list of capability claims, signs the JWT with your private signing key, and generates a file ending in `_s.wasm` containing the original WebAssembly plus the JWT.
+Before an actor can use a capability provider, it needs to be signed with the capability id. The signing process takes a WebAssembly file (with `.wasm` extension), generates a JWT containing the list of capability claims, signs the JWT with your private signing key, and generates a file ending in `_s.wasm` containing the original WebAssembly plus the JWT. When using `wash build`, the signing is done automatically for you, using the claims declared in `wasmcloud.toml`:
 
-Using the wasmCloud Makefiles (which you can get from a project in the [examples](https://github.com/wasmCloud/examples) repository, or a from project generated with `wash new actor`), the signing is done automatically for you, using the claims declared in the Makefile
-
-```make
-CLAIMS = wasmcloud:httpserver
+```toml
+[actor]
+claims = ["wasmcloud:httpserver"]
 ```
 
-Whenever you type `make`, the Makefile's rules execute the command `wash claims sign ...` to sign the actor module.
+Whenever you type `wash build`, `wash` will both use your local language toolchain to compile the `.wasm` file and then use `wash claims sign ...` to sign the actor module.
 
 You can use the command `wash claims inspect` to show the capability claims of a signed actor.
