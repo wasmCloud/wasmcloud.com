@@ -20,7 +20,7 @@ We have developed libraries to support two popular styles of code generation. If
 - **Visitor pattern**
   - A `Generator` class in `weld_codegen::gen` parses the smithy model and invokes callbacks to generate interface definitions, structures, methods, and data types. Each callback function appends its output to a buffer, which is written to the output file after the entire schema has been processed. A base trait implements common, language-independent, functions, and a rust generator extends the base trait to implement specialize generators for Rust output.
 
-The Rust code generator uses both techniques: the Visitor pattern is used for generating `.rs` files, and the handlebars templates are used for generating `Cargo.toml` files and `Makefile`s.
+The Rust code generator uses both techniques: the Visitor pattern is used for generating `.rs` files, and the handlebars templates are used for generating `Cargo.toml` and `wasmcloud.toml` files.
 
 There is a documentation generator that turns `.smithy` files into html. It uses the sample code generation libraries, and is invoked by passing `html` as the output language instead of `rust`.
 

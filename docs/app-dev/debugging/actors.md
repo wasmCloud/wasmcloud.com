@@ -63,7 +63,7 @@ wasmcloud:
 
 ### Missing Capability Claims
 
-When a wasmCloud actor needs access to a capability provider, we require cryptographically signed claims embedded in that actor. The host runtime operates on a deny-by-default and require claims to be an allow-list to ensure our actors are secure. Adding these capability claims is mostly managed for you with `wash` when you build your actor and the space-separated list of capability claims in the `Makefile` included with any actor project.
+When a wasmCloud actor needs access to a capability provider, we require cryptographically signed claims embedded in that actor. The host runtime operates on a deny-by-default and require claims to be an allow-list to ensure our actors are secure. Adding these capability claims is mostly managed for you with `wash` when you build your actor and the list of capability claims in `wasmcloud.toml` included with any actor project.
 
 This can be illustrated with the `KVCounter` example actor fairly easily. The actor needs to be signed with the `wasmcloud:httpserver` capability to receive HTTP requests, and the `wasmcloud:keyvalue` capability to issue requests to a keyvalue database. Omitting either of these will cause errors due to the inability to receive a request or the inability to issue one, so we'll cover both of those scenarios here.
 

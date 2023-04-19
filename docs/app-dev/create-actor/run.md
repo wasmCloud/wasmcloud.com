@@ -14,7 +14,7 @@ We assume you've already [installed](/docs/installation.mdx) wash, the wasmCloud
 
 ### Build the actor
 
-Building the actor is as easy as running `make` in the project's root directory. This will compile the actor and sign it with a freshly generated seed key. The `Makefile` that comes with the newly generated project lists claims for the actor including `wasmcloud:httpserver`, so it can work with the HTTP Server capability provider.
+Building the actor is as easy as running `wash build` in the project's root directory. This will compile the actor using your local toolchain and automatically [sign it](https://wasmcloud.com/docs/reference/host-runtime/security) for you. The `wasmcloud.toml` file that comes with the newly generated project lists claims for the actor including `wasmcloud:httpserver`, so it can work with the HTTP Server capability provider.
 
 ### Launch the Actor
 

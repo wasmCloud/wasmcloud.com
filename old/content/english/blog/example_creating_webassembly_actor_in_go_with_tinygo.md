@@ -1,12 +1,12 @@
 ---
-title : "Building Portable, Scalable Components with TinyGo and wasmCloud"
-image : "images/tinygo-logo.png"
+title: "Building Portable, Scalable Components with TinyGo and wasmCloud"
+image: "images/tinygo-logo.png"
 date: 2022-06-01T9:00:00-04:00
 author: "Kevin Hoffman"
 author_profile: "https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/"
-description : "A walkthrough of creating a TinyGo wasmCloud actor"
+description: "A walkthrough of creating a TinyGo wasmCloud actor"
 categories: ["tinygo", "webassembly", "wasmcloud", "go", "example"]
-draft : false
+draft: false
 ---
 
 <u>[TinyGo](https://tinygo.org)</u> is _"a Go compiler for small places"_. It is a language designed specifically to work on embedded systems and WebAssembly. If you squint hard enough, you can almost imagine that WebAssembly is a form of embedded system (it's embedded in a host runtime).
@@ -46,7 +46,7 @@ func main() {
 type Kvcounter struct{}
 
 func (e *Kvcounter) HandleRequest(
-	ctx *actor.Context, 
+	ctx *actor.Context,
 	req httpserver.HttpRequest)
 	(*httpserver.HttpResponse, error) {
 	r := httpserver.HttpResponse{
@@ -58,6 +58,7 @@ func (e *Kvcounter) HandleRequest(
 	return &r, nil
 }
 ```
+
 In the preceding code, the `RegisterHandlers` function sets up the appropriate dispatch so that when the bound HTTP server capability provider receives a request, it knows to invoke this actor.
 
 What we're going to do for this blog post is modify this web request handler so that it takes the name of a counter from the request, increments it using the key-value interface, and returns the new value in response.
@@ -72,9 +73,9 @@ This will modify our `go.mod` file to contain the new interface. Now let's creat
 
 ```go
 func (e *Kvcounter) HandleRequest(
-	ctx *actor.Context, 
+	ctx *actor.Context,
 	req httpserver.HttpRequest) (*httpserver.HttpResponse, error) {
-	
+
 	key := strings.Replace(req.Path, "/", "_", -1)
 
 	kv := keyvalue.NewProviderKeyValue()
@@ -104,7 +105,8 @@ func InternalServerError(err error) *httpserver.HttpResponse {
 	}
 }
 ```
-In this new function, we are converting the `Path` from the request into a key that will then be used in an `Increment` operation on the key-value store. 
+
+In this new function, we are converting the `Path` from the request into a key that will then be used in an `Increment` operation on the key-value store.
 
 Something might look a little "off" in the code, and that's this line:
 
@@ -121,21 +123,26 @@ This is something that we have to watch out for in TinyGo. If we use the stock J
 (import "env" "syscall/js.valueLoadString" (func $syscall/js.valueLoadString (type 3)))
 (import "env" "syscall/js.finalizeRef" (func $syscall/js.finalizeRef (type 5)))
 ```
+
 To get the preceding output, I typically run the following command (though use could also use `wasm-objdump`, too):
+
 ```
 wasm2wat build/kvcounter_s.wasm| grep import
 ```
+
 The `wasm2wat` binary is included in the <u>[wabt](https://github.com/WebAssembly/wabt)</u> toolkit.
 
 There are still quite a few places in TinyGo where importing a certain package will trigger the use of the `syscall/js` package. Once this package is imported, the host runtime will then _require_ the use of these JavaScript host shims and we then immediately lose all of our portability benefits.
 
 TinyGo is rapidly plugging these holes and providing packages that don't require a JavaScript host runtime, but we still need to watch out for things like this. To keep this example simple rather than hunting for an alternative JSON encoder, we just created a string that contains valid JSON.
 
-Now, just like any other wasmCloud actor, we can modify the `CLAIMS` variable in the actor's `Makefile` to contain both the HTTP server contract and the Key-Value contract:
+Now, just like any other wasmCloud actor, we can modify the `CLAIMS` variable in the actor's `wasmcloud.toml` to contain both the HTTP server contract and the Key-Value contract:
 
+```toml
+[actor]
+claims = ["wasmcloud:httpserver", "wasmcloud:keyvalue"]
 ```
-CLAIMS   = --http_server --keyvalue
-```
+
 With our new TinyGo actor in hand, we can start the actor, start two capability providers (HTTP and Key-Value), provide a link definition, and finally curl the running endpoint:
 
 ```
@@ -144,7 +151,7 @@ $ curl http://localhost:8080/bloggo
 $ curl http://localhost:8080/bloggo
 {"counter": 2}
 ```
+
 This is just the beginning of a really fun journey supporting TinyGo actors in wasmCloud!
 
 For a fully functioning version of this sample, you can take a look at it in our <u>[examples repository](https://github.com/wasmCloud/examples/tree/main/actor/kvcounter-tinygo)</u>.
-
