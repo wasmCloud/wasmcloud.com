@@ -10,6 +10,7 @@ import ReactPlayer from 'react-player/youtube';
 ### Agenda
 - wadm 0.4 release update 
 - Cosmonic devpost hackathon winners - the cool wasmCloud bits
+- [wash command structure rework RFC](https://github.com/wasmCloud/wash/issues/538)
 - Brainstorm: Handling secrets in link definitions / provider configuration
 
 <!--truncate-->
