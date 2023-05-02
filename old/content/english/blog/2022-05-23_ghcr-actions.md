@@ -24,7 +24,7 @@ Today we'll be using a couple of tools for this tutorial:
 
 *   A <u>[Rust](https://www.rust-lang.org/tools/install)</u> toolchain to build actors
     *   Make sure to add wasm32 as a target with `rustup target add wasm32-unknown-unknown`
-*   <u>[wash](https://wasmcloud.dev/overview/installation/#install-wash)</u>, the wasmCloud shell, at least `v0.11.0`
+*   <u>[wash](docs/installation/)</u>, the wasmCloud shell, at least `v0.11.0`
 
 Pushing an actor to GitHub packages
 -----------------------------------

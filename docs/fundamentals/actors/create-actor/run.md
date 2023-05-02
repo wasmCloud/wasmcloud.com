@@ -8,7 +8,7 @@ draft: false
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-In the [first tour](/docs/tour/hello_world) of wasmCloud you ran an actor from the dashboard UI. Now, we're going to start the actor "the long way" so that you can get a feel for all of the moving parts of the process. Our tooling documentation should help you get actors started more easily, once you've been through this guide.
+In the [first getting started guide](/docs/tour/hello_world) of wasmCloud you ran an actor from the dashboard UI. Now, we're going to start the actor "the long way" so that you can get a feel for all of the moving parts of the process. Our tooling documentation should help you get actors started more easily, once you've been through this guide.
 
 We assume you've already [installed](/docs/installation.mdx) wash, the wasmCloud host, and necessary prerequisites.
 
@@ -18,7 +18,7 @@ Building the actor is as easy as running `wash build` in the project's root dire
 
 ### Launch the Actor
 
-There are countless ways to run the actor we just created, and if you went through the [tours](/docs/category/tour) section, you'll have seen some some of them already. Open your browser to view the web dashboard at [http://localhost:4000](http://localhost:4000). If you've configured your host with an alternate port number, use that here.
+There are countless ways to run the actor we just created, and if you went through the [getting started](/docs/category/getting-started) guides, you'll have seen some some of them already. Open your browser to view the web dashboard at [http://localhost:4000](http://localhost:4000). If you've configured your host with an alternate port number, use that here.
 
 At this point, simply click **Start Actor** and then choose _From File_. Open a browser to your current project directory and then navigate to the `build` directory. Here you'll find a `(project)_s.wasm` file, where `(project)` is `hello`, or the name you selected for the project. The `_s` suffix indicates that this WebAssembly module has been _signed_.
 
