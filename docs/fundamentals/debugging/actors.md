@@ -18,7 +18,7 @@ When developing actors there are a few often missed steps that can cause your ac
 Failed to fetch OCI bytes: error sending request for url (https://localhost:5000/v2/): error trying to connect: record overflow
 ```
 
-This error can happen when attempting to run an actor from the local docker registry included in our examples. If you see this error, you need to set the `WASMCLOUD_OCI_ALLOWED_INSECURE` variable either in your [host config](/docs/reference/host-runtime/host_configure#supported-configuration-variables) file or as an environment variable. The proper syntax for this is as follows:
+This error can happen when attempting to run an actor from the local docker registry included in our examples. If you see this error, you need to set the `WASMCLOUD_OCI_ALLOWED_INSECURE` variable either in your [host config](/docs/hosts/elixir/host_configure) file or as an environment variable. The proper syntax for this is as follows:
 
 <Tabs>
   <TabItem value="unix" label="Unix" default>
