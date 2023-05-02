@@ -1,7 +1,7 @@
 ---
 title: "Developer Workflows"
 date: 2018-12-29T11:02:05+06:00
-sidebar_position: 7
+sidebar_position: 15
 draft: false
 description: "Common development loops"
 ---
