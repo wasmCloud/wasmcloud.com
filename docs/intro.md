@@ -4,18 +4,20 @@ sidebar_position: 0
 
 # Welcome
 
-wasmCloud is a platform designed to help developers quickly and easily code secure-by-default business logic with a rapid feedback loop that is free from the burden of boilerplate, integrated (e.g. tangled) dependencies, and tight coupling to non-functional requirements. It is a suite of tools and libraries that can be used to build distributed applications composed of portable units of business logic called _actors_.
+wasmCloud helps you build globally distributed applications that reach from the cloud to the edge. Leveraging WebAssembly's security, portability, and performance, the platform helps you compose applications from tiny, independent building blocks loosely coupled to capabilities.
 
-The creators of wasmCloud believe that we can not only change the way developers build software for the better, but make it easier to secure, deploy, maintain, observe, and upgrade that software as well–all while reducing the amount of boilerplate we have to copy and paste.
+Deciding whether you're building a serverless function, a microservice, a globally distributed app, or a monolith is now a knob you can turn at runtime rather than a one-time decision you're stuck with until your application retires.
+
+Get started building applications with wasmCloud today and enjoy the freedom of only having to write the code that matters.
 
 wasmCloud is designed around the following core tenets:
 
-- Productivity - Developers and Operations
-- Enterprise-Grade Security
-- Cost Savings
-- Portability
-- Performance
+- Dead simple Distributed Applications
+- Run anywhere
+- Secure by default
+- Save time, money, and effort
+- Productivity for both Developers and Operations
 
 You should not have to change your design, architecture, or your programming environment as you move from concept to production.
 
-**We want to bring _joy_ to distributed systems development without sacrificing enterprise-grade features.**
+**We're bringing bring _joy_ to building global-scale applications.**

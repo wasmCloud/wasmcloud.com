@@ -12,7 +12,7 @@ import TabItem from "@theme/TabItem";
 
 `wash` communicates to a wasmCloud host over 2 different NATS connections: the remote procedure call (RPC) connection and the control interface connection.
 
-As of wasmCloud `v0.50.2`, a [host configuration](/docs/reference/host-runtime/host_configure) file is written to `$HOME/.wash/host_config.json` with the last values used to configure and run a host on your machine. `wash` uses that file by default to create a **host_config** context that is managed for you. The end result of this is that `wash` is automatically configured to connect to your recently-launched wasmCloud host with no configuration changes needed.
+As of wasmCloud `v0.50.2`, a [host configuration](/docs/hosts/elixir/host_configure) file is written to `$HOME/.wash/host_config.json` with the last values used to configure and run a host on your machine. `wash` uses that file by default to create a **host_config** context that is managed for you. The end result of this is that `wash` is automatically configured to connect to your recently-launched wasmCloud host with no configuration changes needed.
 
 ### Using the **host_config** context
 
