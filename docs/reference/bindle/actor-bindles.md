@@ -94,7 +94,7 @@ Whew! You made it!
 
 ## A full example
 
-Below is a full invoice example converted from `wasmcloud.azurecr.io/echo:0.3.2` for reference:
+Below is a full invoice example converted from `wasmcloud.azurecr.io/echo:0.3.8` for reference:
 
 ```toml
 bindleVersion = "1.0.0"

@@ -97,10 +97,10 @@ Let’s set up the example `echo` actor to get things running. We’ll need to c
 
 ```shell
 wash ctl start provider wasmcloud.azurecr.io/applier:0.3.0
-wash ctl start provider wasmcloud.azurecr.io/nats_messaging:0.14.5
-wash ctl start provider wasmcloud.azurecr.io/httpserver:0.16.3
+wash ctl start provider wasmcloud.azurecr.io/nats_messaging:0.17.0
+wash ctl start provider wasmcloud.azurecr.io/httpserver:0.17.0
 wash ctl start actor wasmcloud.azurecr.io/service_applier:0.3.0
-wash ctl start actor wasmcloud.azurecr.io/echo:0.3.4
+wash ctl start actor wasmcloud.azurecr.io/echo:0.3.8
 ```
 
 Next link the service applier actor to the NATS provider. You can do this via `wash` commands, but it can be easier to use the wasmCloud UI from your forwarded localhost:4000. Start with linking the service-applier to NATS, using the Contract ID (`wasmcloud:messaging`) and Values (`SUBSCRIPTION=wasmbus.evt.default,URI=nats://localhost:4222`) from the documentation:
