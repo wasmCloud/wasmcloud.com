@@ -28,7 +28,7 @@ A moment later you should see the actor in your web UI as shown in the following
 
 ### Start the web server
 
-We know our new actor needs a web server, so let's start the HTTP server capability provider. To do that, click the **Start Provider** button and enter this OCI URL: `wasmcloud.azurecr.io/httpserver:0.16.2`. Now we should have both an actor and a provider, and the dashboard should look like this:
+We know our new actor needs a web server, so let's start the HTTP server capability provider. To do that, click the **Start Provider** button and enter this OCI URL: `wasmcloud.azurecr.io/httpserver:0.17.0`. Now we should have both an actor and a provider, and the dashboard should look like this:
 
 ![actor and provider](./actorandprovider.png)
 

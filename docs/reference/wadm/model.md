@@ -43,7 +43,7 @@ spec:
     - name: echo
       type: actor
       properties:
-        image: wasmcloud.azurecr.io/echo:0.3.5
+        image: wasmcloud.azurecr.io/echo:0.3.8
       traits: ...
 ```
 
@@ -56,7 +56,7 @@ To define a capability provider, we include a `capability` component, as follows
   type: capability
   properties:
     contract: wasmcloud:httpserver
-    image: wasmcloud.azurecr.io/httpserver:0.13.1
+    image: wasmcloud.azurecr.io/httpserver:0.17.0
     link_name: default
 ```
 
@@ -146,7 +146,7 @@ spec:
     - name: kvcounter
       type: actor
       properties:
-        image: wasmcloud.azurecr.io/kvcounter:0.3.4
+        image: wasmcloud.azurecr.io/kvcounter:0.4.2
       traits:
         - type: linkdef
           properties:
@@ -165,7 +165,7 @@ spec:
     - name: httpserver
       type: capability
       properties:
-        image: wasmcloud.azurecr.io/httpserver:0.16.2
+        image: wasmcloud.azurecr.io/httpserver:0.17.0
         contract: wasmcloud:httpserver
       traits:
         - type: spreadscaler
@@ -175,7 +175,7 @@ spec:
     - name: redis
       type: capability
       properties:
-        image: wasmcloud.azurecr.io/kvredis:0.16.3
+        image: wasmcloud.azurecr.io/kvredis:0.21.0
         contract: wasmcloud:keyvalue
       traits:
         - type: spreadscaler
