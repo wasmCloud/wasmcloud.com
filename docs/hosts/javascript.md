@@ -7,4 +7,8 @@ type: "docs"
 sidebar_position: 9
 ---
 
-TBD
+:::info
+The wasmCloud JavaScript host is not _currently_ maintained. We do have plans to pick it up again and bring it up to par with the rest of our ecosystem.
+:::
+
+For information on the JavaScript host, check out the corresponding [GitHub repository](https://github.com/wasmCloud/wasmcloud-js)

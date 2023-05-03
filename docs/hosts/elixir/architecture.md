@@ -11,6 +11,8 @@ The following diagram illustrates the composition of the Elixir OTP host:
 
 ![host architecture diagram](./otp_host_arch.png)
 
+In this diagram, `Mxxx` represents an actor (an actor's public key is a 56-character string starting with `M`) while `Vxxx` represents a capability provider (their public keys start with `V`).
+
 The unit of deployment is the single OTP application. See the [GitHub repository](https://github.com/wasmcloud/wasmcloud-otp) for details and specifics of how this application is deployed, including instructions for use with Docker.
 
 Inside each deployed Elixir wasmCloud host, there is a process supervisor called the **Virtual Host**. Beneath this supervisor are two more supervisors: the **Actor Supervisor** and the **Provider Supervisor**. In turn, each of these supervise individual processes for actors and providers. 
@@ -25,6 +27,12 @@ If a host is asked to gracefully terminate, then it will usually be able to stop
 
 ```
 ps -ef | grep wasmcloud
+```
+
+Also, if you find that you may have orphaned the actual OTP host and not just a provider, you can look for the `beam` process:
+
+```
+ps -ef | grep beam
 ```
 
 We all look forward to the bright future when we might be able to replace provider archive files containing OS/CPU-bound binaries with fully portable WASI components. Until then, spawning an OS process for a capability provider is the only way to manage them.
