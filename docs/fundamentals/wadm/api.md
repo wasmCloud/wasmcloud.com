@@ -7,4 +7,6 @@ type: "docs"
 sidebar_position: 4
 ---
 
-TBD
+:::info
+This document is under construction as **[wadm](https://github.com/wasmcloud/wadm)** undergoes a transition to the new Rust target. Until then, see the GitHub repository for the most current information.
+:::

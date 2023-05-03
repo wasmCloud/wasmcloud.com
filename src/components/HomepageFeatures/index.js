@@ -8,7 +8,7 @@ const FeatureList = [
     Image: '/img/features/cloud.png',
     description: (
       <>
-        wasmCloud provides a WebAssembly application runtime so you can run your applications everywhere - servers, clients, hosts, IOS, web browsers, IOT or where ever WebAssembly executes.
+      Write your components once and run them <b>anywhere</b> at any scale. Deploy to the cloud, the edge, browsers, IoT, or anywhere in between.
       </>
     ),
   },
@@ -17,7 +17,7 @@ const FeatureList = [
     Image: '/img/features/connected.png',
     description: (
       <>
-        wasmCloud comes out of the box bundled with Lattice - a self-forming, self-healing mesh network that provides a unified, flattened topology across any number of disparate environments, clouds, browsers, or even hardware. No firewalls. No port forwarding. It just works.
+        <b>Cluster</b> wasmCloud hosts together across disparate clouds and infrastructure, managing your apps with a single flat topology and never open a single firewall port. Clusters self-form, self-heal, and bridge multiple protocols to extend the cloud to the farthest edge.         
       </>
     ),
   },
@@ -26,7 +26,7 @@ const FeatureList = [
     Image: '/img/features/secure.png',
     description: (
       <>
-        wasmCloud embraces a deny by default paradigm - actors are only permitted to access capabilities they have been explicity granted permission to leverage. With wasmCloud, ALL code is untrusted code.
+        Build truly <b>zero trust</b> applications on wasmCloud. Leverage the WebAssembly sandbox and wasmCloud's cryptographically secure modules to automatically embrace defense in depth without sacrificing developer experience.        
       </>
     ),
   },

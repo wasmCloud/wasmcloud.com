@@ -32,11 +32,11 @@ When an actor with a call alias is started, the entire lattice in which that act
 
 Call aliases, when used appropriately, can provide consistent, developer-friendly naming conventions for locating target actors and often serve a similar purpose as the concept of "discovery servers" or "discovery services" in more traditional microservice environments.
 
-### Using the actor core API
+### Using the Actor Core API
 
 All actors in the wasmCloud ecosystem are capable of making calls to other actors. The wasmCloud host runtime will, by default, allow any two actors to communicate with each other.
 
-The following code snippet illustrates invoking a ping() method (in other words, sending a ping message) to an actor that implements a Ponger interface:
+The following code snippet illustrates invoking a `ping` method (in other words, sending a ping message) to an actor that implements a Ponger interface:
 
 ```rust
 // import the interface library
