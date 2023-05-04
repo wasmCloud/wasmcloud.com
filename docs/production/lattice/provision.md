@@ -54,6 +54,6 @@ At first glance, you might wonder why the providers are given different RPC cred
 
 For the most part, lattices are self-maintaining. They sit atop the power and flexibility of NATS and use the shared topic space for discovering and communicating with other hosts within the lattice. All you need to do in order to maintain a lattice is ensure that the NATS servers stay up (and, based on NATS historical reliability, this is an easy task).
 
-One thing that you might want to do when testing or experimenting is _clear the distributed cache_. wasmCloud hosts use a **JetStream** stream named `LATTICECACHE_{prefix}` to publish changes to the distributed cache of actor claims, OCI reference maps, and link definitions. To purge this cache, you'll want to _stop all hosts in the cache_, and then use the `nats stream purge` command (`nats` is a CLI provided by NATS that you can [install](https://github.com/nats-io/natscli).
+One thing that you might want to do when testing or experimenting is _clear the distributed cache_. wasmCloud hosts use a **JetStream** stream named `LATTICECACHE_{prefix}` to publish changes to the distributed cache of actor claims, OCI reference maps, and link definitions. To purge this cache, you'll want to _stop all wasmCloud hosts in the cluster_, and then use the `nats stream purge` command (`nats` is a CLI provided by NATS that you can [install](https://github.com/nats-io/natscli)).
 
 For more information about this cache, please read the [JetStream](./jetstream) topic.
