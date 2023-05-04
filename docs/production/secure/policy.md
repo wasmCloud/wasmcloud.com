@@ -39,7 +39,7 @@ Next, your code will need to respond to policy requests that take the following 
         },
         "clusterIssuers": ["Cxxx", "Cxxxy"]
     },  
-    "action": "MyContract.OperationName"
+    "action": "[start_provider | start_actor | perform_invocation]"
 }
 ```
 
@@ -53,6 +53,4 @@ Your policy service can then use the information in this request to decide if th
 }
 ```
 
-:::caution
-We do not currently have an active example of a policy service. However, that should be changing shortly as we plan on publishing an example policy service implemented as a single wasmCloud actor.
-:::
+To see this in action with a wasmCloud actor, see our [policy actor](https://github.com/wasmCloud/examples/tree/main/actor/policy) sample. If you're curious about the RFC that provided the original specification for the policy protocol, see [this RFC](https://github.com/wasmCloud/wasmcloud-otp/issues/439).
