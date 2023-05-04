@@ -1,7 +1,7 @@
 ---
 title: "Official OCI Image List"
 date: 2018-12-29T11:02:05+06:00
-sidebar_position: 8
+sidebar_position: 2
 draft: false
 ---
 
