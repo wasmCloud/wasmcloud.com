@@ -242,7 +242,7 @@ wash lint
 wash validate
 ```
 
-These check the file against a predefined set of rules. The rules will be added to an improved over time.
+These check the file against a predefined set of rules. The rules will be added to and improved over time.
 
 You can type `make` to generate the code and build the Rust library.
 
