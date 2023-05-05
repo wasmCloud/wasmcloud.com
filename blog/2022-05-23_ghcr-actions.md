@@ -36,13 +36,13 @@ To start, let's go ahead and generate a new wasmCloud actor project from the `he
 wash new actor hello
 ```
 
-Once the project is generated, `cd hello` into the project. There, you can run `cargo build --release` build your actor module. The last step before we can push it to GitHub is to <u>[sign](https://wasmcloud.dev/app-dev/std-caps/#sign-the-actor)</u> the actor with embedded claims. The following command will sign your actor and allow it to access the HTTPServer capability:
+Once the project is generated, `cd hello` into the project. There, you can run `wash build` to build
+your actor module. This command will compile and
+<u>[sign](https://wasmcloud.dev/app-dev/std-caps/#sign-the-actor)</u> the actor with embedded
+claims, allowing it to access the HTTPServer capability.
 
-```bash
-wash claims sign build/hello.wasm --http_server --name Hello
-```
-
-By default this will place the actor under the same directory with a `_s` suffix, and you can verify this worked properly by running:
+By default this will place the actor under the `build` directory with a `_s` suffix, and you can
+verify this worked properly by running:
 
 ```bash
 wash claims inspect build/hello_s.wasm
