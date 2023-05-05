@@ -39,13 +39,13 @@ wash new actor hello
 Once the project is generated, `cd hello` into the project. There, you can run `cargo build --release` build your actor module. The last step before we can push it to GitHub is to <u>[sign](https://wasmcloud.dev/app-dev/std-caps/#sign-the-actor)</u> the actor with embedded claims. The following command will sign your actor and allow it to access the HTTPServer capability:
 
 ```bash
-wash claims sign target/wasm32-unknown-unknown/release/hello.wasm --http_server --name Hello
+wash claims sign build/hello.wasm --http_server --name Hello
 ```
 
 By default this will place the actor under the same directory with a `_s` suffix, and you can verify this worked properly by running:
 
 ```bash
-wash claims inspect target/wasm32-unknown-unknown/release/hello_s.wasm
+wash claims inspect build/hello_s.wasm
 ```
 
 Your output should be something like this, just with different `Account` and `Module` keys
@@ -77,13 +77,13 @@ Now, time to push! We'll use `wash` here along with some environment variables. 
 ```bash
 export WASH_REG_USER=<your_github_username>
 export WASH_REG_PASSWORD=<your_gitub_personal_access_token>
-wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 target/wasm32-unknown-unknown/release/hello_s.wasm
+wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
 ```
 
 You should see output like the following:
 
 ```plain
-wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 target/wasm32-unknown-unknown/release/hello_s.wasm
+wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
 
 🚿 Successfully validated and pushed to ghcr.io/brooksmtownsend/hello:0.1.0
 ```
