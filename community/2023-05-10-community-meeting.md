@@ -11,6 +11,7 @@ import ReactPlayer from 'react-player/youtube';
 
 - DEMO + Showcase: wasmCloud burrito releases
 - Discussion: "Built-in" capability providers defined at runtime
+- wasmCloud: Path to a CNCF Incubating project
 
 <!--truncate-->
 
