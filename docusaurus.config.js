@@ -107,6 +107,10 @@ const config = {
                 href: 'https://github.com/wasmcloud/',
               },
               {
+                label: 'Contributing',
+                href: 'https://github.com/wasmCloud/wasmCloud/blob/main/CONTRIBUTING.md',
+              },
+              {
                 label: 'Slack',
                 href: 'https://slack.wasmcloud.com',
               },
