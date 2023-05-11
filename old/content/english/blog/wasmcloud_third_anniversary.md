@@ -45,7 +45,7 @@ The first version of the runtime was built with Rust's "heavy" threads and commu
 
   
 
-This refactor switched from "heavy" threads to using an actor-model crate for Rust called [Actix](https://actix.rs/book/actix/sec-2-actor.html). It made a lot of sense at the time--We were building an actor-based host runtime so an actor model for the internal plumbing felt harmonious. It did clean up the spaghetti from the heavy threads and we were able to see some performance improvements in function calls. However, Actix is based on Rust's async model, and carries all of the baggage that entails. The more we added features to this new runtime, the more difficult it became to develop. Ultimately, the only people who could touch certain parts of the codebase were those who knew the precise magical incantation of syntax to get the futures+Actix code to work.
+This refactor switched from "heavy" threads to using an actor-model crate for Rust called [Actix](https://actix.rs/docs/actix/actor/). It made a lot of sense at the time--We were building an actor-based host runtime so an actor model for the internal plumbing felt harmonious. It did clean up the spaghetti from the heavy threads and we were able to see some performance improvements in function calls. However, Actix is based on Rust's async model, and carries all of the baggage that entails. The more we added features to this new runtime, the more difficult it became to develop. Ultimately, the only people who could touch certain parts of the codebase were those who knew the precise magical incantation of syntax to get the futures+Actix code to work.
 
   
 
