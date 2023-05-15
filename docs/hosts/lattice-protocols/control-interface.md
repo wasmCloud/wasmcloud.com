@@ -27,7 +27,7 @@ All control interface messages conform to the schema found in the [control inter
 | `auction.actor`     | Req  | Hold an auction for starting an actor                                        |
 | `cmd.{host}.la`     | Req  | Tell a host to start (_launch_) an actor                                     |
 | `cmd.{host}.sa`     | Req  | Tell a host to stop an actor                                                 |
-| `cmd.{host}.scale}` | Req  | Scale a given actor to a specific number of instances                        |
+| `cmd.{host}.scale` | Req  | Scale a given actor to a specific number of instances                        |
 | `cmd.{host}.lp`     | Req  | Tell host to launch provider                                                 |
 | `cmd.{host}.sp`     | Req  | Tell host to stop provider                                                   |
 | `cmd.{host}.upd`    | Req  | Tell host to live-update actor                                               |
