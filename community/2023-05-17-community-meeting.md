@@ -10,7 +10,8 @@ import ReactPlayer from 'react-player/youtube';
 ### Agenda
 
 - 
-- 
+- Discuss [RFC Remove the Washboard from the Host](https://github.com/wasmCloud/wasmCloud/issues/321)
+- Discuss [RFC Transition Feature Focus to Rust](https://github.com/wasmCloud/wasmCloud/issues/324)
 - 
 
 <!--truncate-->
