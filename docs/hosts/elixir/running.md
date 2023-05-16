@@ -5,61 +5,24 @@ sidebar_position: 11
 draft: false
 ---
 
-The wasmCloud host runtime is an [Elixir mix release](https://hexdocs.pm/mix/Mix.Tasks.Release.html) that includes various scripts for running and managing an application. By running `bin/wasmcloud_host`, you'll see a variety of commands and options:
+The wasmCloud host runtime is an [Elixir burrito](https://github.com/burrito-elixir/burrito) that allows us to package cross-platform Elixir releases. It's a self-extracting tarball that contains statically linked assets for the most portability, and for all intents and purposes it acts like a single binary. Executing a burrito works just like any other binary, except for the first time you execute it the burrito will extract the Elixir application files to an application directory on your machine.
 
-```plain
-./bin/wasmcloud_host
-Usage: wasmcloud_host COMMAND [ARGS]
+## Installing
 
-The known commands are:
+If you'd like to run the host without using [wash](/docs/installation), simply download the host according to your machine's operating system and architecture from the [wasmcloud-otp Releases page](https://github.com/wasmCloud/wasmcloud-otp/releases), add the executable flag, and then run it.
 
-    start          Starts the system
-    start_iex      Starts the system with IEx attached
-    daemon         Starts the system as a daemon
-    daemon_iex     Starts the system as a daemon with IEx attached
-    eval "EXPR"    Executes the given expression on a new, non-booted system
-    rpc "EXPR"     Executes the given expression remotely on the running system
-    remote         Connects to the running system via a remote shell
-    restart        Restarts the running system via a remote command
-    stop           Stops the running system via a remote command
-    pid            Prints the operating system PID of the running system via a remote command
-    version        Prints the release name and version to be booted
+For example, on a Linux machine with the x86_64 architecture:
+
+```bash
+curl -fLO https://github.com/wasmCloud/wasmcloud-otp/releases/download/v0.63.0/wasmcloud_host_x86_64_linux_gnu
+chmod +x wasmcloud_host_x86_64_linux_gnu
+./wasmcloud_host_x86_64_linux_gnu
 ```
 
-There are a variety of commands and options to get used to here, we generally only focus on the commands that manage starting, stopping, and debugging a wasmCloud application.
+## Uninstalling
 
-- To start the host running in the current terminal, which is recommended to easily view logs, you can use `start`
+Elixir burritos have support for deleting extracted files with the `maintenance` command. Simply run the following command to remove extracted files:
 
-  ```bash
-  bin/wasmcloud_host start
-  ```
-
-- Alternately, you can start it in the background as a daemon with `daemon`
-
-  ```bash
-  bin/wasmcloud_host daemon
-  ```
-
-  and stop it with
-
-  ```bash
-  bin/wasmcloud_host stop
-  ```
-
-  or restart it with
-
-  ```bash
-  bin/wasmcloud_host restart
-  ```
-
-  If you choose this option, host logs will be located under `tmp/log` and can be viewed with:
-
-  ```bash
-  tail tmp/log/erlang.log.1
-  ```
-
-- If you're already familiar with Elixir and **iex**, Elixir's interactive shell, and want to dive into the host's internals, execute Elixir statements, and set breakpoints, start the host including an interactive console with:
-
-  ```bash
-  bin/wasmcloud_host start_iex
-  ```
+```bash
+./wasmcloud_host_x86_64_linux_gnu maintenance uninstall
+```
