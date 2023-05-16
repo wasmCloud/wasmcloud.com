@@ -20,7 +20,7 @@ The wasmCloud host logs include the following:
 
 ## Finding the logs (release tarball)
 
-If you followed the [installation](/docs/installation) guide then you likely started the host by running a command like `./bin/wasmcloud_host start` or `./bin/wasmcloud_host daemon`. In the same directory where you unpacked the tarball you'll be able to find the logs in `./tmp/log/erlang.log.X`, where `X` starts at `1` and will increment monotonically as the log file grows too large.
+If you followed the [installation](/docs/installation) guide then you likely started the host by running a command like `wash up` or `wash up --detached`. If you ran the host using `wash up` the logs will be printed to the screen, otherwise they will be located in the `~/.wash/downloads` directory.
 
 If you take a look at the top of one of these logfiles (using `head` for example on Unix systems) you'll see something like:
 
@@ -74,61 +74,9 @@ At the time of writing this, the main wasmCloud host runtime is an Elixir/OTP ap
 
 ### Elixir + Actors
 
-Elixir supports log levels of `error`, `warn`, `info`, and `debug`. In order to change the log level you'll need to use the integrated Elixir terminal using one of the methods below. Because actors log through the host runtime, this will also affect their log level.
+Elixir supports log levels of `error`, `warn`, `info`, and `debug`. You'll need to set the log level before you launch the host by setting the environment variable `WASMCLOUD_LOG_LEVEL` to one of the supported log level.
 
-<Tabs>
-  <TabItem value="local" label="Local Development" default>
-
-When you launch your host, do so with the integrated terminal attached. In the `wasmcloud_host` directory:
-
-```shell
-iex -S mix phx.server
-```
-
-Then you can set the log level in the `iex` terminal
-
-```elixir
-Logger.configure(level: :debug)
-```
-
-As mentioned above, you can replace `debug` with `info`, `warn`, or `error`.
-
-  </TabItem>
-  <TabItem value="release" label="Release Tarball">
-
-Use the following command to attach to the Elixir integrated terminal
-
-```shell
-./bin/wasmcloud_host remote
-```
-
-Then use the `Logger` module to configure the log level
-
-```elixir
-Logger.configure(level: :debug)
-```
-
-As mentioned above, you can replace `debug` with `info`, `warn`, or `error`. You are now free to quit out of the console by inputting `CTRL+c` twice.
-
-  </TabItem>
-  <TabItem value="docker" label="Docker">
-
-Use the `docker` CLI to `exec` into your container:
-
-```shell
-docker exec -it <your_container_id> /opt/app/bin/wasmcloud_host remote
-```
-
-Then use the `Logger` module to configure the log level
-
-```elixir
-Logger.configure(level: :debug)
-```
-
-As mentioned above, you can replace `debug` with `info`, `warn`, or `error`. You are now free to quit out of the console by inputting `CTRL+c` twice.
-
-  </TabItem>
-</Tabs>
+For example, running `WASMCLOUD_LOG_LEVEL=debug wash up` will show the most verbose logs.
 
 ### Rust Capability Providers
 
