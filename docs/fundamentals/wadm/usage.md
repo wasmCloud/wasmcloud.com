@@ -1,8 +1,9 @@
 ---
-title: "Using Wadm via Wash"
-date: 2022-09-08T11:02:05+06:00
+title: "Deploying Applications"
+date: 2020-01-19T00:00:00+00:00
+description: "Deploying your apps with wadm"
+type: "docs"
 sidebar_position: 3
-draft: false
 ---
 
 Using `wadm` typically involves using the `wash` command line tool. However, you can also use wash's supporting library in your Rust application or, if you continue to the next section, you'll see the API reference if you want to interact with wadm directly over a NATS connection.
