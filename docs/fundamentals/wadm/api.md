@@ -341,7 +341,9 @@ or
 for a non-destructive undeploy. This will stop managing, but will not destroy resources.
 
 :::warning
-This feature is currently not implemented, but will be added in a future version
+Non-destructive undeploy is currently not implemented, but will be added in a future version. Please
+open [an issue](https://github.com/wasmCloud/wadm/issues) if you would like to see this feature and
+how you'd like it to behave
 :::
 
 **Response**:
@@ -407,39 +409,4 @@ Empty body
     }
   ]
 }
-```
-
-### Deployment History
-
-:::warning
-This functionality is not yet implemented. The documentation below is what originally existed in
-wadm 0.3. This may end up being a stream of events that can be consumed rather than a list of events
-you can request
-:::
-
-`wadm.api.{lattice}.model.history.{name}`
-
-Returns the history of compensating actions taken by wadm. Also includes when deploy and undeploy
-actions were taken.
-
-**Request**: `none`
-
-**Response**:
-
-```json
-[
-  {
-    "time": "<RFC3339 Timestamp>",
-    "action": "deploy|undeploy|compensator",
-    "success": true,
-    "message": "... varies ... ",
-    "component": "varies",
-    "trait": "varies",
-    "model_version": "1.0",
-    "details": {
-      "key": "value",
-      "key2": "value2"
-    }
-  }
-]
 ```
