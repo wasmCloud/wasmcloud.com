@@ -71,9 +71,8 @@ you are managing multiple lattices all running on the same NATS cluster (e.g. su
 or group), meaning wadm will be looking for all events on `wasmbus.evt.*`. This is useful if you
 have multiple lattices running in different environments (e.g. dev, staging, production) and want to
 manage them all from a single wadm instance. This pattern requires that you configure NATS
-credentials to be able to receive messages from all lattices. See [Configuring NATS
-Credentials](#configuring-nats-credentials) for more information on how to configure NATS
-credentials. 
+credentials to be able to receive messages from all lattices. The credentials you generate below
+in [Configuring NATS Credentials](#configuring-nats-credentials) are set up to follow this pattern.
 
 However, it is important to note that the difference between this pattern and the single lattice
 management pattern is purely in the credentials used (you still can run the instances in the same
@@ -103,42 +102,91 @@ that will not be covered in full here, but you can get a full walkthrough in the
 documentation](https://docs.nats.io/running-a-nats-service/nats_admin/security/jwt). In this section
 we will cover what topics wadm needs access to in order to function.
 
-TODO: I need some help here enumerating how to restrict credentials down for people
-
 ### Wadm credentials
 
 Wadm will essentially need a set of "root" credentials to your lattice, no matter which deployment
 pattern you choose. Those topics differ depending on the pattern you choose and are detailed in the
-sections below
+sections below.
 
-#### Single lattice management
+The easiest configuration for users is to use anonymous authentication. This is the default
+configuration for NATS leaf nodes started by `wash up`. In this mode anyone with access to NATS can
+make requests of the Wadm API, and Wadm can make any requests it needs of the [wasmCloud control
+interface](../../hosts/lattice-protocols/control-interface). However, if you are deploying to
+production, you will likely want to use JWT authentication, which is described below.
+​
+If you're not using anonymous authentication, the next easiest thing to do is to use JWT
+authentication using a single configuration file with a [memory
+resolver](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt/mem_resolver).
+If you follow this tutorial and change user permissions based on the topics below, you'll be able to
+create an environment that's secure for both Wadm and Wadm consumers. To perform these steps, you'll
+need the NATS [nsc](https://docs.nats.io/using-nats/nats-tools/nsc) command line tool installed. The
+following set of steps will create a simple environment with two users: one for `wadm` and one for
+wadm consumers like `wash`. 
+​
+<details>
+<summary>Creating a Sample Account and Users</summary>
 
-Wadm will need a set of credentials that can publish and receive on the following topics:
+```
+nsc add operator -n wadmdemo
+nsc add account --name WADM
+nsc add user --name wadmconsumer
+```
 
-**Publish**
+Take note of where the user's credentials were created. They aren't part of the server configuration
+so you'll need them later.
 
-- `wadm.evt.<lattice-id>`
-- `wadm.cmd.<lattice-id>`
-- `wadm.notify.<lattice-id>`
-- `wasmbus.ctl.<lattice-id>.>`
-- `$JS.API.STREAM.>`
-- `$JS.*.API.STREAM.>`
-- `$JS.API.STREAM.UPDATE.>`
-- `$JS.*.API.STREAM.CREATE.>`
+```
+[ OK ] generated user creds file `~/.local/share/nats/nsc/keys/creds/wadmdemo/WADM/wadmapp.creds`
+```
 
+Continuing on:
 
-#### Multi-lattice management
+```
+nsc edit user --name wadmconsumer --allow-pub-response --allow-pub "wadm.api.>,wasmbus.ctl.>" 
+nsc add user --name wadmapp
+```
 
-Wadm will need a set of credentials that can publish and receive on the following topics:
+Again, keep track of where the credentials were created.
 
-**Publish**
+```
+nsc edit user --name wadmapp --allow-pub-response --allow-sub "wadm.api.>" --allow-pub "wadm.>,wasmbus.ctl.>,$JS.>"
+nsc generate config --mem-resolver --config-file ./server.conf
+```
 
-- `wadm.evt.*`
-- `wadm.cmd.*`
-- `wadm.notify.*`
-- `wasmbus.ctl.>`
+​Now you should have a configuration file that you can use via `nats-server -c server.conf`. This
+will start NATS with the account you created. You also created a user that `wash` can use to consume
+the wadm API, and you created a user that `wadm` can use to connect to NATS. The generated file will
+look something like this: ​
 
-### User credentials
+```
+// Operator "wadmdemo"
+operator: eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI2QU9ESE9BRDdHTUU0NEE1NFZTSVJXTUlVVzdVWFNUQURVMlBaVVRVVlFERklSQlFKQ1FRIiwiaWF0IjoxNjg0NDEzNDk1LCJpc3MiOiJPQ1BFU1dCRVlWVjNDSkFFUEs2QjdUS0xJQ1hMUzZRTDQ0VTRaNzQ3NFlSVFdMSVFFWE41U0dXMiIsIm5hbWUiOiJ3YWRtZGVtbyIsInN1YiI6Ik9DUEVTV0JFWVZWM0NKQUVQSzZCN1RLTElDWExTNlFMNDRVNFo3NDc0WVJUV0xJUUVYTjVTR1cyIiwibmF0cyI6eyJ0eXBlIjoib3BlcmF0b3IiLCJ2ZXJzaW9uIjoyfX0.eXv6L4qNC6qqsAXrVmxHiRkVIShCpiRrboPcOgC9MUqCosgAN4ybxFKDprCSCx8Y0V17eRUurNndgM4unOEDDQ
+​
+resolver: MEMORY
+​
+resolver_preload: {
+  // Account "WADM"
+  ACQ7XAJEVR6L3MVSGFBD7E5OMQY5Z2V3P35YZD4D6Z535O5FE4AMTCYH: eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJLUTdDQk9MU1NESllDTlJLNUZFNjJOS0VDUTVaM0FTNENTTklJNkZZT1BCNDIzT0JRNFVRIiwiaWF0IjoxNjg0NDEzNjA4LCJpc3MiOiJPQ1BFU1dCRVlWVjNDSkFFUEs2QjdUS0xJQ1hMUzZRTDQ0VTRaNzQ3NFlSVFdMSVFFWE41U0dXMiIsIm5hbWUiOiJXQURNIiwic3ViIjoiQUNRN1hBSkVWUjZMM01WU0dGQkQ3RTVPTVFZNVoyVjNQMzVZWkQ0RDZaNTM1TzVGRTRBTVRDWUgiLCJuYXRzIjp7ImxpbWl0cyI6eyJzdWJzIjotMSwiZGF0YSI6LTEsInBheWxvYWQiOi0xLCJpbXBvcnRzIjotMSwiZXhwb3J0cyI6LTEsIndpbGRjYXJkcyI6dHJ1ZSwiY29ubiI6LTEsImxlYWYiOi0xfSwiZGVmYXVsdF9wZXJtaXNzaW9ucyI6eyJwdWIiOnt9LCJzdWIiOnt9fSwidHlwZSI6ImFjY291bnQiLCJ2ZXJzaW9uIjoyfX0.EwPe-PxWvkBwvKpx4ddhI4qLWU649l6HqUGqIFjK0w6NIoXVTzxq8TCAUPLnNQnU9ItXa50X_uxDkdCljAsgCQ
+​
+}
+```
+
+If you find that the users you created aren't able to perform their required tasks, you can just
+re-run `nsc edit user ....` to modify the credentials files (this doesn't require changing the
+`server.conf` file!). ​
+</details>
+
+Lastly, when you get to production, you may want to secure your topic spaces using the [NATS
+resolver](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt/resolver),
+which is a topic out of scope for this document.
+
+:::note
+The credentials generated above work for the multi-lattice management pattern. If you want to
+restrict it to a single lattice, you can change the `allow` statements to use
+`wasmbus.ctl.<lattice_id>.>` instead of `wasmbus.ctl.>` and `wadm.api.<lattice_id>.>` instead of
+`wadm.api.>`. Please consult the NATS documentation for even more examples on how to restrict
+credentials
+:::
 
 #### Multi-tenant
 
