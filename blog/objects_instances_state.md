@@ -52,7 +52,7 @@ I'm not saying that one approach is more scalable than the other. I'm saying tha
 
 So what does all this have to do with **wasmCloud**? Using wasmCloud means you don't have to be locked into one paradigm. Even better, you can choose one paradigm when you start out and then turn knobs and make _runtime_ adjustments to lean in either scale mode direction.
 
-If you want to run everything like a bunch of ad-hoc activated functions that never maintain their own state and just take arguments, then you can absolutely do that. Actor components that just handle calls can be scaled vertically on each node and horizontally across the cluster.
+If you want to run everything like a bunch of ad-hoc activated functions that never maintain their own state and just take arguments, then you can absolutely do that. Actor components that handle calls can be scaled vertically on each node and horizontally across the cluster.
 
 If you want to run your actors with state associated with each one, you can do that as well, but you can also have the modules with that code scaled out as much as you need, and state delivered to the actor when needed. Combining the power of WebAssembly components, the wasmCloud lattice clustering technology, and flexible and extensible capability providers (which can provide state) means you don't have to pick a paradigm and be stuck with it forever. You can get the best of both worlds, and have a solution that leverages the best ideaas from both Akka and Erlang/OTP.
 
