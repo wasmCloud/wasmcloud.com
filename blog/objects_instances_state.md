@@ -38,11 +38,11 @@ One of the things we need to keep an eye out for in this model are "hot objects"
 
 You've probably seen this happen if you play a lot of online games or MMOs. Instance 1 of the mystical plaza reaches capacity and so now we need to spin up a second instance on a new node. This is often called a _shard_. Now we have two mystical plazas, each with completely isolated crowds (cross-world chat is a topic for a different blog).
 
-So how does this behavior change when we don't model the world as objects and instances, and we instead take a more functional approach? Instead of having an object for the mystical plaza and invoking a bunch of mutating functions, we might instead have a module called `mystical-plaza`. In this module there are functions like `handle-enter` and `handle-exit` or `init` or `handle-emote` etc. Each of these functions can then take as an argument whatever state is relevant for the room at the time.
+So how does this behavior change when we don't model the world as objects and instances, and we instead take a more functional approach? Instead of having an object for the mystical plaza and invoking a bunch of mutating functions, we might instead have a module called `mystical-plaza`. In this module there are functions like `handle-enter` and `handle-exit` or `init` or `handle-emote` etc. Each of these functions can then take, as an argument, whatever state is relevant for the room at the time.
 
 When we model in OOP, methods like `sword->wield(player)` can "un-objectify" into functions like `wield(sword, player)`. So it's entirely natural to assume that `wield(sword, player)` is pretty much the same thing as calling a function in an FP environment. In a single monolith, it is actually quite similar.
 
-When we distribute _functions_ across a cluster, however, the default behavior is a little different. On each node in the cluster, we could have the _code_ for the function `plaza-hello`, but there's no internal state. This means that as players file into the plaza, each one could invoke the "closest" `plaza-hello` function and the runtime would be responsible for passing the state into that function. The default mode is one where "state has no home", and so it might be easier to balance out the utilization of the system.
+When we distribute _functions_ across a cluster, however, the default behavior is a little different. On each node in the cluster, we could have the _code_ for the function `plaza-hello`, but there's no internal state. This means that, as players file into the plaza, each one could invoke the "closest" `plaza-hello` function and the runtime would be responsible for passing the state into that function. The default mode is one where "state has no home", and so it might be easier to balance out the utilization of the system.
 
 When distributing functions, we often (there are exceptions, as always) don't need to shard and segment because we don't have one room running on one node, we have the same code running on all the nodes, being invoked as frequently as needed by the sum total of consumers.
 
@@ -50,7 +50,7 @@ When distributing functions, we often (there are exceptions, as always) don't ne
 
 I'm not saying that one approach is more scalable than the other. I'm saying that they have different _scale modes_. When we distribute object instances, we either need to shard them or figure out a decent replication system to ensure that "hot instances" can be spread out. Akka can actually do that for you, too. When we distribute "freezable functions", it might be easier to spread them out across a vast cluster, but in many cases developers find these systems more difficult to reason about.
 
-So what does all this have to do with **wasmCloud**? Using wasmCloud means you don't have to be locked into one paradigm. Even better, you can choose one paradigm when you start out and then turn knobs and make _runtime_ adjustments to lean in either scale mode direction.
+So, what does all this have to do with **wasmCloud**? Using wasmCloud means you don't have to be locked into one paradigm. Even better, you can choose one paradigm when you start out and then turn knobs and make _runtime_ adjustments to lean in either scale mode direction.
 
 If you want to run everything like a bunch of ad-hoc activated functions that never maintain their own state and just take arguments, then you can absolutely do that. Actor components that handle calls can be scaled vertically on each node and horizontally across the cluster.
 
