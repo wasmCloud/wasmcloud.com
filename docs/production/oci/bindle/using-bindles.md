@@ -12,8 +12,12 @@ and the host will attempt to download the provider or actor using Bindle.
 For example:
 
 ```console
-$ wash ctl start provider bindle://wasmcloud.dev/httpserver/0.14.7
+$ wash start provider bindle://wasmcloud.dev/httpserver/0.14.7
 ```
+:::info
+Previous guides used `wash ctl start` which is deprecated and will be replaced by `wash start` in a future version
+See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
+:::
 
 ## Configuring Bindle
 
