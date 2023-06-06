@@ -96,12 +96,16 @@ We’re also using a handy wasmCloud Actor written by Taylor Thomas at Cosmonic,
 Let’s set up the example `echo` actor to get things running. We’ll need to create several providers and actors, then wire them up with link definitions. First start the actors and providers [with the current latest versions](https://github.com/wasmCloud/capability-providers#first-party-capability-providers):
 
 ```shell
-wash ctl start provider wasmcloud.azurecr.io/applier:0.3.0
-wash ctl start provider wasmcloud.azurecr.io/nats_messaging:0.17.0
-wash ctl start provider wasmcloud.azurecr.io/httpserver:0.17.0
-wash ctl start actor wasmcloud.azurecr.io/service_applier:0.3.0
-wash ctl start actor wasmcloud.azurecr.io/echo:0.3.8
+wash start provider wasmcloud.azurecr.io/applier:0.3.0
+wash start provider wasmcloud.azurecr.io/nats_messaging:0.17.0
+wash start provider wasmcloud.azurecr.io/httpserver:0.17.0
+wash start actor wasmcloud.azurecr.io/service_applier:0.3.0
+wash start actor wasmcloud.azurecr.io/echo:0.3.8
 ```
+:::info
+Previous guides used `wash ctl start` which is deprecated and will be replaced by `wash start` in a future version
+See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
+:::
 
 Next link the service applier actor to the NATS provider. You can do this via `wash` commands, but it can be easier to use the wasmCloud UI from your forwarded localhost:4000. Start with linking the service-applier to NATS, using the Contract ID (`wasmcloud:messaging`) and Values (`SUBSCRIPTION=wasmbus.evt.default,URI=nats://localhost:4222`) from the documentation:
 
@@ -118,10 +122,14 @@ Finally, link the Echo actor to the httpserver actor, using the Contract ID (`wa
 Note that this (and the previous commands) could also be done via wash:
 
 ```shell
-$ wash ctl link put MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5 VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver 'ADDRESS=0.0.0.0:8080'
+$ wash link put MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5 VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver 'ADDRESS=0.0.0.0:8080'
 ⡃⠀ Defining link between MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5 and VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M ...
 Published link (MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5) <-> (VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M) successfully
 ```
+:::info
+Previous guides used `wash ctl link` which is deprecated and will be replaced by `wash link` in a future version
+See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
+:::
 
 This link will create a Kubernetes service automatically on port 8080:
 

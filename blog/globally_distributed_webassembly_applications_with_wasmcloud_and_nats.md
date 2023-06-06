@@ -169,12 +169,16 @@ You now have a running wasmCloud host using NGS as the lattice infrastructure! E
 We can continue by deploying our ngs application from the examples repository which consists of: our DogsAndCats actor, a capability provider that implements the `wasmcloud:httpserver` contract and a capability provider that implements the `wasmcloud:httpclient` contract, both of which we provide as wasmCloud first-party providers but could be swapped to any other implementation at runtime.
 
 ```bash
-wash ctl start actor wasmcloud.azurecr.io/dogs-and-cats:0.2.4
-wash ctl link put MCUCZ7KMLQBRRWAREIBQKTJ64MMQ5YKEGTCRGPPV47N4R72W2SU3EYMU VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver ADDRESS=0.0.0.0:8081
-wash ctl link put MCUCZ7KMLQBRRWAREIBQKTJ64MMQ5YKEGTCRGPPV47N4R72W2SU3EYMU VCCVLH4XWGI3SGARFNYKYT2A32SUYA2KVAIV2U2Q34DQA7WWJPFRKIKM wasmcloud:httpclient
-wash ctl start provider wasmcloud.azurecr.io/httpserver:0.17.0
-wash ctl start provider wasmcloud.azurecr.io/httpclient:0.7.0
+wash start actor wasmcloud.azurecr.io/dogs-and-cats:0.2.4
+wash link put MCUCZ7KMLQBRRWAREIBQKTJ64MMQ5YKEGTCRGPPV47N4R72W2SU3EYMU VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver ADDRESS=0.0.0.0:8081
+wash link put MCUCZ7KMLQBRRWAREIBQKTJ64MMQ5YKEGTCRGPPV47N4R72W2SU3EYMU VCCVLH4XWGI3SGARFNYKYT2A32SUYA2KVAIV2U2Q34DQA7WWJPFRKIKM wasmcloud:httpclient
+wash start provider wasmcloud.azurecr.io/httpserver:0.17.0
+wash start provider wasmcloud.azurecr.io/httpclient:0.7.0
 ```
+:::info
+Previous guides used `wash ctl start` which is deprecated and will be replaced by `wash start` in a future version
+See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
+:::
 
 Once everything completes, check out a pet picture at [http://127.0.0.1:8081](http://127.0.0.1:8081)! You can refresh to your heart's desire to see pictures of cats and dogs, and you've deployed your application on wasmCloud.
 
@@ -214,8 +218,8 @@ We can go ahead and schedule a few extra replicas of the DogsAndCats actor on th
 
 ```bash
 # The constraint flag ensures we start on a host with that label
-wash ctl start actor wasmcloud.azurecr.io/dogs-and-cats:0.2.4 --constraint machine=second
-wash ctl start provider wasmcloud.azurecr.io/httpclient:0.7.0 --constraint machine=second
+wash start actor wasmcloud.azurecr.io/dogs-and-cats:0.2.4 --constraint machine=second
+wash start provider wasmcloud.azurecr.io/httpclient:0.7.0 --constraint machine=second
 ```
 
 We've now transformed this app from running as a monolith to running distributed across two machines, with resources running both local and in the cloud. You can even remove the DogsAndCats actor from your local machine and everything will immediately failover to the cloud.
