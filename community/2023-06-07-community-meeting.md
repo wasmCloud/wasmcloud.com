@@ -9,8 +9,8 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
-- 
+- wadm 0.4 release
+- wash 0.18.0 upcoming features + changes
 - 
 
 <!--truncate-->
