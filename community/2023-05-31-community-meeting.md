@@ -1,8 +1,8 @@
 ---
-title: 2023-05-24 Community Meeting
+title: 2023-05-31 Community Meeting
 authors: [brooks]
 tags: [community, meeting]
-description: Agenda, notes, and recording for the 2023-05-24 community meeting
+description: Agenda, notes, and recording for the 2023-05-31 community meeting
 ---
 
 import ReactPlayer from 'react-player/youtube';
