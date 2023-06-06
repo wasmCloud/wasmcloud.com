@@ -11,6 +11,9 @@ import ReactPlayer from 'react-player/youtube';
 
 - wadm 0.4 release
 - wash 0.18.0 upcoming features + changes
+  - Embedded `wadm` in `wash up`
+  - Flattening CLI commands per [RFC 538](https://github.com/wasmCloud/wash/issues/538)
+  - Updating to BEAM burrito binaries, improved platform portability
 - 
 
 <!--truncate-->
