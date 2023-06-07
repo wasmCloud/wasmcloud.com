@@ -10,13 +10,13 @@ description: Exploring WebAssembly Interaction Patterns - Command, Reactor, and 
 draft: false
 ---
 The first thing people need to learn when encountering WebAssembly for the first time is how to interact with the code inside the module.
-There are a number of patterns available for this, and in this blog post I'll cover the main three: _Command, Reactor_, and _Library_.
+There are a number of patterns available for this and, in this blog post, I'll cover the main three: _Command, Reactor_, and _Library_.
 
 <!-- truncate -->
 
 As we've mentioned in a number of posts and conference talks, WebAssembly's isolated sandbox forces people to use functions that
 can only accept and return numbers. _Bailey Hayes_ likes to refer to this aspect of WebAssembly as just _"[a bunch of numbers in a trenchcoat](https://youtu.be/6_BRLqxiZPU?t=459)"_. There are 
-plenty of libraries, wrappers, tools, and extensions that try and hide this basic fact, but it's important to understand underneath all of that, it's comes down to exchanging numbers.
+plenty of libraries, wrappers, tools and extensions that try and hide this basic fact, but it's important to understand, underneath it all, its comes down to exchanging numbers.
 
 Once we get past the fact that we're only dealing with numbers, we can then move on to explore _how_ we're going to interact with the module. Let's take a look at each of these patterns in turn.
 
@@ -26,14 +26,14 @@ speaking, the command pattern involves sending a request and then obtaining a re
 the request/response nature of the interaction.
 
 Commands can be anything from a simple request to add two numbers together to a complex request to perform object recognition on an image frame. The mechanics of getting this 
-command into a WebAssembly module and getting the response back usually involves building the module to target **WASI** and accepting a single command input over **stdin** and delivering
+command into a WebAssembly module and getting the response back usually involves building the module to target **WASI**, accepting a single command input over **stdin** and delivering
 the response via **stdout**.
 
 The primary appeal of this pattern is simplicity and availability. Even languages that struggle to produce freestanding WebAssembly modules (e.g. targeting `wasm32-unknown-unknown`) can often 
-produce `wasm32-wasi` modules. Accepting data via **stdin** means that the WASI plumbing is taking care of marshaling the data through linear memory and the developer doesn't have to do that manually. Returning the result is a simple matter of writing to **stdout**.
+produce `wasm32-wasi` modules. Accepting data via **stdin** means that the WASI plumbing takes care of marshaling the data through linear memory and the developer doesn't have to do that manually. Returning the result is a simple matter of writing to **stdout**.
 
 The net effect on the developer is a huge boon during today's highly volatile Wasm ecosystem. You can write code that runs both as a regular console app and as a WASI module. This makes
-the code easy to reason about, easy to build, easy to test, and (theoretically) automatically portable to any platform that supports WASI. Sending the request to the module is a simple matter of invoking its default exported function (usually `start` or `_start`).
+the code easy to reason about, easy to build, easy to test and (theoretically) automatically portable to any platform that supports WASI. Sending the request to the module is a simple matter of invoking its default exported function (usually `start` or `_start`).
 
 Here's a few lines of Rust code that can work as easily via `cargo run` as they can as a WASI module:
 ```rust
@@ -55,7 +55,7 @@ In many command pattern implementations, this module could be started up on dema
 It's easy to overthink this one. Rather than being named after some specific library or technology, in this case **reactor** is as its name implies: it _reacts_. 
 The reactor pattern is a command pattern that doesn't shut down after processing a single request. Instead, it stays running and waits for more requests. While both the command and reactor patterns can make use of callbacks for host facilities, these types of callbacks are far more prevalent in reactors. Many implementations of the reactor pattern require that some form of `setup` or `init` function be called prior to the reactor being able to process requests.
 
-Another fundamental difference is that while the command pattern commonly maps a single module to a single function, a reactor can respond to multiple different types of stimulus (which can be modeled as commands, events, or anything else). You'll typically see a dispatcher inside a reactor that routes the request to the appropriate handler. This is a common pattern in many languages and frameworks, but it's especially common in JavaScript and Node.js.
+Another fundamental difference is that, while the command pattern commonly maps a single module to a single function, a reactor can respond to multiple different types of stimulus (which can be modeled as commands, events, or anything else). You'll typically see a dispatcher inside a reactor that routes the request to the appropriate handler. This is a common pattern in many languages and frameworks, but it's especially common in JavaScript and Node.js.
 
 Today Wasm's single-threaded nature implies a single-threaded reactor much like **Node.js**. However, as Wasm becomes more multi-threaded, we'll likely see multi-threaded reactors as well.
 
@@ -97,6 +97,6 @@ In this blog post, we took a quick tour of the three main patterns for working w
 
 * _**Command** -> Serverless_
 * _**Reactor** -> Services_
-* _**Library** -> Components & Hybrid_
+* _**Library** -> Components & Hybrid_ (**wasmCloud**)
 
 We hope that this post has helped you understand the differences between these patterns and how and when they can be used. If this post inspired any ideas or questions, please join us in the [wasmCloud community](https://slack.wasmcloud.com/)! We'd love to hear from you.
