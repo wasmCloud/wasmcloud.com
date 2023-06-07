@@ -15,7 +15,7 @@ But wait, there's more!
 
 GitHub container registry also supports the Open Container Initiative (OCI) specification, which doesn't limit "containers" to just Docker containers, and it supports public anonymous downloads! This makes GHCR a perfect target for hosting OCI-compliant artifacts, like wasmCloud actors and capability providers. Today, we're going to walk through evolving use cases for getting more power out of this feature of GitHub and how it can simplify your wasmCloud development beyond running on your local machine.
 
-  
+
 
 Prerequisites
 -------------
@@ -63,7 +63,7 @@ Your output should be something like this, just with different `Account` and `Mo
   None
 ```
 
-  
+
 
 Now that we've built and signed your actor, let's push it to GitHub! To do this, you'll need a <u>[personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)</u> with the `write:packages` capability. Refer to the link for instructions on how to create this personal access token, and feel free to tweak the other parameters to your liking.
 
@@ -78,13 +78,17 @@ Now, time to push! We'll use `wash` here along with some environment variables. 
 ```bash
 export WASH_REG_USER=<your_github_username>
 export WASH_REG_PASSWORD=<your_gitub_personal_access_token>
-wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 target/wasm32-unknown-unknown/release/hello_s.wasm
+wash push ghcr.io/$WASH_REG_USER/hello:0.1.0 target/wasm32-unknown-unknown/release/hello_s.wasm
 ```
+:::info
+Previous guides used `wash reg push`, which is now deprecated and will be removed in a future version.
+See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
+:::
 
 You should see output like the following:
 
 ```plain
-wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 target/wasm32-unknown-unknown/release/hello_s.wasm
+wash push ghcr.io/$WASH_REG_USER/hello:0.1.0 target/wasm32-unknown-unknown/release/hello_s.wasm
 
 🚿 Successfully validated and pushed to ghcr.io/brooksmtownsend/hello:0.1.0
 ```
@@ -108,7 +112,7 @@ Continuous integration with a GitHub repository
 
 Now that we have a Package set up for our actor, the next step is to connect it to a repository. Once we do that we can take advantage of the built-in Actions that are provided with an actor project to automatically build, test, and release actors.
 
-  
+
 
 First step is to create a GitHub repository. For simplicity, let's call it `hello` to match the actor name.
 
@@ -127,7 +131,7 @@ git push -u origin main
 
 For every commit after this one, and every pull request into `main` , your actor will be automatically built, checked for formatting, lints, and tested once you add unit tests and uncomment the `cargo test` step in `.github/workflows/build.yml`.
 
-  
+
 
 For the `.github/workflows/release.yml` action, we need to configure three repository secrets to properly sign and release your actor. The good news is, we already have all of these secrets, we just need to plop them in GitHub!
 
@@ -159,7 +163,7 @@ Wrap up
 
 Today we walked through the setup process to configure a GitHub repository to automatically build, test, and release wasmCloud actors to GitHub Packages. You can continue to add to these base workflow templates to include your own custom checks as well.
 
-  
+
 
 What's next?
 ------------

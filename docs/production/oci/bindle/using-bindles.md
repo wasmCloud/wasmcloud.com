@@ -15,7 +15,7 @@ For example:
 $ wash start provider bindle://wasmcloud.dev/httpserver/0.14.7
 ```
 :::info
-Previous guides used `wash ctl start` which is deprecated and will be replaced by `wash start` in a future version
+Previous guides used `wash ctl start`, which is now deprecated and will be removed in a future version.
 See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
 :::
 

@@ -13,7 +13,12 @@ A second method for testing a provider is to run it in a realistic environment, 
 
 1. Start a new local OCI registry. You can download the [Docker Compose YAML file](https://github.com/wasmCloud/examples/blob/main/docker/docker-compose.yml) and run `docker compose up -d registry`. You'll also need to [allow unauthenticated OCI registry access](/docs/fundamentals/workflow/#allowing-unauthenticated-oci-registry-access) before starting the wasmCloud host.
 
-2. Upload the newly-created _provider archive_ to the local OCI registry (You can use `wash reg push ...`, or if you have one of the provider project Makefiles, `make push`) `make start` to start it.
+2. Upload the newly-created _provider archive_ to the local OCI registry (You can use `wash push ...`, or if you have one of the provider project Makefiles, `make push`) `make start` to start it.
+
+:::info
+Previous guides used `wash reg push`, which is now deprecated and will be removed in a future version.
+See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
+:::
 
 3. Upload an actor that utilizes the provider to the local OCI registry (`wash build` from the actor source folder to compile it, sign it, and then use `wash reg push` to upload it to the registry). Then, use `wash ctl start` to start the actor from the local registry.
 4. Link the actor with `wash ctl link` [on the command line](/docs/fundamentals/actors/create-actor/run#add-a-link-definition) or via the dashboard web UI. For the fakepay provider, no extra configuration parameters values are required for the link command. Note that even if you don't supply configuration values, an actor must be linked to a provider, and be signed with sufficient claims, before it can communicate with the provider.
