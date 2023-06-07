@@ -176,7 +176,7 @@ wash start provider wasmcloud.azurecr.io/httpserver:0.17.0
 wash start provider wasmcloud.azurecr.io/httpclient:0.7.0
 ```
 :::info
-Previous guides used `wash ctl start` which is deprecated and will be replaced by `wash start` in a future version
+Previous guides used `wash ctl start`, which is now deprecated and will be removed in a future version.
 See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
 :::
 

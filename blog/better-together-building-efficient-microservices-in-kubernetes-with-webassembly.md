@@ -107,7 +107,7 @@ wash start actor wasmcloud.azurecr.io/service_applier:0.3.0
 wash start actor wasmcloud.azurecr.io/echo:0.3.8
 ```
 :::info
-Previous guides used `wash ctl start` which is deprecated and will be replaced by `wash start` in a future version
+Previous guides used `wash ctl start`, which is now deprecated and will be removed in a future version.
 See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
 :::
 

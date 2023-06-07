@@ -63,12 +63,17 @@ To start a local OCI registry, download the [sample Docker Compose file](https:/
 docker compose up -d registry
 ```
 
-Once it's running, you can push actors and capability providers to the registry via the `wash reg` set of commands. For example:
+Once it's running, you can push actors and capability providers to the registry using `wash push`. For example:
 
 ```bash
-wash reg push localhost:5000/myactor:0.1.0 ./build/my_actor_s.wasm
-wash reg push localhost:5000/myprovider:0.1.0 ./build/my_provider.par.gz
+wash push localhost:5000/myactor:0.1.0 ./build/my_actor_s.wasm
+wash push localhost:5000/myprovider:0.1.0 ./build/my_provider.par.gz
 ```
+:::info
+Previous guides used `wash reg push`, which is now deprecated and will be removed in a future version.
+See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
+:::
+
 
 ### Allowing unauthenticated OCI registry access
 
