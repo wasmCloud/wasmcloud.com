@@ -15,6 +15,7 @@ import ReactPlayer from 'react-player/youtube';
   - Embedded `wadm` in `wash up`
   - Flattening CLI commands per [RFC 538](https://github.com/wasmCloud/wash/issues/538)
   - Updating to BEAM burrito binaries, improved platform portability
+- wasmCloud applies for CNCF incubating status
 
 <!--truncate-->
 
