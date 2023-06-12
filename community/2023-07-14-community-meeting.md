@@ -9,8 +9,9 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
-- 
+- DEMO: `wash capture`
+- DEMO: `wash dev`
+- wash 0.18 release!
 - 
 
 <!--truncate-->
