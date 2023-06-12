@@ -1,8 +1,8 @@
 ---
-title: 2023-07-14 Community Meeting
+title: 2023-06-14 Community Meeting
 authors: [brooks]
 tags: [community, meeting]
-description: Agenda, notes, and recording for the 2023-07-14 community meeting
+description: Agenda, notes, and recording for the 2023-06-14 community meeting
 ---
 
 import ReactPlayer from 'react-player/youtube';
@@ -12,7 +12,7 @@ import ReactPlayer from 'react-player/youtube';
 - DEMO: `wash capture`
 - DEMO: `wash dev`
 - wash 0.18 release!
-- 
+- Discussion: wash development loop
 
 <!--truncate-->
 
