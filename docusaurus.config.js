@@ -38,6 +38,9 @@ const config = {
         blog: {
           blogSidebarCount: 100
         },
+        docs: {
+          editUrl: "https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/"
+        },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
         },
