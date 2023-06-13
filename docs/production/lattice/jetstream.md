@@ -5,35 +5,38 @@ sidebar_position: 10
 draft: false
 ---
 
-The wasmCloud lattice makes use of a _distributed cache_. This cache is supplied by [JetStream](https://docs.nats.io/nats-concepts/jetstream), which is convenient because JetStream comes "for free" with any recent NATS server version. For more information on the architectural considerations we made when deciding on JetStream for our distributed cache provider, please consult our [ADR](https://wasmcloud.github.io/adr/0009-jetstream.html).
-
-The wasmCloud lattice uses a JetStream [stream](https://docs.nats.io/jetstream/concepts/streams) to emit _events_ that indicate changes to shared state. The following types of information are maintained within the distributed cache:
+The wasmCloud lattice makes use of a _distributed cache_ for lattice-wide metadata. The information in this cache is required to allow a lattice to function properly. It contains the following information:
 
 - Claims - JWTs are stored for both providers and actors
 - Link Definitions
 - OCI References - a mapping between OCI URLs and public keys
 
+The persistence and implementation of this cache is actually a [NATS Key-Value Bucket](https://docs.nats.io/using-nats/developer/develop_jetstream/kv). When any wasmCloud host starts up, it will create this bucket with the default configuration if it does not yet exist. The default configuration for this key-value bucket is as follows (which you can obtain via the `nats` CLI):
+
+```
+$ nats kv info LATTICEDATA_default
+Information for Key-Value Store Bucket LATTICEDATA_default created 2023-06-13T08:03:15-04:00
+
+Configuration:
+
+          Bucket Name: LATTICEDATA_default
+         History Kept: 1
+        Values Stored: 0
+   Backing Store Kind: JetStream
+          Bucket Size: 0 B
+  Maximum Bucket Size: unlimited
+   Maximum Value Size: unlimited
+     JetStream Stream: KV_LATTICEDATA_default
+              Storage: File
+```
+
+The bucket name will _always_ be `LATTICEDATA_{lattice-id}`, where `lattice-id` is the unique identifier for the lattice. Unless you've explicitly chosen to use something else, your lattice ID will be `default`. 
+
+If you want to change the number of replicas, the maximum size of the bucket, or any other configuration, you can do so by creating a new KV bucket via the `nats` CLI **_before_** the first wasmCloud host starts. When the host starts, if it detects a pre-existing KV bucket, it will simply reuse that one.
+
+
 :::caution
-It is _highly_ recommend that developers _never_ interact with the stream contents/topics directly, and instead use the various operations available on the lattice control interface in order to ensure reliability and stability of the stream contents. In other words, do not directly publish messages _or_ subscribe to `lc.{prefix}.>`.
+It is _strongly_ recommended that developers _never_ interact with the KV bucket contents directly, and instead use the various operations available on the lattice control interface via the `wash` CLI in order to ensure reliability and stability of the stream contents. Manually editing these values could result in corrupted data and unpredictable consequences to the lattice as a whole.
 :::
 
-### Default behavior
-
-If you start a wasmCloud host runtime against a newly started or unconfigured NATS host (with JetStream enabled), then the host will create a new stream for the lattice. The streams are named according to the lattice prefix in order to allow multi-tenancy on a single NATS topic space.
-
-The following stream is created by default by the host:
-
-- Name: `LATTICECACHE_{prefix}` where `prefix` is the lattice prefix
-- Subjects: `lc.{prefix}.>`
-- Retention: `limits`
-- Max Consumers: `-1` (infinite)
-- **Max Messages Per Subject**: **`1`** - This is a crucial setting that allows the last event for each keyed item in the stream to be overwritten by a new event. Because we correlate individual subjects with unique keys, this lets us easily convert events into cache storage.
-- Storage: `memory`
-- Replicas: `1` - this means that only one replica of the stream (cache data) will be maintained regardless of the size of the JetStream cluster
-- Duplicate Window: `120000000000`
-
-### Configuring a custom stream
-
-If the wasmCloud host detects a previously existing stream called `LATTICECACHE_{prefix}` with the subjects `lc.prefix.>`, then it _will not_ create a new one or attempt to overwrite settings. This means that, in your environment, you can do things like define a stream that persists to disk and has 5 replicas in a large JetStream cluster and the wasmCloud host will simply utilize that stream without need for code changes or redeployment. In your custom stream, you must also take care to set **max messages per subject** to **`1`** or wasmCloud may not function properly.
-
-Consult the NATS JetStream documentation for information on how to create and customize streams.
+To interrogate the contents of the KV bucket and ensure you're seeing the correct interpretation of the data, you should use the `wash` CLI tool to interact with the control interface. For example, to get the list of all link definitions in the lattice, you would use `wash link query`.
