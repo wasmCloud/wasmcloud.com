@@ -1,13 +1,16 @@
 ---
 slug: objects-instances-state-distributed-systems
 title: "Objects, Instances, and State in Distributed Systems"
---image: "/img/there-and-back-again.jpg"
+image: "/img/dist-star-system.jpg"
 date: 2023-06-02T09:00:00+05:00
 author: "Kevin Hoffman"
 author_profile: "https://twitter.com/KevinHoffman"
 description: "Comparing Object Oriented and Functional Models in Distributed Systems"
 draft: false
 ---
+
+![map - zoom in for easter eggs](/img/dist-star-system.jpg)
+
 
 When we model data structures and encode business logic into our applications, we generally use either a functional programming model or an object-oriented one. In a single process, this choice can be a matter of personal preference, but in distributed systems this choice can actually have significant impact.
 
