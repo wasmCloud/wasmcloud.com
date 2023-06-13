@@ -2,9 +2,9 @@
 slug: objects-instances-state-distributed-systems
 title: "Objects, Instances, and State in Distributed Systems"
 image: "/img/dist-star-system.jpg"
-date: 2023-06-02T09:00:00+05:00
+date: 2023-06-13T09:00:00+05:00
 author: "Kevin Hoffman"
-author_profile: "https://twitter.com/KevinHoffman"
+author_profile: "https://bsky.app/profile/kevinhoffman.bsky.social"
 description: "Comparing Object Oriented and Functional Models in Distributed Systems"
 draft: false
 ---
