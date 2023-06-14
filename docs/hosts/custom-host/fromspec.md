@@ -31,6 +31,6 @@ The host must perform the following activities:
 - Subscribe to the appropriate lattice subjects for:
   - **RPC** - each actor must subscribe to its appropriate lattice RPC subject
   - **[Control Interface](/docs/hosts/lattice-protocols/control-interface)** - the host must subscribe to the control interface subject(s) and respond in accordance with the interface protocol.
-  - Events - What the custom host does with the events is up to the host, but the host _must_ emit all expected events on the control connection as JSON **CloudEvents**.
+  - Events - What the custom host does with the events is up to the host, but the host _must_ emit all expected events on the control connection as JSON **CloudEvents**. See the reference for the full list of required [CloudEvents](../../reference/cloud_event_list)
 - Ensure that the `Invocation` that is sent via RPC contains a properly signed JWT with the proper invocation hash (anti-forgery token implementation). First-party wasmCloud hosts will reject invocations that do not include these.
-- Publish all appropriate distributed cache messages (claims, link definitions, OCI references) to the `lc.{prefix}.{key}` topic space to keep the rest of the lattice properly informed of changes.
+- Ensure that all link definitions, OCI reference maps, and claims are properly stored in the NATS [JetStream](../../production/lattice/jetstream) Key-Value bucket.
