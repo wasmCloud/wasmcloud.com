@@ -20,6 +20,9 @@ Unless otherwise noted, the `source` field of the CloudEvent is the public key o
 | `actor_started` | `public_key`<br />`image_ref`<br/>`api_version`<br/>`instance_id`<br/>`annotations`(map)<br/>`claims`(map)| A single actor instance started |
 | `actor_updated` | `public_key`<br/>`revision`<br/>`instance_id`<br/> | An actor "live update" operation completed successfully |
 | `actor_update_failed` | `public_key`<br/>`revision`<br/>`instance_id`<br/>`reason` | A live update operation failed |
+| `actors_started` | `public_key`<br/>`image_ref`<br/>`annotations`<br/>`host_id`<br/>`count`<br/>`claims`(map) | A batch of actor instances successfully started. `host_id` is the same as the envelope's `source` |
+| `actors_start_failed` | `public_key`<br/>`image_ref`<br/>`annotations`<br/>`host_id`<br/>`error` | A batch of actor instances failed to start. `host_id` is the same as the envelope's `source` |
+| `actors_stopped` | `host_id`<br/>`public_key`<br/>`count`<br/>`remaining`<br/>`annotations` | A batch of actor instances stopped. `host_id` is the same as the envelope's `source` |
 | `provider_started` | `public_key`<br/>`image_ref`<br/>`link_name`<br/>`contract_id`<br/>`instance_id`<br/>`annotations`<br/>`claims`(map) | A capability provider succesfully started |
 | `provider_start_failed` | `provider_ref`<br/>`link_name`<br/>`error` | A capability provider failed to start |
 | `provider_stopped` | `public_key`<br/>`link_name`<br/>`contract_id`<br/>`instance_id`<br/>`annotations`<br/>`reason` | A capability provider stopped |
@@ -32,9 +35,6 @@ Unless otherwise noted, the `source` field of the CloudEvent is the public key o
 | `refmap_set` | `oci_url`<br/>`public_key` | Event advertising a reference mapping being cached |
 | `linkdef_set` | `id`<br/>`actor_id`<br/>`provider_id`<br/>`link_name`<br/>`contract_id`<br/>`values`(map) | Event advertising a link definition being cached |
 | `linkdef_deleted` | `id`<br/>`actor_id`<br/>`provider_id`<br/>`link_name`<br/>`contract_id`<br/>`values`(map) | Event advertising link definition being deleted from cache |
-| `actors_started` | `public_key`<br/>`image_ref`<br/>`annotations`<br/>`host_id`<br/>`count`<br/>`claims`(map) | A batch of actor instances successfully started. `host_id` is the same as the envelope's `source` |
-| `actors_start_failed` | `public_key`<br/>`image_ref`<br/>`annotations`<br/>`host_id`<br/>`error` | A batch of actor instances failed to start. `host_id` is the same as the envelope's `source` |
-| `actors_stopped` | `host_id`<br/>`public_key`<br/>`count`<br/>`remaining`<br/>`annotations` | A batch of actor instances stopped. `host_id` is the same as the envelope's `source` |
 
 The following events are emitted on a special topic, `wasmbus.rpcevt.{lattice-id}` to keep the relatively chatty RPC notifications separate from the other events.
 
