@@ -1,0 +1,232 @@
+---
+sidebar_position: 2
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# Adding Capabilities
+
+Going from "Hello World" to a full-fledged application requires just identifying what capabilities your application needs, and then adding them to your actor. Applications in wasmCloud have two types of capabilities: external requests that call a function handler in your actor (like HTTP Server and Messaging) and actor requests that call a function handler in a capability provider (like Key-Value Store and Logging). "Hello World" already has the HTTP Server capability, so let's add more features to this application with functional code and more capabilities.
+
+## Adding more functionality
+
+Let's extend this application to do more than just say "Hello World". We can use the `HttpRequest` struct and check the request for a name provided in a query string, and then return a greeting with that name.
+
+```rust
+async fn handle_request(&self, ctx: &Context, req: &HttpRequest) -> RpcResult<HttpResponse> {
+    let name = match req.query_string.split("=").collect::<Vec<&str>>()[..] {
+        ["name", name] => name.to_string(),
+        _ => "World".to_string(),
+    };
+
+    Ok(HttpResponse::ok(format!("Hello, {}!", name,)))
+}
+```
+
+Using a simple pattern match, we can check to see if we can split the query string on a name parameter, and if so, use that name in the response. If not, we'll just use "World" as the name. This won't support adding multiple query parameters but it's a perfectly good start for our goals.
+
+## Deploying your local actor
+
+Now that we're making modifications to the actor, you'll want to run your local copy instead of the wasmCloud example that's already deployed. To do this, we can edit the manifest to instead point at a local file. You can easily find this path by running `wash build -o json` and looking for **actor_path** in the output. Simply take that and prepend `file://` to the absolute path to avoid any reliance on the current working directory.
+
+```yaml
+metadata:
+  name: hello
+  annotations:
+    version: v0.0.2 # Make sure to upgrade the version
+    description: "wasmCloud Hello World Example"
+spec:
+  components:
+    - name: hello
+      type: actor
+      properties:
+        # Change the image to point at your local file
+        image: file:///Users/wasmcloud/hello/build/docs_s.wasm
+      traits:
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        - type: linkdef
+          properties:
+            target: httpserver
+            values:
+              address: 0.0.0.0:8080
+```
+
+Now you can simply undeploy the old version of the application and deploy the new version, and then you can try out your new feature!
+
+:::info
+Whenever you make a change to your actor that you want to deploy, be sure to run `wash build` to recompile and generate a new .wasm file.
+:::
+
+```bash
+> wash app undeploy hello
+> wash app deploy wadm.yaml
+> curl localhost:8080
+Hello, World!
+> curl 'localhost:8080?name=Bob'
+Hello, Bob!
+```
+
+## Adding persistent storage
+
+To further enhance our application, let's add persistent storage to keep a record of each person that this application greeted. We'll use the key-value store capability for this, and just like HTTP server, you won't need to pick a library or a vendor for your Key-Value Store capability. You'll just need to add the capability to your actor, and then you can pick a provider at runtime.
+
+To add the capability, you'll need to add the key-value interface to your actor and then declare `wasmcloud:keyvalue` as a capability claim so that wasmCloud will allow your actor to use the capability.
+
+```bash
+# Add the key-value interface to your Cargo project
+cargo add wasmcloud-interface-keyvalue
+```
+
+```toml
+# wasmcloud.toml
+[actor]
+claims = ["wasmcloud:httpserver", "wasmcloud:keyvalue"]
+```
+
+Now we can make use of the key-value capability. Add a few imports at the top of your file:
+
+```rust
+use wasmcloud_interface_keyvalue::{KeyValue, KeyValueSender, SetAddRequest};
+```
+
+Then, add this line after you parse the name from the query string:
+
+```rust
+async fn handle_request(&self, ctx: &Context, req: &HttpRequest) -> RpcResult<HttpResponse> {
+    let name = match req.query_string.split("=").collect::<Vec<&str>>()[..] {
+        ["name", name] => {
+            KeyValueSender::new()
+                .set_add(
+                    ctx,
+                    &SetAddRequest {
+                        set_name: "names".to_string(),
+                        value: name.to_string(),
+                    },
+                )
+                .await?;
+            name.to_string()
+        }
+        _ => "World".to_string(),
+    };
+}
+```
+
+The modified code will now, whenever a name is provided, add it to the set of greeted names in our key-value store. We still need a way to retrieve the names, so let's add another arm to our match statement to check if the query string is just `names`, and return each name:
+
+```rust
+    async fn handle_request(&self, ctx: &Context, req: &HttpRequest) -> RpcResult<HttpResponse> {
+        let name = match req.query_string.split("=").collect::<Vec<&str>>()[..] {
+            ["name", name] => {
+                KeyValueSender::new()
+                    .set_add(
+                        ctx,
+                        &SetAddRequest {
+                            set_name: "names".to_string(),
+                            value: name.to_string(),
+                        },
+                    )
+                    .await?;
+                name.to_string()
+            }
+            ["names"] => KeyValueSender::new()
+                .set_query(ctx, "names")
+                .await?
+                .join(", "),
+            _ => "World".to_string(),
+        };
+
+        Ok(HttpResponse::ok(format!("Hello, {}!", name,)))
+    }
+```
+
+### Deploying a Key-Value Store provider
+
+Our actor is prepared to use a key-value store, and now that we've built it we're ready to choose an implementation. A great option for local development and testing is the [Redis provider](https://github.com/wasmCloud/capability-providers/tree/main/kvredis), and will only require you to have `redis-server` or Docker installed.
+
+<Tabs queryString="redis">
+  <TabItem value="local" label="Local Redis Server" default>
+
+[Install](https://redis.io/docs/getting-started/) and launch the local redis server in the background
+
+```bash
+redis-server &
+```
+
+  </TabItem>
+  <TabItem value="docker" label="Docker">
+
+Launch a Redis container in the background
+
+```bash
+docker run -d --name redis -p 6379:6379 redis
+```
+
+  </TabItem>
+</Tabs>
+
+We can modify our `wadm.yaml` to include the Redis provider and configure a link for our actor. Since we're nearing the end of this tutorial, we'll provide the full manifest here:
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello
+  annotations:
+    version: v0.0.3 # Remember to bump the version!
+    description: "wasmCloud Hello World Example"
+spec:
+  components:
+    - name: hello
+      type: actor
+      properties:
+        image: file:///Users/wasmcloud/hello/build/docs_s.wasm
+      traits:
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        - type: linkdef
+          properties:
+            target: httpserver
+            values:
+              address: 0.0.0.0:8080
+        # The new key-value link configuration
+        - type: linkdef
+          properties:
+            target: keyvalue
+            values:
+              address: redis://127.0.0.1:6379
+
+    - name: httpserver
+      type: capability
+      properties:
+        image: wasmcloud.azurecr.io/httpserver:0.17.0
+        contract: wasmcloud:httpserver
+    # The new capability provider
+    - name: keyvalue
+      type: capability
+      properties:
+        image: wasmcloud.azurecr.io/kvredis:0.21.1
+        contract: wasmcloud:keyvalue
+```
+
+Last step, we can undeploy the older version of the application and deploy the new version. Then, again, we can test our new functionality.
+
+```bash
+> wash app undeploy hello
+> wash app deploy wadm.yaml
+> curl localhost:8080?name=Bob
+Hello, Bob!
+> curl localhost:8080?name=Alice
+Hello, Alice!
+> curl localhost:8080?names
+Hello, Bob, Alice!
+```
+
+## Moving on
+
+In this tutorial, you added a few more features and persistent storage to a simple microservice. You also got to see the process of developing with interfaces, where the code you write is purely functional, doesn't require you to pick a library or vendor upfront, and allows you to change your application separately from its non-functional requirements. You can continue to build on this application by adding more features, or you can explore additional capabilities and providers in the [wasmCloud Capability Providers repository](https://github.com/wasmCloud/capability-providers) to get an idea of what is possible with wasmCloud.
+
+The next page gives a high level overview of why this application that you've built already eliminates complexity and pain that developers often face when building applications for the cloud.
