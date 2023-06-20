@@ -9,7 +9,7 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
+- DEMO: wasmCloud, Azure Webhooks, and auto-updating OCI URLs
 - 
 - 
 
