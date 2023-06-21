@@ -22,7 +22,7 @@ changes, recompile, and update the actor in the host.
 This is a great way to get started with wasmCloud development, and we recommend it for all new
 actors.
 
-Currently, `wash dev` only will starts the actor, so you'll have to follow the steps in the [running
+Currently, `wash dev` only will start the actor, so you'll have to follow the steps in the [running
 the actor](./run) section to start the providers your actor needs. We hope to automate as much of
 that away in the future.
 

@@ -160,8 +160,8 @@ Then, you can run `wash spy` to see all messages sent between actors and provide
 $ wash spy <actor name or ID>
 ```
 
-You can pass the actual actor ID if you wish, but for ease of use, if a non-key is provided, wash
-will attempt to resolve it to an ID by checking if the `actor_name` or `call_alias`` fields from the
+You can pass the actual actor ID if you wish, but for ease of use  wash
+will attempt to resolve it to an ID by checking if the `actor_name` or `call_alias` fields from the
 actor's claims contains the given string. If more than one matches, then an error will be returned
 indicating the options to choose from. Note that this matching is case-insensitive.
 
@@ -218,13 +218,12 @@ and output it to JSON, but if it is unable to, it will output the raw bytes inst
 ### `wash capture`
 
 As of wash 0.18, there is a new experimental debugging command called `wash capture`. This command
-enables to debug an issue after it occurs by capturing a window of all invocations in the lattice (1
-hour by default). A helpful comparison is that this is similar to many gaming tools that constantly
-capture your video while you game, and then at a press of a button you can save the last 60s for
-later usage/reply. This is useful for debugging issues that are difficult to reproduce, or for
-debugging issues that occur in production. Right now, the functionality is extremely simple, but if
-the community finds it useful, we plan on adding even more useful features to it (such as replaying
-invocation or setting up a lattice for reproducing the issue).
+enables you to debug an issue after it occurs by capturing a window of all invocations in the
+lattice (1 hour by default). A helpful comparison is that this is similar to many gaming tools that
+constantly capture your video while you game, and then at a press of a button you can save the last
+60s for later usage/reply. This is useful for debugging issues that are difficult to reproduce, or
+for debugging issues that occur in production. Right now, the functionality is extremely simple, but
+if the community finds it useful, we plan on adding even more useful features to it.
 
 To use it, you'll need to enable experimental mode for wash and then enable capture mode for your
 lattice:
