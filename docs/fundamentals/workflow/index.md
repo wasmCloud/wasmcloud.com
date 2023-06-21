@@ -28,6 +28,8 @@ The developer's _iteration loop_ for building an actor looks something like this
    1. Leverage the `wasmcloud:testing` interface and the [test provider](https://github.com/wasmCloud/wasmcloud-test)
 1. _Repeat_
 
+As of wash 0.18.0, there is now a `wash dev` command that automates this process for you. See the [Customizing the actor](../actors/create-actor/update) section for more details on how to use it.
+
 ### Building Providers
 
 The workflow for building a capability provider is similar to that of building an actor. Once you've located and declared a dependency on the _interface_ implemented by your capability provider, the _iteration loop_ looks something like this:

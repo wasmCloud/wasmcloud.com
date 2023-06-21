@@ -8,6 +8,34 @@ draft: false
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
+This section describes how you can iteratively build and test your actor functionality.
+
+## `wash dev`
+
+As of wash 0.18.0 you can use the experimental `wash dev` command to rapidly build and iterate on
+your actor.
+
+`wash dev` starts a local wasmCloud host (if you don't already have one started), builds your actor,
+and automatically registers your actor with the host. It will also watch your actor source code for
+changes, recompile, and update the actor in the host. 
+
+This is a great way to get started with wasmCloud development, and we recommend it for all new
+actors.
+
+Currently, `wash dev` only will start the actor, so you'll have to follow the steps in the [running
+the actor](./run) section to start the providers your actor needs. We hope to automate as much of
+that away in the future.
+
+Before running `wash dev`, you'll need to enable experimental mode for wash:
+
+```shell
+export WASH_EXPERIMENTAL=true
+```
+
+Then you can just run the `wash dev` command in the directory of your actor!
+
+## Hot Reloading
+
 ### Prerequisites
 
 To use the hot reloading feature you'll need to install one more [utility](https://github.com/falood/file_system#system-support) to ensure the host can monitor your actor file for changes. The following instructions for your operating system will ensure you are ready for the next section.
@@ -71,7 +99,7 @@ You should now see your actor with a `hot reloading` status badge, and you're re
 
 ![hotreloading](./hotreloading.png)
 
-### Making modifications (Rust)
+## Making modifications (Rust)
 
 Our new actor has come pre-equipped with a message handler that generates a text string in the body of the response. By default, the text is "Hello World", and the greeting changes if the URL contains a name parameter. We will modify the business logic of the actor to select the greeting, using a second URL paramter. In this exercise, you will go through the process of editing code, recompiling, and updating the actor in a live running system.
 
@@ -109,7 +137,9 @@ The new parameter that selects the greeting will be called `msg`. If msg is "hel
 
 In `src/lib.rs`, replace handle_request with the code above. Since we aren't releasing a new version of the actor yet, we don't need to change the version number in `Cargo.toml`.
 
-Run `wash build` to build the actor and re-sign it. The host replaces all running instances of the actor with the new version, thanks to the hot reload feature, and re-links them with the HttpServer capability provider using the link parameters already provided. It is not necessary to re-issue a link command.
+If you are using hot reloading, run `wash build` to build the actor and re-sign it. The host replaces all running instances of the actor with the new version, thanks to the hot reload feature, and re-links them with the HttpServer capability provider using the link parameters already provided. It is not necessary to re-issue a link command.
+
+If you are using `wash dev`, wash will build and relaunch your actor for you
 
 Let's try out the new actor:
 
