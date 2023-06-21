@@ -8,9 +8,29 @@ draft: false
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-Before you follow this section, it's highly recommended to configure your log level to `debug` in order to see the most information when debugging. You can use the [host troubleshooting](./host.md#changing-log-level) section for instructions on how to do this.
+- [Prerequisites](#prerequisites)
+- [Common Errors](#common-errors)
+  - [Using an insecure registry](#using-an-insecure-registry)
+  - [Missing Capability Claims](#missing-capability-claims)
+  - [Missing Link Definitions](#missing-link-definitions)
+  - [Misconfigured Link Definitions](#misconfigured-link-definitions)
+- [Debugging Actor/Provider communication](#debugging-actorprovider-communication)
+  - [`wash spy`](#wash-spy)
+  - [`wash capture`](#wash-capture)
+    - [Using a washcapture file](#using-a-washcapture-file)
 
-When developing actors there are a few often missed steps that can cause your actor to either fail to run or fail to properly operate. Below we'll walk through a few of these scenarios with accompanying error messages.
+
+## Prerequisites
+
+Before you follow this section, it's highly recommended to configure your log level to `debug` in
+order to see the most information when debugging. You can use the [host
+troubleshooting](./host.md#changing-log-level) section for instructions on how to do this.
+
+When developing actors there are a few often missed steps that can cause your actor to either fail
+to run or fail to properly operate. Below we'll walk through a few of these scenarios with
+accompanying error messages.
+
+## Common Errors
 
 ### Using an insecure registry
 
@@ -121,3 +141,179 @@ If you are establishing a link definition but still see errors that indicate tha
 Previous guides used `wash ctl link query`, which is now deprecated and will be removed in a future version.
 See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
 :::
+
+## Debugging Actor/Provider communication
+
+### `wash spy`
+
+As of wash 0.18, there is a new experimental debugging command called `wash spy`. This command
+allows you to see all messages sent between actors and providers, and is useful for debugging
+communication issues. To use it, you'll need to enable experimental mode for wash:
+
+```shell
+export WASH_EXPERIMENTAL=true
+```
+
+Then, you can run `wash spy` to see all messages sent between actors and providers. 
+
+```shell
+$ wash spy <actor name or ID>
+```
+
+You can pass the actual actor ID if you wish, but for ease of use, if a non-key is provided, wash
+will attempt to resolve it to an ID by checking if the `actor_name` or `call_alias`` fields from the
+actor's claims contains the given string. If more than one matches, then an error will be returned
+indicating the options to choose from. Note that this matching is case-insensitive.
+
+You can try out this command with the KV Counter example:
+
+```shell
+$ wget https://raw.githubusercontent.com/wasmCloud/examples/main/actor/kvcounter/wadm.yaml
+$ wash app put wadm.yaml
+
+Successfully put manifest
+$ wash app deploy kvcounter
+
+Deployed model
+$ wash spy kvcounter
+
+Spying on actor kvcounter
+
+[2023-06-21 11:24:32.397138 -06:00]
+From: HTTP Server              To: kvcounter                Host: NC7XZN5VJW2EOK6E565MSRY3JW2WU5ABUA6HTSPY6O7MVKGZTFCR3TDM
+
+Operation: HttpServer.HandleRequest
+Message: {
+  "method": "GET",
+  "path": "/api/counter",
+  "queryString": "",
+  "header": {
+    "host": [
+      "127.0.0.1:8081"
+    ],
+    "user-agent": [
+      "curl/7.88.1"
+    ],
+    "accept": [
+      "*/*"
+    ]
+  },
+  "body": []
+}
+
+[2023-06-21 11:24:32.407787 -06:00]
+From: kvcounter                To: Redis KeyValue Store     Host: CB6S44L4Q5IIRD4BJGQXN5TJXF4YFJXD5DOYBZOYRJP5U2GEZFKXNGD4
+
+Operation: KeyValue.Increment
+Message: {
+  "key": "counter:default",
+  "value": 1
+}
+```
+
+This output has the timestamp the invocation was observed at, the source and target of the
+invocation, and the content of the invocation itself. Wash spy will attempt to decode the invocation
+and output it to JSON, but if it is unable to, it will output the raw bytes instead.
+
+### `wash capture`
+
+As of wash 0.18, there is a new experimental debugging command called `wash capture`. This command
+enables to debug an issue after it occurs by capturing a window of all invocations in the lattice (1
+hour by default). A helpful comparison is that this is similar to many gaming tools that constantly
+capture your video while you game, and then at a press of a button you can save the last 60s for
+later usage/reply. This is useful for debugging issues that are difficult to reproduce, or for
+debugging issues that occur in production. Right now, the functionality is extremely simple, but if
+the community finds it useful, we plan on adding even more useful features to it (such as replaying
+invocation or setting up a lattice for reproducing the issue).
+
+To use it, you'll need to enable experimental mode for wash and then enable capture mode for your
+lattice:
+
+```shell
+$ export WASH_EXPERIMENTAL=true
+$ wash capture --enable
+```
+
+By default, this will set up a sliding capture window of 1 hour (any invocations older than 1 hour
+will be deleted). You can change this by passing the `--window-size` flag. For example, to set up a
+window of 5 minutes, you can run:
+
+```shell
+wash capture --enable --window-size 5
+```
+
+Once you run into a bug, you can capture the last window of invocations by running:
+
+```shell
+$ wash capture
+No messages received in the last second. Ending capture
+
+Completed capture and output to file 2023-06-14T11:11:03.476732-06:00.default.washcapture
+```
+
+This command will run until it detects a message that is past the time you started the capture, or
+no new messages appear for 1s (whichever comes first). It will then output a file that contains all
+the messages that occurred in the last window along with a dump of all hosts in the lattice with
+their inventory. Please note that the file has a `.washcapture` extension, but it is just a normal
+tarball file; however, the structure of the tarball is not a publicly supported contract (meaning
+you shouldn't try building tooling off of its structure). The filename will always be of the form
+`<rfc3339 timestamp>.<lattice-prefix>.washcapture`.
+
+#### Using a washcapture file
+
+You can use the `wash capture replay` command to replay a washcapture file. For example, if you have
+a file called `2023-06-14T11:11:03.476732-06:00.default.washcapture`, you can replay it by running:
+
+```shell
+$ wash capture replay 2023-06-14T11:11:03.476732-06:00.default.washcapture
+```
+
+This command will output all invocations in the order they were received. The output will look
+similar to below:
+
+```
+[2023-06-14 17:10:15.131165 +00:00:00]
+From: VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M  To: MCFMFDWFHGKELOXPCNCDXKK5OFLHBVEWRAOXR5JSQUD2TOFRE3DFPM7E  Host: NC7XZN5VJW2EOK6E565MSRY3JW2WU5ABUA6HTSPY6O7MVKGZTFCR3TDM
+
+Operation: HttpServer.HandleRequest
+Message: {
+  "method": "GET",
+  "path": "/api/counter",
+  "queryString": "",
+  "header": {
+    "host": [
+      "127.0.0.1:8081"
+    ],
+    "user-agent": [
+      "curl/7.88.1"
+    ],
+    "accept": [
+      "*/*"
+    ]
+  },
+  "body": []
+}
+
+[2023-06-14 17:10:15.151724 +00:00:00]
+From: MCFMFDWFHGKELOXPCNCDXKK5OFLHBVEWRAOXR5JSQUD2TOFRE3DFPM7E  To: VAZVC4RX54J2NVCMCW7BPCAHGGG5XZXDBXFUMDUXGESTMQEJLC3YVZWB  Host: CB6S44L4Q5IIRD4BJGQXN5TJXF4YFJXD5DOYBZOYRJP5U2GEZFKXNGD4
+
+Operation: KeyValue.Increment
+Message: {
+  "key": "counter:default",
+  "value": 1
+}
+```
+
+This output has the timestamp the invocation was observed at, the source and target of the
+invocation, and the content of the invocation itself. Wash spy will attempt to decode the invocation
+and output it to JSON, but if it is unable to, it will output the raw bytes instead. Because this
+can be done offline, it does not attempt to fetch friendly names for each of the providers and
+actors like what is done in `wash spy`. 
+
+You can also filter the output by passing the `--provider-id` and `--actor-id` flags. If you pass
+just one of the flags, it will filter all invocations that were set to or from that actor/provider.
+If both flags are passed, it will only output invocations between that actor and provider
+
+Lastly, there is an interactive mode that works similar to stepping through a debugger. This can be
+enabled by passing the `--interactive` flag. You can then step through each invocation by pressing
+the Enter key.
