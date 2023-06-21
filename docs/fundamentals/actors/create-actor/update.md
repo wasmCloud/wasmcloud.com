@@ -12,13 +12,19 @@ This section describes how you can iteratively build and test your actor functio
 
 ## `wash dev`
 
-As of wash 0.18.0 you can use the experimental `wash dev` command to rapidly iterate on your actor.
-This command will start a local wasmCloud host (if you don't already have one started) and
-automatically register your actor with it. It will also watch your actor file for changes and
-automatically recompile and update the actor in the host. This is a great way to get started with
-wasmCloud development, and we recommend it for all new actors. Currently, it only will start the
-actor, so you'll have to follow the steps in the [running the actor](./run) section to start the
-providers your actor needs. We hope to automate as much of that away in the future.
+As of wash 0.18.0 you can use the experimental `wash dev` command to rapidly build and iterate on
+your actor.
+
+`wash dev` starts a local wasmCloud host (if you don't already have one started), builds your actor,
+and automatically registers your actor with the host. It will also watch your actor source code for
+changes, recompile, and update the actor in the host. 
+
+This is a great way to get started with wasmCloud development, and we recommend it for all new
+actors.
+
+Currently, `wash dev` only will starts the actor, so you'll have to follow the steps in the [running
+the actor](./run) section to start the providers your actor needs. We hope to automate as much of
+that away in the future.
 
 Before running `wash dev`, you'll need to enable experimental mode for wash:
 
