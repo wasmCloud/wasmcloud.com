@@ -17,6 +17,33 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Meeting Notes
 
+- DEMO: wasmCloud, Azure Webhooks, and auto-updating OCI URLs - Brooks
+  - We had a problem with the observability of wasmCloud capability providers. In particular, official capability providers and example actors that we publish to Azure Container Registry.
+  - The issue? Azure CR does not support unauthenticated dynamic content discovery so it's tricky to track versions.
+  - We had a workaround - the Capability Provider Repo and shields.io badges. We've been using a dynamic json badge - using their API to provide a custom payload.
+  - Issue: Readme in Github - markdown does not have ability to run customer code - no auto-update.
+  - Last week we ran with an idea proposed by Jordan: capitalizing on the Azure Container Registry webhook - allows you to call version data after it pushes a new image version to Azure CR.
+  - From here we can see the latest information and use the Key-Value contract to save this information in the KV store.
+  - We also set up categories in order to fetch all the official capability provider data - name, OCI URL, actors.
+  - This gives us a really useful way to make sure our capability providers are truly discoverable.
+  - Next: use in wash to dynamically and automatically update the list of capability providers?
+- DEMO: Interop between WebAssembly Components - Bailey
+  - As the component model moves towards prime time, Bailey shows us a really powerful demonstration of how we can work across languages with components.
+  - The component model represents true language interoperability.
+  - FFI bindings, yes, but the processes are a little harder and there are boundaries.
+  - In the component model we have a new process that defines how to cross language boundaries - This is called "lifting and lowering"
+  - For the first time - this will be available in Wasmtime 10 - we can show Rust and Go interop with each other, sending a greeting over the FFI boundary.
+  - In Bailey's demo, she shows that by taking the wit IDL and passing high level strings means we can work in a couple different languages.
+  - Take a look at the recording to see the demo.
+- DISCUSSION: Secrets in wasmCloud applications - All
+  - We had a continuation of last week's lively discussion on secrets in wasmCloud apps. Key points (see the recording for the full discussion):
+  - Taking a secret whether from an environment variable, app manifest or secret value to run within wasmCloud.
+  - Important to differentiate between development environment and production-type environments when choosing secret stores.
+  - Vault and variations - relative merits of ecosystem players.
+  - wasmCloud not intended to be a secret store - plenty of good, established players.
+  - Action: create a series of use cases for testing.
+  - Action: Patrick will create a pre-RFC/RFC on secrets management based off of his infrastructure experience.
+
 ### Recording
 
-Recording is being uploaded to YouTube and will be displayed promptly
+<ReactPlayer url='https://youtu.be/oAuCqEmFoK4' controls />
