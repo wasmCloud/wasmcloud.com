@@ -10,8 +10,8 @@ import ReactPlayer from 'react-player/youtube';
 ### Agenda
 
 - DEMO: wasmCloud, Azure Webhooks, and auto-updating OCI URLs
-- 
-- 
+- DISCUSSION: Secrets in wasmCloud applications
+- DEMO: Interop between WebAssembly Components
 
 <!--truncate-->
 
