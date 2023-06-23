@@ -58,17 +58,17 @@ import ReactPlayer from 'react-player/youtube';
 - Wash developer iteration loop turned security discussion - Brooks
   - Jordan - Wash Spy and Capture will make life easier - dev mode seems cool but hasn't experimented much yet.
   - Issue: wash is becoming powerful but is easy to misconfigure - security consideration.
-    - wash is becoming a _very_ powerful tool. It can spy on NATS, move artifacts around, manage private keys, and from a security perspective it's becoming a possibly very vulnerable tool
-    - Would love to see wash implementing subcommands that promote security, like `wash systemkey` that gives you a key to lock down wash
-    - The fact that it runs in user-land makes it easy for a vulnerability to gain access
-    - Could consider something like `wash lockdown` to clean up local development environments
-- `wash up` provisioning seed keys should be considered when thinking of using `wash` to provision infrastructure
-- Consider reauthentication to access keys
-- There's a few different levels of security to tackle here
-  - Clean config, avoiding writing secret data to local folders
-  - Process isolation for wasmCloud
-  - Isolating NATS connections is the key to locking down a wasmCloud lattice
-- Being able to audit the nkey hierarchy would be really important for enterprise customers that are looking to trace to the source of development
+    - wash is becoming a _very_ powerful tool. It can spy on NATS, move artifacts around, manage private keys, and from a security perspective it's becoming a possibly very vulnerable tool.
+    - Would love to see wash implementing subcommands that promote security, like `wash systemkey` that gives you a key to lock down wash.
+    - The fact that it runs in user-land makes it easy for a vulnerability to gain access.
+    - Could consider something like `wash lockdown` to clean up local development environments.
+- `wash up` provisioning seed keys should be considered when thinking of using `wash` to provision infrastructure.
+- Consider reauthentication to access keys.
+- There are a few different levels of security to tackle here.
+  - Clean config, avoiding writing secret data to local folders.
+  - Process isolation for wasmCloud.
+  - Isolating NATS connections is the key to locking down a wasmCloud lattice.
+- Being able to audit the nkey hierarchy would be really important for enterprise customers that are looking to trace to the source of development.
 - If you're working on solutions in the key management space, please come join our [Slack](https://slack.wasmcloud.com). We'd love to collaborate on the management of keys!
   - Would like to see wash sat implementing some sub- commands that promote security.
 
