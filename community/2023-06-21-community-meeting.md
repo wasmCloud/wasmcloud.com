@@ -29,10 +29,8 @@ import ReactPlayer from 'react-player/youtube';
   - Next: use in wash to dynamically and automatically update the list of capability providers?
 - DEMO: Interop between WebAssembly Components - Bailey
   - As the component model moves towards prime time, Bailey shows us a really powerful demonstration of how we can work across languages with components.
-  - The component model represents true language interoperability.
-  - FFI bindings, yes, but the processes are a little harder and there are boundaries.
-  - In the component model we have a new process that defines how to cross language boundaries - This is called "lifting and lowering"
-  - For the first time - this will be available in Wasmtime 10 - we can show Rust and Go interop with each other, sending a greeting over the FFI boundary.
+  - In the component model we have a new specification that defines how to cross language boundaries
+  - WASI Preview 2 experimental support for Wasm Components will land in wasmtime's v10
   - In Bailey's demo, she shows that by taking the wit IDL and passing high level strings means we can work in a couple different languages.
   - Take a look at the recording to see the demo.
 - DISCUSSION: Secrets in wasmCloud applications - All
