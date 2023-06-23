@@ -29,12 +29,12 @@ import ReactPlayer from 'react-player/youtube';
   - Next: use in wash to dynamically and automatically update the list of capability providers?
 - DEMO: Interop between WebAssembly Components - Bailey
   - As the component model moves towards prime time, Bailey shows us a really powerful demonstration of how we can work across languages with components.
-  - In the component model we have a new specification that defines how to cross language boundaries
-  - WASI Preview 2 experimental support for Wasm Components will land in wasmtime's v10
+  - In the component model we have a new specification that defines how to cross language boundaries.
+  - WASI Preview 2 experimental support for Wasm Components will land in wasmtime's v10.
   - In Bailey's demo, she shows that by taking the wit IDL and passing high level strings means we can work in a couple different languages.
   - Take a look at the recording to see the demo.
 - DISCUSSION: Secrets in wasmCloud applications - All
-  - We had a continuation of last week's lively discussion on secrets in wasmCloud apps. Key points (see the recording for the full discussion):
+  - We had a continuation of last week's lively discussion on secrets in wasmCloud apps. Key points (see the recording for the full discussion).
   - Taking a secret whether from an environment variable, app manifest or secret value to run within wasmCloud.
   - Important to differentiate between development environment and production-type environments when choosing secret stores.
   - Vault and variations - relative merits of ecosystem players.
