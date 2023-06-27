@@ -2,7 +2,7 @@
 slug: webassembly-patterns-command-reactor-library
 title: "WebAssembly Interaction Patterns: Command, Reactor, Library"
 image: "/img/interaction_patterns.jpg"
-date: 2023-06-06T09:00:00+05:00
+date: 2023-06-27T09:00:00+05:00
 author: "Kevin Hoffman"
 author_profile: "https://mastodon.world/@autodidaddict"
 categories: ["webassembly", "components", "patterns"]
