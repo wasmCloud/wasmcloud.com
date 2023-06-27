@@ -1,7 +1,7 @@
 ---
 slug: webassembly-patterns-command-reactor-library
 title: "WebAssembly Interaction Patterns: Command, Reactor, Library"
---image: "/img/there-and-back-again.jpg"
+image: "/img/interaction_patterns.jpg"
 date: 2023-06-06T09:00:00+05:00
 author: "Kevin Hoffman"
 author_profile: "https://mastodon.world/@autodidaddict"
@@ -9,6 +9,9 @@ categories: ["webassembly", "components", "patterns"]
 description: Exploring WebAssembly Interaction Patterns - Command, Reactor, and Library"
 draft: false
 ---
+
+![abstract interaction pattern shapes](/img/interaction_patterns.jpg)
+
 The first thing people need to learn when encountering WebAssembly for the first time is how to interact with the code inside the module.
 There are a number of patterns available for this and, in this blog post, I'll cover the main three: _Command, Reactor_, and _Library_.
 
