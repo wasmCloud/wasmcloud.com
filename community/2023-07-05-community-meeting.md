@@ -10,7 +10,7 @@ import ReactPlayer from 'react-player/youtube';
 ### Agenda
 
 - 
-- 
+- DISCUSSION: Actor Lifecycles
 - 
 
 <!--truncate-->
