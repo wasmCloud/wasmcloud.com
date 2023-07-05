@@ -16,7 +16,7 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Meeting Notes
 - DEMO: decoupled washboard
-	- RFC https://github.com/wasmCloud/wasmCloud/issues/324 and https://github.com/wasmCloud/wasmCloud/issues/321 detail decoupling the dashboard from the OTP host with the feature focus on Rust.
+	- RFC [https://github.com/wasmCloud/wasmCloud/issues/324](https://github.com/wasmCloud/wasmCloud/issues/324) and [https://github.com/wasmCloud/wasmCloud/issues/321](https://github.com/wasmCloud/wasmCloud/issues/321) detail decoupling the dashboard from the OTP host with the feature focus on Rust.
 	- Added a `wash ui` command that runs the UI.
 	- Current washboard uses the Elixir library Phoenix which is embedded in the host
 	- This implementation uses static web files, written using React, and uses the state synthesized by `wadm` to display the state of the lattice.
