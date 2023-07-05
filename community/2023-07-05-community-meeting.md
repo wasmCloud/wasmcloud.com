@@ -9,9 +9,8 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
+- DEMO: `wash ui`, the detached washboard
 - DISCUSSION: Actor Lifecycles
-- 
 
 <!--truncate-->
 
