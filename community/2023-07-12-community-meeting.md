@@ -9,7 +9,7 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
+- DEMO + DISCUSSION: WITty providers, starting with Golang
 - 
 - 
 
