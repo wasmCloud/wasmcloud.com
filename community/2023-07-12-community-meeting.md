@@ -9,9 +9,8 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- DEMO + DISCUSSION: WITty providers, starting with Golang
-- 
-- 
+- DEMO: WITty providers, starting with Golang
+- DISCUSSION: What in the `world` is `wit`, and why wasmCloud is using it
 
 <!--truncate-->
 
