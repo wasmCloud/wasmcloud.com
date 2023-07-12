@@ -16,6 +16,36 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Meeting Notes
 
+- DEMO: WITty providers, starting with Golang - Jordan Rash
+  - Decided to take a peek at [wit](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md) and Bailey will go deeper in our discussion. wit is an interface definition language (IDL) like smithy, built for the wasm ecosystem.
+  - Challenge of removing the smithy-generated interfaces and replacing with wit IDL interfaces.
+  - Starting point: identify in wit what wasmcloud's RPCbus looks like - [PR in wasmCloud interfaces](https://github.com/wasmCloud/interfaces/pull/116).
+  - If you were to pull up the smithy version of our core contract it maps pretty much 1:1 (with a few possible future exceptions).
+  - With the provider SDK in Go we can convert any wasmCloud interfaces on Tiny Go into core Go interfaces.
+  - If we were to take the Bytecode Allliance wit-bindgen binary in the Github repo and run it over a wit file we would be able to replace smithy.
+  - Demo is still work in progress but it funnels in 2 parts:
+    - Provider and an actor running in wasmCloud with no more smithy IDL interface pieces generated.
+    - You can see in NATS that the 30-second health check is running - ping pong provider running/ We can query the actor (you say ping, we say pong).
+  - If we were to link the 2 you would see the provider send an invocation over the the actor which passes all wasmCloud security checks - there is a bug which will shortly be fixed.
+  - When bugs are fixed, we'll see the first full 'round-robin' wit actor/provider example.
+  - wasmCloud will have wasi-cloud interfaces built in which doesn't address custom contracts - so we are building a way to also allow custom contracts.
+  - Now, in the provider - hidden behind wash build - we write Go generate which generates two types of interface code which you then see satisfied in the actor.
+  - Check out the workflow in the demo recording to see how Jordan developed these new features.
+- DISCUSSION: What in the world is wit, and why wasmCloud is using it?
+  - In this section of the call, Bailey Hayes talks through an update on the component model and language interoperability with wit. We recommend listening to Bailey's excellent summary in the recording but here are some key points covered:
+    - WASI, and the Component Model, allow us to split applications into their component parts to remove heavy non-functional requirements (so you’re only coding business logic), which creates tiny, lightweight, highly portable and composable, sandboxed apps that run anywhere.
+    - Wasm runs where there's a WebAssembly runtime - it’s a portable compilation target. The extension that we work with is called a .Wasm.
+    - Wasm modules are different to Wasm components - we split apart Wasm modules to reveal the components inside which become compilable and interchangeable at compile time rather then runtime which means we don't have to code in non-functional requirements (95% of most applications).
+    - How, then, can we get Wasm components, built in different languages, to talk to one another and work together side-by-side? The answer is wit! WebAssembly Interface Types. wit allows components to communicate with high level types. Take a look at Bailey's slides to see what this looks like.
+    - The Component Model builds directly on top of the web assembly core specification. WASI Preview 2 (the latest iteration of WASI standards) sits on top of the component model and, for the first time, incorporates wit.
+    - This development is crucial; working with wit allows us to dynamically swap out different implementations as needed.
+    - When creating a component, we want to work in our own language. We work in Rust and Go, for instance, and, by the power of WIT, these languages understand how to target WASI Preview 2.
+    - We also have tooling that's built into my language ecosystem that lets us work with tools like wit-bindgen, so we can generate bindings with other different components.
+    - This means we can pull in components of any language, build with them and what comes out is a Wasm component.
+    - Most importantly, it doesn't matter if it's written in rust or go or JavaScript, it only wants the best and right component for the job. All we need to do is to link these components together and I can start building.
+    - Components are declaratively linked: with declarative linking, we can link together different capabilities that I want to use, regardless of language.
+    - We didn't have time to dig into worlds or lifting & lowering, but we can cover this in a future call.
+
 ### Recording
 
-Recording is being uploaded to YouTube and will be displayed promptly
+<ReactPlayer url='https://youtu.be/O-Q_SzXckJI' controls />
