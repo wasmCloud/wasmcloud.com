@@ -10,7 +10,7 @@ import ReactPlayer from 'react-player/youtube';
 ### Agenda
 
 - 
-- 
+- DISCUSSION: Update on wit-ified providers
 - 
 
 <!--truncate-->
