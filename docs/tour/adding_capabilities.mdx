@@ -7,16 +7,18 @@ import TabItem from "@theme/TabItem";
 
 # Adding Capabilities
 
-Going from "Hello World" to a full-fledged application requires just identifying what capabilities your application needs, and then adding them to your actor. Applications in wasmCloud have two types of capabilities: external requests that call a function handler in your actor (like HTTP Server and Messaging) and actor requests that call a function handler in a capability provider (like Key-Value Store and Logging). "Hello World" already has the HTTP Server capability, so let's add more features to this application with functional code and more capabilities.
+Going from "Hello World" to a full-fledged application requires just identifying what capabilities your application needs, and then adding them to your actor. Capabilities in wasmCloud can invoke a function handler in your actor in response to some external trigger (like HTTP Server and Messaging) and actors can invoke capabilities as a part of handling a request (like key-value store and logging). "Hello World" already has the HTTP Server capability, so let's add more features to this application with functional code and more capabilities.
 
-## Adding more functionality
+## Adding Functionality
 
 Let's extend this application to do more than just say "Hello World". We can use the `HttpRequest` struct and check the request for a name provided in a query string, and then return a greeting with that name.
 
 ```rust
 async fn handle_request(&self, ctx: &Context, req: &HttpRequest) -> RpcResult<HttpResponse> {
     let name = match req.query_string.split("=").collect::<Vec<&str>>()[..] {
+        // query string is "name=<name>" e.g. localhost:8080?name=Bob
         ["name", name] => name.to_string(),
+        // query string is anything else or empty e.g. localhost:8080
         _ => "World".to_string(),
     };
 
@@ -26,7 +28,7 @@ async fn handle_request(&self, ctx: &Context, req: &HttpRequest) -> RpcResult<Ht
 
 Using a simple pattern match, we can check to see if we can split the query string on a name parameter, and if so, use that name in the response. If not, we'll just use "World" as the name. This won't support adding multiple query parameters but it's a perfectly good start for our goals.
 
-## Deploying your local actor
+## Deploying your Actor
 
 Now that we're making modifications to the actor, you'll want to run your local copy instead of the wasmCloud example that's already deployed. To do this, we can edit the manifest to instead point at a local file. You can easily find this path by running `wash build -o json` and looking for **actor_path** in the output. Simply take that and prepend `file://` to the absolute path to avoid any reliance on the current working directory.
 
@@ -69,11 +71,11 @@ Hello, World!
 Hello, Bob!
 ```
 
-## Adding persistent storage
+## Adding Persistent Storage
 
-To further enhance our application, let's add persistent storage to keep a record of each person that this application greeted. We'll use the key-value store capability for this, and just like HTTP server, you won't need to pick a library or a vendor for your Key-Value Store capability. You'll just need to add the capability to your actor, and then you can pick a provider at runtime.
+To further enhance our application, let's add persistent storage to keep a record of each person that this application greeted. We'll use the key-value store capability for this, and just like HTTP server, you won't need to pick a library or a specific vendor implementation yet. You'll just need to add the capability to your actor, and then you can pick a capability provider at runtime.
 
-To add the capability, you'll need to add the key-value interface to your actor and then declare `wasmcloud:keyvalue` as a capability claim so that wasmCloud will allow your actor to use the capability.
+We'll start by adding the key-value interface in your project and then declare `wasmcloud:keyvalue` as a capability claim so that wasmCloud will allow your actor to use the capability.
 
 ```bash
 # Add the key-value interface to your Cargo project
@@ -142,7 +144,7 @@ The modified code will now, whenever a name is provided, add it to the set of gr
     }
 ```
 
-### Deploying a Key-Value Store provider
+### Deploying a Key-Value Store Provider
 
 Our actor is prepared to use a key-value store, and now that we've built it we're ready to choose an implementation. A great option for local development and testing is the [Redis provider](https://github.com/wasmCloud/capability-providers/tree/main/kvredis), and will only require you to have `redis-server` or Docker installed.
 
@@ -212,7 +214,7 @@ spec:
         contract: wasmcloud:keyvalue
 ```
 
-Last step, we can undeploy the older version of the application and deploy the new version. Then, again, we can test our new functionality.
+For the last step, we can undeploy the older version of the application and deploy the new version. Then, again, we can test our new functionality.
 
 ```bash
 > wash app undeploy hello
