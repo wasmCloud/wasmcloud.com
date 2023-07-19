@@ -9,9 +9,8 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
-- DISCUSSION: Update on wit-ified providers
-- 
+- DEMO + DISCUSSION: Update on wit-ified providers
+- DISCUSSION: RFCs & ADRs in the wasmCloud org
 
 <!--truncate-->
 
