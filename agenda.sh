@@ -10,5 +10,5 @@ git fetch
 git pull
 
 DST_FILE=community/$1-community-meeting.md
-cat community/template.txt | sed "s/YYYY-MM-DD/$1/" | sed "s/VIDEOURL/$2/" > $DST_FILE
+cat community/template.txt | sed "s/YYYY-MM-DD/$1/" | sed "s,VIDEOURL,$2," > $DST_FILE
 echo "Done! Add agenda items, demos, and awesome stuff to $DST_FILE"
