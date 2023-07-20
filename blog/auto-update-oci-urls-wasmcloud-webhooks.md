@@ -1,6 +1,6 @@
 ---
 title: "Automatically Updating OCI URLs with wasmCloud and Azure Webhooks"
-date: 2023-07-19T9:00:00-05:00
+date: 2023-07-20T9:00:00-05:00
 image: "/img/webhookwasmcloud.png"
 author: "Brooks Townsend"
 tags: ["wasmcloud", "developer", "wasm", "cloud", "Azure"]
