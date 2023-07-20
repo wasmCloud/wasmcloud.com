@@ -7,15 +7,14 @@ import TabItem from "@theme/TabItem";
 
 import washboard_init from "../images/washboard_init.png";
 import washboard_echo from "../images/washboard_echo.png";
+import washboard_hello from "../images/washboard_hello.png";
 import washboard_httpserver from "../images/washboard_httpserver.png";
 import washboard_link from "../images/washboard_link.png";
 import washboard_start_actor from "../images/washboard_start_actor.png";
 
-# Building An Echo Service
+# Hello World
 
-Build and run your first wasmCloud actor
-
-<!--truncate-->
+A familiar starting example to get you up and running with wasmCloud.
 
 :::info
 
@@ -24,15 +23,165 @@ If you have not installed `wash`, follow the [installation guide](../installatio
 :::
 
 In this guide, we'll be taking a tour through some of the most common activities in the wasmCloud
-ecosystem like starting and configuring [actors](/docs/reference/glossary#actors) and
-[capability providers](/docs/reference/glossary#capabilities). You'll get to build your own actors and providers in upcoming tutorials,
-but for now let's get familiar with the runtime and tooling.
+ecosystem like starting and configuring the two main components of wasmCloud: [actors](/docs/reference/glossary#actors) and
+[capability providers](/docs/reference/glossary#capabilities). All wasmCloud applications need a [host](/docs/category/host-runtimes) to run on, so let's
+use `wash` to start one now.
 
-## Starting a host
+## Starting a Host
 
-To start a host, simply run `wash up`.
+To start a host, simply run `wash up`. This will start a host with default configurations which is perfect for this tutorial, and you can exit at any time with `CTRL+c`
 
 By default, `wash` will run the host in interactive mode. If you'd rather run the host in the background, run `wash up --detached` (or `wash up -d`, for short).
+
+## Generating a New Project
+
+Now that we have a host to run our application on, let's generate a new actor project. This is where our "Hello World" example begins. If you're running your host in the foreground, just switch to another terminal window to run these commands.
+
+This command generates a new actor project in the `./hello` directory:
+
+```shell
+wash new actor hello
+```
+
+This actor is a simple Rust project with a few extra goodies included for wasmCloud. At a high level, the important pieces are:
+
+1. `src/lib.rs`: Where the business logic is implemented
+2. `wasmcloud.toml`: Actor metadata and capability permissions
+3. `wadm.yaml`: A declarative manifest for running the full application
+
+We'll take a look at each of these in depth later, but for now let's run the example.
+
+## Starting our Application
+
+We'll use `wash` and [wadm](https://github.com/wasmcloud/wadm), the wasmCloud application deployment manager, to start this actor, the httpserver capability, and link them together to configure them.
+
+```shell
+wash app deploy wadm.yaml
+```
+
+`wadm` will take care of taking this manifest and scheduling the resources on the host that you launched earlier. You should see output in the host logs when your actor and capability start up, and then you can query it yourself:
+
+```shell
+$ curl localhost:8080
+Hello, world!
+```
+
+Congratulations, you just ran a WebAssembly application!
+
+## How does it work?
+
+When you send your HTTP request to `localhost:8080`, that request is received by the HTTP Server capability provider. The HTTP Server capability provider then forwards that request to the actor, which responds with the string "Hello, world!". This loose coupling of capability providers and actors provides flexibility, security, and it lets our actor code be loosely coupled to non-functional requirements. Let's take a look at that code now in `src/lib.rs`:
+
+```rust
+use wasmbus_rpc::actor::prelude::*;
+use wasmcloud_interface_httpserver::{HttpRequest, HttpResponse, HttpServer, HttpServerReceiver};
+
+#[derive(Debug, Default, Actor, HealthResponder)]
+#[services(Actor, HttpServer)]
+struct HelloActor {}
+
+/// Implementation of the HttpServer capability contract
+#[async_trait]
+impl HttpServer for HelloActor {
+    async fn handle_request(&self, _ctx: &Context, _req: &HttpRequest) -> RpcResult<HttpResponse> {
+        Ok(HttpResponse::ok("Hello, World!"))
+    }
+}
+```
+
+This actor is set up to receive requests from the `HttpServer` capability, with a single function `handle_request` that matches what the capability provider expects. All you need to worry about as an applicaiton developer is what functional logic you want to apply when you receive an `HttpRequest`, and what `HttpResponse` you want to return. There's no mention of ports, certificates, HTTP libraries, and if those things change this actor will work all the same.
+
+:::info
+
+Capabilities are _deny by default_, and if you take a look in `wasmcloud.toml` you'll see the only capability is `wasmcloud:httpserver`. This means that this actor can never access files on disk, make network requests of its own, or even access the system time, it's blocked by the wasmCloud runtime.
+
+:::
+
+When you ran `wash app deploy wadm.yaml`, `wadm` takes the application manifest and schedules the components on hosts according to the scale you specify. This example has a minimal manifest, let's take a look at it:
+
+```yaml
+# Metadata
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello
+  annotations:
+    version: v0.0.1
+    description: "wasmCloud Hello World Example"
+spec:
+  components:
+    # Your actor component, started from the wasmCloud example OCI artifact
+    - name: hello
+      type: actor
+      properties:
+        image: wasmcloud.azurecr.io/hello:0.1.7
+      traits:
+        # One replica of this actor will run
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        # The link configuration tells the httpserver to listen on 8080
+        - type: linkdef
+          properties:
+            target: httpserver
+            values:
+              address: 0.0.0.0:8080
+
+    # The httpserver capability provider, started from the official wasmCloud OCI artifact
+    - name: httpserver
+      type: capability
+      properties:
+        image: wasmcloud.azurecr.io/httpserver:0.17.0
+        contract: wasmcloud:httpserver
+```
+
+## Scaling up 📈
+
+WebAssembly can be easily scaled due to its small size, portability, and [wasmtime](https://wasmtime.dev/)'s ability to efficiently instantiate multiple instances of a single WebAssembly module. We leverage these aspectes to make it simple to scale your applications with wasmCloud. Let's scale up our hello world application to 50 replicas by editing `wadm.yaml`:
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello
+  annotations:
+    # Make sure to bump the version so wadm knows to update the application
+    version: v0.0.2
+    description: "wasmCloud Hello World Example"
+spec:
+  components:
+    - name: hello
+      type: actor
+      properties:
+        image: wasmcloud.azurecr.io/hello:0.1.7
+      traits:
+        - type: spreadscaler
+          properties:
+            # Update the scale to 50
+            replicas: 50
+```
+
+Now your hello application is ready to deploy v0.0.2 with 50 replicas. Just run `wash app deploy wadm.yaml` again, and you'll see the logs start flowing in. It's a little easier to visualize this in the wasmCloud dashboard, so let's take a look at that next.
+
+## Viewing the wasmCloud dashboard
+
+Open a browser tab to the URL [http://localhost:4000](http://localhost:4000). This is the
+wasmCloud dashboard (or _washboard_), a GUI that you will use quite often as you learn to build distributed applications in
+this ecosystem.
+
+<img
+  src={washboard_hello}
+  width="800"
+  alt="wasmCloud dashboard with hello world application"
+/>
+
+:::info
+
+By default, wasmCloud hosts connect to port **4000**. If this port isn't available, you won't see
+the wasmCloud dashboard. If you need to change the port number, you can set the environment variable
+`WASMCLOUD_DASHBOARD_PORT` to a new number before starting a host.
+
+:::
 
 ## Log files
 
@@ -44,7 +193,7 @@ wasmCloud host, show you where to find logs:
   <TabItem value="wash-up" label="Wash Up" default>
 
 By default, logs from `wash up` are automatically output to your terminal. If you ran the command
-with the `--detached` flag, logs can be found in `~/.wash/downloads/wasmcloud.log`
+with the `--detached` flag, logs can be found in `~/.wash/downloads/wasmcloud_4000.log`
 
   </TabItem>
   <TabItem value="docker" label="Docker">
@@ -53,186 +202,11 @@ Logs from hosts running in Docker, if started with our docker compose, can be fo
 `docker logs wasmcloud`
 
   </TabItem>
-  <TabItem value="manual" label="Manual">
-
-If you manually installed the host from a downloaded release, look in `var/log/erlang.log.1`
-relative to the folder where you extracted the release tar file.
-
-  </TabItem>
 </Tabs>
 
-## Viewing the wasmCloud dashboard
+## Next steps
 
-Open a browser tab to the URL [http://localhost:4000](http://localhost:4000). This is the
-wasmCloud dashboard (or _washboard_), a GUI that you will use quite often as you learn to build distributed applications in
-this ecosystem.
-
-<img src={washboard_init} width="800" alt="empty wasmCloud dashboard" />
-
-:::info
-
-By default, wasmCloud hosts connect to port **4000**. If this port isn't available, you won't see
-the wasmCloud dashboard. If you need to change the port number, you can set the environment variable
-`WASMCLOUD_DASHBOARD_PORT` to a new number before starting a host.
-
-:::
-
-## Querying hosts with `wash`
-
-### Querying for running hosts
-
-To see a list of running hosts, run the following command:
-
-```shell
-wash get hosts
-```
-
-You'll see output like this:
-
-```shell
-⢈⠩  Retrieving Hosts ...
-
-  Host ID                                                    Uptime (seconds)
-  NCPGH5CVPO3BAZ5OSQKXYHDKPBT3JXLG5EAOTG7XOXUWJ6AHZCFT57SI   711
-```
-
-### Querying a host's inventory
-
-Now let's check the host's inventory. Using your host ID (not the one in this guide):
-
-```shell
-wash get inventory NCPGH5CVPO3BAZ5OSQKXYHDKPBT3JXLG5EAOTG7XOXUWJ6AHZCFT57SI
-```
-
-You'll see output similar to the following (your host ID will be different):
-
-```shell
- Host Inventory (NCPGH5CVPO3BAZ5OSQKXYHDKPBT3JXLG5EAOTG7XOXUWJ6AHZCFT57SI)
-
-  hostcore.os                           linux
-  hostcore.osfamily                     unix
-  hostcore.arch                         x86_64
-
-  No actors found
-
-  No providers found
-```
-
-The start of the output displays a host's labels. By default, this includes the operating system and
-architecture the host is running on. These labels are prefixed by `hostcore`.
-
-The rest of the inventory includes a list of **actors** and
-**capability providers**. Since we haven't started any
-actors or providers, these lists are empty.
-
-The terminal output you've seen so far is also reflected in the dashboard. Throughout our guides and
-tutorials, we may alternate between the wasmCloud dashboard UI and terminal-based CLI. When it comes
-to managing a host's inventory, everything you can do in one view, you can do in the other.
-
-### Running an actor
-
-We'll return to the dashboard UI now. (If you're interested in doing this with `wash`, refer to
-[this page](/docs/fundamentals/wash/)). From the dashboard, click the **Start Actor** button and choose
-the _From Registry_ option. When prompted for an OCI reference URL, enter
-`wasmcloud.azurecr.io/echo:0.3.8`. For now, choose **1** for the number of replicas:
-
-<img src={washboard_start_actor} width="500" alt="Starting an actor modal" />
-
-Click **Submit**, and after a few seconds, you should have a running actor on your host:
-
-<img src={washboard_echo} width="500" alt="Running echo actor" />
-
-### Running a capability provider
-
-For this actor to receive HTTP requests, we need to start the HTTP Server capability provider.
-Actors are signed WebAssembly modules, and as such they have embedded claims declaring their ability
-to communicate with capability providers like the HTTP Server. Actors cannot communicate with any
-capability provider for which they have not been signed.
-
-Let's use `wash` to inspect the set of capabilities this actor has:
-
-```shell
-wash claims inspect wasmcloud.azurecr.io/echo:0.3.8
-```
-
-```shell
-                               Echo - Module
-  Account       ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW
-  Module        MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5
-  Expires                                                          never
-  Can Be Used                                                immediately
-  Version                                                      0.3.8 (4)
-  Call Alias                                                   (Not set)
-                               Capabilities
-  HTTP Server
-  Logging
-                                   Tags
-  None
-```
-
-To start the HTTP server capability provider, click **Start Provider** and then select _From
-Registry_. Supply the OCI URL `wasmcloud.azurecr.io/httpserver:0.17.0` and leave the _link name_ set
-to `default`. You should now see this capability provider running, and within 30 seconds it should
-report its status as Healthy.
-
-<img src={washboard_httpserver} width="600" alt="Running HTTP server" />
-
-Let's return to `wash` now and re-query the host's inventory. Re-run the command `wash get inventory`.
-You should see something like the following (again, your Host ID will be different):
-
-```shell
-Host Inventory (NCPGH5CVPO3BAZ5OSQKXYHDKPBT3JXLG5EAOTG7XOXUWJ6AHZCFT57SI)
-
-  hostcore.osfamily                                                              unix
-  hostcore.os                                                                    macos
-  hostcore.arch                                                                  aarch64
-
-  Actor ID                                                    Name               Image Reference
-  MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5    Echo               wasmcloud.azurecr.io/echo:0.3.8
-
-  Provider ID                                                 Name               Link Name          Image Reference
-  VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M    HTTP Server        default            wasmcloud.azurecr.io/httpserver:0.17.0
-```
-
-### Linking actors and capability providers
-
-Since the HTTP server provider hasn't been _linked_ to any actor yet, it hasn't yet opened a port to listen to web
-requests to forward to the actor. To allow the actor and provider to communicate, they need to be
-linked.
-
-Go back to the web UI and click **Define Link**. Select the actor and provider from the dropdown
-boxes, as shown below. Leave the _Link Name_ as default, and set the _Contract ID_ to
-`wasmcloud:httpserver`. For the _Values_ field, you'll need to provide an address including hostname
-and port. Enter the following in the _Values_ field:
-
-```shell
-address=0.0.0.0:8080
-```
-
-<img src={washboard_link} width="500" alt="Link definition modal" />
-
-Once you see that the link has been added to the dashboard, you are ready to send a request to your
-actor.
-
-### Interacting with your actor
-
-In another terminal window, run the following command:
-
-```shell
-curl localhost:8080/echo
-```
-
-In response, you should receive your request object (notice the path argument):
-
-```
-{"body":[],"method":"GET","path":"/echo","query_string":""}
-```
-
-Feel free to try out different methods of making a request to your actor, including adding headers
-or using a different HTTP method, to see different outputs.
-
-Congratulations! You've made it through the first guide to wasmCloud. You should now feel
-comfortable exploring the ecosystem, starting and stopping the host runtime, interacting with the
-wasmCloud dashboard UI, and interacting with hosts using `wash`.
-
-To learn more about actors, providers, and other topics, continue on to the **Fundamentals** section.
+Congratulations! You've made it through the first guide to wasmCloud. You started your first application and
+got familiar with the fundamentals of `wash`, `wadm`, and the wasmCloud dashboard. You should now feel
+comfortable exploring the ecosystem. We recommend proceeding onto the next guide, where you can build your own
+application and get into the developer loop.
