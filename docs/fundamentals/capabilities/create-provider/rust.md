@@ -103,7 +103,7 @@ resolver = "2"
 [dependencies]
 async-trait = "0.1"
 log = "0.4"
-wasmbus-rpc = "0.13"
+wasmbus-rpc = "0.14"
 wasmcloud-examples-payments = { path="../payments/rust" }
 
 [[bin]]
