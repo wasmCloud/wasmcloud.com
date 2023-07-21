@@ -15,7 +15,6 @@ wasmCloud is designed around the following core tenets:
 - Dead simple distributed applications
 - Run anywhere
 - Secure by default
-- Save time, money, and effort
 - Productivity for both developers and operations
 
 You should not have to change your design, architecture, or your programming environment as you move from concept to production.
