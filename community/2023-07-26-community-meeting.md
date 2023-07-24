@@ -11,7 +11,6 @@ import ReactPlayer from 'react-player/youtube';
 
 - DEMO: wit provider [nats-messaging](https://github.com/thomastaylor312/nats-messaging-wit) from Taylor 
 - DISCUSSION: wadm wasmCloud introduction, 0.5.0 roadmap
-- 
 
 <!--truncate-->
 
