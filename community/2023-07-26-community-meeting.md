@@ -16,7 +16,7 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Meeting Notes
 
-- Status update - moving to WIT
+- **Status update - moving to WIT**
   - Background; we have a new PR in the wasmCloud/wasmCloud repo around capability provider SDKs for Wasm providers - specifically for generating them with wit IDL interfaces.
   - Visit this interesting PR if you want to see the codegen behind the wasmCloud SDK [PR](https://github.com/wasmCloud/wasmCloud/pull/396).
   - This focus exemplifies our drive from Smithy to wit.
@@ -28,7 +28,7 @@ import ReactPlayer from 'react-player/youtube';
   - Roman created an issue milestone in the wasmcloud/wasmcloud repo [witify](https://github.com/wasmCloud/wasmCloud/milestone/6). Using all wit contracts for all capability providers and contracts, Roman has outlined a couple of small tasks to get to this milestone.
   - All the functionality of wasi-cloud will be integrated into wasmCloud, and custom contracts will work with wasifills.
   - Watch the recording for a longer discussion on this subject and catch Taylor's demo at the next meeting.
-- DISCUSSION: wadm wasmCloud introduction, 0.5.0 roadmap
+- **DISCUSSION: wadm wasmCloud introduction, 0.5.0 roadmap**
   - We started cutting alpha for Wadm 0.5. These are new features that are minor breaking changes so we're cutting an early release.
   - Multi-tenant flag fixes. Multi-tenant mode allows a Wadm instance to monitor multiple lattices.
   - There is a wasmCloud in production guide under the [wadm section](https://wasmcloud.com/docs/fundamentals/wadm/deploying#configuring-credentials) - talks through the process of working with NATS clusters.
@@ -38,7 +38,7 @@ import ReactPlayer from 'react-player/youtube';
     - Support version upgrades: you can't set up an app in Wadm then upgrade your version Wadm...yet. Wadm currently does a simple comparison of public keys and requires manual stop. We'd love for Wadm to be able to handle upgrades.
   - Brooks will have a more fulsome demo in the coming weeks.
   - If you're interested in contributing to Wadm we have a couple of issues that are marked as [good first issues](https://github.com/wasmCloud/wadm/issues).
-- DISCUSSION: Meetups!
+- **DISCUSSION: Meetups!**
   - Liam has created a helpful digest of two fantastic events we'd love to see you at! The Linux Foundation's new WebAssembly conference, WasmCon, and the [Bytecode Alliance's 'Componentize the World!'](https://cosmonic.com/blog/industry/better-together-lf-wasmCon-and-bytecode-alliance-componentize-the-world-webassembly-hackathon) Hackathon
 
 ### Recording
