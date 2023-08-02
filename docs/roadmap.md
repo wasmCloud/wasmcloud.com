@@ -9,7 +9,7 @@ sidebar_position: 6
 This roadmap page is a snapshot of the current state of the project. It is not a guarantee of future direction or features. It is a living document and will change as the project evolves. You can view the most current version of this roadmap on [GitHub Projects](https://github.com/orgs/wasmCloud/projects/7/views/3).
 :::
 
-wasmCloud is a constantly evolving project. The feature roadmap and release schedule aren't rigid at this time, instead adopting a "Now, Next, Later" format to indicate when efforts are available for work. In addition to the higher-level roadmap on [GitHub Projects](https://github.com/orgs/wasmCloud/projects/7/views/3), wasmCloud is under constant development for smaller improvements, bug fixes, and documentation. wasmCloud seeks to evolve with the WebAssembly ecosystem, adopting standards and best practices as they become available. We believe this is the best way, after hearing invaluable feedback from contributors and users, to accomplish our goals as a project.
+wasmCloud is a constantly evolving project. The feature roadmap and release schedule aren't rigid at this time, instead, we're adopting a "Now, Next, Later" format to indicate when efforts are available for work. In addition to the higher-level roadmap on [GitHub Projects](https://github.com/orgs/wasmCloud/projects/7/views/3), wasmCloud is under constant development for smaller improvements, bug fixes, and documentation. wasmCloud seeks to evolve with the WebAssembly ecosystem, adopting standards and best practices as they become available. We believe this is the best way, after hearing invaluable feedback from contributors and users, to accomplish our goals as a project.
 
 ## Goals
 
