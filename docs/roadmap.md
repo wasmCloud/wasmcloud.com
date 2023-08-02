@@ -15,11 +15,11 @@ wasmCloud is a constantly evolving project. The feature roadmap and release sche
 
 Looking at wasmCloud development in the longer-term, we strive to achieve the following goals:
 
-1. **Leverage as many WebAssembly standards as possible (e.g. WASI, Wasm components, wasi-cloud, etc)**
+1. **Leverage as many WebAssembly standards as possible (WASI, Wasm components, wasi-cloud, etc)**
 1. Provide a seamless developer experience for building, testing, and deploying WebAssembly components
 1. Be the best way to build vendor-less components for WebAssembly applications
 1. Bring joy to distributed computing
-1. Leverage cloud-native standards where possible (e.g. OAM, OCI, CloudEvents, etc.)
+1. Leverage cloud-native standards where possible (OAM, OCI, CloudEvents, etc.)
 
 wasmCloud began in 2019 with the goal of securely connecting capabilities to applications, leveraging WebAssembly to provide a language and platform agnostic unit of compute. This loose coupling of capabilities and applications is the core of wasmCloud's ability to bring joy to distributed computing, allowing application developers to: maintain their business logic and non-functional requirements separately, build without the intricacies of platform-specific dependencies, and seamlessly distribute applications without changing their code.
 
