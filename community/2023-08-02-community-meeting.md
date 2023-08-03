@@ -30,10 +30,10 @@ import ReactPlayer from 'react-player/youtube';
   - For custom contracts we need a wasifill - essentially a translation layer.
   - The introduction of Wasifills means that wasmCloud logic is never in your logic code.
   - In this model the translation layer is built once in any language.
-  - Any language that uses a customer contract will need a wasifill.
+  - Any language that uses a custom contract will need a wasifill.
   - Check the recording for the detailed demo and wider community discussion.
 - **DISCUSSION: wasmCloud roadmap and WebAssembly standards**
-  - The next stable iteration of WASI-Preview 2 has been published as part of the overall server-side Wasm standards effort. You can view the roadmap here.
+  - The next stable iteration of WASI-Preview 2 has been published as part of the overall server-side Wasm standards effort.
   - We have put together a new wasmCloud roadmap that tracks the [Bytecode Alliance Roadmap](https://bytecodealliance.org/articles/webassembly-the-updated-roadmap-for-developers).
   - This is an exciting time as we have componentized wasmCloud in line with these new standard and the soon-to-be-finalized Component Model.
   - As we move towards WasmCon in September, stay tuned for more detail on the wasmCloud blog.
