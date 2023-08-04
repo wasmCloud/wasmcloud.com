@@ -9,11 +9,8 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
-- 
-- 
-
-<!--truncate-->
+- DEMO: wadm 0.5 feature showcase
+- DISCUSSION: Roadmap update on Rust host and Witify efforts
 
 ### Meeting Notes
 
