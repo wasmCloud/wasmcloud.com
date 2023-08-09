@@ -14,14 +14,16 @@ In this guide, we're going to cover all the steps for creating a capability prov
 
 ### The sample use case
 
-For the purposes of this guide, we'll create a capability provider for a _payment service_ that accepts payments from customers. When composing applications with actors and capabilities in an ecommerce setting, actors may be contain business logic that accepts payments from customers.
+For the purposes of this guide, we'll create a capability provider for a _payment service_ that accepts payments from customers.
+When composing applications with actors and capabilities in an ecommerce setting, actors may have to accept payments from customers.
+This, of course, requires access to the "outside world", but our actor can't even make network calls.
 
 To solve this problem, we're going to hide the implementation details of payment approval behind the contract of a capability provider, giving us flexibility in the future to replace providers or reconfigure the implementation at runtime without any impact on running actors.
 
 Creating a new capability provider involves:
 
-1. [Creating a new interface](./new-interface)
-1. [Creating a capability provider](./rust)
+1. [Creating an interface](./new-interface)
+1. [Creating a new provider](./rust)
 1. [Creating a provider archive](./create-par)
-1. [Using the new capability provider in an actor](./consuming)
-1. [Testing the new capability provider](./testing)
+1. [Calling the provider from an actor](./consuming)
+1. [Testing the new provider](./testing)
