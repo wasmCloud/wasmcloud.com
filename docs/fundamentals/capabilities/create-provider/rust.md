@@ -7,7 +7,7 @@ draft: false
 
 Creating a capability provider involves creating a native executable. All capability provider executables have the same basic requirements:
 
-- Accept a [Host Data](https://wasmcloud.github.io/interfaces/html/org_wasmcloud_core.html#host_data) structure from `stdin` immediately upon starting the executable. The host data is a base64 encoded JSON object with a trailing newline making it easy to pull from the `stdin` pipe.
+- Accept a [Host Data](https://wasmcloud.github.io/interfaces/html/org_wasmcloud_core.html#host_data) object from `stdin` immediately upon starting the executable. The host data is a base64 encoded JSON object with a trailing newline making it easy to pull from the `stdin` pipe.
 - Accept linkdef messages according to the [RPC protocol](/docs/hosts/lattice-protocols/rpc)
 - Communicate with actors via RPC messages defined by a capability contract
 - Respond to periodic health checks
