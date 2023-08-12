@@ -14,10 +14,6 @@ Capability providers are always compiled in "release" mode. The `Makefile` creat
 If this is the first time you've run this command, some keys will be generated for you and you should see output that looks like the following:
 
 ```sh
-No keypair found in "/home/user/.wash/keys/user_account.nk".
-We will generate one for you and place it there.
-If you'd like to use alternative keys, you can supply them as a flag.
-
 No keypair found in "/home/user/.wash/keys/fakepay_provider_service.nk".
 We will generate one for you and place it there.
 If you'd like to use alternative keys, you can supply them as a flag.
@@ -37,7 +33,9 @@ wash par inspect build/fakepay_provider.par.gz
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                        Fake Payments - Provider Archive              ║
 ╠═══════════════════════╦══════════════════════════════════════════════╣
-║ Public Key            ║ VAN5FE2JCYMZFHZZWS2KNKVEIIU5...25XKFKCHXEMDU ║
+║ Account               ║ ############################################ ║
+╠═══════════════════════╬══════════════════════════════════════════════╣
+║ Service               ║ ############################################ ║
 ╠═══════════════════════╬══════════════════════════════════════════════╣
 ║ Capability Contract ID║                  wasmcloud:examples:payments ║
 ╠═══════════════════════╬══════════════════════════════════════════════╣
