@@ -12,7 +12,7 @@ If you're already familiar with the computer science of the
 and have experience implementing actors in other projects or tools,
 feel free to [skip to the next section](./wc_actors).
 
-The actor model is a model of concurrent computational that's been around since
+The actor model is a model of concurrent computation that's been around since
 **1973** and is as meaningful and applicable today than it was 50 years ago.
 In this model, the **actor** is the primitive building block
 of concurrent computation.
