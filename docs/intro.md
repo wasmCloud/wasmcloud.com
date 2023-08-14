@@ -12,12 +12,11 @@ Get started building applications with wasmCloud today and enjoy the freedom of 
 
 wasmCloud is designed around the following core tenets:
 
-- Dead simple Distributed Applications
+- Dead simple distributed applications
 - Run anywhere
 - Secure by default
-- Save time, money, and effort
-- Productivity for both Developers and Operations
+- Productivity for both developers and operations
 
 You should not have to change your design, architecture, or your programming environment as you move from concept to production.
 
-**We're bringing bring _joy_ to building global-scale applications.**
+**We're bringing _joy_ to building global-scale applications.**

@@ -10,17 +10,18 @@ An **_actor_** is the smallest unit of deployable, portable compute within the w
 
 ### Single-Threaded
 
-_Concurrency is hard_. Even when we get concurrency correct, it's still hard. Building systems that work properly either through multi-threading or through so-called "green threads" or "coroutines" is difficult and error-prone. Concurrency and parallelism introduce friction in writing new code, maintaining old code, troubleshooting, and routinely wreaks havoc on production systems.
+_Concurrency is hard_.
+Even when we get concurrency correct, it's still hard. Building systems that work properly either through multi-threading or through so-called "green threads" or "coroutines" is difficult and error-prone. Concurrency and parallelism introduce friction in writing new code, maintaining old code, and troubleshooting applications. They routinely wreak havoc on production systems.
 
 Developers want to write business logic without having to worry about the intricate details of the threading model of the surrounding environment. In alignment with [the actor model](https://en.wikipedia.org/wiki/Actor_model), wasmCloud actors are single-threaded _internally_. The surrounding environment provided by the host runtime may have varying levels of concurrency support, or could even have entirely different concurrency models depending on whether it's running in a browser, on a constrained device, or in the cloud. The code we write for actors should be oblivious to these things and, most importantly, _never have to change_ even if the surrounding environment adopts a different concurrency model.
 
-Though we shouldn't have to worry about the surrounding concurrency model, we need to be aware that our single-threaded code can back things up and produce congestion. Therefore, when developing _message handlers_ for actors, we need to embrace the design of performing small amounts of work in a "get in and get out fast" approach: divide the work to be done into the smallest bits possible, and perform each bit as fast as we can. This approach maximizes the benefits of _external concurrency_ while still keeping the code we write blissfully synchronous.
+While it's nice not worrying about the underlying concurrency model, it's important to understand that our single-threaded code has the potential to create bottlenecks. Therefore, when developing _message handlers_ for actors, we need to embrace the design of performing small amounts of work in a "get in and get out fast" approach: divide the work to be done into the smallest bits possible, and perform each bit as fast as we can. This approach maximizes the benefits of _external concurrency_ while still keeping the code we write blissfully synchronous.
 
 Again, these kinds of patterns occur in all actor systems, not just wasmCloud.
 
 ### Reactive
 
-Actors are [reactive](https://en.wikipedia.org/wiki/Reactive_programming). An actor cannot initiate any action on its own, it can simply _react_ to outside stimuli in the form of messages delivered by the host. Actor developers declare which messages their actors handle as input and return messages as output, as shown in the following example that receives a bank account query and responds with the bank account value:
+Actors are [reactive](https://en.wikipedia.org/wiki/Reactive_programming). An actor cannot initiate any action on its own, it can only _react_ to outside stimuli in the form of messages delivered by the host. Actor developers declare which messages their actors handle as input and return messages as output. The following example implements a handler that receives a bank account query and responds with the bank account value:
 
 ```rust
 #[async_trait]
@@ -29,13 +30,13 @@ impl BankServer for BankActor {
         ctx: &Context,
         query: &BalanceInquiry) -> RpcResult<Balance> {
 
-    // queried using another capability provider
-    let balance = get_balance()?;
-    Ok(Balance{
-        account: query.account,
-        balance
-    })
-  }
+        // queried using another capability provider
+        let balance = get_balance()?;
+        Ok(Balance{
+            account: query.account,
+            balance
+        })
+    }
 }
 ```
 
