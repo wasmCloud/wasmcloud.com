@@ -50,7 +50,22 @@ spec:
       traits: ...
 ```
 
-The `image` property of the `actor` component contains an OCI (or bindle) image reference URL. When you attempt to store this model, wadm will reach out to the artifact repository and attempt to pull some metadata about that image (such as its primary key, embedded security information, etc). This means that storing application specifications with invalid/unreachable OCI references is not allowed.
+The `image` property of the `actor` component contains a file reference, an OCI image reference URL, or a Bindle image reference. When you attempt to store this model, wadm will reach out to the artifact repository and attempt to pull some metadata about that image (such as its primary key, embedded security information, etc). This means that storing application specifications with invalid/unreachable OCI references is not allowed.
+
+To launch an actor from a local file, you should prefix the path with `file://`, as follows:
+```yaml
+spec:
+  components:
+    - name: echo
+      type: actor
+      properties:
+        image: file:///Users/wasmcloud/echo/build/echo_s.wasm
+      traits: ...
+```
+
+:::info
+When launching an actor from a local file, ensure that the environment variable `WASMCLOUD_ALLOW_FILE_LOAD=true` is set when you launch wasmCloud. This is the default for hosts ran with `wash up`. Additionally, relative paths are supported but must be relative to where you launch the wasmCloud host, not from where the manifest is defined. For this reason it's recommended to use absolute paths.
+::: 
 
 To define a capability provider, we include a `capability` component, as follows:
 
