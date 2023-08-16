@@ -9,9 +9,11 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
-- 
-- 
+TBD, if you have something you'd like to discuss, please add it to the agenda.
+
+-
+-
+-
 
 <!--truncate-->
 
