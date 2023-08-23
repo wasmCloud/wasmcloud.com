@@ -9,11 +9,9 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-TBD, if you have something you'd like to discuss, please add it to the agenda.
-
--
--
--
+- DEMO: wadm 0.5.0 manifest validation
+- DISCUSSION: wadm 0.5.0 official release, wash 0.20.0 coming soon
+- DISCUSSION: Roadmap update on Rust host OTP parity
 
 <!--truncate-->
 
