@@ -7,7 +7,6 @@ type: "docs"
 sidebar_position: 2
 ---
 
-
 The **w**asmCloud **A**pplication **D**eployment **M**anager uses the [Open Application Model](https://oam.dev/) to define application specifications. Because this specification is extensible and platform agnostic, it makes for an ideal way to represent applications with metadata specific to wasmCloud. Don't worry if OAM seems overwhelming, you don't need to know much about it. We're using it as a way of defining application components in a flexible way that's familiar to a lot of people who have been working in the cloud space.
 
 In this model, an application `specification` is a set of metadata about the app, as well as a list of `components`. Each component within an application is decorated with various `traits`. These core building blocks allow us to make it very easy to define incredibly powerful deployments. wasmCloud defines a number of traits that are specific to our hosts, but let's go through the model from top to bottom.
@@ -85,6 +84,7 @@ Just like when manipulating a lattice _imperatively_, the things that differenti
 Traits are, as their name applies, metadata associated with a `component`. The OAM trait system is completely extensible, so as wadm gains more functionality, it can support more traits. Right now, the following traits are supported:
 
 - `spreadscaler`
+- `daemonscaler`
 - `linkdef`
 
 ### Spread Scaler
@@ -102,11 +102,11 @@ traits:
         - name: eastcoast
         requirements:
             zone: us-east-1
-        sidebar_position: 80
+        weight: 80
         - name: westcoast
         requirements:
             zone: us-west-1
-        sidebar_position: 20
+        weight: 20
 ```
 
 This definition states that, for this component (a spread scaler can apply to an `actor` or `capability`), you want a total of 4 instances, with 80% of them going to hosts with the `zone` label set to `us-east-1` and 20% of them going to hosts with the `zone` label set to `us-west-1`. Because this system uses labels as selectors, and you can set any arbitrary label on your hosts, you can define practically any conditions for the spread rules.
@@ -121,6 +121,30 @@ traits:
 ```
 
 ⚠️ _NOTE_: if you define a label/value pair requirement and wadm is unable to find hosts that match this constraint, it will consider this a deployment failure and will _not_ fall back to arbitrary placement.
+
+### Daemon Scaler
+
+The `daemonscaler` trait is an alternative to the `spreadscaler` trait. It is a simpler trait that simply states that you want a certain number of instances of a component on every host in your lattice that matches certain labels. Take a look at the following sample `daemonscaler` spec:
+
+```yaml
+traits:
+- type: daemonscaler
+    properties:
+    replicas: 4
+    spread:
+        - name: eastcoast
+        requirements:
+            zone: us-east-1
+        - name: westcoast
+        requirements:
+            zone: us-west-1
+```
+
+Note that this looks similar to the above `spreadscaler` spec, but the `daemonscaler` is responsible for running a certain number of instances of a component on _every host_ that matches the label requirements. So, instead of running **4** total instances, it will run **4** instances on every host that either has the `zone` label set to `us-east-1` or `us-west-1`.
+
+:::info For the kubernetes developer
+The `daemonscaler` works just like a k8s DaemonSet, spreading components across all hosts that match the label requirements.
+:::
 
 ### Link Definition
 
