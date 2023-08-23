@@ -39,13 +39,13 @@ import ReactPlayer from 'react-player/youtube';
   - New contributors can help out with good-first-issue label on wash, wasmCloud, wadm repos.
 - **Questions**
   - What big areas are left in OTP > Rust parity? CJ.
-  - impl get operations for link defs and claims.
-  - validate actor and provider claims upon start.
-  - impl policy checking and management.
-  - chunking for large payloads.
-  - Where to asking dumb Qs? Dave Tessman.
-  - [https://slack.wasmcloud.com](https://slack.wasmcloud.com)
-  - #wasmcloud in CNCF slack.
+    - [implement get operations for link defs and claims](https://github.com/wasmCloud/wasmCloud/issues/480).
+    - [validate actor and provider claims upon start](https://github.com/wasmCloud/wasmCloud/issues/554).
+    - [implement policy checking and management](https://github.com/wasmCloud/wasmCloud/issues/480).
+    - [chunking for large payloads](https://github.com/wasmCloud/wasmCloud/issues/482).
+  - Where to ask questions? Dave Tessman.
+    - [https://slack.wasmcloud.com](https://slack.wasmcloud.com)
+    - #wasmcloud in [CNCF slack](https://communityinviter.com/apps/cloud-native/cncf).
 - **WASMCON**
   - Hosted by LinuxFoundation.
   - Workshop by Cosmonic.
