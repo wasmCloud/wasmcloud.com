@@ -46,7 +46,7 @@ import ReactPlayer from 'react-player/youtube';
   - Where to ask questions? Dave Tessman.
     - [https://slack.wasmcloud.com](https://slack.wasmcloud.com)
     - #wasmcloud in [CNCF slack](https://communityinviter.com/apps/cloud-native/cncf).
-- **WASMCON**
+- [**WASMCON**](https://events.linuxfoundation.org/wasmcon/)
   - Hosted by LinuxFoundation.
   - Workshop by Cosmonic.
   - Talks from Bailey, Liam, Taylor, and Brooks.
