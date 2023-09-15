@@ -131,12 +131,12 @@ The `linkdef` trait links two components together with a set of configuration va
     properties:
     target: webcap
     values:
-        port: 8080
+        port: '8080'
 ```
 
 Quite possibly one of the best features of specifying link definitions in a wadm file as opposed to using imperative `wash` commands is that you do _not need to use the source or target's public key_. If you've used `wash` to specify link definitions before, you know the syntax can be verbose.
 
-The value of the `target` field is a _component_ whose `name` field matches that. The `values` is a simple key-value map that will be passed as link definition configuration data at deployment time.
+The value of the `target` field is a _component_ whose `name` field matches that. The `values` is a simple key-value map that will be passed as link definition configuration data at deployment time. Note that the value here **must be a string**, so if you're passing a value like "false" or "125" ensure that you wrap it in single or double quotes.
 
 ### Putting it All Together
 
