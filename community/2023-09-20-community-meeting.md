@@ -9,7 +9,7 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
+- DEMO: Building NATS microservices in wasmCloud
 - DISCUSSION: wasmCloud metrics
 - 
 
