@@ -7,7 +7,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'wasmCloud',
-  tagline: 'Develop. Deploy. Distribute.',
+  tagline: 'Build applications in any language and deploy them anywhere.',
   url: 'https://wasmcloud.com',
   baseUrl: '/',
   onBrokenLinks: 'throw',

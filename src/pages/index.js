@@ -16,28 +16,22 @@ function HomepageHeader() {
         <p className="hero__subtitle">{siteConfig.tagline}</p>
         {/* <div>
           Build your functions and services in the language you want and run them securely everywhere with WebAssembly.
-          <br />
-          <span style={{fontFamily: "monospace"}}>
-            curl -sfLfL https://install.wasmcloud.dev | bash
-          </span>
-          <br />
-          <span style={{fontFamily: "monospace"}}>
-            wash build
-          </span>
-          <br />
-          <span style={{fontFamily: "monospace"}}>
-            wash up
-          </span>
         </div> */}
-        <br />
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
             to="/docs/installation">
-            Get Started Today️
+            Try it yourself️
           </Link>
         </div>
       </div>
+      {/* <div className={styles.terminal} id="terminal">
+        wash new
+        <br />
+        wash app deploy
+        <br />
+        wash up
+      </div> */}
     </header>
   );
 }
