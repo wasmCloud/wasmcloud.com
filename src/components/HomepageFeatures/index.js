@@ -4,29 +4,29 @@ import styles from './styles.module.css';
 
 const FeatureList = [
   {
-    title: 'Pleasantly Portable',
+    title: 'Declarative WebAssembly App Orchestration',
     Image: '/img/features/cloud.png',
     description: (
       <>
-      Write your components once and run them <b>anywhere</b> at any scale. Deploy to the cloud, the edge, browsers, IoT, or anywhere in between.
+        Write your application as a <b>declarative</b> set of WebAssembly components. Deploy your application to any cloud, edge, or IoT device with a single command.
       </>
     ),
   },
   {
-    title: 'Completely Connected',
+    title: 'Edge-to-Cloud Compute Mesh',
     Image: '/img/features/connected.png',
     description: (
       <>
-        <b>Cluster</b> wasmCloud hosts together across disparate clouds and infrastructure, managing your apps with a single flat topology and never open a single firewall port. Clusters self-form, self-heal, and bridge multiple protocols to extend the cloud to the farthest edge.         
+        Using <b>NATS</b>, wasmCloud hosts cluster together across disparate clouds and infrastructure, distributing your apps with a single flat topology without ever opening a single firewall port. Clusters self-form and self-heal to automatically enable load balancing and failover without building it into your app.
       </>
     ),
   },
   {
-    title: 'Securely Scalable',
+    title: 'Vendorless WebAssembly Components',
     Image: '/img/features/secure.png',
     description: (
       <>
-        Build truly <b>zero trust</b> applications on wasmCloud. Leverage the WebAssembly sandbox and wasmCloud's cryptographically secure modules to automatically embrace defense in depth without sacrificing developer experience.        
+        wasmCloud WebAssembly components are completely <b>vendorless</b> and don't tie you to any platform, cloud, or proprietary implementation. Swap out implementations and change your underlying infrastructure at any time without changing your application code.
       </>
     ),
   },
