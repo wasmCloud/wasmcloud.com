@@ -64,7 +64,7 @@ spec:
 ```
 
 :::info
-When launching an actor from a local file, ensure that the environment variable `WASMCLOUD_ALLOW_FILE_LOAD=true` is set when you launch wasmCloud. This is the default for hosts ran with `wash up`. Additionally, relative paths are supported but must be relative to where you launch the wasmCloud host, not from where the manifest is defined. For this reason it's recommended to use absolute paths.
+When launching an actor from a local file, ensure that the environment variable `WASMCLOUD_ALLOW_FILE_LOAD=true` is set when you launch wasmCloud. This is the default for hosts ran with `wash up`. At this time, only absolute paths are supported, since clients cannot reliably assume which directory the target host was started from.
 ::: 
 
 To define a capability provider, we include a `capability` component, as follows:
