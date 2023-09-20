@@ -12,7 +12,7 @@ import ReactPlayer from 'react-player/youtube';
 - DEMO: Live demo from DTW23, WebAssembly Canvas Catalyst Vance Demo
 - DEMO: Building NATS microservices in wasmCloud
 - DISCUSSION: wasmCloud metrics
-- 
+- DISCUSSION: wasmCloud 0.78.0 official release 
 
 <!--truncate-->
 
