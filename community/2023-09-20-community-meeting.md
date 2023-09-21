@@ -35,7 +35,7 @@ import ReactPlayer from 'react-player/youtube';
 - Demo: using a local build called Bob; all services have unique IDs. You’ll see it’s possible to add arbitrary metadata to each service you run.
 - Each service has 1 or more end points.
 - This allows us to discover microservices and obtain a catalog on whats’s running in the infrastructure, or in an account.
-- Does not sacrifice any of the good stuff we get from NATS —e.g. location agnostic goodness of NATS remains.
+- Does not sacrifice any of the good stuff we get from NATS — e.g. location agnostic goodness of NATS remains.
 - You can list all the all the services that are within communication within your NATS CLI.
 - Doesn’t take much effort to expose wasmCloud actors as services.
 - Synadia plans to add an option to the NATS messaging provider (currently manual) — so it magically appears as a NATS service 🙂
@@ -47,15 +47,15 @@ import ReactPlayer from 'react-player/youtube';
 - RFC: Separating out RPC events onto a diff topic rather than cloud events - refactor to the Rust host, we do not have the wasmbus RPC EVT events being published for every single event: https://github.com/wasmCloud/wasmCloud/issues/664
 - Now, you can see the status of all invocations.
 - Main point is to be able to create an aggregate metric — all invocations that failed and succeeded over time. We can start to see trends.
-- In particular, See whether you’re succeeding over time — % of successful requests etc.
+- In particular, see whether you’re succeeding over time — % of successful requests etc.
 - Similar to service mesh - delivered straight over NATS.
 - Implementing Prometheus metrics in wasmCloud:
   - Already have OTEL support for tracing - nice to get that data.
-  - Some of the things missing; accuracy. Historical comparison.
+  - Some of the things missing; accuracy and historical comparison.
   - Rust Host lost some of that introspection.
   - Info on number of actors providers invocations that have a particular provider or actor.
   - Interesting summary stats around specific resource usage: so we can more accurately scale actors up and down.
-  - Provider exposing metrics - counter for number of 500s/400s = pretty common = want to be able to do the same thing in wasmCoud.
+  - Provider exposing metrics - counter for number of 500s/400s is pretty common. We want to be able to do the same thing in wasmCoud.
   - Some work to do to decide how, but this is where we’re leaning.
   - [Observability and metrics RFC](https://github.com/wasmCloud/wasmCloud/issues/664) - please get involved if you have expertise - we’re excited to hear your opinions and experiences.
   - Check out the recording for the full discussion.
@@ -64,9 +64,9 @@ import ReactPlayer from 'react-player/youtube';
 
 - We are excited to announce we have cut a fresh version of wasmCloud.
 - We’ll have a blog ready in the next day or so with all the details.
-- Feature frozen for future stuff.
-- We are really happy with where we are after a ton of testing 🙂
-- From here we can milestone out in the run up to wamCloud 1.0.0 and becoming a CNCF. incubation project (hopefully soon).
+- Feature frozen for future innovation.
+- We are really happy with where we are after much testing 🙂
+- From here, we can milestone out in the run up to wamCloud 1.0.0 and becoming a CNCF. incubation project (hopefully soon).
 - This release will be out in wash and wadm shortly.
 - Check out the recording for the full discussion.
 
