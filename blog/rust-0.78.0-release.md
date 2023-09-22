@@ -2,7 +2,7 @@
 slug: wasmcloud-0.78.0-componentized-rust
 title: "The wasmCloud 0.78.0 Release"
 image: "/img/wasmcloud-0.78.0.png"
-date: 2023-09-21T9:00:00-04:00
+date: 2023-09-25T9:00:00-04:00
 author: "Brooks Townsend"
 author_profile: "https://linkedin.com/in/brooks-townsend"
 description: "The 0.78.0 release of wasmCloud comes with WebAssembly component support and a completely rewritten, backwards compatible Rust core."
