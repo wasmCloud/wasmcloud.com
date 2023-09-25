@@ -11,7 +11,8 @@ import ReactPlayer from 'react-player/youtube';
 
 - 
 - DISCUSSION: Long-running wasmCloud processes
-  - Pre-discussion note: wasmCloud processes are limited by executing for 2 seconds by default, overridable by the `WASMCLOUD_RPC_TIMEOUT_MS` variable. 
+  - Pre-discussion note: wasmCloud processes are limited by executing for 2 seconds by default, overridable by the `WASMCLOUD_RPC_TIMEOUT_MS` variable.
+  - Good pre-reading: [Dealing with the Diabolical Distributed Deadline Dilemma](https://kevinhoffman.blog/post/distributed_deadlines/)
 - DISCUSSION: [Metrics RFC](https://github.com/wasmCloud/wasmCloud/issues/664)
 
 <!--truncate-->
