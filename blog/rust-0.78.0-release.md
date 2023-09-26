@@ -14,7 +14,7 @@ draft: false
 
 # Introducing wasmCloud 0.78.0
 
-We're a big fan of bumping minor versions here at wasmCloud. When we released our first version of the Elixir/OTP host, we bumped from 0.18.0 to 0.50.0 just to make it extra clear that this was a big change. Today, we're making a similar bump to 0.78.0, and this blog post will explain why.
+We're a big fan of bumping minor versions here at wasmCloud. When we released our first version of the Elixir/OTP host, we bumped from 0.18.0 to 0.50.0 just to make it extra clear that this was a big change. Today, we're making a similar bump to [0.78.0](https://github.com/wasmCloud/wasmCloud/releases/tag/v0.78.0), and this blog post will explain why.
 
 <!--truncate-->
 
