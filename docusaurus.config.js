@@ -48,9 +48,7 @@ const config = {
     ],
   ],
 
-  // Setting up community meetings
   plugins: [
-    require.resolve("@cmfcmf/docusaurus-search-local"),
     [
       '@docusaurus/plugin-content-blog',
       {
@@ -163,6 +161,12 @@ const config = {
           }
         ],
         copyright: `Copyright © ${new Date().getFullYear()} wasmCloud LLC. All rights reserved. The Linux Foundation has registered trademarks and uses trademarks. For a list of trademarks of The Linux Foundation, please see our Trademark Usage page: https://www.linuxfoundation.org/trademark-usage. Built with Docusaurus.`,
+      },
+      algolia: {
+        apiKey: 'f0ef30f3d98ce5e9a7dd7579bb221dfc',
+        indexName: 'wasmcloud',
+        appId: '2IM4TMH501',
+        algoliaOptions: {}
       },
       prism: {
         additionalLanguages: ['rust', 'powershell', 'toml', 'elixir'],
