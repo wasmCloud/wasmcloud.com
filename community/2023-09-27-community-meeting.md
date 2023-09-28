@@ -20,6 +20,49 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Meeting Notes
 
+Welcome to our new community members Marcelo Lopez and Mfon! 🎉
+- Marcelo is an IT architect working and living in Argentina. He’s launched a couple of start-ups over the years including a Kubernetes business. He has recently started to experiment with Wasm — architecting systems with Wasm and learning how this compares to K8s (and others). Marcelo is a huge F1 fan! Welcome, Marcelo!
+- Mfon is a site reliability engineer with a history working with K8s, Docker and, these days, AWS. wasmCloud was mentioned in a recent CNCF program meeting and so, with an interest in learning more about Wasm, Mfon has joined us to learn more. Welcome!
+
+**DEMO: Wasi-fill Generation - Taylor**
+
+- We have made significant progress with wasi-fills - we have a working wasi-fill example that [everyone can use](https://github.com/thomastaylor312/wasifill-example).
+- Wasi-fill is a term we came up with — it allows you to use your actor components with any custom defined interfaces. 
+- Common interfaces - wasi-cloud - 80% use case - KV, HTTP, messaging etc are built into wasmCloud itself and do not make use of the wasi-fill.
+- As it currently stands, we take a contract with specific generated interfaces and a dependency on wasmbus RPC. What we had was a ton of dependencies to wasmCloud, enforced a compile time.
+- We wanted to remove the need to have wasmCloud dependencies so you can bring your own components and connect them with wasi-fills at runtime.
+- Every interface is defined with pure WIT. Wasi-fills can be generated efficiently in a language like Rust and then glued together with your Wasm components, regardless of their language or origin. Which is why they are particularly important in custom contracts.
+- See recording for full demo wit a working a wasi-fill example.
+
+**DISCUSSION: Long-running wasmCloud processes**
+
+- Note: wasmCloud processes are limited by executing for 2 seconds by default, overridable by the `WASMCLOUD_RPC_TIMEOUT_MS` variable.
+- Recommended additional reading: [Dealing with the Diabolical Distributed Deadline Dilemma](https://kevinhoffman.blog/post/distributed_deadlines/)
+- Timeout is usually configured at runtime. Whatever value you state, that’s how long wasmCloud will allow a chain to execute - nested timout.
+- wasmCloud is a distributed system capable of running on one or many machines. As such, it’s hard to tell whether an operation is taking a long time because it’s timing out versus a process that will never finish because it has made requests that it will never return.
+- Example: downloading a file can take an arbitrary amount of time depending on the quality of the network, how big the file is etc. We limit execution types, and infinite timeout, with the timeout kill switch.
+- Discussion
+  - Vance: we probably want to loosen restrictions on the ephemeral nature of actors - start an actor and have it not necessarily go away when it responds to the request but hang around and time out if it doesn't get another request.
+  - For today you can always push long-running computation into a capability provider which can continue to execute.
+  - Taylor: the bigger the image the longer the process - would really like to have a mechanism that says “hey leave me alone for a little longer and when I am ready I’ll let you know…”. A way to allow that flexibility.
+  - Dave: fire and forget is ideal — would like to see something built into the Rust host. For example, training an ML that monitors actors and says “the typical timeout is x and I’ll only report if x happens.” Pre-prescribed guardrails.
+  - Taylor: one possible workaround — stream inside wasmCloud — pattern of streaming data that expects a response. Send, receive, stream-patterned processing. Con: wasmCloud specific - code needs to know. How do we balance the need for agnosticism with the need for long-running process management/triggering/listening etc. Contracts would need to reflect this — HTTP service is expecting an HTTP response etc.
+  - Simplify what message you’re interested in. Instead of receiving a message for a particular queue, clients needs to know who is doing the work in order to progress in the workflow.
+- Bailey/Taylor: The best way to solve this is likely to wait for streams enablement in WASI-Preview 2 with resources. This will help us to shape the approach as a community - soon. [Placeholder issue created and placed on our Roadmap.](https://github.com/wasmCloud/wasmCloud/issues/697)
+- Review the recording for the full discussion.
+
+**DISCUSSION:** [Metrics RFC](https://github.com/wasmCloud/wasmCloud/issues/664)
+
+- We talked at length last week about wasmCloud metrics, and the RFC currently rolling - see [Last week’s discussion](https://www.youtube.com/watch?v=7GR19pgb2u0) if you’re interested in diving in further.
+- This is a call out to community to get involved in these RFCs - there’s some excellent discussion taking place in the repo. E.g. Prometheus integration.
+
+**DISCUSSION:** [Autoscaling RFC](https://github.com/wasmCloud/wasmCloud/issues/696)
+
+- This is a new RFC that we’re opening out to the community for contributions.
+- This RFC looks at wasmCloud’s ability to autoscale based on request, and scale to zero when not in use. 🙂
+- You can start an actor and scale down when resources are not in use and bound upper limit of concurrent execution on a single actor.
+- The cold-start penalty of keeping an actor hot is in the negligible area in terms of latency. Wasm is super speedy when it comes to instantiation which makes running instances hot largely unnecessary. But we’re keen to hear from you!
+
 ### Recording
 
 <ReactPlayer url='https://www.youtube.com/watch?v=Ziaik9NayWs' controls />
