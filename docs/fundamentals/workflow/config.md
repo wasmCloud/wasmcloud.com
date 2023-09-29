@@ -1,4 +1,5 @@
-title: "Config - wasmcloud.toml"
+---
+title: "wasmcloud.toml"
 date: 2023-09-29T11:02:05+06:00
 sidebar_position: 4
 draft: false
