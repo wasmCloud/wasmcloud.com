@@ -9,9 +9,9 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
-- 
-- 
+- DEMO
+- DISCUSSION: [Versions](https://docusaurus.io/versions) in wasmCloud documentation. Would like to determine what a "version" is for the wasmCloud project.
+- DISCUSSION: Hacktoberfest! 🎃
 
 <!--truncate-->
 
