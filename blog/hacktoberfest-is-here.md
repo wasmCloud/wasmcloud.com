@@ -30,6 +30,6 @@ We’ve added our [wadm](https://github.com/wasmCloud/wadm), [wash](https://gith
 
 If you find an issue that you’d like to complete and it’s not marked with an applicable label or in a repository with the right discussion topic, let us know! When you open a pull request just add a note that you’re here from Hacktoberfest and we’ll add the issue to the PR so it will still count towards your total of four.
 
-## Join the Community![](https://wasmcloud.com/blog/wasmcloud-0.78.0-componentized-rust#join-the-community)
+## Join the Community!
 
 If you're looking at tackling an issue, please come join us in our [Community Slack](https://slack.wasmcloud.com/) to take part in the conversation, or join our community meetings [every Wednesday at 1pm](https://calendar.google.com/calendar/u/0/embed?src=c_6cm5hud8evuns4pe5ggu3h9qrs@group.calendar.google.com). wasmCloud maintainers and community members alike enjoy talking about solving issues, answering questions and just generally coming together with enthusiasm for Rust and WebAssembly. We’d love to have you!
