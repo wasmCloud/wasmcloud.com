@@ -91,39 +91,39 @@ wash app undeploy petclinic
 The following options can be specified with all of the above subcommands for a finer control of your environment.
 
 #### --output 
-    Alias: `-o`
+Alias: `-o`.
         Specify output format (text or json). The default value is text.
         
 #### --ctl-host 
-    Alias: `-r`
+Alias: `-r`.
         CTL Host for connection. The default value is 127.0.0.1 for local nats [env: WASMCLOUD_CTL_HOST=]
 
 #### --experimental
-        Whether or not to enable experimental features [env: WASH_EXPERIMENTAL=]
+Whether or not to enable experimental features [env: WASH_EXPERIMENTAL=]
 
 #### --ctl-port 
-    Alias: `-p`
+Alias: `-p`.
         CTL Port for connections, defaults to 4222 for local nats [env: WASMCLOUD_CTL_PORT=]
 
 #### --ctl-jwt 
-        JWT file for CTL authentication. Must be supplied with ctl_seed [env: WASMCLOUD_CTL_JWT]
+JWT file for CTL authentication. Must be supplied with ctl_seed [env: WASMCLOUD_CTL_JWT]
 
 #### --ctl-seed 
-        Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
+Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
 #### --ctl-credsfile 
-        Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
+Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
 
 #### --js-domain 
-        JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
 #### --lattice-prefix 
-    Alias: `-x`
+Alias: `-x`.
         Lattice prefix for wasmcloud control interface. The default value is "default". [env: WASMCLOUD_LATTICE_PREFIX=]
 
 #### --timeout-ms 
-    Alias: `-t`
+Alias: `-t`.
         Timeout length to await a control interface response. The default value is 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 #### --context 
-        Path to a context with values to use for CTL connection and authentication
+Path to a context with values to use for CTL connection and authentication
