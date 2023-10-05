@@ -1,7 +1,7 @@
 ---
 title: "Hacktoberfest is Here! 🎃"
 image: "/images/blogs/Hacktoberfest-10.png"
-date: 2023-10-05T09:00:00-05:00
+date: 2023-10-05T11:00:00-05:00
 author: "brooks"
 description: "Come join us for Hacktoberfest and contribute to open source this spooky season!"
 categories: ["webassembly", "wasmcloud", "Hacktoberfest", "Cloud Native"]
