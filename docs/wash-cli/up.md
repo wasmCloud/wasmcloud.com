@@ -5,17 +5,23 @@ sidebar_position: 2
 description: "wash up command reference"
 ---
 
-To get started with wasmCloud, we're going to start off with spinning up a NATS Server and along with it a wasmCloud host.  
+To get started with wasmCloud, we're going to start off with spinning up a NATS Server and along with it a wasmCloud host. This is done by running the `wash up` command. It starts a NATS server (if you don't have one running) on port `4222` and a wasmcloud host. If you successively run `wash up` it will spawn multiple wasmCloud hosts that will connect to the originally created NATS server. By default, the host runs in an interactive mode in your terminal. If you add a `-d` flag to this command, the host will run in a detached mode.
 
+Usage:
+
+```
+wash up
+wash up -d
+```
 
 Options:
 
 #### --detached
-Alias: `-d`
+Alias: `-d`.
     Launch NATS and wasmCloud detached from the current terminal as background processes
 
 #### --output 
-Alias: `-o`
+Alias: `-o`.
     Specify output format (text or json) [default: text]
 
 #### --experimental
@@ -49,7 +55,7 @@ NATS Server Jetstream domain, defaults to `core` [env: NATS_JS_DOMAIN=]
 wasmCloud host version to download, e.g. `v0.55.0`. See https://github.com/wasmCloud/wasmcloud-otp/releases for releases [env: WASMCLOUD_VERSION=] [default: v0.78.0-rc6]
 
 #### --lattice-prefix  
-Alias: `-x`
+Alias: `-x`.
     A lattice prefix is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE_PREFIX=] [default: default]
 
 #### --host-seed  
