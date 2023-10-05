@@ -9,7 +9,7 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- DISCUSSION: WASI-fills newness
+- DISCUSSION: WASI-fills newness.
 - DISCUSSION: [Versions](https://docusaurus.io/versions) in wasmCloud documentation. Would like to determine what a "version" is for the wasmCloud project.
 - DISCUSSION: Hacktoberfest! 🎃
 
@@ -34,7 +34,7 @@ import ReactPlayer from 'react-player/youtube';
 - All you need to do is to close or have 4 approved pull requests on Github or GitLab.
 - One you have this, DigitalOcean will plant a tree on your behalf and send you a nice virtual badge.
 - All you need to do if you want to partake is sign up on the website.
-- On the wasmCloud side we’ll designate our good issues and some stretch issue with the goal to lower the barrier to people are getting started in Wasm.
+- On the wasmCloud side we’ll designate our good issues and some stretch issues with the goal to lower the barrier to people are getting started in Wasm.
 - It officially starts tomorrow at 11am EDT.
 
 **DISCUSSION: [Versions](https://docusaurus.io/versions) in wasmCloud documentation. What is a "version" is for the wasmCloud project.** 
@@ -42,7 +42,7 @@ import ReactPlayer from 'react-player/youtube';
 - We use Docusaurus to manage our documentation. It has a load of different features - including the ‘version’ feature.
 - If you’re using a specific version of Docusaurus, you can change the posture of the information you see. It will be really important to designate between versions of documentation.
 - For example, wasmCloud is not just one entity - it’s comprised of the versions of wash, wadm etc. you’re currently using.
-- Kevin’s view: the newest version of docs really is all that matters. old stuff is deprecated. Concurrent supported releases where they are different enough to have sep docs. Until we have something like that, this could be overkill at this stage.
+- Kevin’s view: the newest version of docs really is all that matters. Old stuff is deprecated. Concurrent supported releases - where they are different enough to have sep docs. Until we have something like that, this could be overkill at this stage.
 - Yordis: tags - old versus new. Easy to discern.
 - Takeaway: We plan to be clear when we introduce new functionality in new versions to indicate that in the documentation for a time, but we do not plan to preserve multiple versions of documentation at this time.
 
