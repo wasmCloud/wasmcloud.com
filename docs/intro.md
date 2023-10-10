@@ -2,7 +2,7 @@
 sidebar_position: 0
 ---
 
-# Welcome
+# What is wasmCloud?
 
 wasmCloud helps you build globally distributed applications that reach from the cloud to the edge. Leveraging WebAssembly's security, portability, and performance, the platform helps you compose applications from tiny, independent building blocks loosely coupled to capabilities.
 
@@ -17,6 +17,4 @@ wasmCloud is designed around the following core tenets:
 - Secure by default
 - Productivity for both developers and operations
 
-You should not have to change your design, architecture, or your programming environment as you move from concept to production.
-
-**We're bringing _joy_ to building global-scale applications.**
+**You should not have to change your design, architecture, or your programming environment as you move from concept to production.**

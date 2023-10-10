@@ -23,8 +23,8 @@ if the operation is "fire and forget", the `InvocationResponse` is required to i
 
 Because these structures are used in multiple places by multiple languages, you can find them in different places throughout the code base. Here are a couple of locations:
 
-- The Smithy [Interface](https://github.com/wasmCloud/interfaces/blob/main/core/wasmcloud-core.smithy#L143) - smithy models are considered authoritative as language-specific implementations should be generated from these IDL models.
-- The [wasmCloud OTP Host Runtime](https://github.com/wasmCloud/wasmcloud-otp/blob/main/host_core/native/hostcore_wasmcloud_native/src/inv.rs#L23) - There is a Rust implementation of the `Invocation` and `InvocationResponse` structs used by the host.
+- The WIT [Interface](https://github.com/wasmCloud/wasmCloud/tree/main/wit)
+- The [wasmCloud actor crate](https://github.com/wasmCloud/wasmCloud/blob/ab9a2e3796cf9a33924c5017d69276ab31a3db2b/crates/actor/macros/src/lib.rs) - There is a Rust implementation of the `Invocation` struct used by the host.
 
 The following is a description of the fields on an `Invocation`:
 
