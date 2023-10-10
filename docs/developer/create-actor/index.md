@@ -1,5 +1,5 @@
 ---
-title: "Creating an actor"
+title: "Creating your first actor component"
 date: 2018-12-29T12:00:00+00:00
 sidebar_position: 2
 draft: false
