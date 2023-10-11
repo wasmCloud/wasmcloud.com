@@ -55,6 +55,7 @@ const config = {
         routeBasePath: 'community',
         path: './community',
         showReadingTime: false,
+        editUrl: 'https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/',
         blogSidebarCount: 100,
         blogTitle: 'wasmCloud Community Content',
         blogDescription: 'wasmCloud community meetings agendas, notes, and recordings',
