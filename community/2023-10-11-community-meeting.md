@@ -9,9 +9,9 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
-- 
-- 
+- DEMO: Actor Autoscaling and "scale to zero"
+- DISCUSSION: Trail of Bits wasmCloud security audit
+- DISCUSSION: wasmCloud documentation improvements
 
 <!--truncate-->
 
