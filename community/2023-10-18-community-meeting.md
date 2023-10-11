@@ -9,7 +9,7 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
+- Give an update about the community's growth and WASI-verse
 - 
 - 
 
