@@ -10,7 +10,8 @@ import ReactPlayer from 'react-player/youtube';
 ### Agenda
 
 - DEMO: wash build and progress to working with wasi-preview-2 components
-- DISCUSSION: Give an update about the community's growth and WASI-verse
+- DISCUSSION: Give an update about the community's growth and WASI-virt
+- DISCUSSION: [wasmCloud security audit](https://ostif.org/ostif-has-completed-a-security-audit-of-wasmcloud/)
 - DISCUSSION: wasmcloud/wasmcloud monorepo
 - DISCUSSION: Accepting ADRs
 
