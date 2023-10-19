@@ -1,50 +1,590 @@
 ---
-title: "Control interface"
+title: "Control Interface"
 date: 2018-12-29T11:02:05+06:00
 sidebar_position: 3
 draft: false
 ---
 
-The lattice control interface provides a way for clients to interact with the lattice to issue control commands and queries. This interface is a message broker protocol that supports functionality for starting and stopping actors and providers, declaring link definitions, monitoring lattice events, holding _auctions_ to determine scheduling compatibility, and much more.
+The lattice control interface provides a way for clients to interact with the lattice to issue
+control commands and queries. This interface is a message broker protocol that supports
+functionality for starting and stopping actors and providers, declaring link definitions, monitoring
+lattice events, holding _auctions_ to determine scheduling compatibility, and much more.
 
-The core message broker protocol can be used by any client capable of connecting to NATS. There is also a [wasmcloud-control-interface](https://docs.rs/wasmcloud-control-interface/) Rust crate that provides a convenient API for accessing the control interface.
+The core message broker protocol can be used by any client capable of connecting to NATS. There is
+also a [wasmcloud-control-interface](https://docs.rs/wasmcloud-control-interface/) Rust crate that
+provides a convenient API for accessing the control interface.
 
-ℹ️ All control interface interactions take place on a _separate_ NATS client connection from the RPC connection for security reasons. All requests and replies on the control interface connection are serialized via **JSON**.
+ℹ️ All control interface interactions take place on a _separate_ NATS client connection from the RPC
+connection for security reasons. All requests and replies on the control interface connection are
+serialized via **JSON**.
 
-### NATS control interface
+## NATS control interface
 
 The following is a list of the operations supported by the control interface.
 
-All of the control interface messages published on NATS topics use a standard prefix. This prefix is `wasmbus.ctl.{namespace}` where `namespace` is a string used to differentiate one lattice from another. Note that this namespace must correspond to the namespace prefix of the lattice you intend to control.
+All of the control interface messages published on NATS topics use a standard prefix. This prefix is
+`wasmbus.ctl.{lattice-prefix}` where `lattice-prefix` is a string used to differentiate one lattice
+from another (this is also referred to as the "lattice ID"). Note that `lattice-prefix` must
+correspond to the lattice prefix of the lattice you intend to control.
 
-⚠️ You must ensure that your namespace prefix is alphanumeric and does not the contain `/` or `.` or `>` characters, as those have special meaning to the NATS message broker.
+⚠️ You must ensure that your namespace prefix is alphanumeric and does not the contain `/` or `.` or
+`>` characters, as those have special meaning to the NATS message broker.
 
-All control interface messages conform to the schema found in the [control interface](https://wasmcloud.github.io/interfaces/html/org_wasmcloud_interface_control.html) smithy model. Assume a `wasmbus.ctl.{prefix}` topic prefix for all of the topics listed below.
+### Auctions
 
-| Topic               | Type | Description                                                                  |
-| :------------------ | :--- | :--------------------------------------------------------------------------- |
-| `auction.provider`  | Req  | Hold an auction for starting a provider                                      |
-| `auction.actor`     | Req  | Hold an auction for starting an actor                                        |
-| `cmd.{host}.la`     | Req  | Tell a host to start (_launch_) an actor                                     |
-| `cmd.{host}.sa`     | Req  | Tell a host to stop an actor                                                 |
-| `cmd.{host}.scale` | Req  | Scale a given actor to a specific number of instances                        |
-| `cmd.{host}.lp`     | Req  | Tell host to launch provider                                                 |
-| `cmd.{host}.sp`     | Req  | Tell host to stop provider                                                   |
-| `cmd.{host}.upd`    | Req  | Tell host to live-update actor                                               |
-| `get.links`         | Req  | Query link definition list                                                   |
-| `get.claims`        | Req  | Query claims cache                                                           |
-| `get.{host}.inv`    | Req  | Query host running inventory                                                 |
-| `linkdefs.put`      | Req  | Put a link definition into the lattice                                       |
-| `linkdefs.del`      | Req  | Delete a link definition from the lattice                                    |
-| `ping.hosts`        | Coll | Collect list of all running hosts by emitting a ping and gathering responses |
+#### Provider
 
-Operations of type `Sub` are subscribe-only. A lattice control interface client may subscribe to this event stream, but _should never publish to it_. A good security scenario is to have a different set of lattice connection credentials for the wasmCloud host than you use for the control client. This allows you to prevent the control client from publishing to potentially dangerous topics.
+`nats req wasmbus.ctl.{lattice_prefix}.auction.provider <json_body>`
 
-Operations of type `Req` are requests that receive replies. These replies may be simple acknowledgements and may not directly indicate completion of work. For example, starting an actor and provider will receive an **ack** as soon as the request is _validated_--the host will not wait until the full start operation is finished.
+Hold an auction for starting a provider. This allows all hosts that match a given list of
+requirements to respond whether or not they can run the provider
 
-Operations of type `Coll` are _collect_ or _scatter-gather_ operations that issue a request on a subject and then wait for some given period of time to collect responses. Use caution with collect/gather operations because if you do not wait long enough, you may receive incomplete responses.
+##### Request
 
-### Lattice Events
+```json
+{
+    "constraints": {
+        "os": "macos"
+    },
+    "link_name": "default",
+    "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1"
+}
+```
 
-Lattice events are published on the stream `wasmbus.evt.{prefix}` where `prefix` is the lattice
-namespace prefix. Lattice events are JSON-serialized [CloudEvents](https://github.com/cloudevents/spec/blob/v1.0.1/json-format.md) for easy, standardized consumption. This means that the `data` field in the cloud event envelope is just another JSON object and does not need to be decoded further.
+
+##### Response 
+
+An auction is a "scatter/gather" type operation. This means that you'll receive multiple json
+responses from all hosts until your configured timeout. If using a nats client (like the NATS CLI),
+you'll need to set `--replies 0 --timeout <your timeout>`. An example response is below:
+
+```json
+{
+    "host_id": "NOTAREALHOSTID",
+    "constraints": {
+        "os": "macos"
+    },
+    "link_name": "default",
+    "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1" 
+}
+```
+
+#### Actor
+
+`nats req wasmbus.ctl.{lattice_prefix}.auction.actor <json_body>`
+
+Hold an auction for starting an actor. This allows all hosts that match a given list of requirements
+to respond whether or not they can run the actor
+
+##### Request
+
+```json
+{
+    "constraints": {
+        "os": "macos"
+    },
+    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7"
+}
+```
+
+##### Response
+
+An auction is a "scatter/gather" type operation. This means that you'll receive multiple json
+responses from all hosts until your configured timeout. If using a nats client (like the NATS CLI),
+you'll need to set `--replies 0 --timeout <your timeout>`. An example response is below:
+
+```json
+{
+    "host_id": "NOTAREALHOSTID",
+    "constraints": {
+        "os": "macos"
+    },
+    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7"
+}
+```
+
+### Commands
+
+#### Launch Actor (deprecated)
+
+`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.la <json_body>`
+
+This command is currently deprecated in favor of the scale command as of version 0.79 of the
+wasmCloud host. It is documented here purely for completeness
+
+##### Request
+
+```json
+{
+    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7",
+    "annotations": {
+        "key": "value"
+    },
+    "count": 5,
+    "host_id": "NOTAREALHOSTID"
+}
+```
+
+Note that `annotations` is an optional field. If you do not wish to provide annotations, you may
+omit the field entirely.
+
+##### Response
+
+```json
+{
+    "accepted": true,
+    "error": ""
+}
+```
+
+If the response has an `accepted` value of `true`, this means the host has accepted the request and
+will attempt to start the actor. This _does not_ guarantee the actor has started. To determine if
+the actor has started, you should monitor the lattice event stream for the `actors_started` event.
+
+#### Stop Actor
+
+`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.sa <json_body>`
+
+Stops an actor on a host, terminating any pre-instantiated instances.
+
+##### Request
+
+```json
+{
+    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7",
+    "host_id": "NOTAREALHOSTID",
+    "annotations": {
+        "key": "value"
+    }
+}
+```
+
+The `annotations` field is optional and can be omitted entirely. However, annotations must match the
+running annotations of the actor in order for the stop command to actually stop the actors. This is
+critical for applications such as `wadm` that use annotations to indicate ownership
+
+##### Response
+
+```json
+{
+    "accepted": true,
+    "error": ""
+}
+```
+
+If the response has an `accepted` value of `true`, this means the host has accepted the request and
+will attempt to stop the actor. This _does not_ guarantee the actor has stopped. To determine if
+the actor has stopped, you should monitor the lattice event stream for the `actors_stopped` event.
+
+#### Scale Actor
+
+`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.scale <json_body>`
+
+Scales an actor on a host to a specific max amount of instances that can run. This means that the
+host will automatically scale up to the specified number of actors as requests come in. Put more
+simply, this makes sure an actor is "hot" (using that term loosely) and ready to handle requests on
+a given host
+
+This command is idempotent, meaning that if you issue a scale command for an actor (with the same
+annotations) that is already at the desired scale, the host will respond with an `accepted` value of
+`true`.
+
+##### Request
+
+```json
+{
+    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7",
+    "host_id": "NOTAREALHOSTID",
+    "annotations": {
+        "key": "value"
+    },
+    "max_concurrent": 5
+}
+```
+
+The `annotations` field is optional and can be omitted entirely.
+
+##### Response
+
+```json
+{
+    "accepted": true,
+    "error": ""
+}
+```
+If the response has an `accepted` value of `true`, this means the host has accepted the request and
+will attempt to start the actor. This _does not_ guarantee the actor has started. To determine if
+the actor has started, you should monitor the lattice event stream for the `actors_started` event.
+
+#### Live Update Actor
+
+`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.upd <json_body>`
+
+Live updates an actor on a host. This means that the host will attempt to update the actor (if it is
+running on the host) with the newer version specified.
+
+##### Request
+
+```json
+{
+    "actor_id": "MNOTAREALACTOR",
+    "host_id": "NOTAREALHOSTID",
+    "new_actor_ref": "wasmcloud.azurecr.io/echo:0.3.8",
+    "annotations": {
+        "key": "value"
+    }
+}
+```
+
+The `annotations` field is optional and can be omitted entirely. However, annotations must match the
+running annotations of the actor in order for the update command to actually update the actor.
+
+##### Response
+
+```json
+{
+    "accepted": true,
+    "error": ""
+}
+```
+
+If the response has an `accepted` value of `true`, this means the host has accepted the request and
+will attempt to update the actor. This _does not_ guarantee the actor has updated. To determine if
+the actor has updated, you should monitor the lattice event stream for the `actor_updated` event.
+
+#### Launch Provider
+
+`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.lp <json_body>`
+
+Launches a capability provider on a host. Unlike actors, only one instance of a provider + link name
+can run on any given host.
+
+##### Request
+
+```json
+{
+    "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1",
+    "link_name": "default",
+    "host_id": "NOTAREALHOSTID",
+    "annotations": {
+        "key": "value"
+    },
+    "config": "encoded config string"
+}
+```
+
+The `annotations` field is optional and can be omitted entirely. The `config` field is also optional
+and is used to pass configuration to a provider. This is provider-specific and is not used by all
+providers or guaranteed to be a specific format.
+
+##### Response
+
+```json
+{
+    "accepted": true,
+    "error": ""
+}
+```
+
+If the response has an `accepted` value of `true`, this means the host has accepted the request and
+will attempt to start the provider. This _does not_ guarantee the provider has started. To determine
+if the provider has started, you should monitor the lattice event stream for the `provider_started`
+event
+
+#### Stop Provider
+
+`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.sp <json_body>`
+
+Stops a matching capability provider + link name on a host.
+
+##### Request
+
+```json
+{
+    "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1 | VPROVIDERID",
+    "link_name": "default",
+    "host_id": "NOTAREALHOSTID",
+    "contract_id": "wasmcloud:httpserver",
+    "annotations": {
+        "key": "value"
+    }
+}
+```
+
+##### Response
+
+```json
+{
+    "accepted": true,
+    "error": ""
+}
+```
+
+If the response has an `accepted` value of `true`, this means the host has accepted the request and
+will attempt to stop the provider. This _does not_ guarantee the provider has stopped. To determine
+if the provider has stopped, you should monitor the lattice event stream for the `provider_stopped`
+event.
+
+#### Stop Host
+
+`nats req wasmbus.ctl.{lattice_prefix}.cmd.stop <json_body>`
+
+Stops the host indicated in the request.
+
+##### Request
+
+```json
+{
+    "host_id": "NOTAREALHOSTID",
+    "timeout_ms": 10000
+}
+```
+
+The `timeout_ms` field is optional and can be omitted entirely. If omitted, the host will use a
+default timeout value for shutting down the host.
+
+##### Response
+
+```json
+{
+    "accepted": true,
+    "error": ""
+}
+```
+
+If the response has an `accepted` value of `true`, this means the host has accepted the request and
+will attempt to stop the host. This _does not_ guarantee the host has stopped. To determine if and
+when the host has stopped, you should monitor the lattice event stream for the `host_stopped` event.
+
+### Queries
+
+#### Links
+
+`nats req wasmbus.ctl.{lattice_prefix}.get.links ''`
+
+Queries the lattice for all link definitions.
+
+##### Request
+
+Empty body
+
+##### Response
+
+```json
+[
+    {
+        "actor_id": "NOTAREALACTOR",
+        "provider_id": "NOTAREALPROVIDER",
+        "contract_id": "wasmcloud:httpserver",
+        "link_name": "default",
+        "values": {
+            "PORT": "8080"
+        }
+    }
+]
+```
+
+#### Claims
+
+`nats req wasmbus.ctl.{lattice_prefix}.get.claims ''`
+
+Gets claims from the lattice. Claims contain additional information about entities running in the
+lattice for use by the host and other applications.
+
+##### Request
+
+Empty body
+
+##### Response
+
+```json
+{
+  "claims": [
+    {
+      "call_alias": "",
+      "caps": "wasmcloud:httpserver,wasmcloud:blobstore",
+      "contract_id": "",
+      "iss": "ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW",
+      "name": "blobby",
+      "rev": "0",
+      "sub": "MBY3COMRDLQYTX2AUTNB5D2WYAH5TUKNIMELDSQ5BUFZVV7CBUUIKEDR",
+      "tags": "",
+      "version": "0.3.0"
+    }
+  ]
+}
+```
+
+Please note that the claims data type is not currently concretely defined. It is basically a
+`map<string, string>` that comes straight from the signed JWTs used by wasmCloud. So for actors,
+only some of the fields will be present and providers will also have a different set of fields. We
+hope to make this type more concrete in the future.
+
+#### Host Inventory
+
+`nats req wasmbus.ctl.{lattice_prefix}.get.{host-id}.inv ''`
+
+Gets the inventory of a given host. This includes all actors and providers running on a host as well
+as some basic metadata about the host.
+
+##### Request
+
+Empty body
+
+##### Response
+
+```json
+{
+  "actors": [
+    {
+      "id": "MBY3COMRDLQYTX2AUTNB5D2WYAH5TUKNIMELDSQ5BUFZVV7CBUUIKEDR",
+      "image_ref": "wasmcloud.azurecr.io/blobby:0.3.0",
+      "instances": [
+        {
+          "annotations": {},
+          "image_ref": "wasmcloud.azurecr.io/blobby:0.3.0",
+          "instance_id": "018b451e-a213-febb-c4be-7e6b5080e3b7",
+          "revision": 0,
+          "max_concurrent": 1
+        }
+      ],
+      "name": "blobby"
+    }
+  ],
+  "host_id": "NCKVAECFVP53CEW7ZF44BZKJHSFL655JRQAUW6JALI5AIPAQTF4PTPKF",
+  "issuer": "CDFLNE6XRCTY7LWJT54G6O7K5ZGBDJ3JVGEMGAZOH2TPS4KR4H2JTTAP",
+  "friendly_name": "empty-paper-9801",
+  "labels": {
+    "hostcore.osfamily": "unix",
+    "hostcore.os": "macos",
+    "hostcore.arch": "aarch64"
+  },
+  "providers": [
+    {
+      "annotations": {},
+      "id": "VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M",
+      "image_ref": "wasmcloud.azurecr.io/httpserver:0.19.1",
+      "contract_id": "wasmcloud:httpserver",
+      "link_name": "default",
+      "name": "HTTP Server",
+      "revision": 0
+    }
+  ]
+}
+```
+
+Please note that actor instances are grouped by annotations. So in the example output above, if
+blobby had also been started with the annotations `foo=bar`, then there would be a second instance
+group with the annotations `{ "foo": "bar" }`.
+
+#### Ping Hosts
+
+`nats req wasmbus.ctl.{lattice_prefix}.ping.hosts ''`
+
+Pings all hosts in the lattice and gathers responses. This is a "scatter/gather" type operation,
+meaning that you'll receive multiple json responses from all hosts until your configured timeout. If
+using a nats client (like the NATS CLI), you'll need to set `--replies 0 --timeout <your timeout>`.
+
+##### Request
+
+Empty body
+
+##### Response
+
+```json
+{
+  "cluster_issuers": "CDFLNE6XRCTY7LWJT54G6O7K5ZGBDJ3JVGEMGAZOH2TPS4KR4H2JTTAP",
+  "ctl_host": "nats://127.0.0.1:4222",
+  "friendly_name": "empty-paper-9801",
+  "id": "NCKVAECFVP53CEW7ZF44BZKJHSFL655JRQAUW6JALI5AIPAQTF4PTPKF",
+  "issuer": "CDFLNE6XRCTY7LWJT54G6O7K5ZGBDJ3JVGEMGAZOH2TPS4KR4H2JTTAP",
+  "js_domain": null,
+  "labels": {
+    "hostcore.arch": "aarch64",
+    "hostcore.os": "macos",
+    "hostcore.osfamily": "unix"
+  },
+  "lattice_prefix": "default",
+  "prov_rpc_host": "nats://127.0.0.1:4222",
+  "rpc_host": "nats://127.0.0.1:4222",
+  "uptime_human": "1h 51m 54s",
+  "uptime_seconds": 6714,
+  "version": "0.79.0"
+}
+```
+
+### Linkdef operations
+
+#### Put Link Definition
+
+`nats req wasmbus.ctl.{lattice_prefix}.linkdefs.put <json_body>`
+
+Puts a link definition into the lattice. This defines a connection between an actor and a provider
+along with a unique set of configuration values.
+
+##### Request
+
+```json
+{
+    "actor_id": "NOTAREALACTOR",
+    "provider_id": "NOTAREALPROVIDER",
+    "contract_id": "wasmcloud:httpserver",
+    "link_name": "default",
+    "values": {
+        "PORT": "8080"
+    }
+}
+```
+
+##### Response
+
+```json
+{
+    "accepted": true,
+    "error": ""
+}
+```
+
+If the response has an `accepted` value of `true`, this means the host has accepted the request and
+will attempt to add the link definition. This _does not_ guarantee the link definition has been
+added. To determine if and when the link definition has been added, you should monitor the lattice
+event stream for the `linkdef_set` event.
+
+#### Delete Link Definition
+
+`nats req wasmbus.ctl.{lattice_prefix}.linkdefs.del <json_body>`
+
+Deletes a link definition from the lattice.
+
+##### Request
+
+```json
+{
+    "actor_id": "NOTAREALACTOR",
+    "contract_id": "wasmcloud:httpserver",
+    "link_name": "default"
+}
+```
+
+##### Response
+
+```json
+{
+    "accepted": true,
+    "error": ""
+}
+```
+
+If the response has an `accepted` value of `true`, this means the host has accepted the request and
+will attempt to delete the link definition. This _does not_ guarantee the link definition has been
+deleted. To determine if and when the link definition has been deleted, you should monitor the
+lattice event stream for the `linkdef_deleted` event.
+
+## Lattice Events
+
+Lattice events are published on the stream `wasmbus.evt.{lattice-prefix}` where `lattice-prefix` is
+the lattice namespace prefix (also referred to as the "lattice ID"). Lattice events are
+JSON-serialized [CloudEvents](https://github.com/cloudevents/spec/blob/v1.0.1/json-format.md) for
+easy, standardized consumption. This means that the `data` field in the cloud event envelope is just
+another JSON object and does not need to be decoded further. For documentation on all emitted
+events, check out the [reference guide](../../reference/cloud_event_list.md)
