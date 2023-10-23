@@ -371,17 +371,19 @@ Empty body
 ##### Response
 
 ```json
-[
-    {
-        "actor_id": "NOTAREALACTOR",
-        "provider_id": "NOTAREALPROVIDER",
-        "contract_id": "wasmcloud:httpserver",
-        "link_name": "default",
-        "values": {
-            "PORT": "8080"
+{
+    "links": [
+        {
+            "actor_id": "NOTAREALACTOR",
+            "provider_id": "NOTAREALPROVIDER",
+            "contract_id": "wasmcloud:httpserver",
+            "link_name": "default",
+            "values": {
+                "PORT": "8080"
+            }
         }
-    }
-]
+    ]
+}
 ```
 
 #### Claims
