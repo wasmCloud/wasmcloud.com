@@ -1,0 +1,73 @@
+---
+title: Golang
+---
+
+# Golang WebAssembly Components
+
+This language guide covers creating WebAssembly Components with Go. Support for golang is rapidly evolving in WebAssembly and Go projects.
+For example, partial [WASI Preview 1 support](https://go.dev/blog/wasi)
+landed with Go 1.21.
+
+### Installing TinyGo
+
+The best experience for building Wasm Components is to use [TinyGo](https://tinygo.org/).
+All of the examples in this project use experimental support in [TinyGo](https://tinygo.org/)
+to build Wasm Components with exported functions.
+
+## Building with wash
+
+We embed crates
+from projects like [wasm-tools](https://github.com/bytecodealliance/wasm-tools) so that we
+can provide a simplified experience of building Wasm actor components. After adding a `wasmcloud.toml`,
+users may then build with:
+
+```bash
+go generate
+wash build
+```
+
+This will produce a signed actor component.
+
+Today component model support is *experimental* so to opt-in to building with components, add the following
+to your `wasmcloud.toml`:
+    
+    ```toml
+    [actor]
+    wasm_target = "wasm32-wasi-preview2"
+    ```
+
+## Using upstream
+
+All of the examples in this project can be built with upstream tooling. This design allows us
+to stay aligned with upstream tools in the WASI and components ecosystem, as well as avoid creating a "walled garden" of tooling.
+
+In order to build a Wasm component for TinyGo, you need to first build a Wasm module then adapt that
+module to a component. There a few other rough edges to be aware of if building a Wasm component.
+Users who set the target to `wasm` may assume that this means a Wasm only binary target à la  `wasm32-unknown-unknown` but the fun part is that this adds JavaScript glue. This means that even if the component does not leverage WASI API's, we recommend setting
+the target to `wasi` for a component meant to run anywhere and not just in a browser.
+
+Additionally, both tinygo and go do not yet support a WASI Preview 2 target nor a Wasm component target.
+In order to build a Wasm component, the build must first build a Wasm module and then adapt that module to WASI Preview 2.
+For this adaption to be successful, the module must be updated to include metadata information about the
+interfaces being exposed for the adapter to be successful.
+
+The component adapter used must be the same version used by the host. The wasmCloud host vendors this in from `wasmtime` via the
+`wasmcloud-component-adapters` crate.
+
+```bash
+go generate
+tinygo build -target=wasi gopher.go
+wasm-tools component embed --world critter ./gopher.wit gopher.wasm -o gopher.embed.wasm
+wasm-tools component new -o gopher.component.wasm --adapt wasi_snapshot_preview1="$COMPONENT_ADAPTER" gopher.embed.wasm
+```
+
+The wasmCloud host supports running `main` only components also known as **commands** that are managed via `stdin` and `stdout`. Additionally, wasmCloud supports running components
+as **reactors** that may export interfaces. Depending on the type of component, **command** or **reactor**,
+the equivalent adapter must be used.
+
+```bash
+wash claims sign --name gopher gopher.component.wasm [capabilities]
+
+# for example with keyvalue, http, and logging capabilities
+wash claims sign --name gopher gopher.component.wasm -k -q -l
+```

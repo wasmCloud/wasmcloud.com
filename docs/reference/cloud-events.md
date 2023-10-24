@@ -1,5 +1,5 @@
 ---
-title: "Cloud Event List"
+title: "Cloud Events"
 date: 2023-06-13T00:00:00+00:00
 description: "List of CloudEvents Used in a Lattice"
 sidebar_position: 3

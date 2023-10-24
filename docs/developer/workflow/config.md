@@ -64,7 +64,7 @@ See the `build` docs in the [wash repo](https://github.com/wasmCloud/wash#build)
 | push_insecure | boolean | false | Whether to push to the registry insecurely                                                                                                  |
 | key_directory | string  | `~/.wash/keys`         | The directory to store the private signing keys in                                                                        |
 | filename      | string  | <build_output>_s.wasm  | The filename of the signed wasm actor                                                                                      |
-| wasm_target   | string  | wasm32-unknown-unknown | Compile target                                                                                                            | 
+| wasm_target   | string  | wasm32-unknown-unknown | Compile target. For experimental component support, specify "wasm32-wasi-preview2"                                                                                   | 
 | call_alias    | string  |                        |  The call alias of the actor |
 
 ### Type Config - [provider]
