@@ -7,16 +7,16 @@ description: "wash app command reference"
 
 When deploying apps using [wadm](../fundamentals/wadm), the easiest way to manage these apps is using `wash app`. `wash app` provides us with all the tools needed to add, remove and get the necessary details of your deployed as well as undeployed applications. Following are the subcommands available under `wash app`.
 
-- list
-- get
-- history
-- del
-- put
-- deploy
-- undeploy
+- `list`
+- `get`
+- `history`
+- `delete`
+- `put`
+- `deploy`
+- `undeploy`
 
-### list
-This will retrieve a list of all applications that wadm knows about. Application specifications (also referred to in our documentation and code as "models") are stored _without regard to lattice_.
+### `list`
+This will retrieve a list of all applications that wadm knows about. Application specifications (also referred to in our documentation and code as "models") are stored in a model store and are associated to your lattice.
 
 Usage: 
 
@@ -24,8 +24,8 @@ Usage:
 wash app list
 ```
 
-### get
-The `get` command is used to retrieve the details for a specific version of a model.You can retrieve both the original text (e.g. YAML) that you submitted and the vetted and normalized model in JSON format.
+### `get`
+The `get` command is used to retrieve the details for a specific version of a model. You can retrieve both the original text (e.g. YAML) that you submitted and the vetted and normalized model in JSON format.
 
 Usage:
 
@@ -34,7 +34,7 @@ wash app get <name> [version]
 wash app get petclinic 0.0.1
 ```
 
-### history
+### `history`
 The `history` command is used to retrieve the version history of a given model. You can view all the previous versions available in store and their respective status for a given app.
 
 Usage:
@@ -44,18 +44,18 @@ wash app history <name>
 wash app history petclinic
 ```
 
-### del
-The `del` command is used to delete an application model of a specific version. You can optionally delete _all_ versions of a specification, but make sure you're aware of the consequences when you do this.
+### `delete`
+The `delete` command is used to delete an application model of a specific version. You can optionally delete _all_ versions of a specificationas well.
 
 Usage:
 
 ```
-wash app del <name> <version>
-wash app del petclinic 0.0.1
-wash app del petclinic --delete-all
+wash app delete <name> <version>
+wash app delete petclinic 0.0.1
+wash app delete petclinic --delete-all
 ```
 
-### put
+### `put`
 
 Performs an _idempotent_ put operation for an application specification _version_. Each time you put a model spec YAML to the server, it will either produce a new version or _be ignored_. Versions are _immutable_ and as such cannot be overwritten. If you wish to change anything about your spec, it needs to be done in a new version.
 
@@ -66,8 +66,8 @@ wash app put <SOURCE>
 wash app put petclinic.yaml
 ```
 
-### deploy
-Application specification versions are deployed _to a given lattice_. When a specification is deployed, wadm will start monitoring the state of the relevant lattice. Once it is satisfied it has enough information, it will begin its _control loop_, where it constantly compares the desired state of an application with the actual state and issues the appropriate low-level imperative commands to reconcile the two.
+### `deploy`
+When a version of an application specification is deployed, wadm will start monitoring the state of your lattice. Wadm will compare the desired state of an application with its current state and issue the appropriate  commands to reconcile the state.
 
 Usage:
 
@@ -76,8 +76,8 @@ wash app deploy <name> [version]
 wash app deploy petclinic v0.0.1
 ```
 
-### undeploy
-Undeploying an application spec tells wadm to stop monitoring that deployment. For now, wadm does not support _destructive_ undeploys, so all resources originally provisioned for an application will _remain_ after that application is undeployed. In the near future, wadm will support destructive undeploys which can optionally remove previously provisioned resources. This
+### `undeploy`
+Undeploying an application spec tells wadm to stop monitoring that deployment. Wadm supports _destructive_ as well as _non-destructive_ undeploys. By default, all resources originally provisioned for an application will be removed after that application is undeployed.
 
 Usage:
 
