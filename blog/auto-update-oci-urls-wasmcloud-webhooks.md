@@ -91,7 +91,7 @@ impl HttpServer for WebhookHandlerActor {
 
 ### Starting and Testing
 
-The neat part is that, here, I don't have to worry about what libraries or databases I have to use, I can just start functionally designing my application thanks to the [interface driven development](https://wasmcloud.com/docs/fundamentals/interface_driven_development) model that wasmCloud is based on. I already have my HTTP handler setup, so the only thing needed there is to define my endpoints and handle the logic appropriately. I know that I will be storing and retrieving OCI references based on which actor or provider that I'm querying, which sounds like a perfect case for a key-value store. Last, I'd like to have some logging functionality so that I can do some testing and debugging. Let's add those capabilities.
+The neat part is that, here, I don't have to worry about what libraries or databases I have to use, I can just start functionally designing my application thanks to the [interface driven development](https://wasmcloud.com/docs/concepts/interface-driven-development) model that wasmCloud is based on. I already have my HTTP handler setup, so the only thing needed there is to define my endpoints and handle the logic appropriately. I know that I will be storing and retrieving OCI references based on which actor or provider that I'm querying, which sounds like a perfect case for a key-value store. Last, I'd like to have some logging functionality so that I can do some testing and debugging. Let's add those capabilities.
 
 ### Adding capabilities
 

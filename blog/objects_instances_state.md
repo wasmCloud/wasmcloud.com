@@ -59,4 +59,6 @@ If you want to run everything like a bunch of ad-hoc activated functions that ne
 
 If you want to run your actors with state associated with each one, you can do that as well, but you can also have the modules with that code scaled out as much as you need, and state delivered to the actor when needed. Combining the power of WebAssembly components, the wasmCloud lattice clustering technology, and flexible and extensible capability providers (which can provide state) means you don't have to pick a paradigm and be stuck with it forever. You can get the best of both worlds, and have a solution that leverages the best ideas from both Akka and Erlang/OTP.
 
-You can pick one, or both, and adjust over time as your application, customer base, and capacity needs evolve. Take a look at our [getting started](/docs/category/getting-started) guide and decide for yourself what kind of paradigm you want to use to build your next amazing distributed application.
+You can pick one, or both, and adjust over time as your application, customer base, and capacity needs evolve. 
+
+Take a look at our [getting started](/docs/tour/hello-world) guide and decide for yourself what kind of paradigm you want to use to build your next amazing distributed application.

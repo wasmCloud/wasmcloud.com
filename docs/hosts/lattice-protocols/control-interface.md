@@ -589,4 +589,4 @@ the lattice namespace prefix (also referred to as the "lattice ID"). Lattice eve
 JSON-serialized [CloudEvents](https://github.com/cloudevents/spec/blob/v1.0.1/json-format.md) for
 easy, standardized consumption. This means that the `data` field in the cloud event envelope is just
 another JSON object and does not need to be decoded further. For documentation on all emitted
-events, check out the [reference guide](../../reference/cloud_event_list.md)
+events, check out the [reference guide](../../reference/cloud-event-list.md)

@@ -9,7 +9,7 @@ You only need to read this section if you want to customize code generation, wri
 
 Code generated from `.smithy` files is driven by a file `codegen.toml`, usually in the project root folder. That file specifies the target languages to generate, where to place the generated files, and includes any flags for customization of the output.
 
-A new-project generator (invoked with [`wash new`](/docs/fundamentals/wash)) copies and transforms files from a template folder, and is configured with `project-generate.toml` in the template folder. Template files are passed through a handlebars template engine. Variables and data used in the templates are pulled from that file and optional additional `.toml` data files.
+A new-project generator (invoked with [`wash new`](/docs/ecosystem/wash)) copies and transforms files from a template folder, and is configured with `project-generate.toml` in the template folder. Template files are passed through a handlebars template engine. Variables and data used in the templates are pulled from that file and optional additional `.toml` data files.
 
 ## Support libraries
 
