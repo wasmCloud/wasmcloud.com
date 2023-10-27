@@ -19,7 +19,7 @@ Every actor in the ecosystem is a WebAssembly module that contains an embedded [
 
 In our ecosystem, the issuer of an actor is the unique public key of an **account** (see the _Key Types_ section below), and the subject of an actor is the actor's public key.
 
-The [wash](/docs/fundamentals/wash) tool is responsible for creating keys and extracting and embeddeding signed JWTs within actor modules.
+The [wash](/docs/ecosystem/wash) tool is responsible for creating keys and extracting and embeddeding signed JWTs within actor modules.
 
 Each JWT embedded within an actor is cryptographically signed using the [ed25519](https://ed25519.cr.yp.to/) signature algorithm. For information on why we chose this method of security over others, please check out our [Archictural Decision Record](https://wasmcloud.github.io/adr/).
 

@@ -8,11 +8,11 @@ type: "docs"
 
 At its core, wasmCloud is a messaging system, and a scalable messaging system needs well-defined API contracts.
 
-Every capability provider has a capability contract - an interface definition - that defines a service and a set of operations it supports. Even [actor-to-actor](/docs/fundamentals/actors/a2a) messages, which don't use capability contracts, benefit by well-defined API contracts. In wasmCloud, we define these API contracts in [Smithy](https://awslabs.github.io/smithy/index.html) files.
+Every capability provider has a capability contract - an interface definition - that defines a service and a set of operations it supports. Even [actor-to-actor](/docs/developer/communication/actor-to-actor-calls) messages, which don't use capability contracts, benefit by well-defined API contracts. In wasmCloud, we define these API contracts in [Smithy](https://awslabs.github.io/smithy/index.html) files.
 
 In this section, you will find documentation on how to define interfaces using smithy IDL files, and use code generation to create libraries from those definitions.
 
-- [Tutorial](/docs/fundamentals/capabilities/create-provider) on creating a new interface project
+- [Tutorial](/docs/developer/providers/rust) on creating a new interface project
 - [The wasmCloud-smithy guide](./wasmcloud-smithy/): how wasmCloud uses smithy models, with examples
 - Configuring the code generator with [`codegen.toml`](./codegen-toml/) files
 - How [Code generation](./code-generation/) works, with pointers for customizing it or writing your own code generator

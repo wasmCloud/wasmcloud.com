@@ -30,7 +30,7 @@ import ReactPlayer from 'react-player/youtube';
   - We can start these on any host that will allow you to measure metrics.
   - Why? Issue remediation, needs-based resource allocation.
 - DISCUSSION: Link names, when to use them, and other use cases. Key Points (check out the recording for the full discussion):
-  - Refer to the [link definition documentation](https://wasmcloud.com/docs/fundamentals/runtime_linking/links) for more detail
+  - Refer to the [link definition documentation](https://wasmcloud.com/docs/concepts/runtime-linking/link-definitions) for more detail
   - If you're not familiar with link definitions, essentially, this is runtime configuration between actors and capability providers.
   - Link definitions allow an actor to interact with a capability provider and add some configuration.
   - For example, our HTTP server port which listens to HTTP requests.
