@@ -4,6 +4,7 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import HomepageFeatures from '@site/src/components/HomepageFeatures';
+import SecurityAudit from '@site/src/components/SecurityAudit';
 
 import styles from './index.module.css';
 
@@ -21,7 +22,7 @@ function HomepageHeader() {
           <Link
             className="button button--secondary button--lg"
             to="/docs/installation">
-            Try it yourself️
+            Try it yourself
           </Link>
         </div>
       </div>
@@ -45,6 +46,8 @@ export default function Home() {
       <HomepageHeader />
       <main>
         <HomepageFeatures />
+        <hr />
+        <SecurityAudit />
       </main>
     </Layout>
   );
