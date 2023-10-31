@@ -91,6 +91,11 @@ const config = {
             label: 'Docs',
           },
           {
+            href: 'https://ostif.org/ostif-has-completed-a-security-audit-of-wasmcloud/',
+            label: 'Security Assessment',
+            position: 'right',
+          },
+          {
             href: 'https://github.com/wasmcloud',
             label: 'GitHub',
             position: 'right',
