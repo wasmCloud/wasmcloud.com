@@ -1,7 +1,7 @@
 ---
 title: "wash completions"
 draft: false
-sidebar_position: 6
+sidebar_position: 5
 description: "wash completions command reference"
 --- 
 

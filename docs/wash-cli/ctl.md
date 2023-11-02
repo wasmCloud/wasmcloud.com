@@ -1,7 +1,7 @@
 ---
 title: "wash ctl"
 draft: false
-sidebar_position: 7
+sidebar_position: 6
 description: "wash ctl command reference"
 --- 
 

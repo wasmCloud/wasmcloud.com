@@ -1,7 +1,7 @@
 ---
 title: "wash claims"
 draft: false
-sidebar_position: 5
+sidebar_position: 4
 description: "wash claims command reference"
 --- 
 
