@@ -1,0 +1,52 @@
+---
+title: "wash start"
+draft: false
+sidebar_position: 23
+description: "wash start command reference"
+--- 
+
+`wash start` assists in launching an actor or a provider from an OCI reference on a host. The user may specify if they want to start an actor or a provider and pass the OCI reference of that entity to the command. By default, the actor or provider are auctioned in the lattice for a suitable host. To specify a host to launch the actor or provider, pass the host ID using the `--host-id` flag. Following are the available subcommads:
+
+- `actor`
+- `provider`
+
+#### Usage
+```
+wash start actor wasmcloud.azurecr.io/echo:0.3.7
+
+wash start provider wasmcloud.azurecr.io/httpserver:0.17.0
+```
+
+#### Options
+
+`--output` (Alias `-o`) Specify output format (text or json) [default: text]
+
+`--ctl-host` (Alias `-r`) CTL Host for connection, defaults to 127.0.0.1 for local nats [env: WASMCLOUD_CTL_HOST=]
+
+`--experimental` Whether or not to enable experimental features [env: WASH_EXPERIMENTAL=]
+
+`--ctl-port` (Alias `-p`) CTL Port for connections, defaults to 4222 for local nats [env: WASMCLOUD_CTL_PORT=]
+
+`--ctl-jwt` JWT file for CTL authentication. Must be supplied with ctl_seed [env: WASMCLOUD_CTL_JWT]
+
+`--ctl-seed` Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
+
+`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
+
+`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+
+`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+
+`--context` Path to a context with values to use for CTL connection and authentication
+
+`--host-id` Id of host, if omitted the actor will be auctioned in the lattice to find a suitable host
+
+`--max-concurrent` Maximum number of instances this actor can run concurrently. Setting this value to 0 means there is no maximum [default: 1]
+
+`--constraint` (Alias `-c`) Constraints for actor auction in the form of "label=value". If host-id is supplied, this list is ignored
+
+`--auction-timeout-ms` Timeout to await an auction response, defaults to 2000 milliseconds [default: 2000]
+
+`--skip-wait` By default, the command will wait until the actor has been started. If this flag is passed, the command will return immediately after acknowledgement from the host, without waiting for the actor to start.  If this flag is omitted, the timeout will be adjusted to 30 seconds to account for provider download times and  5 seconds to account for actor download times.

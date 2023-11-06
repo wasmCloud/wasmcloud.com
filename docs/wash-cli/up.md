@@ -1,7 +1,7 @@
 ---
 title: "wash up"
 draft: false
-sidebar_position: 2
+sidebar_position: 26
 description: "wash up command reference"
 ---
 
