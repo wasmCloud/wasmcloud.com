@@ -9,7 +9,7 @@ Inspect helps you to examine the capabilities of a wasmCloud component. It accep
 
 #### Usage
 ```
-➜ wash claims inspect wasmcloud.azurecr.io/echo:0.3.7
+➜ wash inspect wasmcloud.azurecr.io/echo:0.3.7
 
                                                                           
                                Echo - Module                              
@@ -26,7 +26,7 @@ Inspect helps you to examine the capabilities of a wasmCloud component. It accep
   None                                                                    
                                                                           
 
-➜ wash claims inspect wasmcloud.azurecr.io/httpserver:0.17.0
+➜ wash inspect wasmcloud.azurecr.io/httpserver:0.17.0
 
                                                                                       
                             HTTP Server - Provider Archive                            
