@@ -14,4 +14,4 @@ The following is an overview of the high level functionality exposed by `wadm`. 
 wash app --help
 ```
 
-Please refer the [CLI reference](../../wash-cli/app.md) of `wash app` for a detailed usage guide.
+Please refer the [CLI reference](../../cli/app.md) of `wash app` for a detailed usage guide.
