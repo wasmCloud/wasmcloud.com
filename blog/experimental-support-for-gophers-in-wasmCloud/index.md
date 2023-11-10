@@ -44,12 +44,12 @@ During a recent CNCF wasmCloud Community Meeting, Jordan explained how Blobby ha
 In our earlier Blobby example, we can see 6 different dependencies including Smithy contracts and an imported library needed to interact with the host. The earlier module relies on these to run successfully in wasmCloud. Adding dependencies means more third party code to manage down the line, and all the potential issues that can bring.
 
 ![Early Blobby Example](blobby-wasi-preview-1.png)
-Early TinyGo Blobby actor, written with the WASI-Preview 1 toolchain, with both external and wasmCloud-specific dependencies.
+Image: Early TinyGo Blobby actor, written with the WASI-Preview 1 toolchain, with both external and wasmCloud-specific dependencies.
 
 When written as a component, `globby-wasi` has no dependencies; when we look inside the mod file, it’s empty. The component is more like a library; it exposes an API once it’s instantiated and remains live, allowing functions to be called from the host or other components. What this means is you manage just your code, there is nothing down/up/aroundstream to maintain other than your own code. In recalling Log4j and all the issues that emanated, this is important: every vulnerability in `globby-wasi` will always show up in the go.mod file. No more bug hunts and a clean, safe application.
 
 ![Globby WASI Contracts Example](globby-wasi-preview-2.png)
-Written in WASI, Globby has zero dependencies which means fewer issues down the line.
+Image: Written in WASI, Globby has zero dependencies which means fewer issues down the line.
 
 **Embed Jordan’s demo here: @Brooks Townsend we could snip his section from the community meeting to add here.**
 
