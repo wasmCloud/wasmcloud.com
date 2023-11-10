@@ -48,14 +48,14 @@ Early TinyGo Blobby actor, written with the WASI-Preview 1 toolchain, with both 
 
 When written as a component, `globby-wasi` has no dependencies; when we look inside the mod file, it’s empty. The component is more like a library; it exposes an API once it’s instantiated and remains live, allowing functions to be called from the host or other components. What this means is you manage just your code, there is nothing down/up/aroundstream to maintain other than your own code. In recalling Log4j and all the issues that emanated, this is important: every vulnerability in `globby-wasi` will always show up in the go.mod file. No more bug hunts and a clean, safe application.
 
-![Globby WASI Contracts Example](blobby-wasi-preview-2.png)
+![Globby WASI Contracts Example](globby-wasi-preview-2.png)
 Written in WASI, Globby has zero dependencies which means fewer issues down the line.
 
 **Embed Jordan’s demo here: @Brooks Townsend we could snip his section from the community meeting to add here.**
 
 Of course, we want developers to have a choice of approach and so we’ll continue to support projects built in the SDK-oriented approach. wasmCloud has WebAssembly component support in both the WASI-Preview 1-style command module *and* the WASI-Preview 2-style reactor component. 
 
-CTA: Review progress in the Bytecode Alliance repo, where most of the current work is happening: https://github.com/bytecodealliance/meetings/tree/main/SIG-Guest-Languages/Go
+CTA: Review progress in the [Bytecode Alliance repo](https://github.com/bytecodealliance/meetings/tree/main/SIG-Guest-Languages/Go), where most of the current work is happening.
 
 ### What’s next?
 
