@@ -5,7 +5,7 @@ sidebar_position: 18
 description: "wash reg command reference"
 --- 
 
-`wash reg` allows users to interact with OCI compliant registries and their artifacts. A user may pull artifacts from the registry to use in their projects. They may also push their own projects to registries to use in various constellations. Following are the subcommands available under `wash reg`.
+`wash reg` allows users to interact with OCI compliant registries and their artifacts. A user may pull artifacts from the registry to use in their projects. They may also push their own projects to registries to use in various lattices. Following are the subcommands available under `wash reg`.
 
 - `push`
 - `pull`
@@ -15,7 +15,7 @@ description: "wash reg command reference"
 Push an artifact to an OCI compliant registry. A user needs to provide a registry URL and the path to the artifact that needs to be pushed.
 
 :::caution
-This subcommand will be deprecated in furture versions. Please use `wash push` instead.
+This subcommand will be deprecated in future versions. Please use `wash push` instead.
 :::
 
 #### Usage
@@ -45,7 +45,7 @@ wash reg push wasmcloud.azurecr.io/example:0.0.1 /path/to/artifact
 Pull an artifact from an OCI compliant registry
 
 :::caution
-This subcommand will be deprecated in furture versions. Please use `wash pull` instead.
+This subcommand will be deprecated in future versions. Please use `wash pull` instead.
 :::
 
 #### Usage

@@ -11,6 +11,7 @@ This command helps a user to generate NATS keys and manage them. Following are t
 - `get`
 - `list`
 
+
 ### `gen`
 `gen`, short for generate. will generate a secret and public key pair. The type of key pair needs to be specified. The following ke types can be used:
 
@@ -29,7 +30,7 @@ wash keys gen server
 ```
 
 ### `get`
-This subcommand retrives a key pair and prints its contents.
+This subcommand retrieves a key pair and prints its contents.
 
 #### Usage
 ```

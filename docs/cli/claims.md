@@ -5,7 +5,7 @@ sidebar_position: 4
 description: "wash claims command reference"
 --- 
 
-Every actor in a wasmCloud environment claims its capabilities or the features it can interact with to supplement its current behaviour. These capabilities are claimed in the form of JSON Web Tokens (JWTs). `wash claims` will assist you to generate, manage and view these JWTs for wasmCloud actors. Following are the subcommands available under `wash claims`.
+Every actor in a wasmCloud environment claims its capabilities or the features it can interact with to supplement its current behavior. These capabilities are claimed in the form of JSON Web Tokens (JWTs). `wash claims` will assist you to generate, manage and view these JWTs for wasmCloud actors. Following are the subcommands available under `wash claims`.
 
 - `inspect`
 - `sign`
@@ -14,7 +14,7 @@ Every actor in a wasmCloud environment claims its capabilities or the features i
 ## `inspect`
 
 :::caution
-This subcommand will be deprecated in furture versions. Please use `wash inspect` instead.
+This subcommand will be deprecated in future versions. Please use `wash inspect` instead.
 :::
 
 Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud actor or provider and prints out the properties of that component. 
@@ -80,7 +80,7 @@ Inspect helps you to examine the capabilities of a wasmCloud component. It accep
 
 ## `sign`
 
-`wash claims sign` assists you to sign a WebAssembly component by specifying some standard capabilities available in the wasmCloud environment. A user may also specify custom capabilities and other metadata such as expiration, tags, etc.
+`wash claims sign` assists you in signing a WebAssembly component by specifying some standard capabilities available in the wasmCloud environment. A user may also specify custom capabilities and other metadata such as expiration, tags, etc.
 
 #### Usage
 ```

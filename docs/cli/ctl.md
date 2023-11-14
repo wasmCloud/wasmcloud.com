@@ -7,6 +7,10 @@ description: "wash ctl command reference"
 
 This subcommand will help you to interact with the wasmCloud control interface. You may perform operations such as retrieving information about the lattice, enable provisioning or deprovisioning of entities in the lattice, creating links or updating items in the lattice. Following are the subcommands available under `wash ctl`
 
+:::caution
+This subcommand will be deprecated in future versions. Please use the following subcommands directly with `wash` instead. For example: `wash get`, `wash link` and so on.
+:::
+
 - `get`
 - `link`
 - `start`
@@ -16,10 +20,6 @@ This subcommand will help you to interact with the wasmCloud control interface. 
 
 ## `get`
 wash get retrives information about the lattice. The following subcommands will help you retrieve different information available to query:
-
-:::caution
-This subcommand will be deprecated in furture versions. Please use `wash get` instead.
-:::
 
 ### `claims`
 This subcommand fetches all the known claims inside the lattice.
@@ -63,11 +63,11 @@ These options can be used for all of the `wash ctl get` subcommands.
 
 `--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
 
-`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+`--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
-`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+`--timeout-ms` (Alias `-t`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
 
@@ -78,9 +78,6 @@ This command will assist you to add remove and query all the links in the lattic
 - `put`
 - `del`
 
-:::caution
-This subcommand will be deprecated in furture versions. Please use `wash link` instead.
-:::
 
 ### `query`
 Queries all the links in the lattice. Links persist in the lattice even if the associated actor or provider are stopped.
@@ -123,11 +120,11 @@ These options can be used for all of the `wash ctl link` subcommands.
 
 `--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
 
-`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+`--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
-`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+`--timeout-ms` (Alias `-t`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
 
@@ -137,10 +134,6 @@ This command helps to start an actor or provider in the the lattice. Following a
 
 - `actor`
 - `provider`
-
-:::caution
-This subcommand will be deprecated in furture versions. Please use `wash start` instead.
-:::
 
 ### `actor`
 Start an actor by providing its OCI reference. You may specify the host to start this actor on by providing the `--host-id` flag. By default, the actor is auctioned in the lattice for a suitable host.
@@ -167,11 +160,11 @@ wash ctl start actor wasmcloud.azurecr.io/echo:0.3.7
 
 `--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
 
-`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+`--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
-`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+`--timeout-ms` (Alias `-t`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
 
@@ -209,11 +202,11 @@ wash ctl start provider wasmcloud.azurecr.io/httpserver:0.17.0
 
 `--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
 
-`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+`--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
-`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+`--timeout-ms` (Alias `-t`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
 
@@ -229,15 +222,12 @@ wash ctl start provider wasmcloud.azurecr.io/httpserver:0.17.0
 
 `--skip-wait` By default, the command will wait until the provider has been started. If this flag is passed, the command will return immediately after acknowledgement from the host, without waiting for the provider to start. If this flag is omitted, the timeout will be adjusted to 30 seconds to account for provider download times
 
+
 ## `stop`
 Stop an actor provider or a host. Following are the available subcommands:
 - `actor`
 - `provider`
 - `host`
-
-:::caution
-This subcommand will be deprecated in furture versions. Please use `wash stop` instead.
-:::
 
 ### `actor`
 Stop an actor running in a host 
@@ -280,22 +270,18 @@ The following options can be used for all subcommands of `wash ctl stop`.
 
 `--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
 
-`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+`--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
-`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+`--timeout-ms` (Alias `-t`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
 
-`--skip-wait` By default, the command will wait until the actor/provider has been started. If this flag is passed, the command will return immediately after acknowledgement from the host, without waiting for the provider to start. If this flag is omitted, the timeout will be adjusted to 30 seconds to account for provider download times and  5 seconds to account for actor download times.
+`--skip-wait` By default, the command will wait until the actor/provider has been started. If this flag is passed, the command will return immediately after acknowledgement from the host, without waiting for the provider to start. If this flag is omitted, the timeout will be adjusted to 30 seconds to account for provider download times and 5 seconds to account for actor download times.
 
 ## `update`
 Update an actor running in a host to a new reference
-
-:::caution
-This subcommand will be deprecated in furture versions. Please use `wash update` instead.
-:::
 
 #### Usage
 ```
@@ -318,21 +304,17 @@ wash ctl update actor <host-id> <actor-id> <new-actor-reference>
 
 `--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
 
-`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+`--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
-`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+`--timeout-ms` (Alias `-t`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
 
 ## `scale`
 
 This command supports scaling the actors in your lattice to handle concurrent requests. It accepts the host ID on which the actor is running and the reference of the actor to scale as required arguments. It also accepts a `--max-concurrent` value that specifies the maximum number of instances this actor can run concurrently. By default, the value is an unbounded level of concurrency. A value of zero is equivalent to stopping the actor.
-
-:::caution
-This subcommand will be deprecated in furture versions. Please use `wash scale` instead.
-:::
 
 #### Usage
 ```
@@ -356,11 +338,11 @@ wash ctl scale actor <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concur
 
 `--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
 
-`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+`--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
-`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+`--timeout-ms` (Alias `-t`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
 

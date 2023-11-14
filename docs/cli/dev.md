@@ -9,7 +9,7 @@ Starts a local dev loop for an actor. Takes a local `wasmcloud.toml` file to dep
 
 ### Usage
 ```
-wash dev --experimental --host-id=<you-host-id>
+wash dev --experimental --host-id=<your-host-id>
 ```
 
 ### Options

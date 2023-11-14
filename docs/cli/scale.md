@@ -11,6 +11,9 @@ description: "wash scale command reference"
 ```
 wash scale actor <your-host-id> wasmcloud.azurecr.io/echo:0.3.7
 wash scale actor <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concurrent=20
+
+# Stopping the actor
+wash scale actor <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concurrent=0
 ```
 
 ### Options
@@ -28,11 +31,11 @@ wash scale actor <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concurrent
 
 `--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
 
-`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+`--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
-`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+`--timeout-ms` (Alias `-t`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
 

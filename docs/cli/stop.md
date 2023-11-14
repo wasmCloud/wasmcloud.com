@@ -5,7 +5,7 @@ sidebar_position: 24
 description: "wash stop command reference"
 --- 
 
-`wash stop` assists in stopping an actor or a provider from an OCI reference on a host. `wash stop` also helps in stopping hosts. The user may specify if they want to stop an actor or a provider and pass the OCI reference of that entity to the command. To specify a host to launch the actor or provider, pass the host ID using the `--host-id` flag. Following are the available subcommads:
+`wash stop` allows you to stop an actor, provider or a host. The user may specify if they want to stop an actor or a provider and pass the OCI reference of that entity to the command. To specify a host to stop the actor or provider, pass the host ID using the `--host-id` flag. Following are the available subcommads:
 
 - `actor`
 - `provider`
@@ -53,11 +53,11 @@ The following options can be used for all subcommands of `wash stop`.
 
 `--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
 
-`--js-domain` JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+`--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmcloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix` (Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
-`--timeout-ms` (Alias `-ot`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
+`--timeout-ms` (Alias `-t`) Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
 

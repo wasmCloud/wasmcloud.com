@@ -32,6 +32,7 @@ Usage:
 ```
 wash app get <name> [version]
 wash app get petclinic 0.0.1
+wash app get petclinic 0.0.1 -o json
 ```
 
 ### `history`
@@ -45,7 +46,7 @@ wash app history petclinic
 ```
 
 ### `delete`
-The `delete` command is used to delete an application model of a specific version. You can optionally delete _all_ versions of a specificationas well.
+The `delete` command is used to delete an application model of a specific version. You can optionally delete _all_ versions of a specification as well.
 
 Usage:
 
@@ -67,7 +68,7 @@ wash app put petclinic.yaml
 ```
 
 ### `deploy`
-When a version of an application specification is deployed, wadm will start monitoring the state of your lattice. Wadm will compare the desired state of an application with its current state and issue the appropriate  commands to reconcile the state.
+When a version of an application specification is deployed, wadm will start monitoring the state of your lattice. Wadm will compare the desired state of an application with its current state and issue the appropriate commands to reconcile the state.
 
 Usage:
 
@@ -77,7 +78,7 @@ wash app deploy petclinic v0.0.1
 ```
 
 ### `undeploy`
-Undeploying an application spec tells wadm to stop monitoring that deployment. Wadm supports _destructive_ as well as _non-destructive_ undeploys. By default, all resources originally provisioned for an application will be removed after that application is undeployed.
+Undeploying an application spec tells wadm to stop monitoring that deployment. By default, all resources originally provisioned for an application will be removed after that application is undeployed.
 
 Usage:
 
@@ -115,11 +116,11 @@ Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env:
 Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
 
 #### --js-domain 
-JS domain for wasmcloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
+JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
 #### --lattice-prefix 
 Alias: `-x`.
-        Lattice prefix for wasmcloud control interface. The default value is "default". [env: WASMCLOUD_LATTICE_PREFIX=]
+        Lattice prefix for wasmCloud control interface. The default value is "default". [env: WASMCLOUD_LATTICE_PREFIX=]
 
 #### --timeout-ms 
 Alias: `-t`.
