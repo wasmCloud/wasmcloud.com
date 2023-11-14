@@ -9,9 +9,12 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- 
-- 
-- 
+- New control interface topics/features
+  - [Adjusting Labels](https://github.com/wasmCloud/wasmCloud/pull/780)
+  - [Actor Config](https://github.com/wasmCloud/wasmCloud/pull/990)
+  - [Lame Duck/Cordon](https://github.com/wasmCloud/wasmCloud/issues/693)
+  - [Dynamic log levels](https://github.com/wasmCloud/wasmCloud/issues/998) 
+
 
 <!--truncate-->
 
