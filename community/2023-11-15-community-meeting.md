@@ -20,6 +20,28 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Meeting Notes
 
+- The recordings for Cloud Native Wasm Day NA 2023 are here! Check out the playlist here:
+  https://www.youtube.com/watch?v=EFq7pt9hVAQ&list=PLj6h78yzYM2MEIqhZoMMKhZ6Q-XDxiDg7
+- We have a bunch of new control interface topics/features that we'd like to discuss. We'd like to
+  get some feedback on them before we merge them into main.
+  - First up is the ability to adjust labels on actors. This is a feature that both allows for
+    scheduling (letting wadm make scheduing decisions) and for features like drain/cordon/lame duck
+    mode.
+    - There is a possible security concern, but Kevin pointed out that other tech like Kubernetes
+      doesn't have an answer to this either. There could be other edge cases
+  - Next is the ability to configure an actor at runtime. 
+    - Brings up the thorny question about stateless actors
+    - There are two different problems: With a getter (how it is currently implemented), an actor
+      could store the state in a static variable and then will be out of sync if the config changes.
+      With a setter, you could get a race condition where some actors could start, a config change
+      could occur, and then some actors could get the new config. It also means that the actor has
+      to be able to handle the config change as it comes in and then probably store that config.
+  - We also have lame duck mode, which was mostly covered in the discussion around labels
+  - Lastly, we have dynamic log levels. This is a feature that allows for a host's logging level to
+    be changed at runtime.
+- Component model is getting very close! We're just waiting for JCO to finish its implementation as
+  well as a little bit of work in other repos
+
 ### Recording
 
 <ReactPlayer url='https://www.youtube.com/watch?v=mJ_tL4o-cCI' controls />
