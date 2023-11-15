@@ -5,7 +5,7 @@ sidebar_position: 23
 description: "wash start command reference"
 --- 
 
-`wash start` assists in launching an actor or a provider from an OCI reference on a host. The user may specify if they want to start an actor or a provider and pass the OCI reference of that entity to the command. By default, the actor or provider are auctioned in the lattice for a suitable host. To specify a host to launch the actor or provider, pass the host ID using the `--host-id` flag. Following are the available subcommads:
+`wash start` assists in launching an actor or a provider from an OCI reference on a host. The user may specify if they want to start an actor or a provider and pass the OCI reference of that entity to the command. By default, the actor or provider are auctioned in the lattice for a suitable host. To specify a host to launch the actor or provider, pass the host ID using the `--host-id` flag. Actors or providers can also be started from local files using the prefix `file://` followed by the file path. By default, loading from files is permitted and can be disabled using the `WASMCLOUD_ALLOW_FILE_LOAD` environment variable. Following are the available subcommads:
 
 - `actor`
 - `provider`
@@ -14,7 +14,11 @@ description: "wash start command reference"
 ```
 wash start actor wasmcloud.azurecr.io/echo:0.3.7
 
+wash start actor file://<path-to-actor>
+
 wash start provider wasmcloud.azurecr.io/httpserver:0.17.0
+
+wash start provider file://<path-to-provider>
 ```
 
 #### Options
