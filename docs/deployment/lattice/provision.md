@@ -46,7 +46,6 @@ To ensure that any set of hosts are able to join the same lattice and securely c
 - Each host must have a single `WASMCLOUD_CLUSTER_SEED` that has a corresponding public key in the list of valid cluster issuers
 - Each host must have NATS credentials that allow access to a shared NATS topic space for **RPC** - supplied by `WASMCLOUD_RPC_*` environment variables.
 - Each host must have NATS credentials that allow access to a shared NATS topic space for **Control** - supplied by the `WASMCLOUD_CTL_*` environment variables.
-- Each host must have NATS credentials that can be given to capability providers to grant them access to a shared NATS topic space for **RPC** - supplied by the `WASMCLOUD_PROV_RPC_*` environment variables.
 
 At first glance, you might wonder why the providers are given different RPC credentials than the regular host itself. By default, these are the same credentials. However, developers and operations folks have the option of using different NATS users. The NATS user that has access to the RPC channels can have potentially different limitations than the host that has access to RPC communications. Further, by giving the capability provider a different user than the host, it's possible to enable situations where the user for a provider can be invalidated/disabled at runtime without harming the host.
 

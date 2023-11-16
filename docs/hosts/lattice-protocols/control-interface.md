@@ -582,7 +582,6 @@ Empty body
     "hostcore.osfamily": "unix"
   },
   "lattice_prefix": "default",
-  "prov_rpc_host": "nats://127.0.0.1:4222",
   "rpc_host": "nats://127.0.0.1:4222",
   "uptime_human": "1h 51m 54s",
   "uptime_seconds": 6714,

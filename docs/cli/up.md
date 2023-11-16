@@ -82,24 +82,6 @@ Optional flag to enable host communication with a NATS server over TLS for RPC m
 #### --rpc-credsfile  
 Convenience flag for RPC authentication, internally this parses the JWT and seed from the credsfile [env: WASMCLOUD_RPC_CREDSFILE=]
 
-#### --prov-rpc-host  
-An IP address or DNS name to use to connect to NATS for Provider RPC messages, defaults to the value supplied to --nats-host if not supplied [env: WASMCLOUD_PROV_RPC_HOST=]
-
-#### --prov-rpc-port  
-A port to use to connect to NATS for Provider RPC messages, defaults to the value supplied to --nats-port if not supplied [env: WASMCLOUD_PROV_RPC_PORT=]
-
-#### --prov-rpc-seed  
-A seed nkey to use to authenticate to NATS for Provider RPC messages [env: WASMCLOUD_PROV_RPC_SEED=]
-
-#### --prov-rpc-tls
-Optional flag to enable host communication with a NATS server over TLS for Provider RPC messages [env: WASMCLOUD_PROV_RPC_TLS=]
-
-#### --prov-rpc-jwt 
-A user JWT to use to authenticate to NATS for Provider RPC messages [env: WASMCLOUD_PROV_RPC_JWT=]
-
-#### --prov-rpc-credsfile  
-Convenience flag for Provider RPC authentication, internally this parses the JWT and seed from the credsfile [env: WASMCLOUD_PROV_RPC_CREDSFILE=]
-
 #### --ctl-host  
 An IP address or DNS name to use to connect to NATS for Control Interface (CTL) messages, defaults to the value supplied to --nats-host if not supplied [env: WASMCLOUD_CTL_HOST=]
 
