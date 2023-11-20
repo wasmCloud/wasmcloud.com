@@ -27,4 +27,4 @@ You should never connect anonymously or without TLS to a remote NATS installatio
 
 ### User/password not supported?
 
-You may have noticed that while NATS supports clear text username and password authentication, we do not support this for wasmCloud lattice authentication. We have chosen instead to support either anonymous connections or de-centralized authentication connections. If you feel that there is suitable justification to support username and password lattice authentication, please [file an issue](https://github.com/wasmCloud/wasmcloud-otp/issues) with the team.
+You may have noticed that while NATS supports clear text username and password authentication, we do not support this for wasmCloud lattice authentication. We have chosen instead to support either anonymous connections or de-centralized authentication connections. If you feel that there is suitable justification to support username and password lattice authentication, please [file an issue](https://github.com/wasmCloud/wasmCloud/issues) with the team.

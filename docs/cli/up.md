@@ -52,7 +52,7 @@ NATS websocket port to use. Websocket support will not be enabled if this option
 NATS Server Jetstream domain, defaults to `core` [env: NATS_JS_DOMAIN=]
 
 #### --wasmcloud-version  
-wasmCloud host version to download, e.g. `v0.55.0`. See https://github.com/wasmCloud/wasmcloud-otp/releases for releases [env: WASMCLOUD_VERSION=] [default: v0.78.0-rc6]
+wasmCloud host version to download, e.g. `v0.80.0`. See https://github.com/wasmCloud/wasmCloud/releases for releases [env: WASMCLOUD_VERSION=] [default: v0.80.0]
 
 #### --lattice-prefix  
 Alias: `-x`.

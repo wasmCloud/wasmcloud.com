@@ -44,7 +44,7 @@ As you can see, we retrieved the list of vets in our database in just under 40ms
 
 In order to enable tracing we'll take a look at the above example to show you what to set up. At a high level, you'll need:
 
-1. wasmCloud [v0.55.1](https://github.com/wasmCloud/wasmcloud-otp/releases/tag/v0.55.1) or later with the following environment variables:
+1. [The wasmCloud host](https://github.com/wasmCloud/wasmCloud/releases) with the following environment variables:
    - `OTEL_TRACES_EXPORTER=otlp` To set the exporter to `otlp`
    - `OTEL_EXPORTER_OTLP_ENDPOINT=<tracing exporter backend>` To export traces to your backend, e.g. `http://localhost:55681` for Tempo.
 1. A tracing backend that supports [otlp](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md), [Grafana Tempo](https://github.com/grafana/tempo) was what we chose for its simplicity for Docker compose, but [Zipkin](https://zipkin.io/) and [Jaeger](https://www.jaegertracing.io/) are open source and also visualize traces. There are also commercial / "production-grade" offerings like [DataDog](https://www.datadoghq.com/knowledge-center/distributed-tracing/#distributed-tracing-tools) and [Honeycomb](https://www.honeycomb.io/trace/) too.

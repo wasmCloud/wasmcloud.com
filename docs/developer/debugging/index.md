@@ -12,4 +12,4 @@ The following sections detail ways to track down errors with specific wasmCloud 
 - [Actor Troubleshooting](./actors)
 - [Provider Troubleshooting](./providers)
 
-If you find any issues that are not resolved by this documentation, please file an [issue here](https://github.com/wasmCloud/wasmcloud-otp/issues/new?assignees=&labels=bug%2C+help+wanted&template=bug_report.md&title=%5BBUG%5D+%3CIssue%3E) and we can assist you with the problem as well as look to add it to this section of the documentation.
+If you find any issues that are not resolved by this documentation, please file an [issue here](https://github.com/wasmCloud/wasmCloud/issues/new?assignees=&labels=bug%2C+help+wanted&template=bug_report.md&title=%5BBUG%5D+%3CIssue%3E) and we can assist you with the problem as well as look to add it to this section of the documentation.

@@ -21,10 +21,7 @@ Lattice RPC supports the following interaction modes:
 All RPC interactions within the lattice involve sending an `Invocation` and receiving an `InvocationResponse`. Even
 if the operation is "fire and forget", the `InvocationResponse` is required to indicate a successful acknowledgement of the invocation.
 
-Because these structures are used in multiple places by multiple languages, you can find them in different places throughout the code base. Here are a couple of locations:
-
-- The Smithy [Interface](https://github.com/wasmCloud/interfaces/blob/main/core/wasmcloud-core.smithy#L143) - smithy models are considered authoritative as language-specific implementations should be generated from these IDL models.
-- The [wasmCloud OTP Host Runtime](https://github.com/wasmCloud/wasmcloud-otp/blob/main/host_core/native/hostcore_wasmcloud_native/src/inv.rs#L23) - There is a Rust implementation of the `Invocation` and `InvocationResponse` structs used by the host.
+Because these structures are used in multiple places by multiple languages, you can find them in different places throughout the code base. The primary source of truth is in the [core crate](https://github.com/wasmCloud/wasmCloud/blob/main/crates/core/src/lib.rs), used by the host runtime and Rust clients.
 
 The following is a description of the fields on an `Invocation`:
 
