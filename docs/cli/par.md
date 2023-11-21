@@ -59,7 +59,7 @@ wash par create --capid <CAPID> --vendor <VENDOR> --name <NAME> --arch <ARCH> --
 
 Inspect accepts the path or OCI reference of the provider archive and prints out the properties of the archive.
 
-:::caution
+:::warning
 This subcommand will be deprecated in future versions. Please use `wash inspect` instead.
 :::
 

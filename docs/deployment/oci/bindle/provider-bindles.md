@@ -103,7 +103,7 @@ size = 1191
 memberOf = ["jwt"]
 ```
 
-:::caution
+:::warning
 The group names and the `parcel.label.feature.wasmcloud` feature are REQUIRED for use in wasmCloud
 :::
 

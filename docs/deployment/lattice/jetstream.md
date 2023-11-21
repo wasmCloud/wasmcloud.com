@@ -35,7 +35,7 @@ The bucket name will _always_ be `LATTICEDATA_{lattice-id}`, where `lattice-id` 
 If you want to change the number of replicas, the maximum size of the bucket, or any other configuration, you can do so by creating a new KV bucket via the `nats` CLI **_before_** the first wasmCloud host starts. When the host starts, if it detects a pre-existing KV bucket, it will simply reuse that one.
 
 
-:::caution
+:::warning
 It is _strongly_ recommended that developers _never_ interact with the KV bucket contents directly, and instead use the various operations available on the lattice control interface via the `wash` CLI in order to ensure reliability and stability of the stream contents. Manually editing these values could result in corrupted data and unpredictable consequences to the lattice as a whole.
 :::
 

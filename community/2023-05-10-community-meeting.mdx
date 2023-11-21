@@ -1,0 +1,131 @@
+---
+title: 2023-05-10 Community Meeting
+authors: [brooks]
+tags: [community, meeting]
+description: Agenda, notes, and recording for the 2023-05-10 community meeting
+---
+
+import ReactPlayer from 'react-player/youtube';
+
+### Agenda
+
+- DEMO + Showcase: wasmCloud burrito releases
+- Discussion: "Built-in" capability providers defined at runtime
+- wasmCloud: Path to a CNCF Incubating project
+
+{/* truncate */}
+
+### Meeting Notes
+
+#### DEMO + Showcase: wasmCloud burrito releases
+
+- Roman: We switched to [Burrito][burrito], which let's us build a static self-extracting executable (and specify Erlang distribution we want to package)
+- (Demo of the functionality in a Ubuntu container)
+- Burrito uses [Zig][zig] under the hood to cross-compile (see their docs)
+- For the end-user, running the wasmcloud host binary after starting NATS is all you need to do
+- (Demo of the functionality in an Alpine container)
+  - There is one extra dependency on Alpine, which is libgcc (brought in by Rust)
+- This works on Windows and MacOS, out of the box
+- If you'd like to learn more, please check out the Burrito project documentation
+- Bailey: Thanks Roman! Just to summarize the "why":
+  - This came about because we've been chatting with people who had issues getting set up in the Slack
+  - With these changes, we should be much closer to a "batteries included wasmcloud host"
+- Roman: Another positive side effect is that the binaries can also be run from CI *without* any extra dependencies
+- Brooks: Hey it looks like the build took about 24 minutes which is a bit faster than the previous build
+  - Roman: yes -- the builds are now using Nix
+  - We only take the penalty for building (i.e. updating the cache) large dependencies actually change (ex. the NIF)
+  - Note: [Erlang Native Implemented Functions (NIFs)][erlang-nifs] are an [Foreign Function Interface (FFI)][wiki-ffi] mechanism that Erlang uses
+
+[zig]: https://ziglang.org/
+[burrito]: https://github.com/burrito-elixir/burrito
+[erlang-nifs]: https://www.erlang.org/doc/tutorial/nif.html
+[wiki-ffi]: https://en.wikipedia.org/wiki/Foreign_function_interface
+
+#### Discussion: "Built-in" capability providers defined at runtime
+
+- Brooks: Some disambiguation before we get into it
+  - The wasmCloud host has some builtins (ex. numbercore and logging), but it also has support for "external" providers
+- Teams are going to have a core of functionality that they can share and access, which is what providers are for
+  - For example, if you're working on a project and everyone is using a HTTP client/server, then you'll want the HTTP client/server provider available
+  - The key question is when you run a wasmcloud host, should there be a way to specify providers which are treated like built-ins (no need to configure link defs, etc)?
+- (audio issues)
+- Jordan: We started this discussion 2/3 talks ago, mentioning the cryptographic space and built-in numbers generators
+  - Some providers are good for using locally, but we don't want people to remove builtin stuff (logging) & relink it
+  - If there's a directory of providers, it would be nice to have them loaded and accessible as builtins
+  - Don't want to rewrite CI to use different contracts and providers
+- Brooks: We've been talking about logging, but do you see this concept extending to other capabilities?
+  - Jordan: Maybe there's a centralized ops team that maintains a set of shared plugins
+  - Kevin: what we're doing right now is looking at all our contracts and seeing how they need to evolve with all the changes coming (ex. components)
+    - Whether something is builtin or not should actually *not* be built into the contract
+    - It's up to the host to decide if it satisfies the contract with a builtin or something else.
+    - This is really a way to avoid creating link definitions
+    - If you find yourself trying to make environment-specific changes to a contract, there's a bit of a problem -- you should be using the same contract across platforms
+    - There is some impedance mismatch here
+  - Jordan: Do you see the capabilities being pluggable or hardcoded into the host?
+    - Kevin: depends on the host -- what the OTP host and Rust host (and other hosts) can do is different
+    - For example a JS host might have more hard-coded builtins, and the OTP host might be able to accept builtin providers in Elixir/Erlang and have them loaded in
+    - There are lots of possibilities here, but the idea is spot on -- we need to resolve discrepancies in the contracts
+  - Jordan: Can we get more visibility into the builtins? They're the only ones we have no visibility into
+    - Kevin: Turns out this is a bigger problem -- there's a general need for providers to emit their own events, and there's no good way to do that right now.
+    - Also this rolls into not forcing the actors to know the difference between a builtin and not-builtin.
+- Vance: Assuming the difference between a builtin and an external provider is that there is no link definition...
+  - Kevin: You can delete and add a new linkdef for providers, but you *can't* do that for builtins.
+  - Vance: I'm assumign that today the builtins don't use the lattice?
+  - Kevin: That's right, they don't
+  - Vance: How does it work when you change from one provider to another? If you want to migrate from one http provider to another one, would that be destructive/cause downtime?
+    - Kevin: Deleting the LinkDef *could* be potentially destructive
+    - Vance: I thought maybe you'd be able to add the link *first*?
+    - Kevin: It would be rejected since only one link for a given contract can exist at one time
+  - Brooks: We've thought about this some...
+- Brooks: Linking an actor (creating a LinkDef) to a provider serves two main purposes:
+  - Telling wasmcloud that the two things will talk
+  - Provide optional configuration values
+  - Here's the question: how much security validation are we getting at runtime by the link being explicit? If it was automatic, are we compromising on security somewhat?
+  - Kevin: the dangerous case is that there's a signed contract, wasmCloud tries to find a suitable provider, there have some issues:
+    - It doesn't know which providers need config and which ones don't
+    - If there's an impostor (with that contract signed), then it's possible to choose it
+  - Kevin: this is why the linkdefs up until now have been explicit -- you need to sign and have cluster issuers.
+    - It'd be more unpredictable which would be an even bigger problem than security.
+    - Link names can't change since the actor needs them
+- Brooks: It's interesting
+  - Jochen: Is this a limitation of NATS or a chosen path? since it can only receive on single paht but listen on a *?
+  - Brooks: It's more of a chosen path -- we use a different links (frotend and backend) to get around that, so we're flexible in routing.
+- Brooks: We're trying to find a way for linking to be more natural
+  - Most of the time there's not even configuration required (ex. HTTP Client is just making outbound requests, versus HTTP Server which *might* need a port to listen on)
+  - You could run two KVs but there's no way to know which one to talk to by default, which feels artificially restrictive
+  - No concrete suggestions, but we've got some people with hands
+- Jordan: Concrete suggestion, rename the project to Wild Wild wasmCloud west.
+  - More seriously: compiling link names to actors -- it's been a bit of a pain-point
+- Kevin: COmment on Brooks' usecase (implicit links)
+  - In addition to the security problem, you could have many different providers all on the same link ID on the same lattice, and they could pick the wrong one (ex. looking for redis, and you find vault)
+  - Brooks: definitely still things to think about here, but this settles it for me (for now)
+- Brooks: What should we take away from this discussion? What about Jordan's question from Slack about compiling link names
+  - Jordan: Should washboard have a section that says "these builtins are up and running"
+  - Jordan: Other question was answered -- Kevin says it's in the works
+  - Bailey: we should probably write some RFCs
+- Jordan: If we do a bunch of hosts with different providers and builtins and lattice them all together, how do we...
+  - Kevin: if the list of builtins is variable and we don't have contracts that specify that they're builtins, then only if a no link exists should a builtin be chosen
+  - If an actor comes up on a host has a builtin for wasi:logging and there is no link definition, then the host *should* hook the actor up to the builtin wasi logging
+    - Only if no link exists for the contract would the builtin be used
+    - If you deploy a distributed logger, then a linkdef should be added to stay meaningful, explicit and durable
+    - We do want a hierarchy of defaults here
+  - Brooks: Love that, we should totally get an RFC
+- Kevin: one example of reasonable defaults -- right now you have to deploy an HTTP client provider to enable HTTP requests... But a host could easily provide this, and then you don't need a link definition
+  - An issue is that if you have multiple different hosts -- one with a default and another one without -- then you could get a provider when you didn't expect it
+
+#### wasmCloud: Path to a CNCF Incubating project
+
+- Bailey: This will be quick because most of the criteria are actually already hit!
+  - Right now we're at the sandbox stage.
+  - The journey to graduated starts at the incubating stage -- so keeping an eye on the requirements for graduation is crucial
+  - What we expect to be at soon (tm) is the incubating stage
+- **Bailey: Call for adopters -- please let us know how you're using wasmcloud**
+- See the [OpenSSF best practices (via badge on wasmCloud repo)](https://bestpractices.coreinfrastructure.org/en/projects/6363)
+- Brooks: I'm a wasmcloud user, how do I get in contact about how I'm using wasmCloud?
+  - Bailey: If you're comfortable with it, post it in the [wasmCloud Slack][wasmcloud-slack]! If not, send a direct message to me on Slack!
+
+[wasmcloud-slack]: https://slack.wasmcloud.com
+
+### Recording
+
+<ReactPlayer url='https://youtu.be/b5XX7gw520Y' controls />

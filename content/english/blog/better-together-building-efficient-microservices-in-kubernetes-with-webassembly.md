@@ -16,9 +16,7 @@ Having multi-tenant clusters has loads of operational benefits (flexibility, sec
 
 What if there was a more lightweight model that could be almost instantly scaled as traffic scales up, giving more scheduling flexibility than a coarse-grained container? I’m reminded of the quote from Docker creator, Solomon Hykes:
 
-{{< aside >}}
-“If WASM+WASI existed in 2008, we wouldn't have needed to have created Docker. That's how important it is. WebAssembly on the server is the future of computing.”
-{{< /aside >}}
+> “If WASM+WASI existed in 2008, we wouldn't have needed to have created Docker. That's how important it is. WebAssembly on the server is the future of computing.”
 
 For the past 5 years Adobe has invested heavily in Wasm to bring native codebases to first-class apps in a web browser. With much work in the cloud native community having been done to bring Wasm to more ‘beyond the browser’ use cases, we began experimenting to see if some of these benefits could be achieved directly in Kubernetes.
 

@@ -13,7 +13,7 @@ Every actor in a wasmCloud environment claims its capabilities or the features i
 
 ## `inspect`
 
-:::caution
+:::warning
 This subcommand will be deprecated in future versions. Please use `wash inspect` instead.
 :::
 

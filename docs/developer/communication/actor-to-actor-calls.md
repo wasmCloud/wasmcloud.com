@@ -20,7 +20,7 @@ The single most important task when calling other actors is to identify the targ
 
 Every single actor _must_ have a subject, which is a 56-character public key made of up uppercase letters. These subject strings always start with the capital letter **M** (module). When actors are signed with embedded capability claims, they are always required to have a _subject_ claim. This means that invocation by public key is the **most reliable** means for locating target actors, though it can often impose some amount of friction on the part of calling actors.
 
-:::caution
+:::warning
 You must be cautious when hard-coding public keys in your actors. If your software pipeline involves signing actors with _different private keys_ across different environments, then that will change the public keys of those actors and result in target actors not being found during invocations at runtime.
 :::
 

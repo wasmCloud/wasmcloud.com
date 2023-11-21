@@ -1,9 +1,9 @@
 ---
-title: "Using the Wadm API"
+title: 'Using the Wadm API'
 date: 2020-01-19T00:00:00+00:00
-icon: "ti-map" # themify icon pack : https://themify.me/themify-icons
+icon: 'ti-map' # themify icon pack : https://themify.me/themify-icons
 description: "Interacting with Wadm's API"
-type: "docs"
+type: 'docs'
 sidebar_position: 4
 ---
 
@@ -11,7 +11,7 @@ The normal way to interact with a `wadm` installation (which could be a single s
 is through the [wash](./usage.md) command-line tool. However, if you are planning on
 creating your own integration or writing a non-Rust language binding, then this reference will help.
 
-:::caution
+:::warning
 _wadm and its corresponding API are not currently 1.0_. This means the API is likely to
 undergo changes and there may be some pieces that aren't yet implemented. This document will be
 updated as we continue to work on the API. All API changes will also be communicated via the release

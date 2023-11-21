@@ -204,7 +204,7 @@ values are supported:
 
 ### Preconfiguring storage
 
-:::caution
+:::warning
 wadm uses two buckets for storage: manifests and state. The manifests bucket contains the "source of
 truth" for wadm applications. If the manifest storage is lost, all knowledge of applications is
 gone. For production deployments, we highly recommend preconfiguring this bucket to have multiple

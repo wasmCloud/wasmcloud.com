@@ -7,7 +7,7 @@ description: "wash ctl command reference"
 
 This subcommand will help you to interact with the wasmCloud control interface. You may perform operations such as retrieving information about the lattice, enable provisioning or deprovisioning of entities in the lattice, creating links or updating items in the lattice. Following are the subcommands available under `wash ctl`
 
-:::caution
+:::warning
 This subcommand will be deprecated in future versions. Please use the following subcommands directly with `wash` instead. For example: `wash get`, `wash link` and so on.
 :::
 
