@@ -12,7 +12,7 @@ description: "The wasmCloud Shell (wash)"
 wash --help
 ```
 
-`wash` has built-in help and you can follow any subcommand with `--help` to get more information about options available. For example `wash --help`, `wash ctl --help`, `wash ctl start --help`, and `wash ctl start actor --help` all provide contextual help.
+`wash` has built-in help and you can follow any subcommand with `--help` to get more information about options available. For example `wash --help`, `wash start --help` and `wash start actor --help` all provide contextual help.
 
 ## Installation
 

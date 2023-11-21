@@ -73,7 +73,7 @@ export HELLO_ACTOR_ID=
 ```
 
 ```shell
-wash ctl link put ${HELLO_ACTOR_ID} VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver address=0.0.0.0:8087
+wash link put ${HELLO_ACTOR_ID} VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver address=0.0.0.0:8087
 ```
 
   </TabItem>
@@ -85,7 +85,7 @@ $env:HELLO_ACTOR_ID =
 ```
 
 ```powershell
-wash ctl link put $env:HELLO_ACTOR_ID VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver address=0.0.0.0:8087
+wash link put $env:HELLO_ACTOR_ID VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver address=0.0.0.0:8087
 ```
 
   </TabItem>
