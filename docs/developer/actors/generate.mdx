@@ -40,24 +40,11 @@ struct HelloActor {}
 The two lines above the actor name invoke Rust macros that generate - at compile time - nearly all of the scaffolding needed to build an actor. The `HealthResponder` term generates a function that automatically responds to health check queries from the wasmCloud host. The `#[services(...)]` line declares the services ('traits', in Rust) that your actor implements, and generates message handling code for those interfaces. All actors implement the `Actor` interface. The `HttpServer` entry declares that the actor will also implement that interface, and requires an implementation of that trait's method: `handle_request`.
 
 ```rust
+/// Implementation of the HttpServer capability contract
 #[async_trait]
 impl HttpServer for HelloActor {
-    /// Returns a greeting, "Hello World", in the response body.
-    /// If the request contains a query parameter 'name=NAME', the
-    /// response is changed to "Hello NAME"
-    async fn handle_request(
-        &self,
-        _ctx: &Context,
-        req: &HttpRequest,
-    ) -> std::result::Result<HttpResponse, RpcError> {
-        let text=form_urlencoded::parse(req.query_string.as_bytes())
-            .find(|(n, _)| n == "name")
-            .map(|(_, v)| v.to_string())
-            .unwrap_or_else(|| "World".to_string());
-        Ok(HttpResponse {
-            body: format!("Hello {}", text).as_bytes().to_vec(),
-            ..Default::default()
-        })
+    async fn handle_request(&self, _ctx: &Context, _req: &HttpRequest) -> RpcResult<HttpResponse> {
+        Ok(HttpResponse::ok("Hello, World!"))
     }
 }
 ```
@@ -81,6 +68,8 @@ wash new actor hello --template-name echo-tinygo
 Let's change into the newly-created folder `hello` and take a look at the generated project. The file `hello.go` will include imports, a `main` function, a `Hello` struct, and an HTTP handler. Let's walk through these pieces in depth.
 
 ```go
+package main
+
 import (
 	"github.com/wasmcloud/actor-tinygo"
 	"github.com/wasmcloud/interfaces/httpserver/tinygo"
@@ -94,8 +83,9 @@ Just below that, you'll see:
 ```go
 func main() {
 	me := Hello{}
-	actor.RegisterHandlers(httpserver.HttpServerHandler(&me), actor.ActorHandler(&me))
+	actor.RegisterHandlers(httpserver.HttpServerHandler(&me))
 }
+
 type Hello struct{}
 ```
 
