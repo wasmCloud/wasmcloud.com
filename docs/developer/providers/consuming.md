@@ -64,7 +64,7 @@ async fn checkout(&self, ctx: &Context, order: &Order) -> RpcResult<()> {
 
 In the preceding sample, any (authorized) actor could simply perform an actor-to-actor invocation using the shared actor interface in the `commerce` crate to trigger a shopping cart checkout, which in turn makes use of the payment capability provider, all without any actor developer ever having to know how payments are processed in production, and, even better, allowing actor developers to simulate arbitrary payment environments for unit tests, acceptance tests, and feedback loop/REPL experimentation on their workstation.
 
-:::caution
+:::warning
 Make sure your actor is signed by adding `wasmcloud:examples:payments` to the `claims` declaration in the actor project's `wasmcloud.toml`, or your actor(s) will not be authorized to link with or communicate with the provider we wrote.
 :::
 

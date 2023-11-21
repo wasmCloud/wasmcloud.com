@@ -14,7 +14,7 @@ description: "wash reg command reference"
 ### `push`
 Push an artifact to an OCI compliant registry. A user needs to provide a registry URL and the path to the artifact that needs to be pushed.
 
-:::caution
+:::warning
 This subcommand will be deprecated in future versions. Please use `wash push` instead.
 :::
 
@@ -44,7 +44,7 @@ wash reg push wasmcloud.azurecr.io/example:0.0.1 /path/to/artifact
 ### `pull`
 Pull an artifact from an OCI compliant registry
 
-:::caution
+:::warning
 This subcommand will be deprecated in future versions. Please use `wash pull` instead.
 :::
 

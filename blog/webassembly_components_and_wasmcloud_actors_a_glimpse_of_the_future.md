@@ -354,7 +354,7 @@ impl wasmbus_sender::WasmbusSender for WasmbusSender {
 
 #### Linking and running
 
-:::caution
+:::warning
 **NOTE**: Right as we were preparing this blog post, the `wasmlink` command and tooling
 was [removed](https://github.com/bytecodealliance/wit-bindgen/pull/240) from the wit-bindgen repo in
 favor of the [most up to date component model

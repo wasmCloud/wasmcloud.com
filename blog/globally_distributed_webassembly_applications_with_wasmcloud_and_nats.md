@@ -45,7 +45,7 @@ wasmCloud uses NATS in a multitude of ways. To name a few:
 
 # Gathering Prerequisites
 
-:::caution
+:::warning
 This post was updated on **11 Oct 2022** to include new conveniences like the `wash up` command. This requires at least `v0.12.0` and removes the need to install NATS or the wasmCloud host runtime manually.
 :::
 
@@ -73,7 +73,7 @@ Proceed through the dialogues to sign in through your email until you reach the 
 
 ![](/img/ngs-global/ngs-curl.png)
 
-:::caution
+:::warning
 The 58 character key starting with `SA` is a secret (S) key for an account (A). You'll want to avoid sharing this value on Twitter or anywhere else public.
 :::
 
