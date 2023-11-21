@@ -7,7 +7,7 @@ draft: false
 
 A [provider archive](/docs/reference/glossary#provider-archive) (also called a _par file_) is an archive file (in unix 'tar' format) containing platform-specific executable files for a variety of CPU and OS combinations. A typical provider archive file contains executables for 64-bit linux, x86_64 macos, aarch64 macos, and other supported platforms. The par file includes a cryptographically signed JSON Web Token (JWT) that contains a set of claims attestations for the capability provider.
 
-A provider archive can be uploaded to, or downloaded from, OCI registries, and may be uploaded to a host via the web dashboard UI.
+A provider archive can be uploaded to, or downloaded from, OCI registries.
 
 Capability providers are always compiled in "release" mode. The `Makefile` created for your new project already has rules to compile the source code and issue the applicable `wash` commands to assemble the par file with a signed JWT. All you need to do is type `make`, and the par file is generated in `build/your-project.par.gz`.
 

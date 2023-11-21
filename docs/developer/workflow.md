@@ -6,7 +6,7 @@ draft: false
 description: "Common development loops"
 ---
 
-As a developer using wasmCloud, there are a number of common day-to-day workflows that you will experience. 
+As a developer using wasmCloud, there are a number of common day-to-day workflows that you will experience.
 
 The following is a list of developer workflows _sorted_ from **_most to least common_**.
 
@@ -21,8 +21,8 @@ The developer's _iteration loop_ for building an actor looks something like this
 1. Make code changes
 1. Compile and sign the WebAssembly module, creating a `_s.wasm` file (using `wash build` in an actor project)
 1. Test the module
-   1. In the wasmCloud web dashboard
-      1. Use the _From File (Hot reload)_ form to automatically watch actor files for changes
+   1. In the CLI
+      1. Use the `wash dev` command to automatically watch actor files for changes
       1. Script `wash call` commands to invoke the actor
       1. Modify your actor code, run `wash build` to recompile and re-sign the actor, repeat the above step
    1. Leverage the `wasmcloud:testing` interface and the [test provider](https://github.com/wasmCloud/wasmcloud-test)
@@ -71,11 +71,11 @@ Once it's running, you can push actors and capability providers to the registry 
 wash push localhost:5000/myactor:0.1.0 ./build/my_actor_s.wasm
 wash push localhost:5000/myprovider:0.1.0 ./build/my_provider.par.gz
 ```
+
 :::info
 Previous guides used `wash reg push`, which is now deprecated and will be removed in a future version.
 See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
 :::
-
 
 ### Allowing unauthenticated OCI registry access
 
