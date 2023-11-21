@@ -170,7 +170,7 @@ docs](https://github.com/deislabs/bindle/blob/main/docs/standalone-bindle-spec.m
 
 ## A full example
 
-Below is a full invoice example converted from `wasmcloud.azurecr.io/httpserver:0.17.0` for
+Below is a full invoice example converted from `wasmcloud.azurecr.io/httpserver:0.19.1` for
 reference:
 
 ```toml

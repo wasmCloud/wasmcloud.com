@@ -13,7 +13,7 @@ A familiar starting example to get you up and running with wasmCloud.
 
 :::info
 
-If you have not installed `wash`, follow the [installation guide](../installation/) first.
+If you have not installed `wash`, follow the [installation guide](../installation.mdx) first.
 
 :::
 
@@ -26,11 +26,13 @@ use `wash` to start one now.
 
 To start a host, simply run `wash up`. The default settings should work well for this tutorial. The host can be killed at any time with `CTRL+c`
 
-This command does a lot behind the scenes, but most importantly it spins up 3 core processes:
+This command bootstraps 3 independent processes to create the necessary local infrastructure for wasmCloud:
 
 - the **wasmCloud** host which manages the execution of actors and capability providers
 - a [**NATS**](https://nats.io/) server to manage communications between application components
 - a [**wadm**](/docs/category/declarative-application-deployment-wadm) process which monitors the [lattice](/docs/reference/glossary#lattice) and maintains the state of managed deployments
+
+![wash up infrastructure](../images/washupinfra.png)
 
 By default, `wash` will run the host in interactive mode.
 If you'd rather run the host in the background, run `wash up --detached` (or `wash up -d`, for short).
@@ -62,6 +64,8 @@ cd hello # enter the new project directory (if you haven't already)
 wash app deploy wadm.yaml
 ```
 
+![wash app deploy diagram](../images/washappdeploy.png)
+
 `wadm` will take care of taking this manifest and scheduling the resources on the host that you launched earlier. You should see output in the host logs when your actor and capability start up, and then you can query it yourself:
 
 ```shell
@@ -72,6 +76,8 @@ Hello, world!
 Congratulations, you just ran a WebAssembly application in wasmCloud!
 
 ## How does it work?
+
+![hello app architecture](../images/helloapp.png)
 
 When you send your HTTP request to `localhost:8080`, that request is received by the HTTP Server capability provider. The HTTP Server capability provider then forwards that request to the actor, which responds with the string "Hello, world!". This loose coupling of capability providers and actors provides flexibility, security, and it lets our actor code be loosely coupled to non-functional requirements. Let's take a look at that code now in `src/lib.rs`:
 
@@ -134,7 +140,7 @@ spec:
     - name: httpserver
       type: capability
       properties:
-        image: wasmcloud.azurecr.io/httpserver:0.17.0
+        image: wasmcloud.azurecr.io/httpserver:0.19.1
         contract: wasmcloud:httpserver
 ```
 
@@ -164,16 +170,19 @@ spec:
             replicas: 50
 ```
 
-Now your hello application is ready to deploy v0.0.2 with 50 replicas. Just run `wash app deploy wadm.yaml` again, and you'll see the logs start flowing in. It's a little easier to visualize this in the wasmCloud dashboard, so let's take a look at that next.
+Now your hello application is ready to deploy v0.0.2 with 50 replicas, meaning it can handle up to 50 concurrent incoming HTTP requests. Just run `wash app deploy wadm.yaml` again, and you'll see the logs start flowing in. It's a little easier to visualize this in the wasmCloud dashboard, so let's take a look at that next.
 
 ## Viewing the wasmCloud dashboard (experimental)
 
-To view the wasmCloud dashboard, you'll have to launch `wash` with the option `--nats-websocket-port 4001`. This is currently an experimental command because the dashboard is still in rapid development.
-Go ahead and `CTRL+c` or `wash down` to stop your previous host, and then relaunch it with the new option:
+To view the wasmCloud dashboard, you'll have to launch `wash` with the option `--nats-websocket-port 4001`. Go ahead and `CTRL+c` or `wash down` to stop your previous host, and then relaunch it with the new option:
 
 ```shell
 wash up --nats-websocket-port 4001
 ```
+
+:::info What will happen to my application?
+Treat wasmCloud hosts as cattle, not pets. Stopping your host will stop all of the components running on it, and **wadm** will look for other available hosts to reschedule your application on. As soon as you launch your new host with the `--nats-websocket-port` option, your application will be rescheduled on it and work just as it did before.
+:::
 
 Then, you can launch the wasmCloud dashboard using `wash ui --experimental`, which will launch the dashboard on [http://localhost:3030](http://localhost:3030).
 This is a great way to visualize what is running on your host, even multiple hosts that are connected to the same NATS server.

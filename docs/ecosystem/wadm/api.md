@@ -11,7 +11,7 @@ The normal way to interact with a `wadm` installation (which could be a single s
 is through the [wash](./usage.md) command-line tool. However, if you are planning on
 creating your own integration or writing a non-Rust language binding, then this reference will help.
 
-:::caution 
+:::caution
 _wadm and its corresponding API are not currently 1.0_. This means the API is likely to
 undergo changes and there may be some pieces that aren't yet implemented. This document will be
 updated as we continue to work on the API. All API changes will also be communicated via the release
@@ -57,7 +57,7 @@ retention policy and will not replace previously existing versions. This means t
 model with the same version, it will be rejected. The `name` of the model is a unique identifier and
 should be a valid NATS topic segment.
 
-#### Request 
+#### Request
 
 YAML or JSON serialization of OAM model. You can specify a `Content-Type` header in the
 NATS request if you wish to hint to the server that you are sending JSON or YAML. If you do not
@@ -192,7 +192,7 @@ to fetch a specific version
           "name": "httpserver",
           "type": "capability",
           "properties": {
-            "image": "wasmcloud.azurecr.io/httpserver:0.17.0",
+            "image": "wasmcloud.azurecr.io/httpserver:0.19.1",
             "contract": "wasmcloud:httpserver"
           },
           "traits": [
@@ -253,7 +253,7 @@ currently deployed, then the resources will be undeployed automatically as well.
 ```json
 {
   "version": "1.0",
-  "delete_all": false,
+  "delete_all": false
 }
 ```
 
@@ -375,7 +375,7 @@ is included in the response.
 The response includes a `status` field which is an aggregate at high levels and an individual status
 for single traits.
 
-#### Request 
+#### Request
 
 Empty body
 

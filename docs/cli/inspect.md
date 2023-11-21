@@ -3,50 +3,52 @@ title: "wash inspect"
 draft: false
 sidebar_position: 12
 description: "wash inspect command reference"
---- 
+---
 
-Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud actor or provider and prints out the properties of that component. 
+Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud actor or provider and prints out the properties of that component.
 
 #### Usage
+
 ```
 ➜ wash inspect wasmcloud.azurecr.io/echo:0.3.7
 
-                                                                          
-                               Echo - Module                              
-  Account       ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW  
-  Module        MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5  
-  Expires                                                          never  
-  Can Be Used                                                immediately  
-  Version                                                      0.3.7 (4)  
-  Call Alias                                                   (Not set)  
-                               Capabilities                               
-  HTTP Server                                                             
-  Logging                                                                 
-                                   Tags                                   
-  None                                                                    
-                                                                          
 
-➜ wash inspect wasmcloud.azurecr.io/httpserver:0.17.0
+                               Echo - Module
+  Account       ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW
+  Module        MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5
+  Expires                                                          never
+  Can Be Used                                                immediately
+  Version                                                      0.3.7 (4)
+  Call Alias                                                   (Not set)
+                               Capabilities
+  HTTP Server
+  Logging
+                                   Tags
+  None
 
-                                                                                      
-                            HTTP Server - Provider Archive                            
-  Account                   ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW  
-  Service                   VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M  
-  Capability Contract ID                                        wasmcloud:httpserver  
-  Vendor                                                                   wasmCloud  
-  Version                                                                     0.17.0  
-  Revision                                                                         0  
-                            Supported Architecture Targets                            
-  x86_64-macos                                                                        
-  armv7-linux                                                                         
-  aarch64-linux                                                                       
-  x86_64-windows                                                                      
-  x86_64-linux                                                                        
-  aarch64-macos                                                                       
-                    
+
+➜ wash inspect wasmcloud.azurecr.io/httpserver:0.19.1
+
+
+                            HTTP Server - Provider Archive
+  Account                   ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW
+  Service                   VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M
+  Capability Contract ID                                        wasmcloud:httpserver
+  Vendor                                                                   wasmCloud
+  Version                                                                     0.17.0
+  Revision                                                                         0
+                            Supported Architecture Targets
+  x86_64-macos
+  armv7-linux
+  aarch64-linux
+  x86_64-windows
+  x86_64-linux
+  aarch64-macos
+
 ```
 
 #### Options
+
 `--jwt-only` Extract the raw JWT from the file and print to stdout
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
@@ -64,4 +66,3 @@ Inspect helps you to examine the capabilities of a wasmCloud component. It accep
 `--insecure` Allow insecure (HTTP) registry connections
 
 `--no-cache` skip the local OCI cache
-
