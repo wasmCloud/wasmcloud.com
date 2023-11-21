@@ -3,7 +3,7 @@ title: "wash par"
 draft: false
 sidebar_position: 17
 description: "wash par command reference"
---- 
+---
 
 `wash par` gives a user the capacity to interact with provider archives. A user may create, inspect or modify provider archive files. Following are the subcommands available under `wash par`.
 
@@ -12,14 +12,17 @@ description: "wash par command reference"
 - `insert`
 
 ### `create`
+
 This subcommand creates a provider archive using an architecture target, provider and signing keys. A user will have to provide the capability ID, vendor, name of provider, target architecture and path to provider binary for populating the archive.
 
 #### Usage
+
 ```
 wash par create --capid <CAPID> --vendor <VENDOR> --name <NAME> --arch <ARCH> --binary /path/to/binary
 ```
 
 #### Options
+
 `--capid` (Alias `-c`) Capability contract ID (e.g. wasmcloud:messaging or wasmcloud:keyvalue)
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
@@ -53,6 +56,7 @@ wash par create --capid <CAPID> --vendor <VENDOR> --name <NAME> --arch <ARCH> --
 `--disable-keygen` Disables autogeneration of signing keys
 
 ### `inspect`
+
 Inspect accepts the path or OCI reference of the provider archive and prints out the properties of the archive.
 
 :::caution
@@ -60,23 +64,24 @@ This subcommand will be deprecated in future versions. Please use `wash inspect`
 :::
 
 #### Usage
-```
-wash par inspect wasmcloud.azurecr.io/httpserver:0.17.0
 
-                            HTTP Server - Provider Archive                            
-  Account                   ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW  
-  Service                   VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M  
-  Capability Contract ID                                        wasmcloud:httpserver  
-  Vendor                                                                   wasmCloud  
-  Version                                                                     0.17.0  
-  Revision                                                                         0  
-                            Supported Architecture Targets                            
-  x86_64-macos                                                                        
-  armv7-linux                                                                         
-  aarch64-linux                                                                       
-  x86_64-windows                                                                      
-  x86_64-linux                                                                        
-  aarch64-macos 
+```
+wash par inspect wasmcloud.azurecr.io/httpserver:0.19.1
+
+                            HTTP Server - Provider Archive
+  Account                   ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW
+  Service                   VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M
+  Capability Contract ID                                        wasmcloud:httpserver
+  Vendor                                                                   wasmCloud
+  Version                                                                     0.17.0
+  Revision                                                                         0
+                            Supported Architecture Targets
+  x86_64-macos
+  armv7-linux
+  aarch64-linux
+  x86_64-windows
+  x86_64-linux
+  aarch64-macos
 
 ```
 
@@ -99,14 +104,17 @@ wash par inspect wasmcloud.azurecr.io/httpserver:0.17.0
 `--no-cache` skip the local OCI cache
 
 ### `insert`
+
 Inserts a provider into a provider archive file
 
 #### Usage
+
 ```
 wash par insert /path/to/provider-archive --arch <ARCH> --binary /path/to/binary
 ```
 
 #### Options
+
 `--arch` Architecture of provider binary in format ARCH-OS (e.g. x86_64-linux)
 
 `--binary` (Alias `-b`) Path to provider binary for populating the archive

@@ -3,7 +3,7 @@ title: "wash claims"
 draft: false
 sidebar_position: 4
 description: "wash claims command reference"
---- 
+---
 
 Every actor in a wasmCloud environment claims its capabilities or the features it can interact with to supplement its current behavior. These capabilities are claimed in the form of JSON Web Tokens (JWTs). `wash claims` will assist you to generate, manage and view these JWTs for wasmCloud actors. Following are the subcommands available under `wash claims`.
 
@@ -17,48 +17,50 @@ Every actor in a wasmCloud environment claims its capabilities or the features i
 This subcommand will be deprecated in future versions. Please use `wash inspect` instead.
 :::
 
-Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud actor or provider and prints out the properties of that component. 
+Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud actor or provider and prints out the properties of that component.
 
 #### Usage
+
 ```
 ➜ wash claims inspect wasmcloud.azurecr.io/echo:0.3.7
 
-                                                                          
-                               Echo - Module                              
-  Account       ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW  
-  Module        MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5  
-  Expires                                                          never  
-  Can Be Used                                                immediately  
-  Version                                                      0.3.7 (4)  
-  Call Alias                                                   (Not set)  
-                               Capabilities                               
-  HTTP Server                                                             
-  Logging                                                                 
-                                   Tags                                   
-  None                                                                    
-                                                                          
 
-➜ wash claims inspect wasmcloud.azurecr.io/httpserver:0.17.0
+                               Echo - Module
+  Account       ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW
+  Module        MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5
+  Expires                                                          never
+  Can Be Used                                                immediately
+  Version                                                      0.3.7 (4)
+  Call Alias                                                   (Not set)
+                               Capabilities
+  HTTP Server
+  Logging
+                                   Tags
+  None
 
-                                                                                      
-                            HTTP Server - Provider Archive                            
-  Account                   ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW  
-  Service                   VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M  
-  Capability Contract ID                                        wasmcloud:httpserver  
-  Vendor                                                                   wasmCloud  
-  Version                                                                     0.17.0  
-  Revision                                                                         0  
-                            Supported Architecture Targets                            
-  x86_64-macos                                                                        
-  armv7-linux                                                                         
-  aarch64-linux                                                                       
-  x86_64-windows                                                                      
-  x86_64-linux                                                                        
-  aarch64-macos                                                                       
-                    
+
+➜ wash claims inspect wasmcloud.azurecr.io/httpserver:0.19.1
+
+
+                            HTTP Server - Provider Archive
+  Account                   ACOJJN6WUP4ODD75XEBKKTCCUJJCY5ZKQ56XVKYK4BEJWGVAOOQHZMCW
+  Service                   VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M
+  Capability Contract ID                                        wasmcloud:httpserver
+  Vendor                                                                   wasmCloud
+  Version                                                                     0.17.0
+  Revision                                                                         0
+                            Supported Architecture Targets
+  x86_64-macos
+  armv7-linux
+  aarch64-linux
+  x86_64-windows
+  x86_64-linux
+  aarch64-macos
+
 ```
 
 #### Options
+
 `--jwt-only` Extract the raw JWT from the file and print to stdout
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
@@ -77,19 +79,19 @@ Inspect helps you to examine the capabilities of a wasmCloud component. It accep
 
 `--no-cache` skip the local OCI cache
 
-
 ## `sign`
 
 `wash claims sign` assists you in signing a WebAssembly component by specifying some standard capabilities available in the wasmCloud environment. A user may also specify custom capabilities and other metadata such as expiration, tags, etc.
 
 #### Usage
+
 ```
 wash claims sign /path/to/wasm-module --name=component-name -q -k
 ```
 
 #### Options
 
-`--destination` (Alias `-d`) Destination for signed module. If this flag is not provided, the signed module will be placed in the same directory as the source with a "_s" suffix
+`--destination` (Alias `-d`) Destination for signed module. If this flag is not provided, the signed module will be placed in the same directory as the source with a "\_s" suffix
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
 
@@ -123,7 +125,7 @@ wash claims sign /path/to/wasm-module --name=component-name -q -k
 
 `--ver` (Alias `-v`) Human-readable version string
 
-`--call-alias` (Alias `-a`) Developer or human friendly unique alias used for invoking an actor, consisting of lowercase alphanumeric characters, underscores '_' and slashes '/'
+`--call-alias` (Alias `-a`) Developer or human friendly unique alias used for invoking an actor, consisting of lowercase alphanumeric characters, underscores '\_' and slashes '/'
 
 `--issuer` (Alias `-i`) Path to issuer seed key (account). If this flag is not provided, the will be sourced from $WASH_KEYS ($HOME/.wash/keys) or generated for you if it cannot be found [env: WASH_ISSUER_KEY]
 
@@ -137,8 +139,8 @@ wash claims sign /path/to/wasm-module --name=component-name -q -k
 
 `--disable-keygen` Disables autogeneration of keys if seed(s) are not provided
 
-
 ## `token`
+
 Using this subcommand, a user can generate signed JWTs for actors, operators, accounts and providers by supplying basic token information, a signing seed key and metadata. Following are the subcommands available under token.
 
 - `actor`
@@ -147,11 +149,13 @@ Using this subcommand, a user can generate signed JWTs for actors, operators, ac
 - `provider`
 
 ### `actor`
+
 Generate a signed JWT for an actor
 
 #### Usage
+
 ```
-wash claims token actor --name=example -k 
+wash claims token actor --name=example -k
 ```
 
 #### Options
@@ -188,7 +192,7 @@ wash claims token actor --name=example -k
 
 `--ver` (Alias `-v`) Human-readable version string
 
-`--call-alias` (Alias `-a`) Developer or human friendly unique alias used for invoking an actor, consisting of lowercase alphanumeric characters, underscores '_' and slashes '/'
+`--call-alias` (Alias `-a`) Developer or human friendly unique alias used for invoking an actor, consisting of lowercase alphanumeric characters, underscores '\_' and slashes '/'
 
 `--issuer` (Alias `-i`) Path to issuer seed key (account). If this flag is not provided, the will be sourced from $WASH_KEYS ($HOME/.wash/keys) or generated for you if it cannot be found [env: WASH_ISSUER_KEY]
 
@@ -202,16 +206,18 @@ wash claims token actor --name=example -k
 
 `--disable-keygen` Disables autogeneration of keys if seed(s) are not provided
 
-
 ### `operator`
+
 Generate a signed JWT for an operator
 
 #### Usage
+
 ```
 wash claims token operator --name=example
 ```
 
 #### Options
+
 `--name` (Alias `-n`) A human-readable, descriptive name for the token
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
@@ -230,16 +236,18 @@ wash claims token operator --name=example
 
 `--disable-keygen` Disables autogeneration of keys if seed(s) are not provided
 
-
 ### `account`
+
 Generate a signed JWT for an account
 
 #### Usage
+
 ```
 wash claims token account --name=example
 ```
 
 #### Options
+
 `--name` (Alias `-n`) A human-readable, descriptive name for the token
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
@@ -261,14 +269,17 @@ wash claims token account --name=example
 `--disable-keygen` Disables autogeneration of keys if seed(s) are not provided
 
 ### `provider`
+
 Generate a signed JWT for a capability provider
 
 #### Usage
+
 ```
 wash claims token provider --name=example --capid=your-capid --vendor=vendor-name
 ```
 
 #### Options
+
 `--name` (Alias `-n`) A human-readable, descriptive name for the token
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]

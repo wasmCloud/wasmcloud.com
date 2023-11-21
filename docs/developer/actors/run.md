@@ -20,6 +20,7 @@ First install the crate we're using to parse the query string:
 ```shell
 cargo add form_urlencoded
 ```
+
 After that, building the actor is as easy as running `wash build` in the project's root directory.
 This will compile the actor using your local toolchain and automatically [sign it](https://wasmcloud.com/docs/reference/host-runtime/security) for you. The `wasmcloud.toml` file that comes with the newly generated project lists claims for the actor including `wasmcloud:httpserver`, so it can work with the HTTP Server capability provider.
 
@@ -38,7 +39,7 @@ A moment later you should see the actor in your web UI as shown in the following
 
 ### Start the web server
 
-We know our new actor needs a web server, so let's start the HTTP server capability provider. To do that, click the **Start Provider** button and enter this OCI URL: `wasmcloud.azurecr.io/httpserver:0.17.0`. Now we should have both an actor and a provider, and the dashboard should look like this:
+We know our new actor needs a web server, so let's start the HTTP server capability provider. To do that, click the **Start Provider** button and enter this OCI URL: `wasmcloud.azurecr.io/httpserver:0.19.1`. Now we should have both an actor and a provider, and the dashboard should look like this:
 
 ![actor and provider](./actorandprovider.png)
 
