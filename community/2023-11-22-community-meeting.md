@@ -9,7 +9,7 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Agenda
 
-- DEMO: 
+- DEMO: wash CLI human updates, removing the need for 56 character IDs for most commands
 - DISCUSSION: Wasmtime 15
 
 <!--truncate-->
@@ -18,4 +18,4 @@ import ReactPlayer from 'react-player/youtube';
 
 ### Recording
 
-<ReactPlayer url='' controls />
+<ReactPlayer url='https://www.youtube.com/watch?v=HDa_lkCOuJA' controls />
