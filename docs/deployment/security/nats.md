@@ -12,7 +12,7 @@ NATS forms the connective tissue that stitches together all of the wasmCloud hos
 
 Securing these connections should be a _top priority_ for the security of your deployed application. Never rely on the **zero trust** behavior of other components to properly handle intrusion detection and the blocking of malicious actors.
 
-For information on how to properly secure your NATS servers, clusters, superclusters, and leaf nodes, please consult the [NATS security documentation](https://docs.nats.io/developing-with-nats/security).
+For information on how to properly secure your NATS servers, clusters, superclusters, and leaf nodes, please consult the [NATS security documentation](https://docs.nats.io/nats-concepts/security).
 
 wasmCloud embraces the decentralized security system based on JSON Web Tokens, accounts, and users that has been part of NATS since the 2.0 release. Much of our tooling will only allow you to authenticate to NATS using either an anonymous or decentralized JWT-based session.
 
