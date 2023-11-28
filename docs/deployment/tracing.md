@@ -12,7 +12,7 @@ The most applicable bit is:
 A **Distributed Trace**, more commonly known as a **Trace**, records the paths taken by requests (made by an application or end-user) as they propagate through multi-service architectures, like microservice and serverless applications.
 :::
 
-As of [wasmbus-rpc v0.9](https://crates.io/crates/wasmbus-rpc) the feature `otel` can be enabled for any capability providers. Once enabled functions can be instrumented to provide traces through your custom provider. wasmCloud first-party providers already have this feature enabled and functions instrumented, and actors do not need to do any additional work to take advantage of OTEL.
+[wasmbus-rpc](https://crates.io/crates/wasmbus-rpc) supports an `otel` feature flag that can be enabled for any capability provider. Once enabled, functions can be instrumented to provide traces through your custom provider. wasmCloud first-party providers already have this feature enabled and functions instrumented, and actors do not need to do any additional work to take advantage of OTEL.
 
 ### Tracing in Action
 
