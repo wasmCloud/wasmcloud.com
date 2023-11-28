@@ -34,6 +34,6 @@ If you'd like to learn more about Smithy in general, try some of these resources
 - [Rust-atelier](https://github.com/johnstonskj/rust-atelier)
 - SDKs
   - Go [github](https://github.com/aws/smithy-go)
-  - Java sdk [github](https://github.com/awslabs) ( [javadoc](https://awslabs.github.io/smithy/javadoc/1.8.0/) )
+  - Java sdk [github](https://github.com/awslabs)
   - Rust [github](https://github.com/awslabs/smithy-rs) (Alpha status)
   - TypeScript [github](https://github.com/awslabs/smithy-typescript)
