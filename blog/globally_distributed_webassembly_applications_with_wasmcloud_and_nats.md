@@ -58,20 +58,20 @@ We're also going to use a few files from the aptly named [ngs](https://github.co
 
 To help illustrate the architecture of our application, take a look at this diagram:
 
-![](/img/ngs-global/excalidraw.png)
+![NGS diagram](/img/ngs-global/excalidraw.png)
 
 We'll have wasmCloud running both locally and in the cloud (or just on another machine), and we'll be spreading compute across these two wasmCloud hosts. Don't worry, you won't have to look up your local IP address or expose any ports, NATS makes distributed computing a breeze.
 
 The first step will be to get yourself a set of NGS credentials. Navigate to [https://app.ngs.global](https://app.ngs.global) and select "Try It Out" under **Free**.
-![](/img/ngs-global/ngs-signup.png)
+![NGS signup page](/img/ngs-global/ngs-signup.png)
 
 For simplicity, go ahead and name this account `wasmcloud` to keep it separate from any other NATS accounts you may create in the future.
 
-![](/img/ngs-global/ngs-account.png)
+![NGS confirmation page](/img/ngs-global/ngs-account.png)
 
 Proceed through the dialogues to sign in through your email until you reach the `Subscription Successful` page (keep in mind this is completely free, and you can't accidentally exceed your free tier limits). The last step in this process is to copy the `curl` command with your secret account key to install the NATS CLI and `nsc` to download your NGS credentials
 
-![](/img/ngs-global/ngs-curl.png)
+![NGS installation command](/img/ngs-global/ngs-curl.png)
 
 :::warning
 The 58 character key starting with `SA` is a secret (S) key for an account (A). You'll want to avoid sharing this value on Twitter or anywhere else public.
@@ -212,7 +212,7 @@ You should see a similar dump of logs, but notably you should see that you are c
 
 And now, on your local machine, check out [http://localhost:4000](http://localhost:4000). You should see your DogsAndCats resources and additionally under your **Host Info** section you'll see two hosts:
 
-![](/img/ngs-global/dashboard.png)
+![wasmCloud dashboard](/img/ngs-global/dashboard.png)
 
 We can go ahead and schedule a few extra replicas of the DogsAndCats actor on the cloud host and an HTTPClient provider using `wash` or by using the dashboard. These commands can be run with `wash` on either machine, the result is the same!
 

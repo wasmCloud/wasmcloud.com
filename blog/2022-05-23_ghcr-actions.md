@@ -66,11 +66,11 @@ Your output should be something like this, just with different `Account` and `Mo
 
 Now that we've built and signed your actor, let's push it to GitHub! To do this, you'll need a <u>[personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)</u> with the `write:packages` capability. Refer to the link for instructions on how to create this personal access token, and feel free to tweak the other parameters to your liking.
 
-![](/img/ghcr-actions/new-pat.png)
+![new PAT page](/img/ghcr-actions/new-pat.png)
 
 Once created, copy this token and store it in a safe place before moving back to your terminal.
 
-![](/img/ghcr-actions/pat-created.png)
+![PAT created banner](/img/ghcr-actions/pat-created.png)
 
 Now, time to push! We'll use `wash` here along with some environment variables. `WASH_REG_USER` should be set to your GitHub username, and `WASH_REG_PASSWORD` should be set to your GitHub personal access token that you created before, starting with `ghp_`
 
@@ -90,11 +90,11 @@ wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
 
 Now, you can navigate to your GitHub profile and access the `Packages` tab to see your `hello` actor.
 
-![](/img/ghcr-actions/package.png)
+![package page](/img/ghcr-actions/package.png)
 
 By default, our actor package is private so that it cannot be downloaded anonymously. Any wasmCloud host can be configured with a username and password for registry authentication, and in this case you can supply your GitHub username and personal access token to authenticate and download your actor. However, this step can be missed easily, so let's make this actor package public so you can start it anywhere. Click on your package, then on the "[⚙️](https://emojipedia.org/gear/) Package Settings" sidebar. From there, scroll to the bottom and "Change visibility" to public.
 
-![](/img/ghcr-actions/change-visibility.png)
+![change visibility modal](/img/ghcr-actions/change-visibility.png)
 
 Now you can download and run that actor on any wasmCloud host, which can be on Mac, Linux, Windows, or even in a browser tab! You can test connectivity at any time by running:
 
@@ -108,7 +108,7 @@ Now that we have a Package set up for our actor, the next step is to connect it 
 
 First step is to create a GitHub repository. For simplicity, let's call it `hello` to match the actor name.
 
-![](/img/ghcr-actions/create-repo.png)
+![create repository page](/img/ghcr-actions/create-repo.png)
 
 Once that's created, we need to associate our local actor project with the GitHub repository. `cd hello` into your actor project if you haven't already, and then:
 
@@ -125,7 +125,7 @@ For every commit after this one, and every pull request into `main` , your actor
 
 For the `.github/workflows/release.yml` action, we need to configure three repository secrets to properly sign and release your actor. The good news is, we already have all of these secrets, we just need to plop them in GitHub!
 
-![](/img/ghcr-actions/repo-secrets.png)
+![secrets page](/img/ghcr-actions/repo-secrets.png)
 
 Under your repository settings, head to the `Secrets` dropdown and click `Actions` . Here we can configure the following secrets for use in this repository.
 
@@ -135,7 +135,7 @@ Under your repository settings, head to the `Secrets` dropdown and click `Action
 | WASH_SUBJECT_KEY | Can be found under `$HOME/.wash/keys/hello_module.nk`. Copy the contents of this file, a 56 character <u>[NKey](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth)</u> starting with `SM`, into the value section.                               |
 | WASMCLOUD_PAT    | Your personal access token that you previously used for `WASH_REG_PASSWORD`                                                                                                                                                                                                                 |
 
-![](/img/ghcr-actions/required-secrets.png)
+![required secrets](/img/ghcr-actions/required-secrets.png)
 
 Once these three secrets are configured, let's cut our first release of the `hello` actor. Head back to your command line and create a tag for `v0.1.0` and push it to `main`
 
@@ -146,7 +146,7 @@ git push -u origin v0.1.0
 
 This will automatically kick off the release action, which includes building and testing the actor just like the build action, and after a few minutes you'll see a new GitHub release created with the OCI URL for the actor and claims information, as well as the `hello` package associated with this repo.
 
-![](/img/ghcr-actions/release.png)
+![release page](/img/ghcr-actions/release.png)
 
 ## Wrap up
 
