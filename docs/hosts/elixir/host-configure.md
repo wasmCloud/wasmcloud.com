@@ -1,5 +1,5 @@
 ---
-title: "Host Configuration"
+title: "OTP Host Configuration"
 date: 2022-07-29
 sidebar_position: 3
 draft: false
