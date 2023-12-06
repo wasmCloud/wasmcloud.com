@@ -1,6 +1,6 @@
 ---
-title: "Road to 1.0: wasmCloud a Retrospective"
-image: "img/wasmcloud-blog-1/header.png"
+title: "Road to 1.0: wasmCloud, a Retrospective"
+image: "img/wasmcloud-a-retro/header.png"
 date: 2022-11-06T11:00:00-05:00
 author: "Brooks Townsend"
 description: "As we near the launch of wasmCloud 1.0 we take a look back at the progress wasmCloud has made"
