@@ -30,7 +30,7 @@ This is a fairly minimal configuration for a wasmCloud Rust `echo` actor. It def
 
 The partner-in-crime to `wasmcloud.toml` is `wash build`. This command takes all the options set in the `wasmcloud.toml` file to build and sign the actor/provider/interface.
 
-See the `build` docs in the [wash repo](https://github.com/wasmCloud/wash#build) for more info.
+See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-cli#build) for more info.
 
 ## `wasmcloud.toml` Spec
 
