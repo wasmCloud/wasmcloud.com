@@ -4,19 +4,19 @@ sidebar_position: 0
 
 # What is wasmCloud?
 
-wasmCloud helps you build globally distributed applications that reach from the cloud to the edge.
+wasmCloud helps you build and run globally distributed applications on any cloud and any edge.
 
-By leveraging WebAssembly's security, portability, and performance, wasmCloud helps compose applications from tiny, independent building blocks loosely coupled to capabilities.
+Our goal is to make developers more productive by allowing them to write only the code that matters.
 
-Deciding whether you're building a serverless function, a microservice, a globally distributed app, or a monolith is now a knob you can turn at runtime rather than a one-time decision you're stuck with until your application retires.
+wasmCloud leverages WebAssembly's security, portability, and performance to compose applications from tiny, independent building blocks.
 
-Get started building applications with wasmCloud today and enjoy the freedom of only having to write the code that matters.
+These building blocks are managed declaratively and reconfigurable at runtime. You shouldn't need to recompile your whole app to upgrade a database client or patch a vulnerability. You shouldn't need to recompile *anything* to move your app from development to production.
 
 wasmCloud is designed around the following core tenets:
 
-- Dead simple distributed applications
-- Run anywhere
+- Distributed from day one
+- Run anywhere and everywhere
 - Secure by default
-- Productivity for both developers and operations
+- Faster iteration and lower maintenance
 
 **Move from concept to production without changing your design, architecture, or your programming environment.**
