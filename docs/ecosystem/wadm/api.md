@@ -112,7 +112,7 @@ Empty body
         "version": "v0.1.0",
         "description": "My cool model",
         "deployed_version": "v0.1.0",
-        "status": "compensating|ready|failed|undeployed"
+        "status": "reconciling|deployed|failed|undeployed"
     },
     ...
 ]
@@ -385,7 +385,7 @@ Empty body
 {
   "version": "...",
   "status": {
-    "type": "undeployed|compensating|ready|failed",
+    "type": "undeployed|reconciling|deployed|failed",
     "message": "..."
   },
   "components": [
