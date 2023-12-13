@@ -10,15 +10,15 @@ draft: false
 
 ![New roadmap](/img/2024q1roadmap.png)
 
-Last week, we [looked back](https://wasmcloud.com/blog/wasmcloud-a-retrospective) at how far the wasmCloud project has come. In particular, the progress made in the last few months since the [Q3/Q4 roadmap](https://wasmcloud.com/docs/roadmap) was published. We’re nearing the release of wasmCloud 1.0; our stable, standards-led and production-ready release due to be unveiled in early 2024. As we reach this major milestone, we’re excited to unveil a [refreshed roadmap for Q1 2024](https://wasmcloud.com/docs/roadmap).
+Last week, we [looked back](https://wasmcloud.com/blog/wasmcloud-a-retrospective) at how far the wasmCloud project has come. In particular, the progress made in the last few months since the [Q3/Q4 roadmap](https://wasmcloud.com/docs/roadmap/q3q4) was published. We’re nearing the release of wasmCloud 1.0; our stable, standards-led and production-ready release due to be unveiled in early 2024. As we reach this major milestone, we’re excited to unveil a [refreshed roadmap for Q1 2024](https://wasmcloud.com/docs/roadmap).
 
 <!--truncate-->
 
-In our second post in our Road to 1.0 series, we’ll review our revised goals, feature set and the final tasks in the plan to get wasmCloud to 1.0. The fresh roadmap is available on [GitHub Projects](https://github.com/orgs/wasmCloud/projects/7/views/3); this is a snapshot of the current state of the project, and will evolve as the project progresses. In the coming weeks, we’ll share a host of new documentation, RFCs and guidance on all things wasmCloud 1.0. In the meantime, let’s take a look at how our goals and features have evolved.
+In our second post in our Road to 1.0 series, we’ll review our revised goals, feature set and the final tasks in the plan to get wasmCloud to 1.0. The fresh roadmap is available on [GitHub Projects](https://github.com/orgs/wasmCloud/projects/7/views/8); this is a snapshot of the current state of the project, and will evolve as the project progresses. In the coming weeks, we’ll share a host of new documentation, RFCs and guidance on all things wasmCloud 1.0. In the meantime, let’s take a look at how our goals and features have evolved.
 
 ## Goals and Features
 
-Our [Q3/Q4 roadmap](https://wasmcloud.com/docs/roadmap#wasmcloud-q3q4-2023-roadmap) focused heavily on the desire to embrace common Wasm and cloud-native standards, and to make the developer experience a genuine delight. These aspirations stay in focus as we push to release wasmCloud 1.0 and so it won’t be a surprise to see our goals remain, largely, unchanged.
+Our [Q3/Q4 roadmap](https://wasmcloud.com/docs/roadmap/q3q4) focused heavily on the desire to embrace common Wasm and cloud-native standards, and to make the developer experience a genuine delight. These aspirations stay in focus as we push to release wasmCloud 1.0 and so it won’t be a surprise to see our goals remain, largely, unchanged.
 
 1. A core ongoing tenet of is to **provide a seamless developer experience** for building, testing, and deploying WebAssembly components.
 2. We recognise the importance of being a completely vendor-agnostic development environment and so our goal is to **enable developers to build features without vendor lock-in**, **platform specific dependencies, or language constraints.**
