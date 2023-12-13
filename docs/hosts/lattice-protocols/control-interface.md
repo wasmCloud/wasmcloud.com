@@ -356,6 +356,81 @@ If the response has an `accepted` value of `true`, this means the host has accep
 will attempt to stop the host. This _does not_ guarantee the host has stopped. To determine if and
 when the host has stopped, you should monitor the lattice event stream for the `host_stopped` event.
 
+### Config
+
+wasmCloud has support for pull based config for an actor. Currently this is something that can be
+set using the following set of topics. In the future we may consider adding support for other
+sources of config.
+
+In general all config data consists of a string key with arbitrary bytes as a value. It makes no
+other guarantees about the kind of data that is stored in the config.
+
+#### Set Actor Config
+
+`nats req wasmbus.ctl.{lattice_prefix}.config.put.{actor_id}.{key} <arbitrary_bytes>`
+
+Sets the value of a config key for an actor. This will overwrite any value that is currently set
+
+##### Request
+
+Arbitrary bytes. This could be a string or other encoded data. 
+
+##### Response
+
+```json
+{
+  "accepted": true,
+  "error": ""
+}
+```
+
+This means the config data has been accepted, but there may be a small delay before it is available
+across the whole lattice
+
+#### Delete Specific Actor Config Key
+
+`nats req wasmbus.ctl.{lattice_prefix}.config.del.{actor_id}.{key} ''`
+
+Deletes a specific config key for an actor.
+
+##### Request
+
+Empty body
+
+##### Response
+
+```json
+{
+  "accepted": true,
+  "error": ""
+}
+```
+
+This means the config data deletion has been accepted, but there may be a small delay before it is
+deleted across the whole lattice
+
+#### Delete All Actor Config
+
+`nats req wasmbus.ctl.{lattice_prefix}.config.del.{actor_id} ''`
+
+Deletes all config data for an actor.
+
+##### Request
+
+Empty body
+
+##### Response
+
+```json
+{
+  "accepted": true,
+  "error": ""
+}
+```
+
+This means the config data deletion has been accepted, but there may be a small delay before it is
+deleted across the whole lattice
+
 ### Queries
 
 #### Links
@@ -512,6 +587,69 @@ Empty body
   "uptime_human": "1h 51m 54s",
   "uptime_seconds": 6714,
   "version": "0.79.0"
+}
+```
+
+### Get All Actor Config
+
+`nats req wasmbus.ctl.{lattice_prefix}.get.config.{actor_id} ''`
+
+Fetches all config data for an actor
+
+##### Request
+
+Empty body
+
+##### Response
+
+```json
+{
+  "foo": [
+    98,
+    97,
+    114
+  ],
+  "baz": [
+    113,
+    117,
+    120
+  ]
+}
+```
+
+If no data is set an empty JSON object (`{}`) will be returned
+
+#### Get Actor Config Key
+
+`nats req wasmbus.ctl.{lattice_prefix}.get.config.{actor_id}.{key} ''`
+
+Fetches a single config key for an actor
+
+##### Request
+
+Empty body
+
+##### Response
+
+If the key exists, the following body will be returned:
+
+```json
+{
+  "data": [
+    113,
+    117,
+    120
+  ],
+  "found": true
+}
+```
+
+If the key does not exist, the following body will be returned:
+
+```json
+{
+  "data": [],
+  "found": false
 }
 ```
 
