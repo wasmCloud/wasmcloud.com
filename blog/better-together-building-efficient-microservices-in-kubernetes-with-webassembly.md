@@ -20,7 +20,7 @@ Having multi-tenant clusters has loads of operational benefits (flexibility, sec
 
 What if there was a more lightweight model that could be almost instantly scaled as traffic scales up, giving more scheduling flexibility than a coarse-grained container? I’m reminded of the quote from Docker creator, Solomon Hykes:
 
-:::note Quote
+:::note[Quote]
 “If WASM+WASI existed in 2008, we wouldn't have needed to have created Docker. That's how important it is. WebAssembly on the server is the future of computing.”
 :::
 
