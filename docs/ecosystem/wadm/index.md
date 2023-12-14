@@ -13,8 +13,8 @@ If you've been reading the tutorials or going through the reference guide in ord
 
 Imperative deployments are good for debugging and experimentation, but when it comes time to deploy an application to production, you're usually managing many actors and providers. You also need to manage the configuration information for the bindings between actors and providers. If you want to scale your application out to handle more load or you want to relocate actors or providers to optimize for certain conditions, just using the wasmCloud host and `wash` means you're doing that all by hand.
 
-:::info For the Kubernetes Developer
-You can think of a wadm application like a k8s Deployment: define your application components and wadm will ensure that your application reaches desired state based on your manifest.
+:::info[For the Kubernetes Developer]
+You can think of a wadm application like a Kubernetes Deployment: define your application components and wadm will ensure that your application reaches desired state based on your manifest.
 :::
 
 ## Introduction

@@ -143,8 +143,8 @@ traits:
 
 Note that this looks similar to the above `spreadscaler` spec, but the `daemonscaler` is responsible for running a certain number of instances of a component on _every host_ that matches the label requirements. So, instead of running **4** total instances, it will run **4** instances on every host that either has the `zone` label set to `us-east-1` or `us-west-1`. If you leave off the `spread` key entirely, it will run the specified number of instances on _every host_ in your lattice.
 
-:::info For the kubernetes developer
-The `daemonscaler` works just like a k8s DaemonSet, spreading components across all hosts that match the label requirements.
+:::info[For the Kubernetes developer]
+The `daemonscaler` works just like a Kubernetes DaemonSet, spreading components across all hosts that match the label requirements.
 :::
 
 ### Link Definition
