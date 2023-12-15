@@ -1,18 +1,14 @@
 ---
-title: "Creating an actor"
+title: 'Actor Components'
 date: 2018-12-29T12:00:00+00:00
 sidebar_position: 2
 draft: false
 ---
 
-To perform the steps in this guide, you'll need to have completed [installation](/docs/installation.mdx) of the wasmCloud host and prerequisites, and if you're using Rust, the wasm32 target installed:
+To perform the steps in this guide, you'll need to have completed [installation](/docs/installation.mdx) of `wash`. You'll be able to pick your own language, or follow the "bring your own component" guide to create an actor in any language. For a conceptual overview of actors, see the [actor concepts](/docs/concepts/actors.mdx) documentation.
 
-```shell
-rustup target add wasm32-unknown-unknown
-```
+The following pages will take you through the process of creating a new actor:
 
-This guide will walk you through the following steps to create an actor:
-
-- [Generating a new actor project](./generate)
+- [Creating a new actor project](./generate)
 - [Running the actor](./run)
 - [Customizing the actor and using the hot-reload feature](./update)
