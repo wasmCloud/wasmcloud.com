@@ -5,6 +5,10 @@ sidebar_position: 12
 draft: false
 ---
 
+:::warning
+wasmCloud's [Elixir host runtime](https://github.com/wasmcloud/wasmcloud-otp) has been deprecated. The [Rust wasmCloud runtime](https://github.com/wasmCloud/wasmCloud) is receiving all new features
+:::
+
 There are a number of different health check mechanisms available within the wasmCloud host. One health check type is internal, which will periodically send a health check message to an actor or capability provider to see if it is still responding. The second type involves exposing liveness and readiness probe endpoints that can be used when running in containerized or orchestrated (e.g. Kubernetes) environments.
 
 #### Internal Health Checks

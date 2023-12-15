@@ -5,6 +5,10 @@ sidebar_position: 11
 draft: false
 ---
 
+:::warning
+wasmCloud's [Elixir host runtime](https://github.com/wasmcloud/wasmcloud-otp) has been deprecated. The [Rust wasmCloud runtime](https://github.com/wasmCloud/wasmCloud) is receiving all new features
+:::
+
 The wasmCloud host runtime is an [Elixir burrito](https://github.com/burrito-elixir/burrito) that allows us to package cross-platform Elixir releases. It's a self-extracting tarball that contains statically linked assets for the most portability, and for all intents and purposes it acts like a single binary. Executing a burrito works just like any other binary, except for the first time you execute it the burrito will extract the Elixir application files to an application directory on your machine.
 
 ## Installing

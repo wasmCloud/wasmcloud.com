@@ -5,6 +5,10 @@ sidebar_position: 12
 draft: false
 ---
 
+:::warning
+wasmCloud's [Elixir host runtime](https://github.com/wasmcloud/wasmcloud-otp) has been deprecated. The [Rust wasmCloud runtime](https://github.com/wasmCloud/wasmCloud) is receiving all new features
+:::
+
 In most cases, initiating a safe shutdown of the wasmCloud host runtime is quick and easy.
 
 ### Stopping the Background Daemon
