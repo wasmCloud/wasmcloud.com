@@ -7,6 +7,10 @@ type: "docs"
 sidebar_position: 0
 ---
 
+:::warning
+wasmCloud's [Elixir host runtime](https://github.com/wasmcloud/wasmcloud-otp) has been deprecated. The [Rust wasmCloud runtime](https://github.com/wasmCloud/wasmCloud) is receiving all new features
+:::
+
 The following diagram illustrates the composition of the Elixir OTP host:
 
 ![host architecture diagram](./otp_host_arch.png)

@@ -5,6 +5,10 @@ sidebar_position: 3
 draft: false
 ---
 
+:::warning
+wasmCloud's [Elixir host runtime](https://github.com/wasmcloud/wasmcloud-otp) has been deprecated. The [Rust wasmCloud runtime](https://github.com/wasmCloud/wasmCloud) is receiving all new features
+:::
+
 The wasmcloud host is configured by environment variables, which can be set in the environment or `.env` files.
 Real environment variables take precedence over values found in `.env` files.
 Some of the values contain secrets and should be protected accordingly.
