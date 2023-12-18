@@ -341,9 +341,7 @@ or
 for a non-destructive undeploy. This will stop managing, but will not destroy resources.
 
 :::warning
-Non-destructive undeploy is currently not implemented, but will be added in a future version. Please
-open [an issue](https://github.com/wasmCloud/wadm/issues) if you would like to see this feature and
-how you'd like it to behave
+Non-destructive undeploy is currently not implemented, but will be added in a future version. Please comment on [this issue](https://github.com/wasmCloud/wadm/issues/113) if you would like to see this feature and how you'd like it to behave
 :::
 
 **Response**:
