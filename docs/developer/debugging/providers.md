@@ -1,8 +1,8 @@
 ---
-title: "Provider Troubleshooting"
+title: 'Provider Troubleshooting'
 date: 2022-01-19T11:02:05+06:00
-sidebar_position: 3
+sidebar_position: 4
 draft: false
 ---
 
-This section is still under construction and is tracked in [issue #99](https://github.com/wasmCloud/wasmcloud-dev-site/issues/99)
+This section is still under construction. If there is specific content you'd like to see here, please [file an issue for this site](https://github.com/wasmCloud/wasmCloud.com/issues/new).
