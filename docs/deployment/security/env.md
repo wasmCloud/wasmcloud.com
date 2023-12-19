@@ -5,16 +5,12 @@ sidebar_position: 1
 draft: false
 ---
 
-Environment variables are the primary means by which the wasmCloud host obtains configuration. For a list of the environment variables supported by the Elixir host, check out the [host configuration](/docs/hosts/elixir/host-configure) section.
+The wasmCloud host can obtain configuration via environment variables. (For a list of the environment variables supported by the host, check out the [host configuration](/docs/reference/host-config) section.)
 
-When it comes to environment variables, there are, however, some security pitfalls into which it is remarkably easy to fall. In many production scripts that we've seen in the past, environment variables are set on the command line along with invoking the script, e.g.
+However, there are security pitfalls related to environment variables. For example, consider setting environment variables on the command line along with invoking the script, e.g.
 
 ```shell
 $ ENV_VAR_1=foo ENV_VAR_2=bar ./startapp
 ```
 
-The downside to this is that anyone on the same server with access to the process list (generally less secure than explicitly-owned folders) can see all commands used to start all processes. As a precaution, we recommend not following this pattern and instead setting environment variables _prior_ to the execution of a process like the wasmCloud host.
-
-We support the use of **.env files**, a loose standard around supplying a hierarhical set of files for setting up environment variables to be used by a process. You can also explicitly set environment variables in whatever script you use to launch the wasmCloud host.
-
-In summary, environment variables used by wasmCloud host can contain sensitive information (especially signing keys, which are discussed next), and you need to plan around this and take as many measures as possible to keep environment variable data secure.
+The downside to this is that anyone on the same server with access to the process list can see all commands used to start all processes. Since environment variables can contain sensitive information such as signing keys and authentication to registries, we recommend avoiding this pattern. Instead, **set environment variables _prior_ to the execution of a process like the wasmCloud host**.

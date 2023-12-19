@@ -10,7 +10,7 @@ wasmCloud hosts will always enforce a certain level of security by default that 
 
 If you want to add _**more**_ security to your cluster of wasmCloud hosts, then you can deploy a _policy service_.
 
-To make a policy service, you will need to create code that subscribes to a specific NATS topic (you can choose this topic by supplying it to the [host config](../../hosts/elixir/host-configure)).
+To make a policy service, you will need to create code that subscribes to a specific NATS topic (you can override this topic by supplying the relevant [host config](/docs/reference/host-config) option).
 
 Next, your code will need to respond to policy requests that take the following shape in JSON:
 
@@ -53,4 +53,4 @@ Your policy service can then use the information in this request to decide if th
 }
 ```
 
-To see this in action with a wasmCloud actor, see our [policy actor](https://github.com/wasmCloud/examples/tree/main/actor/policy) sample. If you're curious about the RFC that provided the original specification for the policy protocol, see [this RFC](https://github.com/wasmCloud/wasmcloud-otp/issues/439).
+To see this in action with a wasmCloud actor, see our [policy actor](https://github.com/wasmCloud/examples/tree/main/actor/policy) sample.
