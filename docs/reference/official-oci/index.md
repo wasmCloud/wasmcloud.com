@@ -5,4 +5,4 @@ sidebar_position: 2
 draft: false
 ---
 
-We maintain a list of all officially supported, continually updated, first-party images managed by the wasmcloud team in our Github repositories. Refer to the [capability-providers](https://github.com/wasmcloud/capability-providers) repository for the latest updated versions of our first party capability providers, and the [examples](https://github.com/wasmcloud/examples) repository for the latest updated versions of our example actors and providers. The `Releases` page in both of those repositories shows the latest releases of the individual capability providers and examples.
+We maintain a list of all officially supported, continually updated, first-party images managed by the wasmcloud team in our Github repositories. Refer to the [providers directory](https://github.com/wasmCloud/wasmCloud/tree/main/crates/providers) for the latest updated versions of our first party capability providers, and the [examples directory](https://github.com/wasmCloud/wasmCloud/tree/main/examples) for the latest updated versions of our example actors and providers.
