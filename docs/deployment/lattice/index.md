@@ -17,6 +17,6 @@ The lattice is designed to operate in the presence of network partition events, 
 
 ### Flattened topology
 
-Without wasmCloud's laattice, when we deploy mesh networks into a cluster in some cloud environments, those networks are isolated within their cluster. If we want to span multiple clusters, we have to make a bunch of explicit configuration changes, and, more importantly, our application code and operations personnel may have to be intimately aware of the boundaries between networks, clouds, and other infrastructure zones.
+Without wasmCloud's lattice, when we deploy mesh networks into a cluster in some cloud environments, those networks are isolated within their cluster. If we want to span multiple clusters, we have to make a bunch of explicit configuration changes, and, more importantly, our application code and operations personnel may have to be intimately aware of the boundaries between networks, clouds, and other infrastructure zones.
 
 With lattice, it simply doesn't matter. As long as any two endpoints in the lattice can somehow reach each other over any number of intervening hops across any kind of disparate infrastructure, those endpoints can be part of the same lattice. As we'll describe throughout this reference documentation, the combination of the power of **NATS**, _leaf nodes_, and pub/sub messaging (as opposed to strict point-to-point calls) allows for extremely flexible deployments that are still fast, secure, and easily maintained.
