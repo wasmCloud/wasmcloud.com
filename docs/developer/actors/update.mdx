@@ -1,16 +1,13 @@
 ---
-title: "Customizing the actor"
+title: "Iterate"
 date: 2018-12-29T09:00:00+00:00
-sidebar_position: 6
+sidebar_position: 3
 draft: false
 ---
 
 This section describes how you can iteratively build and test your actor functionality.
 
-## `wash dev`
-
-As of wash 0.18.0 you can use the experimental `wash dev` command to rapidly build and iterate on
-your actor.
+## wash dev
 
 `wash dev` starts a local wasmCloud host (if you don't already have one started), builds your actor,
 and automatically registers your actor with the host. It will also watch your actor source code for
@@ -29,68 +26,23 @@ Before running `wash dev`, you'll need to enable experimental mode for wash:
 export WASH_EXPERIMENTAL=true
 ```
 
-Then you can just run the `wash dev` command in the directory of your actor!
-
-## Making modifications (Rust)
-
-First install the crate we're using to parse the query string:
+Alternatively, you can run the command with the `--experimental` flag:
 
 ```shell
-cargo add form_urlencoded
+wash dev --experimental
 ```
 
-Our new actor has come pre-equipped with an http handler that generates a text string in the body of the response. By default, the text is "Hello World", and the greeting changes if the URL contains a name parameter. We will modify the business logic of the actor to select the greeting, using a second URL paramter. In this exercise, you will go through the process of editing code, recompiling, and updating the actor in a live running system.
-
-The new parameter that selects the greeting will be called `msg`. If msg is "hello" (or if there is no msg parameter), the greeting will be "Hello NAME". If msg is "bye", the greeting will be 'Goodbye NAME', and so on.
-
-```rust
-    async fn handle_request(
-        &self,
-        _ctx: &Context,
-        req: &HttpRequest,
-    ) -> std::result::Result<HttpResponse, RpcError> {
-        let name = form_urlencoded::parse(req.query_string.as_bytes())
-            .find(|(n, _)| n == "name")
-            .map(|(_, v)| v.to_string())
-            .unwrap_or_else(|| "You".to_string());
-
-        let msg_id = form_urlencoded::parse(req.query_string.as_bytes())
-            .find(|(n, _)| n == "msg")
-            .map(|(_, v)| v.to_string())
-            .unwrap_or_else(|| "hello".to_string());
-
-        let response = match msg_id.as_str() {
-            "hello" => format!("Hello {}", name),
-            "bye" => format!("Goodbye {}", name),
-            "hey" => format!("Hey {}, what's up?", name),
-            _ => format!("I didn't  understand that, {}", name),
-        };
-
-        Ok(HttpResponse {
-            body: response.as_bytes().to_vec(),
-            ..Default::default()
-        })
-    }
-```
-
-In `src/lib.rs`, replace handle_request with the code above. Since we aren't releasing a new version of the actor yet, we don't need to change the version number in `Cargo.toml`.
-
-If you are using hot reloading, run `wash build` to build the actor and re-sign it. The host replaces all running instances of the actor with the new version, thanks to the hot reload feature, and re-links them with the HttpServer capability provider using the link parameters already provided. It is not necessary to re-issue a link command.
-
-If you are using `wash dev`, wash will build and relaunch your actor for you
-
-Let's try out the new actor:
-
+The output should look like the following:
 ```shell
-curl 'localhost:8087/?name=Alice&msg=hello'
+⚠️   No running wasmcloud host detected (PID file missing), starting a new host...
+🔧  Successfully started wasmCloud instance
+⏳  Waiting for host to become reachable...
+✅  Found single host w/ ID [NANYXG3E44U4PNBHROWR3KE6V6YK3AP6IJTZVOKH47MGHQJM7ICHG6HK]
+🚧  Starting project build
+✅ successfully built project at [/Users/wasmcloud/hello/build/http-hello-world_s.wasm]
+👀 watching for file changes (press Ctrl+c to stop)...
 ```
 
-```shell
-curl 'localhost:8087/?name=Bob&msg=bye'
-```
+This will watch your project's files and, whenever there's a change, recompile and update the actor in the host. Try iterating through a few changes in the [Adding Capabilities](/docs/tour/adding-capabilities) section to see how it works.
 
-```shell
-curl 'localhost:8087/?name=Carol&msg=hey'
-```
-
-You've just completed a full development cycle of test, edit, recompile, run - all while the host continued running. If an actor is handling a message when an update occurs, the host waits for the message handler to complete, then swaps in the newer WebAssembly module before the next message is processed.
+If an actor is handling a message when an update occurs, the host waits for the message handler to complete, then swaps in the newer WebAssembly component before the next message is processed.
