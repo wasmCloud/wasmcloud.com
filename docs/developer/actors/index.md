@@ -5,10 +5,12 @@ sidebar_position: 2
 draft: false
 ---
 
-To perform the steps in this guide, you'll need to have completed [installation](/docs/installation.mdx) of `wash`. You'll be able to pick your own language, or follow the "bring your own component" guide to create an actor in any language. For a conceptual overview of actors, see the [actor concepts](/docs/concepts/actors.mdx) documentation.
+To perform the steps in this guide, you'll need to have completed [installation](/docs/installation.mdx) of `wash`. You'll be able to pick your own language, or follow the "bring your own component" guide to develop an actor in any language that supports Wasm components. For a conceptual overview of actors, see the [actor concepts](/docs/concepts/actors.mdx) documentation.
 
-The following pages will take you through the process of creating a new actor:
+The following pages will take you through the process of developing actor components:
 
-- [Creating a new actor project](./generate)
-- [Running the actor](./run)
-- [Customizing the actor and using the hot-reload feature](./update)
+- [Create](./generate)
+- [Build](./build)
+- [Run](./run)
+- [Iterate](./update)
+- [Publish](./publish)
