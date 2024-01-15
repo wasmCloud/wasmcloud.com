@@ -1,7 +1,7 @@
 ---
 title: "wash capture"
 draft: false
-sidebar_position: 3
+sidebar_position: 4
 description: "wash capture command reference"
 --- 
 
