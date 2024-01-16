@@ -182,7 +182,7 @@ See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/
 
 Once everything completes, check out a pet picture at [http://127.0.0.1:8081](http://127.0.0.1:8081)! You can refresh to your heart's desire to see pictures of cats and dogs, and you've deployed your application on wasmCloud.
 
-[^2]: When using Jetstream domains, NATS maps some internally used topics to use the topic specific to that Jetstream domain. At the wasmCloud level, this would enable you to reuse the same NATS infrastructure on completely different domains and lattice prefixes for multi-tenancy, but it's not necessary to know these details for today's example.
+[^2]: When using Jetstream domains, NATS maps some internally used topics to use the topic specific to that Jetstream domain. At the wasmCloud level, this would enable you to reuse the same NATS infrastructure on completely different domains and lattice names for multi-tenancy, but it's not necessary to know these details for today's example.
 
 # Turning the Knob from Local to Global
 
@@ -198,7 +198,7 @@ This is the same set of credentials you used in the previous step, located under
 
 wasmCloud uses a cluster seed to sign and verify each invocation (e.g. `HttpServer.HandleRequest`) in wasmCloud. This is a part of wasmCloud's [zero-trust security model](https://wasmcloud.dev/app-dev/secure/clusterkeys/) and any invocations that aren't signed with a verified issuer (e.g. from an unknown host) will be denied before it even reaches the actor / provider. This can be found in the output of your `wash up` command that you ran earlier as the 58 character seed starting with **SC**.
 
-Other than that, both hosts will use the default values from `wash up` like the JetStream domain (core) and lattice prefix (default). You can run the following command to launch your second host, which specifies a label, the cluster seed, and a separate JetStream domain for the _leaf node_ to allow your locally launched host to remain as the "primary" node:
+Other than that, both hosts will use the default values from `wash up` like the JetStream domain (core) and lattice name (default). You can run the following command to launch your second host, which specifies a label, the cluster seed, and a separate JetStream domain for the _leaf node_ to allow your locally launched host to remain as the "primary" node:
 
 ```bash
 HOST_machine=second wash up --nats-remote-url tls://connect.ngs.global --nats-credsfile ./default.creds --cluster-seed SCAGI4US72YWQT6TAJBCK77XSOAJMWI5PCG5MICC3FWNRFQLHE53BEZIFU --nats-js-domain extender --wasmcloud-js-domain core

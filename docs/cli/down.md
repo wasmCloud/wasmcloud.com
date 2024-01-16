@@ -22,7 +22,7 @@ wash down --all
 ### Options
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
 
-`--lattice-prefix` (Alias `-x`) A lattice prefix is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE_PREFIX=] [default: default]
+`--lattice-prefix` (Alias `-x`) A lattice name is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE_PREFIX=] [default: default]
 
 `--ctl-host` An IP address or DNS name to use to connect to NATS for Control Interface (CTL) messages, defaults to the value supplied to --nats-host if not supplied [env: WASMCLOUD_CTL_HOST=]
 

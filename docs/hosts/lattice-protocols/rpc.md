@@ -64,9 +64,9 @@ The claims data structure can be found in the [wascap](https://github.com/wasmCl
 
 All actors that are in hosts connected to a lattice will **queue** subscribe to incoming invocations on the following topic:
 
-`wasmbus.rpc.{namespace}.{actor public key}`
+`wasmbus.rpc.{lattice}.{actor public key}`
 
-For example, the `echo` sample in wasmCloud's official OCI registry would subscribe to the following topic if no alternative namespace prefix were supplied:
+For example, the `echo` sample in wasmCloud's official OCI registry would subscribe to the following topic in the `default` lattice:
 
 `wasmbus.rpc.default.MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5`
 
@@ -81,7 +81,7 @@ Capability providers also **queue** subscribe to incoming invocations from _link
 `wasmbus.rpc.{namespace}.{provider public key}.{provider link name}`
 
 For example, if the NATS message broker capability provider were loaded into a host using the `backend` link name on
-a lattice with a namespace prefix of `prod`, the subscription topic for the capability provider would be:
+a `prod` lattice, the subscription topic for the capability provider would be:
 
 `wasmbus.rpc.prod.VADNMSIML2XGO2X4TPIONTIC55R2UUQGPPDZPAVSC2QD7E76CR77SPW7.backend`
 
@@ -91,9 +91,9 @@ The link names allow multiple instances of the same capability provider to be st
 
 Capability providers must also subscribe to topics that contain messages indicating the addition and removal of link definitions. For security reasons, providers are only ever notified of link definitions that pertain to them. The following topics are mandatory subscriptions for providers to handle link definitions:
 
-- `wasmbus.rpc.{prefix}.{public_key}.{link_name}.linkdefs.put` - Adds a link definition. The payload on this subject (remember all RPC payloads are _message pack_) is the `LinkDefinition` struct which you can find in the [core interface](https://wasmcloud.github.io/interfaces/html/org_wasmcloud_core.html#link_definition).
-- `wasmbus.rpc.{prefix}.{public_key}.{link_name}.linkdefs.del` - Deletes a link definition. The payload on this subject is also a `LinkDefinition` struct.
+- `wasmbus.rpc.{lattice}.{public_key}.{link_name}.linkdefs.put` - Adds a link definition. The payload on this subject (remember all RPC payloads are _message pack_) is the `LinkDefinition` struct which you can find in the [core interface](https://wasmcloud.github.io/interfaces/html/org_wasmcloud_core.html#link_definition).
+- `wasmbus.rpc.{lattice}.{public_key}.{link_name}.linkdefs.del` - Deletes a link definition. The payload on this subject is also a `LinkDefinition` struct.
 
 Lastly, capability providers must subscribe to (and respond on) the following health check topic. Providers that do not properly respond on this topic will be flagged as "unhealthy" by the system. While the host runtime may not take action, other external entities could use this information to terminate the provider.
 
-- `wasmbus.rpc.{prefix}.{public_key}.{link_name}.health`
+- `wasmbus.rpc.{lattice}.{public_key}.{link_name}.health`

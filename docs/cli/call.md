@@ -31,7 +31,7 @@ wash call --cluster-seed $CLUSTER_SEED MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5
 
 `--rpc-credsfile` Credsfile for RPC authentication. Combines rpc_seed and rpc_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details
 
-`--lattice-prefix`(Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix`(Alias `-x`) Lattice name for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
 `--data` (Alias `-d`) Optional JSON file to send as the operation payload
 
