@@ -56,7 +56,7 @@ wasmCloud host version to download, e.g. `v0.80.0`. See https://github.com/wasmC
 
 #### --lattice-prefix  
 Alias: `-x`.
-    A lattice prefix is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE_PREFIX=] [default: default]
+    A lattice name is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE_PREFIX=] [default: default]
 
 #### --host-seed  
 The seed key (a printable 256-bit Ed25519 private key) used by this host to generate it's public key [env: WASMCLOUD_HOST_SEED=]

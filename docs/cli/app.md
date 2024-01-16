@@ -120,7 +120,7 @@ JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_D
 
 #### --lattice-prefix 
 Alias: `-x`.
-        Lattice prefix for wasmCloud control interface. The default value is "default". [env: WASMCLOUD_LATTICE_PREFIX=]
+        Lattice name for wasmCloud control interface. The default value is "default". [env: WASMCLOUD_LATTICE_PREFIX=]
 
 #### --timeout-ms 
 Alias: `-t`.

@@ -15,7 +15,7 @@ An actor is the smallest deployment of compute within a wasmCloud cluster. They 
 "Capability Provider", "Capability", or most commonly called "Provider" is any form of side effect that can be produced by an actor. In other words, capabilities are the means by which actors, otherwise isolated and sandboxed, can perform high-level I/O. For more information, see [capability model](/docs/concepts/capabilities).
 
 ## Lattice
-The lattice is a self-forming cluster of wasmCloud nodes. Each lattice is uniquely identified by a "prefix" which is used to differentiate traffic from other lattices. Membership within a lattice requires a secret key for signing invocations and the ability to trust a specific set of public keys from other hosts. For more information, see [lattice management](/docs/deployment/lattice).
+The lattice is a self-forming cluster of wasmCloud nodes. Each lattice is uniquely identified by a name, which is used to differentiate traffic from other lattices. Membership within a lattice requires a secret key for signing invocations and the ability to trust a specific set of public keys from other hosts. For more information, see [lattice management](/docs/deployment/lattice).
 
 ## Provider Archive
 The provider archive is a file that is basically a `.tar.gz` file that contains a number of OS and CPU specific binaries, as well as a JWT containing the claims that belong to that capability provider. For more information, see [creating a provider archive](/docs/developer/providers/create-par).
