@@ -721,7 +721,7 @@ lattice event stream for the `linkdef_deleted` event.
 
 ## Lattice Events
 
-Lattice events are published on the stream `wasmbus.evt.{lattice}` where `lattice` is
+Lattice events are published on `wasmbus.evt.{lattice}.>` subjects, where `lattice` is
 the lattice name (also referred to as the "lattice ID"). Lattice events are
 JSON-serialized [CloudEvents](https://github.com/cloudevents/spec/blob/v1.0.1/json-format.md) for
 easy, standardized consumption. This means that the `data` field in the cloud event envelope is just
