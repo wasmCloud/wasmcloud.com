@@ -166,6 +166,68 @@ func main() {}
 ```
 
   </TabItem>
+  <TabItem value="typescript" label="TypeScript Component">
+:::caution
+Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
+:::
+
+:::info[TypeScript & WebAssembly]
+To perform the steps in this guide, you'll need you'll need to install [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) and run `npm install` in the project directory. We use npm to install dependencies and compile TypeScript code to WebAssembly.
+:::
+
+Let's extend this application to do more than just say "hello." Using the `pathWithQuery` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "hello world!". To make this code more readable, we'll add a helper function to extract the name from the path.
+
+```typescript
+import {
+  IncomingRequest,
+  ResponseOutparam,
+  OutgoingResponse,
+  Fields,
+} from "wasi:http/types@0.2.0-rc-2023-12-05";
+
+// Implementation of wasi-http incoming-handler
+//
+// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
+function handle(req: IncomingRequest, resp: ResponseOutparam) {
+  // Start building an outgoing response
+  const outgoingResponse = new OutgoingResponse(new Fields());
+
+  // Access the outgoing response body
+  let outgoingBody = outgoingResponse.body();
+  // Create a stream for the response body
+  let outputStream = outgoingBody.write();
+  //highlight-start
+  // Write "hello [name]" to the response stream
+  const name = getNameFromPath(req.pathWithQuery() || "")
+  outputStream.blockingWriteAndFlush(
+    new Uint8Array(new TextEncoder().encode(`hello ${name}!`))
+  );
+  //highlight-end
+
+  // Set the status code for the response
+  outgoingResponse.setStatusCode(200);
+
+  // Set the created response
+  ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
+}
+
+//highlight-start
+function getNameFromPath(path: string): string {
+  const parts = path.split("=");
+  if (parts.length == 2) {
+    return parts[1];
+  }
+  return "world";
+}
+//highlight-end
+
+export const incomingHandler = {
+  handle,
+};
+
+```
+
+  </TabItem>
 </Tabs>
 
 After changing the code, you can use `wash` to build the local actor:
@@ -205,6 +267,15 @@ Hello, Bob!
 
   </TabItem>
   <TabItem value="tinygo" label="TinyGo Component">
+
+```bash
+> curl localhost:8080
+Hello, World!
+> curl 'localhost:8080?name=Bob'
+Hello, Bob!
+```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript Component">
 
 ```bash
 > curl localhost:8080
@@ -384,6 +455,76 @@ func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWrite
 ```
 
   </TabItem>
+  <TabItem value="typescript" label="TypeScript Component">
+
+  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
+```wit
+package wasmcloud:hello;
+
+world hello {
+  // highlight-start
+  import wasi:keyvalue/atomic;
+  import wasi:keyvalue/readwrite;
+  import wasi:logging/logging;
+  // highlight-end
+
+  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
+}
+```
+
+```typescript
+import {
+  IncomingRequest,
+  ResponseOutparam,
+  OutgoingResponse,
+  Fields,
+} from "wasi:http/types@0.2.0-rc-2023-12-05";
+
+//highlight-start
+//@ts-expect-error -- these types aren't currently known by JCO
+import {log} from "wasi:logging/logging";
+//@ts-expect-error -- these types aren't currently known by JCO
+import {increment} from "wasi:keyvalue/atomic";
+//@ts-expect-error -- these types aren't currently known by JCO
+import {openBucket} from "wasi:keyvalue/types";
+//highlight-end
+
+// Implementation of wasi-http incoming-handler
+//
+// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
+function handle(req: IncomingRequest, resp: ResponseOutparam) {
+  // Start building an outgoing response
+  const outgoingResponse = new OutgoingResponse(new Fields());
+
+  // Access the outgoing response body
+  let outgoingBody = outgoingResponse.body();
+  // Create a stream for the response body
+  let outputStream = outgoingBody.write();
+  //highlight-start
+  // Write to the response stream
+  const name = getNameFromPath(req.pathWithQuery() || "")
+
+  log("info", "", `Greeting ${name}`);
+
+  // Increment the bucket's count
+  const bucket = openBucket("");
+  const count = increment(bucket, name, 1);
+
+  outputStream.blockingWriteAndFlush(
+    new Uint8Array(new TextEncoder().encode(`hello x${count}, ${name}!`))
+  );
+  //highlight-end
+
+  // Set the status code for the response
+  outgoingResponse.setStatusCode(200);
+
+  // Set the created response
+  ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
+}
+
+```
+
+  </TabItem>
 </Tabs>
 
 
@@ -491,6 +632,19 @@ Hello x1, Alice!
 
   </TabItem>
   <TabItem value="tinygo" label="TinyGo Component">
+
+```bash
+> wash app deploy wadm.yaml
+> curl localhost:8080?name=Bob
+Hello x1, Bob!
+> curl localhost:8080?name=Bob
+Hello x2, Bob!
+> curl localhost:8080?name=Alice
+Hello x1, Alice!
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript Component">
 
 ```bash
 > wash app deploy wadm.yaml
