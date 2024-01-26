@@ -14,22 +14,21 @@ function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
     const { colorMode } = useColorMode();
   return (
-    <header className={clsx('hero hero--primary', styles.heroBanner)}>
+    <header className={clsx(styles.hero, styles.heroBanner)}>
       <div className="container" >
         <div className={clsx('row', styles.heroItems)}>
-          <div className='col padding-left--lg' align='right'>
+          <div className='col' align='right'>
             <img id="cloudspic" 
                 src={colorMode === 'dark' ? "img/heroclouds-dark.svg" : "img/heroclouds-light.svg"}
                 alt="logo" className={styles.heroLogo} />
           </div>
-          <div className='col padding-top--lg' align='center'>
-                        <div classname={styles.heroText} align='left'>
-            <h1 className="hero__title">{siteConfig.title}</h1>
-            <p className="hero__subtitle">
-            {siteConfig.customFields.tagline_1}
-            <br />
-            {siteConfig.customFields.tagline_2}
-            </p>
+          <div className='col'>
+            <div className={styles.heroText} align='left'>
+                <h1>{siteConfig.title}</h1>
+                <p> {siteConfig.customFields.tagline_1}
+                <br />
+                {siteConfig.customFields.tagline_2}
+                </p>
         {/* <div>
           Build your functions and services in the language you want and run them securely everywhere with WebAssembly.
         </div> */}

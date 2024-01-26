@@ -1,6 +1,7 @@
 import React from 'react';
 import styles from './styles.module.css';
 import { useColorMode } from '@docusaurus/theme-common';
+import clsx from 'clsx';
 
 function NewsImageComponent() {
     const { colorMode } = useColorMode();
@@ -24,7 +25,7 @@ export default function NewsSection() {
                   <i>"WasmCloud is a well reviewed project, with lots of diligence in its security posture. This has paid off, as evidenced by this audit, which had <strong>no severe or high issues to resolve</strong>."</i> 
                 </div>
               <a
-                className="button button--frontpage button--lg"
+                className={clsx(styles.ctaButton, "button", "button--frontpage", "button--lg")}
                 href="https://ostif.org/ostif-has-completed-a-security-audit-of-wasmcloud/">
                 Read more on OSTIF.org
               </a>
