@@ -59,21 +59,12 @@ function FeatureTextComponent({ title, description }) {
 }
 
 function Feature({ image, title, description, imageFirst }) {
-    if (imageFirst == true) {
-        return (
-            <div className={styles.featureRow}>
-                  <FeatureImageComponent image={image} />
-                  <FeatureTextComponent title={title} description={description} />
-            </div>
-        ) 
-    }
-
     return (
-    <div className={styles.featureRow}>
-          <FeatureTextComponent title={title} description={description} />
-          <FeatureImageComponent image={image} />
-    </div>
-    );
+        <div className={clsx(styles.featureRow, imageFirst && styles.frImageFirst)}>
+              <FeatureImageComponent image={image} />
+              <FeatureTextComponent title={title} description={description} />
+        </div>
+    ) 
 }
 
 export default function HomepageFeatures() {
