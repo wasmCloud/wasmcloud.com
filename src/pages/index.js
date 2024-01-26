@@ -5,25 +5,43 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import HomepageFeatures from '@site/src/components/HomepageFeatures';
 import SecurityAudit from '@site/src/components/SecurityAudit';
+import { useColorMode } from '@docusaurus/theme-common';
 
 import styles from './index.module.css';
+import NewsSection from '../components/NewsSection';
 
 function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
+    const { colorMode } = useColorMode();
   return (
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
-      <div className="container">
-        <h1 className="hero__title">{siteConfig.title}</h1>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
+      <div className="container" >
+        <div className={clsx('row', styles.heroItems)}>
+          <div className='col padding-left--lg' align='right'>
+            <img id="cloudspic" 
+                src={colorMode === 'dark' ? "img/heroclouds-dark.svg" : "img/heroclouds-light.svg"}
+                alt="logo" className={styles.heroLogo} />
+          </div>
+          <div className='col padding-top--lg' align='center'>
+                        <div classname={styles.heroText} align='left'>
+            <h1 className="hero__title">{siteConfig.title}</h1>
+            <p className="hero__subtitle">
+            {siteConfig.customFields.tagline_1}
+            <br />
+            {siteConfig.customFields.tagline_2}
+            </p>
         {/* <div>
           Build your functions and services in the language you want and run them securely everywhere with WebAssembly.
         </div> */}
-        <div className={styles.buttons}>
+        <div className={styles.heroButton}>
           <Link
             className="button button--frontpage button--lg"
             to="/docs/installation">
             Try it yourself
           </Link>
+        </div>
+        </div>
+      </div>
         </div>
       </div>
       {/* <div className={styles.terminal} id="terminal">
@@ -40,14 +58,14 @@ function HomepageHeader() {
 export default function Home() {
   const { siteConfig } = useDocusaurusContext();
   return (
-    <Layout
+    <Layout 
+      wrapperClassName="homepage"
       title={`Homepage`}
       description="wasmCloud - Why stop at the Edge?">
       <HomepageHeader />
       <main>
         <HomepageFeatures />
-        <hr />
-        <SecurityAudit />
+        <NewsSection />
       </main>
     </Layout>
   );

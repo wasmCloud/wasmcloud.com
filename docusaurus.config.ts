@@ -9,7 +9,12 @@ import { themes } from 'prism-react-renderer';
 
 const config: Config = {
   title: 'wasmCloud',
-  tagline: 'Build applications in any language and deploy them anywhere.',
+  tagline: 'Build applications in any language. Deploy them anywhere.',
+    customFields: {
+      description: 'The secure, distributed, WebAssembly Actor runtime',
+      tagline_1: 'Build applications in any language.',
+      tagline_2: 'Deploy them anywhere.'
+        },
   url: 'https://wasmcloud.com',
   baseUrl: '/',
   onBrokenLinks: 'throw',
