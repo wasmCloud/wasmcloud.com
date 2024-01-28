@@ -156,6 +156,31 @@ You don't need any TypeScript/JavaScript dependencies installed to run this exam
 :::
 
   </TabItem>
+  <TabItem value="Python" label="Python Component">
+
+:::caution
+Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
+:::
+
+This command generates a new actor project in the `./hello` directory:
+```shell
+wash new actor --git wasmcloud/wasmcloud --subfolder examples/python/actors/http-hello-world hello
+```
+
+This actor is a simple Python project with a few extra goodies included for wasmCloud. At a high level, the important pieces are:
+
+1. `app.py`: Where the business logic is implemented
+2. `wasmcloud.toml`: Actor metadata and capability permissions
+3. `wadm.yaml`: A declarative manifest for running the full application
+
+:::info[Dependencies]
+You don't need any Python dependencies installed to run this example, but if you want to build it yourself you'll need to install [Python 3.10 or later](https://www.python.org/) and [pip](https://pypi.org/project/pip/). After you have those, you'll need to install [componentize-py](https://github.com/bytecodealliance/componentize-py/tree/main?tab=readme-ov-file#getting-started):
+```
+pip install componentize-py==0.9.2
+```
+:::
+
+  </TabItem>
   <TabItem value="unlisted" label="My Language Isn't Listed">
 
   If you prefer working in a language that isn't listed here, let us know!
@@ -193,7 +218,7 @@ Then, replace the `image` property in `wadm.yaml` with the path to your actor. F
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: rust-http-hello-world
+  name: http-hello-world
   annotations:
     version: v0.0.1
     description: "HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)"
@@ -229,11 +254,17 @@ wash app deploy wadm.yaml
 
 ![wash app deploy diagram](../images/washappdeploy.png)
 
-`wadm` will take care of taking this manifest and scheduling the resources on the host that you launched earlier. You should see output in the host logs when your actor and capability start up, and then you can query it yourself:
+`wadm` will take care of taking this manifest and scheduling the resources on the host that you launched earlier. You should see output in the host logs when your actor and capability start up, which should happen after just a few seconds. After you see that the HTTP server set up the listener in the host logs, or once the application is `Deployed` when you check `wash app list`, you can query it yourself:
+```shell
+➜ wash app list
+
+Name             Latest Version   Deployed Version   Deploy Status   Description
+http-hello-world v0.0.1           v0.0.1                  Deployed   HTTP Hello World
+```
 
 ```shell
 $ curl localhost:8080
-Hello, world!
+Hello, World!
 ```
 
 Congratulations, you just ran a WebAssembly application in wasmCloud!
@@ -242,7 +273,7 @@ Congratulations, you just ran a WebAssembly application in wasmCloud!
 
 ![hello app architecture](../images/helloapp.png)
 
-When you send your HTTP request to `localhost:8080`, that request is received by the HTTP Server capability provider. The HTTP Server capability provider then forwards that request to the actor, which responds with the string "Hello, world!". This loose coupling of capability providers and actors provides flexibility, security, and it lets our actor code be purely business logic instead of compiling in vendor specific code. Let's take a look at that code now in `src/lib.rs`:
+When you send your HTTP request to `localhost:8080`, that request is received by the HTTP Server capability provider. The HTTP Server capability provider then forwards that request to the actor, which responds with the string "Hello, world!". This loose coupling of capability providers and actors provides flexibility, security, and it lets our actor code be purely business logic instead of compiling in vendor specific code. Let's take a look at your application code now:
 
 <Tabs groupId="lang" queryString>
   <TabItem value="rustmod" label="Rust" default>
@@ -382,6 +413,33 @@ export const incomingHandler = {
 ```
 
 This actor has a single function, `handle`, that implements the `incoming-handler` interface. This function is called by the HTTP Server capability provider when it receives an incoming HTTP request. The `handle` function constructs an `OutgoingResponse` and sends it back to the HTTP Server capability provider, which then sends it back to the client. There's no mention of ports, certificates, HTTP libraries, and if those things change this actor will work all the same.
+
+  </TabItem>
+
+  <TabItem value="Python" label="Python Component">
+    ```python
+from hello import exports
+from hello.types import Ok
+from hello.imports.types import (
+      IncomingRequest, ResponseOutparam,
+      OutgoingResponse, Fields, OutgoingBody
+)
+
+class IncomingHandler(exports.IncomingHandler):
+      def handle(self, _: IncomingRequest, response_out: ResponseOutparam):
+          # Construct the HTTP response to send back 
+          outgoingResponse = OutgoingResponse(Fields.from_list([]))
+          # Set the status code to OK
+          outgoingResponse.set_status_code(200)
+          outgoingBody = outgoingResponse.body()
+          # Write our Hello World message to the response body
+          outgoingBody.write().blocking_write_and_flush(bytes("Hello from Python!\n", "utf-8"))
+          OutgoingBody.finish(outgoingBody, None)
+          # Set and send the HTTP response
+          ResponseOutparam.set(response_out, Ok(outgoingResponse))
+    ```
+
+    This actor has a single class, `IncomingHandler`, that implements the `handle` function. This function is called by the HTTP Server capability provider when it receives an incoming HTTP request. The `handle` function constructs an HttpResponse and sends it back to the HTTP Server capability provider, which then sends it back to the client. There's no mention of ports, certificates, HTTP libraries, and if those things change this actor will work all the same.
 
   </TabItem>
 </Tabs>

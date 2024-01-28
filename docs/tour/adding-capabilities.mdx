@@ -228,6 +228,63 @@ export const incomingHandler = {
 ```
 
   </TabItem>
+
+  <TabItem value="python" label="Python Component">
+
+:::caution
+Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
+:::
+
+:::info[Python & WebAssembly]
+To perform the steps in this guide, you'll need you'll need to install [Python 3.10](https://www.python.org/) or later, [pip](https://pip.pypa.io/en/stable/installation/), and `componentize-py` to compile Python code to WebAssembly.
+
+```shell
+pip install componentize-py==0.9.2
+```
+::: 
+
+Let's extend this application to do more than just say "hello." Using the `path_with_query` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "hello world!". We'll also add a helper function to keep our code readable.
+
+:::info
+If you're using an IDE or would like to look at the imports, you can generate the bindings using `componentize-py` to get IDE suggestions and autofills.
+```shell
+componentize-py bindings .
+```
+:::
+
+```python
+class IncomingHandler(exports.IncomingHandler):
+#highlight-start
+    # Make sure to change the variable name for the request from _ to request in the handle function.
+    def handle(self, request: IncomingRequest, response_out: ResponseOutparam):
+#highlight-end
+        # Construct the HTTP response to send back 
+        outgoingResponse = OutgoingResponse(Fields.from_list([]))
+        # Set the status code to OK
+        outgoingResponse.set_status_code(200)
+        outgoingBody = outgoingResponse.body()
+
+        # Write our Hello message to the response body
+#highlight-start
+        name = get_name_from_path(request.path_with_query())
+        outgoingBody.write().blocking_write_and_flush(bytes("Hello {}!\n".format(name), "utf-8"))
+#highlight-end
+        OutgoingBody.finish(outgoingBody, None)
+        # Set and send the HTTP response
+        ResponseOutparam.set(response_out, Ok(outgoingResponse))
+
+#highlight-start
+def get_name_from_path(path: str) -> str:
+    parts = path.split("=")
+    if len(parts) == 2:
+        return parts[-1]
+    else:
+        return "World"
+#highlight-end
+```
+
+  </TabItem>
+
 </Tabs>
 
 After changing the code, you can use `wash` to build the local actor:
@@ -261,7 +318,7 @@ Hello, Bob!
 ```bash
 > curl localhost:8081
 Hello, World!
-> curl localhost:8081/Bob
+> curl 'localhost:8081?name=Bob'
 Hello, Bob!
 ```
 
@@ -276,6 +333,15 @@ Hello, Bob!
 ```
   </TabItem>
   <TabItem value="typescript" label="TypeScript Component">
+
+```bash
+> curl localhost:8080
+Hello, World!
+> curl 'localhost:8080?name=Bob'
+Hello, Bob!
+```
+  </TabItem>
+  <TabItem value="python" label="Python Component">
 
 ```bash
 > curl localhost:8080
@@ -431,6 +497,8 @@ world hello {
 }
 ```
 
+Let's use the atomic increment function to keep track of how many times we've greeted each person.
+
 ```go
 func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
 	// Construct HttpResponse to send back
@@ -471,6 +539,8 @@ world hello {
   export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
 }
 ```
+
+Let's use the atomic increment function to keep track of how many times we've greeted each person.
 
 ```typescript
 import {
@@ -523,6 +593,62 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
 }
 
 ```
+
+  </TabItem>
+
+    <TabItem value="python" label="Python Component">
+
+  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
+```wit
+package wasmcloud:hello;
+
+world hello {
+  // highlight-start
+  import wasi:keyvalue/atomic;
+  import wasi:keyvalue/readwrite;
+  import wasi:logging/logging;
+  // highlight-end
+
+  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
+}
+```
+
+Let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+```python
+from hello import exports
+from hello.types import Ok
+from hello.imports.types import (
+    IncomingRequest, ResponseOutparam,
+#highlight-start
+    OutgoingResponse, Fields, OutgoingBody, open_bucket
+)
+from hello.imports.atomic import increment
+from hello.imports.logging import (log, Level)
+#highlight-end
+
+class IncomingHandler(exports.IncomingHandler):
+    def handle(self, request: IncomingRequest, response_out: ResponseOutparam):
+        # Construct the HTTP response to send back 
+        outgoingResponse = OutgoingResponse(Fields.from_list([]))
+        # Set the status code to OK
+        outgoingResponse.set_status_code(200)
+        outgoingBody = outgoingResponse.body()
+
+        # Write our Hello message to the response body
+        name = get_name_from_path(request.path_with_query())
+#highlight-start
+        log(Level.INFO, "", "Greeting {}".format(name))
+        bucket = open_bucket("")
+        count = increment(bucket, name, 1)
+
+        outgoingBody.write().blocking_write_and_flush(bytes("Hello x{}, {}!\n".format(count, name), "utf-8"))
+#highlight-end
+        OutgoingBody.finish(outgoingBody, None)
+        # Set and send the HTTP response
+        ResponseOutparam.set(response_out, Ok(outgoingResponse))
+```
+
 
   </TabItem>
 </Tabs>
@@ -645,6 +771,19 @@ Hello x1, Alice!
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript Component">
+
+```bash
+> wash app deploy wadm.yaml
+> curl localhost:8080?name=Bob
+Hello x1, Bob!
+> curl localhost:8080?name=Bob
+Hello x2, Bob!
+> curl localhost:8080?name=Alice
+Hello x1, Alice!
+```
+
+  </TabItem>
+  <TabItem value="python" label="Python Component">
 
 ```bash
 > wash app deploy wadm.yaml
