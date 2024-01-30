@@ -4,28 +4,17 @@ description: "How to set up a NATS server/cluster"
 sidebar_position: 1
 ---
 
-A wasmCloud deployment requires at least one NATS server configured to use
-JetStream. A production deployment should use at least one NATS _cluster_ with
-three or five servers depending on your reliability requirements.
+A wasmCloud deployment requires at least one NATS server configured to use [JetStream](https://docs.nats.io/nats-concepts/jetstream). A production deployment should use at least one NATS [_cluster_](https://docs.nats.io/running-a-nats-service/configuration/clustering) with three or five servers depending on your reliability requirements.
 
 :::info
-It is difficult to provide a one size fits all guide for deploying NATS since
-the topology of a cluster can vary wildly depending on your requirements. We
-recommend getting familiar with the [NATS
-Configuration](https://docs.nats.io/running-a-nats-service/configuration)
-options and the topology examples in provided by [NATS by
-Example](https://natsbyexample.com/).
+It's difficult to offer a one-size-fits-all guide for deploying NATS, since the topology of a cluster can vary significantly depending on your requirements. The [NATS Configuration](https://docs.nats.io/running-a-nats-service/configuration) options and the topology examples provided by [NATS by Example](https://natsbyexample.com/) are helpful resources for becoming familiar with how to set up a cluster.
 :::
 
-This guide will walk you through the process of running a single server as an
-example and then show you how to configure a three node NATS cluster suitable
-for production use cases. Advanced topics such as configuring a NATS operator
-hierarchy or enabling TLS are strongly recommended, but outside of the scope of
-this guide.
+The following sections will cover running a single server and a three node cluster suitable for production use cases. Advanced topics such as configuring a NATS operator hierarchy or enabling TLS—while strongly recommended—are out of scope.
 
 ## A single server deployment
 
-A minimal example of a configuration file is provided below:
+Below is a minimal example of a server configuration file:
 
 ```text
 # Use an appropriate server name for your environment
@@ -39,47 +28,29 @@ jetstream {
 }
 ```
 
-This configures a single nats server with JetStream with data stored in a known
-location. It also sets a JetStream domain so that you are all set to fan out
-your deployment using leaf nodes if you choose. We recommend pairing a leaf
-node with a wasmCloud host in order to mimimize latency for actors or providers
-running on the same host.
+This configures a single NATS server with JetStream enabled and data stored in a known location. This configuration sets a JetStream domain, which enables fanning out the deployment using [leaf node sidecars](/docs/deployment/nats/leaf-nodes) later.
 
-You can run a simple NATS server with this config:
+To start a server with this configuration file, run:
 
 ```bash
 nats-server -c sample.conf
 ```
 
-## Configuring a NATS Cluster
+## Clustering NATS
 
-In production we recommend running a [NATS
-_cluster_](https://docs.nats.io/running-a-nats-service/configuration/clustering)
-for high availability and resiliency. A production deployment requires at least
-a single NATS cluster consisting of at least three or five nodes. This is so
-that you can replicate the NATS key-value bucket that stores link definitions
-for lattices on more than one server so that you do not have a single point of
-failure.
+A [NATS _cluster_](https://docs.nats.io/running-a-nats-service/configuration/clustering) is a set of servers configured to communicate with one another and "gossip" the existence of new members of the cluster.
+
+In production, run a cluster consisting of at least three nodes for high availability and resiliency. Clustering enables replicating lattice data, such as the NATS Key Value bucket that stores link definitions, so data is available even if a server becomes unavailable.
 
 :::info
-
-The reason you need at least 3-5 servers in a cluster is because JetStream uses
-[RAFT](https://raft.github.io/) as a consensus algorithm for ensuring data
-consistency. This means that you need an odd number of servers that are part of
-your JetStream-enabled cluster for the algorithm to function as intended.
-
+Clusters require at least three or five servers because JetStream uses [RAFT](https://raft.github.io/) as its consensus algorithm for ensuring data consistency. Using an odd number of clustered servers allows the algorithm to function as intended.
 :::
 
-### Clustering NATS
+### Configuring a cluster
 
-A NATS cluster is a set of servers that are configured to communicate with one
-another and will gossip the existence of new members of the cluster. The
-following will show you how to configure three servers that are clustered
-together on three different hosts.
+The following shows how to configure a cluster composed of three servers on three different hosts.
 
-The first server acts as the _seed_ for the cluster. The is nothing
-particularly special about a seed cluster other than the fact that it just
-starts the discovery process for other nodes.
+The first server acts as the _seed_ for the cluster. The is nothing special about a seed server, other than the fact it starts the discovery process for other nodes.
 
 ```text
 server_name: wasmcloud-0
@@ -95,7 +66,7 @@ jetstream {
 }
 ```
 
-Bring this server up with the following:
+Start this server up with the following command:
 
 ```bash
 nats-server -c server-0.conf
@@ -138,12 +109,10 @@ jetstream {
 ```
 
 :::info
-You can provide the same set of NATS routes in the cluster configuration block
-in every server configuration file. NATS is smart enough to disambiguate
-between duplicate routes.
+You can use the same set of NATS routes in the `cluster` configuration block in each server configuration file. NATS will disambiguate between duplicate routes.
 :::
 
-Start these two new servers and you should have a three node cluster!
+Start these two new servers, and now you have a three node cluster!
 
 ```bash
 nats-server -c server-1.conf
@@ -152,12 +121,9 @@ nats-server -c server-2.conf
 
 ### Kubernetes
 
-If you are running Kubernetes in your environment, then we strongly recommend
-deploying NATS using the [official Helm
-charts](https://artifacthub.io/packages/helm/nats/nats).
+If you are running Kubernetes, deploy NATS using the [official Helm charts](https://artifacthub.io/packages/helm/nats/nats).
 
-A sample `values.yaml` file that would work well for a simple wasmCloud
-deployment might look like the following:
+Below is an example `values.yaml` file for a simple wasmCloud deployment:
 
 ```yaml
 config:
@@ -179,34 +145,25 @@ podTemplate:
       whenUnsatisfiable: DoNotSchedule
 ```
 
-You can then start the cluster by running
+You can start the cluster by running
 
 ```bash
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
 helm upgrade --install nats nats/nats -f sample.yaml
 ```
 
-### JetStream
+### JetStream data replication
 
-Once you have a running cluster, you will want to ensure that the lattice data
-and wadm key-value buckets are replicated across more than one NATS server.
-This is to ensure that your wasmCloud cluster is resilient in the face of node
-or instance failures.
+Once you have a running cluster, create the [lattice metadata](/docs/deployment/lattice/metadata#production-configuration) and [wadm Key Value buckets](/docs/deployment/wadm/configuration) configured with replication across more than one NATS server. This makes the wasmCloud cluster resilient to node and instance failures.
 
-A wasmCloud host and a wadm server will create their required buckets when they
-first start, as described
-[here](docs/deployment/lattice/metadata#default-configuration). We recommend
-you pre-create these buckets and ensure that they are properly configured.
-
-Assuming you are using the default lattice name (`default`):
+The following commands create these buckets with the appropriate configuration. If you are using a lattice with a different name than `default`, remember to use the correct name here:
 
 ```bash
 nats --domain wasmcloud kv add --replicas 3 LATTICEDATA_default
 nats --domain wasmcloud kv add --replicas 3 wadm_manifests
 ```
 
-If you have an existing lattice data bucket you can run the following to the
-increase the number of replicas:
+If the buckets already exist, you can increase the number of replicas:
 
 ```bash
 nats --domain wasmcloud stream edit --replicas 3 KV_LATTICEDATA_default
