@@ -11,11 +11,13 @@ Going from "Hello World" to a full-fledged application requires just identifying
 
 ## Adding Functionality
 
+<Tabs groupId="lang" queryString>
+  <TabItem value="rustmod" label="Rust" default>
 :::info[Rust & WebAssembly]
 To perform the steps in this guide, you'll need to have a [Rust toolchain](https://www.rust-lang.org/tools/install) installed locally and the wasm32 target installed:
 
 ```shell
-rustup target add wasm32-unknown-unknown
+rustup target add wasm32-wasi
 ```
 
 :::
@@ -35,69 +37,339 @@ async fn handle_request(&self, ctx: &Context, req: &HttpRequest) -> RpcResult<Ht
 }
 ```
 
-Using a simple pattern match, we can check to see if we can split the query string on a name parameter, and if so, use that name in the response. If not, we'll just use "World" as the name. This won't support adding multiple query parameters but it's a perfectly good start for our goals. After changing the code, you can use `wash` to build the local actor:
+Using a simple pattern match, we can check to see if we can split the query string on a name parameter, and if so, use that name in the response. If not, we'll just use "World" as the name. This won't support adding multiple query parameters but it's a perfectly good start for our goals. 
 
+  </TabItem>
+  <TabItem value="rust" label="Rust Component">
+
+:::caution
+Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
+:::
+
+:::info[Rust & WebAssembly]
+To perform the steps in this guide, you'll need to have a [Rust toolchain](https://www.rust-lang.org/tools/install) installed locally and the wasm32 target installed:
+
+```shell
+rustup target add wasm32-wasi
+```
+
+:::
+
+Let's extend this application to do more than just say "Hello from Rust!" Using the `path_with_query` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!".
+
+```rust
+wit_bindgen::generate!({
+    world: "hello",
+    exports: {
+        "wasi:http/incoming-handler": HttpServer,
+    },
+});
+
+use exports::wasi::http::incoming_handler::Guest;
+use wasi::http::types::*;
+
+struct HttpServer;
+
+impl Guest for HttpServer {
+    fn handle(request: IncomingRequest, response_out: ResponseOutparam) {
+        let response = OutgoingResponse::new(Fields::new());
+        response.set_status_code(200).unwrap();
+        let response_body = response.body().unwrap();
+// highlight-start
+        let name = match request
+            .path_with_query()
+            .unwrap()
+            .split("=")
+            .collect::<Vec<&str>>()[..]
+        {
+            // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
+            ["/?name", name] => name.to_string(),
+            // query string is anything else or empty e.g. localhost:8080
+            _ => "World".to_string(),
+        };
+        response_body
+            .write()
+            .unwrap()
+            .blocking_write_and_flush(format!("Hello, {}!\n", name).as_bytes())
+            .unwrap();
+// highlight-end
+        OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+        ResponseOutparam::set(response_out, Ok(response));
+    }
+```
+
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo Component">
+:::caution
+Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
+:::
+
+:::info[Go & WebAssembly]
+To perform the steps in this guide, you'll need you'll need to install both [Go](https://golang.org/doc/install) and [TinyGo](https://tinygo.org/getting-started/). We use the TinyGo toolchain to compile Go code to WebAssembly.
+:::
+
+Let's extend this application to do more than just say "Hello from Go!" Using the `PathWithQuery` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!". To make this code more readable, we'll add a helper function to extract the name from the path.
+
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+
+	http "github.com/wasmcloud/wasmcloud/examples/golang/actors/http-hello-world/gen"
+)
+
+// Helper type aliases to make code more readable
+type HttpRequest = http.ExportsWasiHttp0_2_0_rc_2023_12_05_IncomingHandlerIncomingRequest
+type HttpResponseWriter = http.ExportsWasiHttp0_2_0_rc_2023_12_05_IncomingHandlerResponseOutparam
+type HttpOutgoingResponse = http.WasiHttp0_2_0_rc_2023_12_05_TypesOutgoingResponse
+type HttpError = http.WasiHttp0_2_0_rc_2023_12_05_TypesErrorCode
+
+type HttpServer struct{}
+
+func init() {
+	httpserver := HttpServer{}
+	// Set the incoming handler struct to HttpServer
+	http.SetExportsWasiHttp0_2_0_rc_2023_12_05_IncomingHandler(httpserver)
+}
+
+func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
+	// Construct HttpResponse to send back
+	headers := http.NewFields()
+	httpResponse := http.NewOutgoingResponse(headers)
+	httpResponse.SetStatusCode(200)
+
+//highlight-start
+	name := getNameFromPath(request.PathWithQuery().Unwrap())
+	httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello %s!\n", name))).Unwrap()
+//highlight-end
+
+	// Send HTTP response
+	okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+	http.StaticResponseOutparamSet(responseWriter, okResponse)
+}
+
+//highlight-start
+func getNameFromPath(path string) string {
+	parts := strings.Split(path, "=")
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return "World"
+}
+//highlight-end
+
+//go:generate wit-bindgen tiny-go wit --out-dir=gen --gofmt
+func main() {}
+
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript Component">
+:::caution
+Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
+:::
+
+:::info[TypeScript & WebAssembly]
+To perform the steps in this guide, you'll need you'll need to install [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) and run `npm install` in the project directory. We use npm to install dependencies and compile TypeScript code to WebAssembly.
+:::
+
+Let's extend this application to do more than just say "hello." Using the `pathWithQuery` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "hello world!". To make this code more readable, we'll add a helper function to extract the name from the path.
+
+```typescript
+import {
+  IncomingRequest,
+  ResponseOutparam,
+  OutgoingResponse,
+  Fields,
+} from "wasi:http/types@0.2.0-rc-2023-12-05";
+
+// Implementation of wasi-http incoming-handler
+//
+// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
+function handle(req: IncomingRequest, resp: ResponseOutparam) {
+  // Start building an outgoing response
+  const outgoingResponse = new OutgoingResponse(new Fields());
+
+  // Access the outgoing response body
+  let outgoingBody = outgoingResponse.body();
+  // Create a stream for the response body
+  let outputStream = outgoingBody.write();
+  //highlight-start
+  // Write "hello [name]" to the response stream
+  const name = getNameFromPath(req.pathWithQuery() || "")
+  outputStream.blockingWriteAndFlush(
+    new Uint8Array(new TextEncoder().encode(`hello ${name}!`))
+  );
+  //highlight-end
+
+  // Set the status code for the response
+  outgoingResponse.setStatusCode(200);
+
+  // Set the created response
+  ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
+}
+
+//highlight-start
+function getNameFromPath(path: string): string {
+  const parts = path.split("=");
+  if (parts.length == 2) {
+    return parts[1];
+  }
+  return "world";
+}
+//highlight-end
+
+export const incomingHandler = {
+  handle,
+};
+
+```
+
+  </TabItem>
+
+  <TabItem value="python" label="Python Component">
+
+:::caution
+Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
+:::
+
+:::info[Python & WebAssembly]
+To perform the steps in this guide, you'll need you'll need to install [Python 3.10](https://www.python.org/) or later, [pip](https://pip.pypa.io/en/stable/installation/), and `componentize-py` to compile Python code to WebAssembly.
+
+```shell
+pip install componentize-py==0.9.2
+```
+::: 
+
+Let's extend this application to do more than just say "hello." Using the `path_with_query` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "hello world!". We'll also add a helper function to keep our code readable.
+
+:::info
+If you're using an IDE or would like to look at the imports, you can generate the bindings using `componentize-py` to get IDE suggestions and autofills.
+```shell
+componentize-py bindings .
+```
+:::
+
+```python
+class IncomingHandler(exports.IncomingHandler):
+#highlight-start
+    # Make sure to change the variable name for the request from _ to request in the handle function.
+    def handle(self, request: IncomingRequest, response_out: ResponseOutparam):
+#highlight-end
+        # Construct the HTTP response to send back 
+        outgoingResponse = OutgoingResponse(Fields.from_list([]))
+        # Set the status code to OK
+        outgoingResponse.set_status_code(200)
+        outgoingBody = outgoingResponse.body()
+
+        # Write our Hello message to the response body
+#highlight-start
+        name = get_name_from_path(request.path_with_query())
+        outgoingBody.write().blocking_write_and_flush(bytes("Hello {}!\n".format(name), "utf-8"))
+#highlight-end
+        OutgoingBody.finish(outgoingBody, None)
+        # Set and send the HTTP response
+        ResponseOutparam.set(response_out, Ok(outgoingResponse))
+
+#highlight-start
+def get_name_from_path(path: str) -> str:
+    parts = path.split("=")
+    if len(parts) == 2:
+        return parts[-1]
+    else:
+        return "World"
+#highlight-end
+```
+
+  </TabItem>
+
+</Tabs>
+
+After changing the code, you can use `wash` to build the local actor:
 ```bash
 wash build
 ```
 
 ## Deploying your Actor
 
-Now that we're making modifications to the actor, you'll want to run your local copy instead of the wasmCloud example that's already deployed. To do this, we can edit the manifest to instead point at a local file. You can easily find this path by running `wash build -o json` and looking for **actor_path** in the output. Simply take that and prepend `file://` to the absolute path to avoid any reliance on the current working directory.
-
-```yaml
-metadata:
-  name: hello
-  annotations:
-    version: v0.0.3 # Make sure to upgrade the version
-    description: "wasmCloud Hello World Example"
-spec:
-  components:
-    - name: hello
-      type: actor
-      properties:
-        # Change the image to point at your local file
-        image: file:///Users/wasmcloud/hello/build/docs_s.wasm
-      traits:
-        - type: spreadscaler
-          properties:
-            replicas: 50
-        - type: linkdef
-          properties:
-            target: httpserver
-            values:
-              address: 0.0.0.0:8080
+Now that you've made an update to your actor, you can use wash to stop the previous version. You can supply either the name of the actor or the full 56 character signing key to the `wash stop actor` command. **wadm** will take care of starting the new local copy from the updated file. 
+```bash
+wash stop actor http-hello-world
 ```
-
-Now you can simply deploy the new version of your application, and then you can try out your new feature! **wadm** will take care of updating your actor to your local copy.
 
 :::info
 Whenever you make a change to your actor that you want to deploy, be sure to run `wash build` to recompile and generate a new .wasm file.
 :::
 
+<Tabs groupId="lang" queryString>
+  <TabItem value="rustmod" label="Rust" default>
+
 ```bash
-> wash app deploy wadm.yaml
 > curl localhost:8080
 Hello, World!
 > curl 'localhost:8080?name=Bob'
 Hello, Bob!
 ```
+  </TabItem>
+  <TabItem value="rust" label="Rust Component">
+
+```bash
+> curl localhost:8081
+Hello, World!
+> curl 'localhost:8081?name=Bob'
+Hello, Bob!
+```
+
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo Component">
+
+```bash
+> curl localhost:8080
+Hello, World!
+> curl 'localhost:8080?name=Bob'
+Hello, Bob!
+```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript Component">
+
+```bash
+> curl localhost:8080
+Hello, World!
+> curl 'localhost:8080?name=Bob'
+Hello, Bob!
+```
+  </TabItem>
+  <TabItem value="python" label="Python Component">
+
+```bash
+> curl localhost:8080
+Hello, World!
+> curl 'localhost:8080?name=Bob'
+Hello, Bob!
+```
+  </TabItem>
+</Tabs>
 
 ## Adding Persistent Storage
 
 To further enhance our application, let's add persistent storage to keep a record of each person that this application greeted. We'll use the key-value store capability for this, and just like HTTP server, you won't need to pick a library or a specific vendor implementation yet. You'll just need to add the capability to your actor, and then you can pick a capability provider at runtime.
 
-We'll start by adding the key-value interface in your project and then declare `wasmcloud:keyvalue` as a capability claim so that wasmCloud will allow your actor to use the capability.
-
-```bash
-# Add the key-value interface to your Cargo project
-cargo add wasmcloud-interface-keyvalue
-```
+We'll start by adding the key-value interface in your project and then declare `wasmcloud:keyvalue` as a capability claim so that wasmCloud will allow your actor to use the capability. If you'd like to also use the logging capability, you can add that to your claims as well.
 
 ```toml
 # wasmcloud.toml
 [actor]
-claims = ["wasmcloud:httpserver", "wasmcloud:keyvalue"]
+claims = ["wasmcloud:httpserver", "wasmcloud:keyvalue", "wasmcloud:builtin:logging"]
+```
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rustmod" label="Rust" default>
+
+```bash
+# Add the key-value interface to your Cargo project
+cargo add wasmcloud-interface-keyvalue
 ```
 
 Now we can make use of the key-value capability. Add a few imports at the top of your file:
@@ -156,11 +428,237 @@ The modified code will now, whenever a name is provided, add it to the set of gr
     }
 ```
 
+  </TabItem>
+  <TabItem value="rust" label="Rust Component">
+
+  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
+```wit
+package wasmcloud:hello;
+
+world hello {
+  // highlight-start
+  import wasi:keyvalue/atomic;
+  import wasi:keyvalue/readwrite;
+  import wasi:logging/logging;
+  // highlight-end
+
+  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
+}
+```
+
+Let's use the atomic increment function to keep track of how many times we've greeted each person. 
+  ```rust
+    let name = match request
+        .path_with_query()
+        .unwrap()
+        .split("=")
+        .collect::<Vec<&str>>()[..]
+    {
+        // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
+        ["/?name", name] => name.to_string(),
+        // query string is anything else or empty e.g. localhost:8080
+        _ => "World".to_string(),
+    };
+
+// highlight-start
+    wasi::logging::logging::log(
+        wasi::logging::logging::Level::Info,
+        "",
+        &format!("Greeting {name}"),
+    );
+
+    let bucket = wasi::keyvalue::types::open_bucket("").expect("failed to open empty bucket");
+    let count =
+        wasi::keyvalue::atomic::increment(bucket, &name, 1).expect("failed to increment count");
+
+    response_body
+        .write()
+        .unwrap()
+        .blocking_write_and_flush(format!("Hello x{count}, {name}!\n").as_bytes())
+// highlight-end
+        .unwrap();
+  ```
+
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo Component">
+
+  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
+```wit
+package wasmcloud:hello;
+
+world hello {
+  // highlight-start
+  import wasi:keyvalue/atomic;
+  import wasi:keyvalue/readwrite;
+  import wasi:logging/logging;
+  // highlight-end
+
+  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
+}
+```
+
+Let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+```go
+func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
+	// Construct HttpResponse to send back
+	headers := http.NewFields()
+	httpResponse := http.NewOutgoingResponse(headers)
+	httpResponse.SetStatusCode(200)
+
+	name := getNameFromPath(request.PathWithQuery().Unwrap())
+
+//highlight-start
+	http.WasiLoggingLoggingLog(http.WasiLoggingLoggingLevelInfo(), "", fmt.Sprintf("Greeting %s", name))
+	bucket := http.WasiKeyvalueTypesOpenBucket("").Unwrap()
+	count := http.WasiKeyvalueAtomicIncrement(bucket, name, 1).Unwrap()
+
+	httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello x%d, %s!\n", count, name))).Unwrap()
+//highlight-end
+
+	// Send HTTP response
+	okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+	http.StaticResponseOutparamSet(responseWriter, okResponse)
+}
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript Component">
+
+  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
+```wit
+package wasmcloud:hello;
+
+world hello {
+  // highlight-start
+  import wasi:keyvalue/atomic;
+  import wasi:keyvalue/readwrite;
+  import wasi:logging/logging;
+  // highlight-end
+
+  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
+}
+```
+
+Let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+```typescript
+import {
+  IncomingRequest,
+  ResponseOutparam,
+  OutgoingResponse,
+  Fields,
+} from "wasi:http/types@0.2.0-rc-2023-12-05";
+
+//highlight-start
+//@ts-expect-error -- these types aren't currently known by JCO
+import {log} from "wasi:logging/logging";
+//@ts-expect-error -- these types aren't currently known by JCO
+import {increment} from "wasi:keyvalue/atomic";
+//@ts-expect-error -- these types aren't currently known by JCO
+import {openBucket} from "wasi:keyvalue/types";
+//highlight-end
+
+// Implementation of wasi-http incoming-handler
+//
+// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
+function handle(req: IncomingRequest, resp: ResponseOutparam) {
+  // Start building an outgoing response
+  const outgoingResponse = new OutgoingResponse(new Fields());
+
+  // Access the outgoing response body
+  let outgoingBody = outgoingResponse.body();
+  // Create a stream for the response body
+  let outputStream = outgoingBody.write();
+  //highlight-start
+  // Write to the response stream
+  const name = getNameFromPath(req.pathWithQuery() || "")
+
+  log("info", "", `Greeting ${name}`);
+
+  // Increment the bucket's count
+  const bucket = openBucket("");
+  const count = increment(bucket, name, 1);
+
+  outputStream.blockingWriteAndFlush(
+    new Uint8Array(new TextEncoder().encode(`hello x${count}, ${name}!`))
+  );
+  //highlight-end
+
+  // Set the status code for the response
+  outgoingResponse.setStatusCode(200);
+
+  // Set the created response
+  ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
+}
+
+```
+
+  </TabItem>
+
+    <TabItem value="python" label="Python Component">
+
+  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
+```wit
+package wasmcloud:hello;
+
+world hello {
+  // highlight-start
+  import wasi:keyvalue/atomic;
+  import wasi:keyvalue/readwrite;
+  import wasi:logging/logging;
+  // highlight-end
+
+  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
+}
+```
+
+Let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+```python
+from hello import exports
+from hello.types import Ok
+from hello.imports.types import (
+    IncomingRequest, ResponseOutparam,
+#highlight-start
+    OutgoingResponse, Fields, OutgoingBody, open_bucket
+)
+from hello.imports.atomic import increment
+from hello.imports.logging import (log, Level)
+#highlight-end
+
+class IncomingHandler(exports.IncomingHandler):
+    def handle(self, request: IncomingRequest, response_out: ResponseOutparam):
+        # Construct the HTTP response to send back 
+        outgoingResponse = OutgoingResponse(Fields.from_list([]))
+        # Set the status code to OK
+        outgoingResponse.set_status_code(200)
+        outgoingBody = outgoingResponse.body()
+
+        # Write our Hello message to the response body
+        name = get_name_from_path(request.path_with_query())
+#highlight-start
+        log(Level.INFO, "", "Greeting {}".format(name))
+        bucket = open_bucket("")
+        count = increment(bucket, name, 1)
+
+        outgoingBody.write().blocking_write_and_flush(bytes("Hello x{}, {}!\n".format(count, name), "utf-8"))
+#highlight-end
+        OutgoingBody.finish(outgoingBody, None)
+        # Set and send the HTTP response
+        ResponseOutparam.set(response_out, Ok(outgoingResponse))
+```
+
+
+  </TabItem>
+</Tabs>
+
+
 ### Deploying a Key-Value Store Provider
 
 Our actor is prepared to use a key-value store, and now that we've built it we're ready to choose an implementation. A great option for local development and testing is the [Redis provider](https://github.com/wasmCloud/capability-providers/tree/main/kvredis), and will only require you to have `redis-server` or Docker installed.
 
-<Tabs queryString="redis">
+<Tabs groupId="env" queryString>
   <TabItem value="local" label="Local Redis Server" default>
 
 [Install](https://redis.io/docs/getting-started/) and launch the local redis server in the background
@@ -187,16 +685,18 @@ We can modify our `wadm.yaml` to include the Redis provider and configure a link
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: hello
+  name: http-hello-world
   annotations:
-    version: v0.0.4 # Remember to bump the version!
-    description: 'wasmCloud Hello World Example'
+    version: v0.0.1
+    description: "HTTP hello world demo, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)"
+    experimental: true
 spec:
   components:
-    - name: hello
+    - name: http-hello-world
       type: actor
       properties:
-        image: file:///Users/wasmcloud/hello/build/docs_s.wasm
+        # Try using `wash build -o json` and use the `actor_path` field, prepended with `file://`
+        image: file:///Users/wasmcloud/hello/build/http_hello_world_s.wasm
       traits:
         - type: spreadscaler
           properties:
@@ -206,6 +706,7 @@ spec:
             target: httpserver
             values:
               address: 0.0.0.0:8080
+//highlight-start
         # The new key-value link configuration
         - type: linkdef
           properties:
@@ -222,11 +723,15 @@ spec:
     - name: keyvalue
       type: capability
       properties:
-        image: wasmcloud.azurecr.io/kvredis:0.21.1
+        image: wasmcloud.azurecr.io/kvredis:0.22.0
         contract: wasmcloud:keyvalue
+//highlight-end
 ```
 
 For the last step, we can deploy the `v0.0.3` version of our application. Then, again, we can test our new functionality.
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rustmod" label="Rust" default>
 
 ```bash
 > wash app deploy wadm.yaml
@@ -238,8 +743,63 @@ Hello, Alice!
 Hello, Bob, Alice!
 ```
 
+  </TabItem>
+  <TabItem value="rust" label="Rust Component">
+
+```bash
+> wash app deploy wadm.yaml
+> curl localhost:8080?name=Bob
+Hello x1, Bob!
+> curl localhost:8080?name=Bob
+Hello x2, Bob!
+> curl localhost:8080?name=Alice
+Hello x1, Alice!
+```
+
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo Component">
+
+```bash
+> wash app deploy wadm.yaml
+> curl localhost:8080?name=Bob
+Hello x1, Bob!
+> curl localhost:8080?name=Bob
+Hello x2, Bob!
+> curl localhost:8080?name=Alice
+Hello x1, Alice!
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript Component">
+
+```bash
+> wash app deploy wadm.yaml
+> curl localhost:8080?name=Bob
+Hello x1, Bob!
+> curl localhost:8080?name=Bob
+Hello x2, Bob!
+> curl localhost:8080?name=Alice
+Hello x1, Alice!
+```
+
+  </TabItem>
+  <TabItem value="python" label="Python Component">
+
+```bash
+> wash app deploy wadm.yaml
+> curl localhost:8080?name=Bob
+Hello x1, Bob!
+> curl localhost:8080?name=Bob
+Hello x2, Bob!
+> curl localhost:8080?name=Alice
+Hello x1, Alice!
+```
+
+  </TabItem>
+</Tabs>
+
 ## Moving on
 
-In this tutorial, you added a few more features and persistent storage to a simple microservice. You also got to see the process of developing with interfaces, where the code you write is purely functional, doesn't require you to pick a library or vendor upfront, and allows you to change your application separately from its non-functional requirements. You can continue to build on this application by adding more features, or you can explore additional capabilities and providers in the [wasmCloud Capability Providers repository](https://github.com/wasmCloud/capability-providers) to get an idea of what is possible with wasmCloud.
+In this tutorial, you added a few more features and persistent storage to a simple microservice. You also got to see the process of developing with interfaces, where the code you write is purely functional, doesn't require you to pick a library or vendor upfront, and allows you to change your application separately from its non-functional requirements. You can continue to build on this application by adding more features, or you can explore additional capabilities and providers in [wasmCloud Capability Providers](https://github.com/wasmCloud/wasmCloud/tree/main/vendor/capability-providers) to get an idea of what is possible with wasmCloud.
 
 The next page gives a high level overview of why this application that you've built already eliminates complexity and pain that developers often face when building applications for the cloud.

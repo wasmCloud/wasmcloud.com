@@ -35,7 +35,7 @@ wash dev --experimental --host-id=<your-host-id>
 
 `--wasmcloud-version` wasmCloud host version to download, e.g. `v0.80.0`. See https://github.com/wasmCloud/wasmCloud/releases for releases [env: WASMCLOUD_VERSION=] [default: v0.80.0]
 
-`--lattice-prefix` (Alias `-x`) A lattice prefix is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE_PREFIX=] [default: default]
+`--lattice-prefix` (Alias `-x`) ALattice name for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
 `--host-seed` The seed key (a printable 256-bit Ed25519 private key) used by this host to generate it's public key [env: WASMCLOUD_HOST_SEED=]
 

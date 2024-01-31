@@ -59,7 +59,7 @@ When the library is ready to release, it can be published. For example, interfac
 
 While it isn't called out as a specific pre-requisite, _many_ of the steps in the developer iteration loops involve interacting with an OCI registry. Unless you've got a public one that you can use, you'll likely want to use a local one for testing.
 
-To start a local OCI registry, download the [sample Docker Compose file](https://raw.githubusercontent.com/wasmCloud/examples/main/docker/docker-compose.yml) into the current folder and run
+To start a local OCI registry, download the [sample Docker Compose file](https://github.com/wasmCloud/wasmCloud/blob/main/examples/docker/docker-compose-full.yml) into the current folder and run
 
 ```bash
 docker compose up -d registry

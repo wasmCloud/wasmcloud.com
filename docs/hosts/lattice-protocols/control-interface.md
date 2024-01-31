@@ -23,9 +23,9 @@ serialized via **JSON**.
 The following is a list of the operations supported by the control interface.
 
 All of the control interface messages published on NATS topics use a standard prefix. This prefix is
-`wasmbus.ctl.{lattice-prefix}` where `lattice-prefix` is a string used to differentiate one lattice
-from another (this is also referred to as the "lattice ID"). Note that `lattice-prefix` must
-correspond to the lattice prefix of the lattice you intend to control.
+`wasmbus.ctl.{lattice}` where `lattice` is a string used to differentiate one lattice
+from another (this is also referred to as the "lattice ID"). Note that `lattice` must
+correspond to the name of the lattice you intend to control.
 
 ⚠️ You must ensure that your namespace prefix is alphanumeric and does not the contain `/` or `.` or
 `>` characters, as those have special meaning to the NATS message broker.
@@ -34,7 +34,7 @@ correspond to the lattice prefix of the lattice you intend to control.
 
 #### Provider
 
-`nats req wasmbus.ctl.{lattice_prefix}.auction.provider <json_body>`
+`nats req wasmbus.ctl.{lattice}.auction.provider <json_body>`
 
 Hold an auction for starting a provider. This allows all hosts that match a given list of
 requirements to respond whether or not they can run the provider
@@ -71,7 +71,7 @@ you'll need to set `--replies 0 --timeout <your timeout>`. An example response i
 
 #### Actor
 
-`nats req wasmbus.ctl.{lattice_prefix}.auction.actor <json_body>`
+`nats req wasmbus.ctl.{lattice}.auction.actor <json_body>`
 
 Hold an auction for starting an actor. This allows all hosts that match a given list of requirements
 to respond whether or not they can run the actor
@@ -107,7 +107,7 @@ you'll need to set `--replies 0 --timeout <your timeout>`. An example response i
 
 #### Launch Actor (deprecated)
 
-`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.la <json_body>`
+`nats req wasmbus.ctl.{lattice}.cmd.{host-id}.la <json_body>`
 
 This command is currently deprecated in favor of the scale command as of version 0.79 of the
 wasmCloud host. It is documented here purely for completeness
@@ -143,7 +143,7 @@ the actor has started, you should monitor the lattice event stream for the `acto
 
 #### Stop Actor
 
-`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.sa <json_body>`
+`nats req wasmbus.ctl.{lattice}.cmd.{host-id}.sa <json_body>`
 
 Stops an actor on a host, terminating any pre-instantiated instances.
 
@@ -178,7 +178,7 @@ the actor has stopped, you should monitor the lattice event stream for the `acto
 
 #### Scale Actor
 
-`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.scale <json_body>`
+`nats req wasmbus.ctl.{lattice}.cmd.{host-id}.scale <json_body>`
 
 Scales an actor on a host to a specific max amount of instances that can run. This means that the
 host will automatically scale up to the specified number of actors as requests come in. Put more
@@ -218,7 +218,7 @@ the actor has started, you should monitor the lattice event stream for the `acto
 
 #### Live Update Actor
 
-`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.upd <json_body>`
+`nats req wasmbus.ctl.{lattice}.cmd.{host-id}.upd <json_body>`
 
 Live updates an actor on a host. This means that the host will attempt to update the actor (if it is
 running on the host) with the newer version specified.
@@ -254,7 +254,7 @@ the actor has updated, you should monitor the lattice event stream for the `acto
 
 #### Launch Provider
 
-`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.lp <json_body>`
+`nats req wasmbus.ctl.{lattice}.cmd.{host-id}.lp <json_body>`
 
 Launches a capability provider on a host. Unlike actors, only one instance of a provider + link name
 can run on any given host.
@@ -293,7 +293,7 @@ event
 
 #### Stop Provider
 
-`nats req wasmbus.ctl.{lattice_prefix}.cmd.{host-id}.sp <json_body>`
+`nats req wasmbus.ctl.{lattice}.cmd.{host-id}.sp <json_body>`
 
 Stops a matching capability provider + link name on a host.
 
@@ -327,7 +327,7 @@ event.
 
 #### Stop Host
 
-`nats req wasmbus.ctl.{lattice_prefix}.cmd.stop <json_body>`
+`nats req wasmbus.ctl.{lattice}.cmd.stop <json_body>`
 
 Stops the host indicated in the request.
 
@@ -367,7 +367,7 @@ other guarantees about the kind of data that is stored in the config.
 
 #### Set Actor Config
 
-`nats req wasmbus.ctl.{lattice_prefix}.config.put.{actor_id}.{key} <arbitrary_bytes>`
+`nats req wasmbus.ctl.{lattice}.config.put.{actor_id}.{key} <arbitrary_bytes>`
 
 Sets the value of a config key for an actor. This will overwrite any value that is currently set
 
@@ -389,7 +389,7 @@ across the whole lattice
 
 #### Delete Specific Actor Config Key
 
-`nats req wasmbus.ctl.{lattice_prefix}.config.del.{actor_id}.{key} ''`
+`nats req wasmbus.ctl.{lattice}.config.del.{actor_id}.{key} ''`
 
 Deletes a specific config key for an actor.
 
@@ -411,7 +411,7 @@ deleted across the whole lattice
 
 #### Delete All Actor Config
 
-`nats req wasmbus.ctl.{lattice_prefix}.config.del.{actor_id} ''`
+`nats req wasmbus.ctl.{lattice}.config.del.{actor_id} ''`
 
 Deletes all config data for an actor.
 
@@ -435,7 +435,7 @@ deleted across the whole lattice
 
 #### Links
 
-`nats req wasmbus.ctl.{lattice_prefix}.get.links ''`
+`nats req wasmbus.ctl.{lattice}.get.links ''`
 
 Queries the lattice for all link definitions.
 
@@ -463,7 +463,7 @@ Empty body
 
 #### Claims
 
-`nats req wasmbus.ctl.{lattice_prefix}.get.claims ''`
+`nats req wasmbus.ctl.{lattice}.get.claims ''`
 
 Gets claims from the lattice. Claims contain additional information about entities running in the
 lattice for use by the host and other applications.
@@ -499,7 +499,7 @@ hope to make this type more concrete in the future.
 
 #### Host Inventory
 
-`nats req wasmbus.ctl.{lattice_prefix}.get.{host-id}.inv ''`
+`nats req wasmbus.ctl.{lattice}.get.{host-id}.inv ''`
 
 Gets the inventory of a given host. This includes all actors and providers running on a host as well
 as some basic metadata about the host.
@@ -556,7 +556,7 @@ group with the annotations `{ "foo": "bar" }`.
 
 #### Ping Hosts
 
-`nats req wasmbus.ctl.{lattice_prefix}.ping.hosts ''`
+`nats req wasmbus.ctl.{lattice}.ping.hosts ''`
 
 Pings all hosts in the lattice and gathers responses. This is a "scatter/gather" type operation,
 meaning that you'll receive multiple json responses from all hosts until your configured timeout. If
@@ -591,7 +591,7 @@ Empty body
 
 ### Get All Actor Config
 
-`nats req wasmbus.ctl.{lattice_prefix}.get.config.{actor_id} ''`
+`nats req wasmbus.ctl.{lattice}.get.config.{actor_id} ''`
 
 Fetches all config data for an actor
 
@@ -620,7 +620,7 @@ If no data is set an empty JSON object (`{}`) will be returned
 
 #### Get Actor Config Key
 
-`nats req wasmbus.ctl.{lattice_prefix}.get.config.{actor_id}.{key} ''`
+`nats req wasmbus.ctl.{lattice}.get.config.{actor_id}.{key} ''`
 
 Fetches a single config key for an actor
 
@@ -656,7 +656,7 @@ If the key does not exist, the following body will be returned:
 
 #### Put Link Definition
 
-`nats req wasmbus.ctl.{lattice_prefix}.linkdefs.put <json_body>`
+`nats req wasmbus.ctl.{lattice}.linkdefs.put <json_body>`
 
 Puts a link definition into the lattice. This defines a connection between an actor and a provider
 along with a unique set of configuration values.
@@ -691,7 +691,7 @@ event stream for the `linkdef_set` event.
 
 #### Delete Link Definition
 
-`nats req wasmbus.ctl.{lattice_prefix}.linkdefs.del <json_body>`
+`nats req wasmbus.ctl.{lattice}.linkdefs.del <json_body>`
 
 Deletes a link definition from the lattice.
 
@@ -721,8 +721,8 @@ lattice event stream for the `linkdef_deleted` event.
 
 ## Lattice Events
 
-Lattice events are published on the stream `wasmbus.evt.{lattice-prefix}` where `lattice-prefix` is
-the lattice namespace prefix (also referred to as the "lattice ID"). Lattice events are
+Lattice events are published on `wasmbus.evt.{lattice}.>` subjects, where `lattice` is
+the lattice name (also referred to as the "lattice ID"). Lattice events are
 JSON-serialized [CloudEvents](https://github.com/cloudevents/spec/blob/v1.0.1/json-format.md) for
 easy, standardized consumption. This means that the `data` field in the cloud event envelope is just
 another JSON object and does not need to be decoded further. For documentation on all emitted

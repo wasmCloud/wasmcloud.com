@@ -5,7 +5,7 @@ description: "List of CloudEvents Used in a Lattice"
 sidebar_position: 5
 type: "docs"
 ---
-The following is a list of all of the [CloudEvents](https://cloudevents.io) emitted by wasmCloud hosts in a lattice. The events are published to `wasmbus.evt.{lattice-id}`, and so will publish to `wasmbus.evt.default` by default.
+The following is a list of all of the [CloudEvents](https://cloudevents.io) emitted by wasmCloud hosts in a lattice. The events are published to `wasmbus.evt.{lattice-id}.{event-type}`, and so will publish to `wasmbus.evt.default.>` by default.
 
 All of the events in the table below are namespaced by the prefix `com.wasmcloud.lattice`, so the `actor_started` event has the Cloud Event type of `com.wasmcloud.lattice.actor_started`. These event types do _not_ include the lattice identifier.
 

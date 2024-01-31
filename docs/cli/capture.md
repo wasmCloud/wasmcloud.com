@@ -1,7 +1,7 @@
 ---
 title: "wash capture"
 draft: false
-sidebar_position: 3
+sidebar_position: 4
 description: "wash capture command reference"
 --- 
 
@@ -43,7 +43,7 @@ wash capture replay --experimental /path/to/captured-file
 
 `--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-`--lattice-prefix`(Alias `-x`) Lattice prefix for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
+`--lattice-prefix`(Alias `-x`) Lattice name for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
 `--timeout-ms` Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
