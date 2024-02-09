@@ -5,7 +5,7 @@ sidebar_position: 2
 description: "wash build command reference"
 ---
 
-`wash build` enables users to build and sign custom wasmCloud entities like actors, providers, or interfaces. One can bring in their own project containing some business logic and build these entities by simply providing the path to the project or its associated `wasmcloud.toml` file. The built artifact is signed using automatically generated keys or a user may use their own keys to sign the build.
+`wash build` enables you to build and sign custom wasmCloud entities like actors, providers, or interfaces. You can bring in your own project containing some business logic and build these entities by simply providing the path to the project or its associated `wasmcloud.toml` file. The built artifact is signed using automatically generated keys or you may use your own keys to sign the build.
 
 ### Usage
 
