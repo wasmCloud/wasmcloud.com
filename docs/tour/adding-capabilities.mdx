@@ -11,12 +11,12 @@ Going from "Hello World" to a full-fledged application requires just identifying
 
 ## Adding Functionality
 
-<Tabs groupId="lang" queryString>
-  <TabItem value="rust" label="Rust">
-
 :::caution
 Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
 :::
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust">
 
 :::info[Rust & WebAssembly]
 To perform the steps in this guide, you'll need to have a [Rust toolchain](https://www.rust-lang.org/tools/install) installed locally and the wasm32 target installed:
@@ -43,7 +43,10 @@ use wasi::http::types::*;
 struct HttpServer;
 
 impl Guest for HttpServer {
+// highlight-start
+    // Make sure to remove the _ prefix from the `request` variable
     fn handle(request: IncomingRequest, response_out: ResponseOutparam) {
+// highlight-end
         let response = OutgoingResponse::new(Fields::new());
         response.set_status_code(200).unwrap();
         let response_body = response.body().unwrap();
@@ -72,9 +75,6 @@ impl Guest for HttpServer {
 
   </TabItem>
   <TabItem value="tinygo" label="TinyGo">
-:::caution
-Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
-:::
 
 :::info[Go & WebAssembly]
 To perform the steps in this guide, you'll need you'll need to install both [Go](https://golang.org/doc/install) and [TinyGo](https://tinygo.org/getting-started/). We use the TinyGo toolchain to compile Go code to WebAssembly.
@@ -139,9 +139,6 @@ func main() {}
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-:::caution
-Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
-:::
 
 :::info[TypeScript & WebAssembly]
 To perform the steps in this guide, you'll need you'll need to install [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) and run `npm install` in the project directory. We use npm to install dependencies and compile TypeScript code to WebAssembly.
@@ -200,12 +197,7 @@ export const incomingHandler = {
 ```
 
   </TabItem>
-
   <TabItem value="python" label="Python">
-
-:::caution
-Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
-:::
 
 :::info[Python & WebAssembly]
 To perform the steps in this guide, you'll need you'll need to install [Python 3.10](https://www.python.org/) or later, [pip](https://pip.pypa.io/en/stable/installation/), and `componentize-py` to compile Python code to WebAssembly.
@@ -256,7 +248,6 @@ def get_name_from_path(path: str) -> str:
 ```
 
   </TabItem>
-
 </Tabs>
 
 After changing the code, you can use `wash` to build the local actor:
@@ -275,75 +266,34 @@ wash stop actor http-hello-world
 Whenever you make a change to your actor that you want to deploy, be sure to run `wash build` to recompile and generate a new .wasm file.
 :::
 
-<Tabs groupId="lang" queryString>
-  <TabItem value="rust" label="Rust">
-
-```bash
-> curl localhost:8081
-Hello, World!
-> curl 'localhost:8081?name=Bob'
-Hello, Bob!
-```
-
-  </TabItem>
-  <TabItem value="tinygo" label="TinyGo">
-
 ```bash
 > curl localhost:8080
 Hello, World!
 > curl 'localhost:8080?name=Bob'
 Hello, Bob!
 ```
-  </TabItem>
-  <TabItem value="typescript" label="TypeScript">
-
-```bash
-> curl localhost:8080
-Hello, World!
-> curl 'localhost:8080?name=Bob'
-Hello, Bob!
-```
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-```bash
-> curl localhost:8080
-Hello, World!
-> curl 'localhost:8080?name=Bob'
-Hello, Bob!
-```
-  </TabItem>
-</Tabs>
 
 ## Adding Persistent Storage
 
 To further enhance our application, let's add persistent storage to keep a record of each person that this application greeted. We'll use the key-value store capability for this, and just like HTTP server, you won't need to pick a library or a specific vendor implementation yet. You'll just need to add the capability to your actor, and then you can pick a capability provider at runtime.
 
-We'll start by adding the key-value interface in your project and then declare `wasmcloud:keyvalue` as a capability claim so that wasmCloud will allow your actor to use the capability. If you'd like to also use the logging capability, you can add that to your claims as well.
-
-```toml
-# wasmcloud.toml
-[actor]
-claims = ["wasmcloud:httpserver", "wasmcloud:keyvalue", "wasmcloud:builtin:logging"]
-```
-
-<Tabs groupId="lang" queryString>
-  <TabItem value="rust" label="Rust">
-
-  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
+  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/world.wit` file:
 ```wit
 package wasmcloud:hello;
 
 world hello {
   // highlight-start
-  import wasi:keyvalue/atomic;
-  import wasi:keyvalue/readwrite;
+  import wasi:keyvalue/atomic@0.1.0;
+  import wasi:keyvalue/eventual@0.1.0;
   import wasi:logging/logging;
   // highlight-end
 
-  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
+  export wasi:http/incoming-handler@0.2.0;
 }
 ```
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust">
 
 Let's use the atomic increment function to keep track of how many times we've greeted each person. 
   ```rust
@@ -366,9 +316,10 @@ Let's use the atomic increment function to keep track of how many times we've gr
         &format!("Greeting {name}"),
     );
 
-    let bucket = wasi::keyvalue::types::open_bucket("").expect("failed to open empty bucket");
-    let count =
-        wasi::keyvalue::atomic::increment(bucket, &name, 1).expect("failed to increment count");
+    let bucket =
+        wasi::keyvalue::types::Bucket::open_bucket("").expect("failed to open empty bucket");
+    let count = wasi::keyvalue::atomic::increment(&bucket, &name, 1)
+        .expect("failed to increment count");
 
     response_body
         .write()
@@ -380,21 +331,6 @@ Let's use the atomic increment function to keep track of how many times we've gr
 
   </TabItem>
   <TabItem value="tinygo" label="TinyGo">
-
-  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
-```wit
-package wasmcloud:hello;
-
-world hello {
-  // highlight-start
-  import wasi:keyvalue/atomic;
-  import wasi:keyvalue/readwrite;
-  import wasi:logging/logging;
-  // highlight-end
-
-  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
-}
-```
 
 Let's use the atomic increment function to keep track of how many times we've greeted each person.
 
@@ -423,21 +359,6 @@ func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWrite
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-
-  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
-```wit
-package wasmcloud:hello;
-
-world hello {
-  // highlight-start
-  import wasi:keyvalue/atomic;
-  import wasi:keyvalue/readwrite;
-  import wasi:logging/logging;
-  // highlight-end
-
-  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
-}
-```
 
 Let's use the atomic increment function to keep track of how many times we've greeted each person.
 
@@ -497,21 +418,6 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
 
     <TabItem value="python" label="Python">
 
-  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
-```wit
-package wasmcloud:hello;
-
-world hello {
-  // highlight-start
-  import wasi:keyvalue/atomic;
-  import wasi:keyvalue/readwrite;
-  import wasi:logging/logging;
-  // highlight-end
-
-  export wasi:http/incoming-handler@0.2.0-rc-2023-12-05;
-}
-```
-
 Let's use the atomic increment function to keep track of how many times we've greeted each person.
 
 ```python
@@ -547,7 +453,6 @@ class IncomingHandler(exports.IncomingHandler):
         # Set and send the HTTP response
         ResponseOutparam.set(response_out, Ok(outgoingResponse))
 ```
-
 
   </TabItem>
 </Tabs>
@@ -586,7 +491,9 @@ kind: Application
 metadata:
   name: http-hello-world
   annotations:
-    version: v0.0.1
+//highlight-start
+    version: v0.0.3
+//highlight-end
     description: "HTTP hello world demo, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)"
     experimental: true
 spec:
@@ -594,8 +501,7 @@ spec:
     - name: http-hello-world
       type: actor
       properties:
-        # Try using `wash build -o json` and use the `actor_path` field, prepended with `file://`
-        image: file:///Users/wasmcloud/hello/build/http_hello_world_s.wasm
+        image: file://./build/http_hello_world_s.wasm
       traits:
         - type: spreadscaler
           properties:
@@ -629,60 +535,15 @@ spec:
 
 For the last step, we can deploy the `v0.0.3` version of our application. Then, again, we can test our new functionality.
 
-<Tabs groupId="lang" queryString>
-  <TabItem value="rust" label="Rust">
-
 ```bash
 > wash app deploy wadm.yaml
-> curl localhost:8080?name=Bob
+> curl 'localhost:8080?name=Bob'
 Hello x1, Bob!
-> curl localhost:8080?name=Bob
+> curl 'localhost:8080?name=Bob'
 Hello x2, Bob!
-> curl localhost:8080?name=Alice
+> curl 'localhost:8080?name=Alice'
 Hello x1, Alice!
 ```
-
-  </TabItem>
-  <TabItem value="tinygo" label="TinyGo">
-
-```bash
-> wash app deploy wadm.yaml
-> curl localhost:8080?name=Bob
-Hello x1, Bob!
-> curl localhost:8080?name=Bob
-Hello x2, Bob!
-> curl localhost:8080?name=Alice
-Hello x1, Alice!
-```
-
-  </TabItem>
-  <TabItem value="typescript" label="TypeScript">
-
-```bash
-> wash app deploy wadm.yaml
-> curl localhost:8080?name=Bob
-Hello x1, Bob!
-> curl localhost:8080?name=Bob
-Hello x2, Bob!
-> curl localhost:8080?name=Alice
-Hello x1, Alice!
-```
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-```bash
-> wash app deploy wadm.yaml
-> curl localhost:8080?name=Bob
-Hello x1, Bob!
-> curl localhost:8080?name=Bob
-Hello x2, Bob!
-> curl localhost:8080?name=Alice
-Hello x1, Alice!
-```
-
-  </TabItem>
-</Tabs>
 
 ## Moving on
 

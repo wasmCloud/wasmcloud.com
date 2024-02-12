@@ -72,7 +72,7 @@ Pick your language of choice below to follow
 
 This command generates a new actor project in the `./hello` directory:
 ```bash
-wash new actor hello --git wasmcloud/wasmcloud --subfolder examples/rust/actors/http-hello-world --branch v0.81.0
+wash new actor hello --git wasmcloud/wasmcloud --subfolder examples/rust/actors/http-hello-world
 ```
 
 This actor is a simple Rust project with a few extra goodies included for wasmCloud. At a high level, the important pieces are:
@@ -98,7 +98,7 @@ rustup target add wasm32-wasi
 
 This command generates a new actor project in the `./hello` directory:
 ```bash
-wash new actor hello --git wasmcloud/wasmcloud --subfolder examples/golang/actors/http-hello-world  --branch v0.81.0
+wash new actor hello --git wasmcloud/wasmcloud --subfolder examples/golang/actors/http-hello-world
 ```
 
 This actor is a simple Go project with a few extra goodies included for wasmCloud. At a high level, the important pieces are:
@@ -120,7 +120,7 @@ Component examples are experimental and likely to require recompilation with eac
 
 This command generates a new actor project in the `./hello` directory:
 ```bash
-wash new actor hello --git wasmcloud/wasmcloud --subfolder examples/typescript/actors/http-hello-world  --branch v0.81.0
+wash new actor hello --git wasmcloud/wasmcloud --subfolder examples/typescript/actors/http-hello-world
 ```
 
 This actor is a simple TypeScript project with a few extra goodies included for wasmCloud. At a high level, the important pieces are:
@@ -142,7 +142,7 @@ Component examples are experimental and likely to require recompilation with eac
 
 This command generates a new actor project in the `./hello` directory:
 ```bash
-wash new actor hello --git wasmcloud/wasmcloud --subfolder examples/python/actors/http-hello-world --branch v0.81.0
+wash new actor hello --git wasmcloud/wasmcloud --subfolder examples/python/actors/http-hello-world
 ```
 
 This actor is a simple Python project with a few extra goodies included for wasmCloud. At a high level, the important pieces are:
@@ -181,45 +181,19 @@ pip install componentize-py==0.9.2
 Feel free to take a look at the code and the project structure. We'll take a look at each of these in depth later, so for now let's build and run the example.
 
 ## Building the Application
+:::info
+If you prefer not to build anything yet, you can use `wasmcloud.azurecr.io/hello:0.1.7` as the image inside of `wadm.yaml` instead to pull our prebuilt example actor.
+:::
+
 We can use the open source HTTP Server capability provider to serve our application, so the only thing you'll need to build is the actor component. Change directory into the generated `hello` directory and run `wash build` to build your actor, taking note of the actor path after building:
+
 ```bash
-cd hello
+cd hello # enter the new project directory (if you haven't already)
 wash build
 ```
 ```bash
 Actor built and signed and can be found at "/Users/wasmcloud/hello/build/http_hello_world_s.wasm"
 ```
-
-Then, replace the `image` property in `wadm.yaml` with the path to your actor. For example, if your actor path is `/Users/wasmcloud/hello/build/http_hello_world_s.wasm`, your `wadm.yaml` should look like this:
-
-```yaml
-apiVersion: core.oam.dev/v1beta1
-kind: Application
-metadata:
-  name: http-hello-world
-  annotations:
-    version: v0.0.1
-    description: "HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)"
-    experimental: true
-spec:
-  components:
-    - name: http-hello-world
-      type: actor
-      // highlight-start
-      properties:
-        # Try using `wash build -o json` and use the `actor_path` field, prepended with `file://`
-        image: file:///Users/wasmcloud/hello/build/http_hello_world_s.wasm
-      // highlight-end
-      traits:
-        # Govern the spread/scheduling of the actor
-        - type: spreadscaler
-          properties:
-            replicas: 1
-```
-
-:::info
-If you prefer not to build anything yet, you can use `wasmcloud.azurecr.io/hello:0.1.7` as the image instead to pull our prebuilt example actor.
-:::
 
 ## Starting our Application
 
@@ -232,7 +206,7 @@ wash app deploy wadm.yaml
 
 ![wash app deploy diagram](../images/washappdeploy.png)
 
-`wadm` will take care of taking this manifest and scheduling the resources on the host that you launched earlier. You should see output in the host logs when your actor and capability start up, which should happen after just a few seconds. After you see that the HTTP server set up the listener in the host logs, or once the application is `Deployed` when you check `wash app list`, you can query it yourself:
+`wadm` will take care of taking this manifest and scheduling the resources on the host that you launched earlier. You should see output in the host logs when your actor and capability start up, which should happen after just a few seconds. After you see that the HTTP server set up the listener in the host logs, or once the application is **Deployed** when you check `wash app list`, you can query it yourself:
 ```bash
 ➜ wash app list
 
@@ -371,7 +345,6 @@ export const incomingHandler = {
 This actor has a single function, `handle`, that implements the `incoming-handler` interface. This function is called by the HTTP Server capability provider when it receives an incoming HTTP request. The `handle` function constructs an `OutgoingResponse` and sends it back to the HTTP Server capability provider, which then sends it back to the client. There's no mention of ports, certificates, HTTP libraries, and if those things change this actor will work all the same.
 
   </TabItem>
-
   <TabItem value="Python" label="Python">
     ```python
 from hello import exports
@@ -402,7 +375,7 @@ class IncomingHandler(exports.IncomingHandler):
 
 :::info
 
-Capabilities are _deny by default_, and if you take a look in `wasmcloud.toml` you'll see the only capability is `wasmcloud:httpserver`. This means that this actor can never access files on disk, make network requests of its own, or even access the system time, it's blocked by the wasmCloud runtime.
+Capabilities are _deny by default_, the link inside of `wadm.yaml` explicitly allowed the "Hello World" component to receive an HTTP request. If you inspect the [wit](https://wasmcloud.com/docs/hosts/abis/components/) of your component with `wash inspect --wit` you'll see the only `export` is `wasi:http/incoming-handler`, and the only `import`s are standard capabilities. This means that this actor cannot make network requests of its own, read arbitrary files, or even generate a random number, all are denied by the wasmCloud runtime.
 
 :::
 
