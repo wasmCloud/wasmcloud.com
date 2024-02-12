@@ -31,7 +31,9 @@ build_artifact = "http.wasm"
 
 If you use the `build_command` field, you must also specify the `build_artifact`: the filename and location of the Wasm artifact that will be produced by the build command. This provides `wash build` with a target for signing the artifact.
 
-**Note**: Currently the `language` field in the `wasmcloud.toml` metadata must be set to an "officially supported" language (i.e. Rust or Go) to avoid errors. The `build_command` field does not have full support for environment variables or multiple commands and should be in the form of "command arg1 arg2 arg...". Use an external script to handle more complex build commands.  
+:::info[Note] 
+Currently the `language` field in the `wasmcloud.toml` metadata must be set to an "officially supported" language (i.e. Rust or Go) to avoid errors. The `build_command` field does not have full support for environment variables or multiple commands and should be in the form of "command arg1 arg2 arg...". Use an external script to handle more complex build commands.  
+:::
 
 ### Options
 
