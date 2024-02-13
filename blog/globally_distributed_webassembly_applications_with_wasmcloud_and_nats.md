@@ -1,11 +1,11 @@
 ---
-title: "Globally Distributed WebAssembly Applications with wasmCloud and NATS"
-image: "/img/ngs-global.png"
+title: 'Globally Distributed WebAssembly Applications with wasmCloud and NATS'
+image: '/img/ngs-global.png'
 date: 2022-10-18T9:00:00-04:00
-author: "Brooks Townsend"
-author_profile: "https://linkedin.com/in/brooks-townsend"
-description: "Taking a wasmCloud lattice from local to globally distributed with NATS and NGS"
-categories: ["webassembly", "wasmcloud", "nats", "distributed", "lattice"]
+author: 'Brooks Townsend'
+author_profile: 'https://linkedin.com/in/brooks-townsend'
+description: 'Taking a wasmCloud lattice from local to globally distributed with NATS and NGS'
+categories: ['webassembly', 'wasmcloud', 'nats', 'distributed', 'lattice']
 draft: false
 ---
 
@@ -132,7 +132,7 @@ wash up --nats-remote-url tls://connect.ngs.global --nats-credsfile ~/.nkeys/cre
 
 You should see output like the following:
 
-```plain
+```
 🏃 Running in interactive mode, your host is running at http://localhost:4000
 🚪 Press `CTRL+c` at any time to exit
 11:37:41.559 [info] Wrote "./host_config.json"
@@ -175,6 +175,7 @@ wash link put MCUCZ7KMLQBRRWAREIBQKTJ64MMQ5YKEGTCRGPPV47N4R72W2SU3EYMU VCCVLH4XW
 wash start provider wasmcloud.azurecr.io/httpserver:0.17.0
 wash start provider wasmcloud.azurecr.io/httpclient:0.7.0
 ```
+
 :::info
 Previous guides used `wash ctl start`, which is now deprecated and will be removed in a future version.
 See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
@@ -206,7 +207,7 @@ HOST_machine=second wash up --nats-remote-url tls://connect.ngs.global --nats-cr
 
 You should see a similar dump of logs, but notably you should see that you are connecting to a stream with one consumer (your local machine)
 
-```plain
+```
 16:06:22.896 [info] Lattice cache stream created or verified as existing (1 consumers).
 ```
 

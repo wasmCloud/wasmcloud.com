@@ -1,10 +1,10 @@
 ---
-title: "Better Together: Building Efficient Microservices in Kubernetes using WebAssembly"
-image: "images/blogs/adobe-kubernetes/header.png"
+title: 'Better Together: Building Efficient Microservices in Kubernetes using WebAssembly'
+image: 'images/blogs/adobe-kubernetes/header.png'
 date: 2022-11-17T11:00:00-05:00
-author: "Sean Isom and Colin Murphy, Adobe"
-description: "Bringing two major CNCF projects together – wasmCloud and Kubernetes – promises greater agility and major efficiencies"
-categories: ["webassembly", "wasmcloud", "kubernetes", "Cloud Native", "CNCF"]
+author: 'Sean Isom and Colin Murphy, Adobe'
+description: 'Bringing two major CNCF projects together – wasmCloud and Kubernetes – promises greater agility and major efficiencies'
+categories: ['webassembly', 'wasmcloud', 'kubernetes', 'Cloud Native', 'CNCF']
 draft: false
 ---
 
@@ -63,18 +63,18 @@ Normally, you can follow the single step in the documentation for installing was
 wasmcloud:
   enableApplierSupport: true
   customLabels:
-    wasmcloud.dev/route-to: "true"
+    wasmcloud.dev/route-to: 'true'
 ```
 
 Then you can deploy via helm (with your choice of RELEASE_NAME)
 
-```shell
+```bash
 helm install <RELEASE_NAME> wasmcloud/wasmcloud-host -f values.yaml
 ```
 
 Finally, to verify the install, you can grab the name of the deployment:
 
-```shell
+```bash
 $ kubectl get deployments
 NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
 wasmcloud-test-wasmcloud-host   1/1     1            1           4m32s
@@ -82,7 +82,7 @@ wasmcloud-test-wasmcloud-host   1/1     1            1           4m32s
 
 And then forward port 4000 to localhost:
 
-```shell
+```bash
 $ kubectl port-forward deployment/wasmcloud-test-wasmcloud-host 4000
 Forwarding from 127.0.0.1:4000 -> 4000
 Forwarding from [::1]:4000 -> 4000
@@ -99,13 +99,14 @@ We’re also using a handy wasmCloud Actor written by Taylor Thomas at Cosmonic,
 
 Let’s set up the example `echo` actor to get things running. We’ll need to create several providers and actors, then wire them up with link definitions. First start the actors and providers [with the current latest versions](https://github.com/wasmCloud/capability-providers#first-party-capability-providers):
 
-```shell
+```bash
 wash start provider wasmcloud.azurecr.io/applier:0.3.0
 wash start provider wasmcloud.azurecr.io/nats_messaging:0.17.0
 wash start provider wasmcloud.azurecr.io/httpserver:0.17.0
 wash start actor wasmcloud.azurecr.io/service_applier:0.3.0
 wash start actor wasmcloud.azurecr.io/echo:0.3.8
 ```
+
 :::info
 Previous guides used `wash ctl start`, which is now deprecated and will be removed in a future version.
 See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
@@ -125,7 +126,7 @@ Finally, link the Echo actor to the httpserver actor, using the Contract ID (`wa
 
 Note that this (and the previous commands) could also be done via wash:
 
-```shell
+```bash
 $ wash ctl link put MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5 VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver 'ADDRESS=0.0.0.0:8080'
 ⡃⠀ Defining link between MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5 and VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M ...
 Published link (MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5) <-> (VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M) successfully
@@ -133,7 +134,7 @@ Published link (MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5) <-> (V
 
 This link will create a Kubernetes service automatically on port 8080:
 
-```shell
+```bash
 $ kubectl get svc
 NAME TYPE CLUSTER-IP EXTERNAL-IP PORT(S) AGE
 mbcfopm6jw2apjlxjd3z5o4cn7cpyj2b4ftkljur5yr5mitiu7hd3wd5 ClusterIP 10.96.170.75 <none> 8080/TCP 10s
@@ -141,7 +142,7 @@ mbcfopm6jw2apjlxjd3z5o4cn7cpyj2b4ftkljur5yr5mitiu7hd3wd5 ClusterIP 10.96.170.75 
 
 Finally, to test that it is all working, forward port 8080 from the new service, and you can hit localhost:8080 to see your wasmCloud actor in action!
 
-```shell
+```bash
 $ kubectl port-forward svc/mbcfopm6jw2apjlxjd3z5o4cn7cpyj2b4ftkljur5yr5mitiu7hd3wd5 8080
 Forwarding from 127.0.0.1:8080 -> 8080
 Forwarding from [::1]:8080 -> 8080

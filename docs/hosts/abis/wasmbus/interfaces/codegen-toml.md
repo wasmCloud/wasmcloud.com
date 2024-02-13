@@ -1,5 +1,5 @@
 ---
-title: "codegen.toml files"
+title: 'codegen.toml files'
 draft: false
 ---
 
@@ -26,32 +26,31 @@ Directories are scanned recursively for all model files ending in `.smithy` or `
 Examples:
 
 - single path
-   ```text
-   # Load a model from an absolute or relative path.
-   # Relative paths are relative to the location of codegen.toml.
-   [[models]]
-   path = "models/foo.smithy"
-   ```
-  
- - folder 
+  ```
+  # Load a model from an absolute or relative path.
+  # Relative paths are relative to the location of codegen.toml.
+  [[models]]
+  path = "models/foo.smithy"
+  ```
+- folder
 
-   ```text
-   # Search the my-models folder recursively, and load all model files found.
-   # Path is absolute or relative
-   [[models]]
-   path = "my-models"
-   ```
-   
+  ```
+  # Search the my-models folder recursively, and load all model files found.
+  # Path is absolute or relative
+  [[models]]
+  path = "my-models"
+  ```
+
 - path prefix with mix of folders and named files
 
-   ```text
-   # Load a list of files that share a common path prefix. This example
-   # loads all the files in any subdirectory of /etc/models/v1/,
-   # and the named files /etc/models/base/foo.smithy and /etc/models/base/bar.json
-   [[models]]
-   path = "/etc/models"
-   files = [ "v1", "base/foo.smithy", "base/bar.json" ]
-   ```
+  ```
+  # Load a list of files that share a common path prefix. This example
+  # loads all the files in any subdirectory of /etc/models/v1/,
+  # and the named files /etc/models/base/foo.smithy and /etc/models/base/bar.json
+  [[models]]
+  path = "/etc/models"
+  files = [ "v1", "base/foo.smithy", "base/bar.json" ]
+  ```
 
 ### From URLs
 
@@ -62,15 +61,15 @@ Examples:
 
 - single file url
 
-  ```text
+  ```
   # Load a single smithy file from a url
   [[models]]
   url = "https://example.com/models/foo.smithy"
   ```
 
 - multiple files with common prefix
-  
-  ```text
+
+  ```
   # Load multiple files from the same base url
   #   https://example.com/models/v1/foo.smithy and
   #   https://example.com/models/v1/bar.smithy"
@@ -79,7 +78,6 @@ Examples:
   files =  [ "foo.smithy", "bar.smithy" ]
   ```
 
-
 ### Caching
 
 All files loaded by url are cached locally, to speed up development time
@@ -87,11 +85,10 @@ and to enable offline builds (after the first time).
 
 Cached files are located in the following folders, depending on your platform.
 
-|Platform | Value                               | Example                      |
-| ------- | ----------------------------------- | ---------------------------- |
-| Linux   | `$XDG_CACHE_HOME`/weld or `$HOME`/.cache/weld | /home/alice/.cache/weld           |
-| macOS   | `$HOME`/Library/Caches/weld              | /Users/Alice/Library/Caches/weld  |
-| Windows | `{FOLDERID_LocalAppData}\weld`           | C:\Users\Alice\AppData\Local\weld |
-
+| Platform | Value                                         | Example                           |
+| -------- | --------------------------------------------- | --------------------------------- |
+| Linux    | `$XDG_CACHE_HOME`/weld or `$HOME`/.cache/weld | /home/alice/.cache/weld           |
+| macOS    | `$HOME`/Library/Caches/weld                   | /Users/Alice/Library/Caches/weld  |
+| Windows  | `{FOLDERID_LocalAppData}\weld`                | C:\Users\Alice\AppData\Local\weld |
 
 The command `wash drain smithy` can be used to discard all files in the local cache, so they will be downloaded again as-needed by the code generator.

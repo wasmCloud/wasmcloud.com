@@ -1,5 +1,5 @@
 ---
-title: "Annotation traits"
+title: 'Annotation traits'
 draft: false
 ---
 
@@ -73,7 +73,7 @@ Uses the provided name for on-the-wire serialization
 
 **Example**
 
-```text
+```
 structure Data {
     name: String,
 
