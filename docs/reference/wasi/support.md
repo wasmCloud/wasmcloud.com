@@ -20,6 +20,7 @@ wash inspect --wit ./build/hello_world_s.wasm
 ```
 
 ```javascript
+
 package root:component;
 
 world root {

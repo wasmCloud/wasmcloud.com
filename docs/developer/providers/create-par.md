@@ -1,5 +1,5 @@
 ---
-title: "Creating a provider archive"
+title: 'Creating a provider archive'
 date: 2018-12-29T11:02:05+06:00
 sidebar_position: 8
 draft: false
@@ -13,7 +13,7 @@ Capability providers are always compiled in "release" mode. The `Makefile` creat
 
 If this is the first time you've run this command, some keys will be generated for you and you should see output that looks like the following:
 
-```sh
+```bash
 No keypair found in "/home/user/.wash/keys/fakepay_provider_service.nk".
 We will generate one for you and place it there.
 If you'd like to use alternative keys, you can supply them as a flag.
@@ -28,7 +28,7 @@ The `wash` command creates a private issuer _seed key_ if there isn't one alread
 
 We can use `wash` to inspect a provider archive as well (primary key has been truncated to fit documentation):
 
-```sh
+```bash
 wash par inspect build/fakepay_provider.par.gz
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                        Fake Payments - Provider Archive              ║

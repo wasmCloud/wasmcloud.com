@@ -1,11 +1,11 @@
 ---
-title: "WebAssembly Components and wasmCloud Actors: A Glimpse of the Future"
-image: "/img/wasm.png"
+title: 'WebAssembly Components and wasmCloud Actors: A Glimpse of the Future'
+image: '/img/wasm.png'
 date: 2022-06-16T11:00:00-04:00
-author: "Taylor Thomas"
-author_profile: "https://twitter.com/_oftaylor"
-description: "Using the Component Model with wasmCloud Actors"
-categories: ["wasm", "webassembly", "components"]
+author: 'Taylor Thomas'
+author_profile: 'https://twitter.com/_oftaylor'
+description: 'Using the Component Model with wasmCloud Actors'
+categories: ['wasm', 'webassembly', 'components']
 draft: false
 ---
 
@@ -90,7 +90,7 @@ Here are what the interfaces look like:
 
 **wasmbus_receiver.wit**
 
-```plain
+```
 // These are importing some common types that you see in the receive function signature. See the
 // actual code on Github if you are curious what these types look like
 use * from error-type
@@ -104,7 +104,7 @@ receive a message. We'll see how this works in code below
 
 **httpserver.wit**
 
-```plain
+```
 use * from error-type
 
 type header-map = list<tuple<string, string>>
@@ -199,7 +199,7 @@ keyvalue:
 
 **keyvalue.wit**
 
-```plain
+```
 use * from error-type
 
 // Increment the value of the key by the given amount
@@ -268,7 +268,7 @@ keyvalue contract described above and also requires one other interface:
 
 **wasmbus-sender.wit**
 
-```plain
+```
 use * from error-type
 use * from wasmbus-common
 
@@ -371,7 +371,7 @@ to use, so hopefully we can enlighten you here. Before linking, we built all of 
 workspace by running `cargo build --release`. Once they were built, we ran the following command to
 link them together
 
-```terminal
+```bash
 wasmlink ./target/wasm32-wasi/release/httpserver.wasm \
    -m keyvalue=./target/wasm32-wasi/release/keyvalue.wasm \
    -m httpserver=./target/wasm32-wasi/release/kvcounter_actor.wasm \

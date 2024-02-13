@@ -1,9 +1,9 @@
 ---
-title: "Automatically Updating OCI URLs with wasmCloud and Azure Webhooks"
+title: 'Automatically Updating OCI URLs with wasmCloud and Azure Webhooks'
 date: 2023-07-20T9:00:00-05:00
-image: "/img/webhookwasmcloud.png"
-author: "Brooks Townsend"
-tags: ["wasmcloud", "developer", "wasm", "cloud", "Azure"]
+image: '/img/webhookwasmcloud.png'
+author: 'Brooks Townsend'
+tags: ['wasmcloud', 'developer', 'wasm', 'cloud', 'Azure']
 ---
 
 ![Azure webhook and wasmcloud logo](/img/webhookwasmcloud.png)
@@ -66,7 +66,7 @@ The full, completed, source code for this example can be found in the GitHub rep
 
 I started using the wasmCloud "hello world" template, since it scaffolds out a basic HTTP server handler. If you're following along with this blog, make sure you have [wash](https://wasmcloud.com/docs/installation) installed.
 
-```shell
+```bash
 wash new actor webhook-handler --template-name hello
 ```
 
@@ -97,7 +97,7 @@ The neat part is that, here, I don't have to worry about what libraries or datab
 
 We can use `cargo add` to add the interfaces for `keyvalue` and `logging`, and then ensure that this actor has the capability claim to use these interfaces. While we're at it, we're also going to need some deserialization logic for the payload later, so we can add the `serde` and `serde_json` libraries now as well.
 
-```shell
+```bash
 cargo add wasmcloud-interface-keyvalue wasmcloud-interface-logging
 cargo add serde serde_json
 ```

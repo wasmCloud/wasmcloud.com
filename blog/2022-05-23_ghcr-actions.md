@@ -1,12 +1,12 @@
 ---
 slug: 2022-05-23_ghcr-actions
-title: "Deploying wasmCloud Actors from Github Packages"
-image: "/img/ghcr-actions/github-packages.png"
+title: 'Deploying wasmCloud Actors from Github Packages'
+image: '/img/ghcr-actions/github-packages.png'
 date: 2022-05-23T9:00:00-04:00
-author: "Brooks Townsend"
-author_profile: "https://linkedin.com/in/brooks-townsend"
-description: "Simplifying the deployment experience for WebAssembly modules."
-categories: ["webassembly", "wasmcloud", "developer experience"]
+author: 'Brooks Townsend'
+author_profile: 'https://linkedin.com/in/brooks-townsend'
+description: 'Simplifying the deployment experience for WebAssembly modules.'
+categories: ['webassembly', 'wasmcloud', 'developer experience']
 draft: false
 ---
 
@@ -50,7 +50,7 @@ wash claims inspect build/hello_s.wasm
 
 Your output should be something like this, just with different `Account` and `Module` keys
 
-```plain
+```
                               Hello - Module
   Account       ABYFZKXEHQWJIMBKVAVG3Y5LGEBT3MQXRYVTQBF7RVHUIG62LUK3N5EQ
   Module        MAMP52XKSBHNDMWK4OR4BZVBDQNNZQ5FXDXUAX7KIT7KNOKK2N3CCLZ2
@@ -82,7 +82,7 @@ wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
 
 You should see output like the following:
 
-```plain
+```
 wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
 
 🚿 Successfully validated and pushed to ghcr.io/brooksmtownsend/hello:0.1.0

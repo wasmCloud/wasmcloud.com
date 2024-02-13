@@ -1,9 +1,9 @@
 ---
-title: "Developer Workflows"
+title: 'Developer Workflows'
 date: 2018-12-29T11:02:05+06:00
 sidebar_position: 1
 draft: false
-description: "Common development loops"
+description: 'Common development loops'
 ---
 
 As a developer using wasmCloud, there are a number of common day-to-day workflows that you will experience.
