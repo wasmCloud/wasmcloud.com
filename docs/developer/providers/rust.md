@@ -1,5 +1,5 @@
 ---
-title: "Creating a new provider"
+title: 'Creating a new provider'
 date: 2018-12-29T11:02:05+06:00
 sidebar_position: 7
 draft: false
@@ -18,7 +18,7 @@ Thankfully, our scaffolding and reusable Rust crates take care of the basic plum
 
 Let's create a new provider project
 
-```shell
+```bash
 wash new provider fakepay-provider
 ```
 
@@ -115,7 +115,7 @@ Change the path of the interface file to match your location.
 
 Also, we need to make one edit to the project Makefile: change the last part of CAPABILITY_ID to replace "fakepay_provider" with "payments", to match the capability contract we defined in the interface:
 
-```Makefile
+```makefile
 CAPABILITY_ID = "wasmcloud:examples:payments"
 ```
 

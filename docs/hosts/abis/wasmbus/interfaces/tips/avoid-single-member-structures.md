@@ -1,15 +1,15 @@
 ---
-title: "Single-member structures"
+title: 'Single-member structures'
 draft: false
 ---
 
-A function is modeled as an operation, with an optional `input` type 
+A function is modeled as an operation, with an optional `input` type
 for its parameters, and an optional `output` type for its return value.
 If either input or output type is a structure containing one member, it
 is often preferred to simplify the declaration and api to use the value directly,
-without the structure wrapper. For example, instead of 
+without the structure wrapper. For example, instead of
 
-```text
+```
 /// count the number of values matching a query string
 operation Count {
     input: String,
@@ -22,7 +22,8 @@ structure CountResponse {
 ```
 
 Use
-```text
+
+```
 /// count the number of values matching a query string
 operation Count {
     input: String,
@@ -35,8 +36,3 @@ One reason you might still prefer to use a structure is if you expect to add fie
 Another reason you may need a structure is if the value is optional (in Rust, `Option<T>`). Since operation input and output can't be declared optional, you'd have to make the optional value a field of a structure.
 
 If neither of those cases apply, structures with one member can be replaced with the member.
-
-
-
-
-

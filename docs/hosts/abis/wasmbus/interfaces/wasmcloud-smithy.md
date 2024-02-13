@@ -1,5 +1,5 @@
 ---
-title: "wasmCloud Smithy"
+title: 'wasmCloud Smithy'
 draft: false
 ---
 
@@ -81,7 +81,7 @@ Due to the way we use msgpack, map key types are limited to String.
 
 Structures are just like the structures in your favorite programming languages.
 
-```text
+```
 /// Documentation for my structure
 structure Point {
     x: Integer,
@@ -104,6 +104,7 @@ The `@required` trait may be used on structure members to indicate that it must 
 A Service defines a set of operations. wasmCloud has defined a set of required and optional annotations for services and their operations.
 
 The `@wasmbus` annotation is required. `wasmbus` is the name wasmCloud uses for its messaging protocol.
+
 ```
 @wasmbus(
     contractId: "wasmcloud:httpclient",
@@ -124,7 +125,7 @@ These attributes control code generation, so if you can't find the generated met
 Operations represent functions, and are declared with 0 or 1 input types (parameters)
 and 0 or 1 output types (return values).
 
-```text
+```
 /// Increment the value of the counter, returning its new value
 operation Increment {
     input: I32,
@@ -137,7 +138,7 @@ other than optional types.
 An operation with no input declaration means the operation takes no parameters,
 for example,
 
-```text
+```
 operation GetTimeOfDay {
     output: Timestamp
 }
@@ -146,7 +147,7 @@ operation GetTimeOfDay {
 An operation without output means the operation has no return value
 (e.g., returns 'void'), for example,
 
-```text
+```
 operation SetCounter {
     input: U64,
 }
@@ -163,13 +164,13 @@ We would like to model functions that take multiple parameters. We can do that w
 
 For example, a key value store might have a "set" operation:
 
-```text
+```
 Set(key: string, value: string, expires: i32): SetResponse
 ```
 
 Since Smithy operations can only be declared with a single input type, the Smithy declaration might look like
 
-```text
+```
 operation Set {
   input: SetRequest,
   output: SetResponse,

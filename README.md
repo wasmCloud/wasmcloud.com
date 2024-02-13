@@ -6,7 +6,7 @@ Repository for the wasmCloud homepage including our community, team, docs, links
 
 ## Running the site locally
 
-```console
+```bash
 npm ci
 npm run start
 ```
@@ -15,7 +15,7 @@ This command starts a local development server and opens up a browser window. Mo
 
 ### Build
 
-```console
+```bash
 npm run build
 ```
 
@@ -25,6 +25,6 @@ This command generates static content into the `build` directory and can be serv
 
 To serve the generated static content:
 
-```console
+```bash
 npm run serve
 ```

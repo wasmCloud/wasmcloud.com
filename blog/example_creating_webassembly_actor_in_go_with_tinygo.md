@@ -1,11 +1,11 @@
 ---
-title: "Building Portable, Scalable Components with TinyGo and wasmCloud"
-image: "/img/tinygo-logo.png"
+title: 'Building Portable, Scalable Components with TinyGo and wasmCloud'
+image: '/img/tinygo-logo.png'
 date: 2022-06-01T9:00:00-04:00
-author: "Kevin Hoffman"
-author_profile: "https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/"
-description: "A walkthrough of creating a TinyGo wasmCloud actor"
-categories: ["tinygo", "webassembly", "wasmcloud", "go", "example"]
+author: 'Kevin Hoffman'
+author_profile: 'https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/'
+description: 'A walkthrough of creating a TinyGo wasmCloud actor'
+categories: ['tinygo', 'webassembly', 'wasmcloud', 'go', 'example']
 draft: false
 ---
 
@@ -23,8 +23,8 @@ To get started, you'll need <u>[wash](https://github.com/wasmcloud/wash)</u> ver
 
 Let's create a new empty actor from a template as follows:
 
-```terminal
- $ wash new actor
+```bash
+$ wash new actor
 ? Select a project template: ›
   hello: a hello-world actor (in Rust) that responds over an http connection
 ❯ echo-tinygo: a hello-world actor (in TinyGo) that responds over an http connection
@@ -69,7 +69,7 @@ What we're going to do for this blog post is modify this web request handler so 
 
 First, let's add another provider interface to our imports by first running `go get`
 
-```terminal
+```bash
 go get github.com/wasmcloud/interfaces/keyvalue/tinygo
 ```
 
@@ -130,7 +130,7 @@ This is something that we have to watch out for in TinyGo. If we use the stock J
 
 To get the preceding output, I typically run the following command (though use could also use `wasm-objdump`, too):
 
-```terminal
+```bash
 wasm2wat build/kvcounter_s.wasm| grep import
 ```
 
