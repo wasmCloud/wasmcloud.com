@@ -179,7 +179,28 @@ const config: Config = {
       appId: '2IM4TMH501',
     },
     prism: {
-      additionalLanguages: ['rust', 'powershell', 'toml', 'elixir'],
+      additionalLanguages: [
+        // this is all the currently supported and enabled languages. To add more, see https://prismjs.com/#supported-languages
+        'bash',
+        'cpp',
+        'css',
+        'elixir',
+        'go',
+        'javascript',
+        'json',
+        'makefile',
+        'powershell',
+        'python',
+        'rust',
+        'toml',
+        'typescript',
+        'yaml',
+        // unsupported languages
+        // TODO: switch to http://shiki.style/
+        // 'grpc',
+        // 'smithy',
+        // 'wit',
+      ],
       theme: themes.dracula,
       darkTheme: themes.dracula,
     },
