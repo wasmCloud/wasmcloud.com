@@ -43,31 +43,28 @@ use wasi::http::types::*;
 struct HttpServer;
 
 impl Guest for HttpServer {
-// highlight-start
-    // Make sure to remove the _ prefix from the `request` variable
-    fn handle(request: IncomingRequest, response_out: ResponseOutparam) {
-// highlight-end
+    fn handle(_request: IncomingRequest, response_out: ResponseOutparam) { // [!code --]
+    fn handle(request: IncomingRequest, response_out: ResponseOutparam) { // [!code ++]
         let response = OutgoingResponse::new(Fields::new());
         response.set_status_code(200).unwrap();
         let response_body = response.body().unwrap();
-// highlight-start
-        let name = match request
-            .path_with_query()
-            .unwrap()
-            .split("=")
-            .collect::<Vec<&str>>()[..]
-        {
-            // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
-            ["/?name", name] => name.to_string(),
-            // query string is anything else or empty e.g. localhost:8080
-            _ => "World".to_string(),
-        };
+        let name = match request // [!code ++]
+            .path_with_query() // [!code ++]
+            .unwrap() // [!code ++]
+            .split("=") // [!code ++]
+            .collect::<Vec<&str>>()[..] // [!code ++]
+        { // [!code ++]
+            // query string is "/?name=<name>" e.g. localhost:8080?name=Bob // [!code ++]
+            ["/?name", name] => name.to_string(), // [!code ++]
+            // query string is anything else or empty e.g. localhost:8080 // [!code ++]
+            _ => "World".to_string(), // [!code ++]
+        }; // [!code ++]
         response_body
             .write()
             .unwrap()
-            .blocking_write_and_flush(format!("Hello, {}!\n", name).as_bytes())
+            .blocking_write_and_flush(b"Hello from Rust!\n") // [!code --]
+            .blocking_write_and_flush(format!("Hello, {}!\n", name).as_bytes()) // [!code ++]
             .unwrap();
-// highlight-end
         OutgoingBody::finish(response_body, None).expect("failed to finish response body");
         ResponseOutparam::set(response_out, Ok(response));
     }
@@ -86,9 +83,9 @@ Let's extend this application to do more than just say "Hello from Go!" Using th
 package main
 
 import (
-	"fmt"
-	"strings"
-	http "github.com/wasmcloud/wasmcloud/examples/golang/actors/http-hello-world/gen"
+  "fmt"
+  "strings"
+  http "github.com/wasmcloud/wasmcloud/examples/golang/actors/http-hello-world/gen"
 )
 
 // Helper type aliases to make code more readable
@@ -100,36 +97,33 @@ type HttpError = http.WasiHttp0_2_0_TypesErrorCode
 type HttpServer struct{}
 
 func init() {
-	httpserver := HttpServer{}
-	// Set the incoming handler struct to HttpServer
-	http.SetExportsWasiHttp0_2_0_IncomingHandler(httpserver)
+  httpserver := HttpServer{}
+  // Set the incoming handler struct to HttpServer
+  http.SetExportsWasiHttp0_2_0_IncomingHandler(httpserver)
 }
 
 func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
-	// Construct HttpResponse to send back
-	headers := http.NewFields()
-	httpResponse := http.NewOutgoingResponse(headers)
-	httpResponse.SetStatusCode(200)
+  // Construct HttpResponse to send back
+  headers := http.NewFields()
+  httpResponse := http.NewOutgoingResponse(headers)
+  httpResponse.SetStatusCode(200)
 
-// highlight-start
-	name := getNameFromPath(request.PathWithQuery().Unwrap())
-	httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello %s!\n", name))).Unwrap()
-// highlight-end
+  httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap() // [!code --]
+  name := getNameFromPath(request.PathWithQuery().Unwrap()) // [!code ++]
+  httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello %s!\n", name))).Unwrap() // [!code ++]
 
-	// Send HTTP response
-	okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-	http.StaticResponseOutparamSet(responseWriter, okResponse)
+  // Send HTTP response
+  okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+  http.StaticResponseOutparamSet(responseWriter, okResponse)
 }
 
-// highlight-start
-func getNameFromPath(path string) string {
-	parts := strings.Split(path, "=")
-	if len(parts) == 2 {
-		return parts[1]
-	}
-	return "World"
-}
-// highlight-end
+func getNameFromPath(path string) string { // [!code ++]
+  parts := strings.Split(path, "=") // [!code ++]
+  if len(parts) == 2 { // [!code ++]
+    return parts[1] // [!code ++]
+  } // [!code ++]
+  return "World" // [!code ++]
+} // [!code ++]
 
 //go:generate wit-bindgen tiny-go wit --out-dir=gen --gofmt
 func main() {}
@@ -150,7 +144,7 @@ import {
   ResponseOutparam,
   OutgoingResponse,
   Fields,
-} from "wasi:http/types@0.2.0-rc-2023-12-05";
+} from "wasi:http/types@0.2.0";
 
 // Implementation of wasi-http incoming-handler
 //
@@ -163,13 +157,12 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
   let outgoingBody = outgoingResponse.body();
   // Create a stream for the response body
   let outputStream = outgoingBody.write();
-  //highlight-start
-  // Write "hello [name]" to the response stream
-  const name = getNameFromPath(req.pathWithQuery() || "")
+  // Write "hello [name]" to the response stream // [!code ++]
+  const name = getNameFromPath(req.pathWithQuery() || "") // [!code ++]
   outputStream.blockingWriteAndFlush(
-    new Uint8Array(new TextEncoder().encode(`Hello ${name}!\n`))
+    new Uint8Array(new TextEncoder().encode("hello from Typescript")) // [!code --]
+    new Uint8Array(new TextEncoder().encode(`hello ${name}!`)) // [!code ++]
   );
-  //highlight-end
 
   // Set the status code for the response
   outgoingResponse.setStatusCode(200);
@@ -178,15 +171,13 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
   ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
 }
 
-//highlight-start
-function getNameFromPath(path: string): string {
-  const parts = path.split("=");
-  if (parts.length == 2) {
-    return parts[1];
-  }
-  return "world";
-}
-//highlight-end
+function getNameFromPath(path: string): string { // [!code ++]
+  const parts = path.split("="); // [!code ++]
+  if (parts.length == 2) { // [!code ++]
+    return parts[1]; // [!code ++]
+  } // [!code ++]
+  return "world"; // [!code ++]
+} // [!code ++]
 
 export const incomingHandler = {
   handle,
@@ -216,10 +207,8 @@ componentize-py bindings .
 
 ```python
 class IncomingHandler(exports.IncomingHandler):
-#highlight-start
-    # Make sure to change the variable name for the request from _ to request in the handle function.
-    def handle(self, request: IncomingRequest, response_out: ResponseOutparam):
-#highlight-end
+    def handle(self, _: IncomingRequest, response_out: ResponseOutparam): # [!code --]
+    def handle(self, request: IncomingRequest, response_out: ResponseOutparam): # [!code ++]
         # Construct the HTTP response to send back 
         outgoingResponse = OutgoingResponse(Fields.from_list([]))
         # Set the status code to OK
@@ -227,22 +216,19 @@ class IncomingHandler(exports.IncomingHandler):
         outgoingBody = outgoingResponse.body()
 
         # Write our Hello message to the response body
-#highlight-start
-        name = get_name_from_path(request.path_with_query())
-        outgoingBody.write().blocking_write_and_flush(bytes("Hello {}!\n".format(name), "utf-8"))
-#highlight-end
+        outgoingBody.write().blocking_write_and_flush(bytes("Hello from Python!\n", "utf-8")) # [!code --]
+        name = get_name_from_path(request.path_with_query()) # [!code ++]
+        outgoingBody.write().blocking_write_and_flush(bytes("Hello {}!\n".format(name), "utf-8")) # [!code ++]
         OutgoingBody.finish(outgoingBody, None)
         # Set and send the HTTP response
         ResponseOutparam.set(response_out, Ok(outgoingResponse))
 
-#highlight-start
-def get_name_from_path(path: str) -> str:
-    parts = path.split("=")
-    if len(parts) == 2:
-        return parts[-1]
-    else:
-        return "World"
-#highlight-end
+def get_name_from_path(path: str) -> str: # [!code ++]
+    parts = path.split("=") # [!code ++]
+    if len(parts) == 2: # [!code ++]
+        return parts[-1] # [!code ++]
+    else: # [!code ++]
+        return "World" # [!code ++]
 ```
 
   </TabItem>
@@ -275,16 +261,14 @@ Hello, Bob!
 
 To further enhance our application, let's add persistent storage to keep a record of each person that this application greeted. We'll use the key-value store capability for this, and just like HTTP server, you won't need to pick a library or a specific vendor implementation yet. You'll just need to add the capability to your actor, and then you can pick a capability provider at runtime.
 
-  In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/world.wit` file:
+In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
 ```wit
 package wasmcloud:hello;
 
 world hello {
-  // highlight-start
-  import wasi:keyvalue/atomic@0.1.0;
-  import wasi:keyvalue/eventual@0.1.0;
-  import wasi:logging/logging;
-  // highlight-end
+  import wasi:keyvalue/atomic@0.1.0; // [!code ++]
+  import wasi:keyvalue/eventual@0.1.0; // [!code ++]
+  import wasi:logging/logging; // [!code ++]
 
   export wasi:http/incoming-handler@0.2.0;
 }
@@ -294,7 +278,7 @@ world hello {
   <TabItem value="rust" label="Rust">
 
 Let's use the atomic increment function to keep track of how many times we've greeted each person. 
-  ```rust
+```rust
     let name = match request
         .path_with_query()
         .unwrap()
@@ -307,23 +291,21 @@ Let's use the atomic increment function to keep track of how many times we've gr
         _ => "World".to_string(),
     };
 
-// highlight-start
-    wasi::logging::logging::log(
-        wasi::logging::logging::Level::Info,
-        "",
-        &format!("Greeting {name}"),
-    );
-
-    let bucket =
-        wasi::keyvalue::types::Bucket::open_bucket("").expect("failed to open empty bucket");
-    let count = wasi::keyvalue::atomic::increment(&bucket, &name, 1)
-        .expect("failed to increment count");
-
+    wasi::logging::logging::log( // [!code ++]
+        wasi::logging::logging::Level::Info, // [!code ++]
+        "", // [!code ++]
+        &format!("Greeting {name}"), // [!code ++]
+    ); // [!code ++]
+// [!code ++]
+    let bucket = // [!code ++]
+        wasi::keyvalue::types::Bucket::open_bucket("").expect("failed to open empty bucket"); // [!code ++]
+    let count = wasi::keyvalue::atomic::increment(&bucket, &name, 1) // [!code ++]
+        .expect("failed to increment count"); // [!code ++]
+// [!code ++]
     response_body
         .write()
         .unwrap()
         .blocking_write_and_flush(format!("Hello x{count}, {name}!\n").as_bytes())
-// highlight-end
         .unwrap();
   ```
 
@@ -334,24 +316,23 @@ Let's use the atomic increment function to keep track of how many times we've gr
 
 ```go
 func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
-	// Construct HttpResponse to send back
-	headers := http.NewFields()
-	httpResponse := http.NewOutgoingResponse(headers)
-	httpResponse.SetStatusCode(200)
+  // Construct HttpResponse to send back
+  headers := http.NewFields()
+  httpResponse := http.NewOutgoingResponse(headers)
+  httpResponse.SetStatusCode(200)
+// [!code ++]
+  name := getNameFromPath(request.PathWithQuery().Unwrap()) // [!code ++]
+// [!code ++]
+  http.WasiLoggingLoggingLog(http.WasiLoggingLoggingLevelInfo(), "", fmt.Sprintf("Greeting %s", name)) // [!code ++]
+  bucket := http.StaticBucketOpenBucket("").Unwrap() // [!code ++]
+  count := http.WasiKeyvalue0_1_0_AtomicIncrement(bucket, name, 1).Unwrap() // [!code ++]
 
-	name := getNameFromPath(request.PathWithQuery().Unwrap())
+  httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap() // [!code --]
+  httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello x%d, %s!\n", count, name))).Unwrap() // [!code ++]
 
-//highlight-start
-	http.WasiLoggingLoggingLog(http.WasiLoggingLoggingLevelInfo(), "", fmt.Sprintf("Greeting %s", name))
-	bucket := http.StaticBucketOpenBucket("").Unwrap()
-	count := http.WasiKeyvalue0_1_0_AtomicIncrement(bucket, name, 1).Unwrap()
-
-	httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello x%d, %s!\n", count, name))).Unwrap()
-//highlight-end
-
-	// Send HTTP response
-	okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-	http.StaticResponseOutparamSet(responseWriter, okResponse)
+  // Send HTTP response
+  okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+  http.StaticResponseOutparamSet(responseWriter, okResponse)
 }
 ```
 
@@ -360,22 +341,29 @@ func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWrite
 
 Let's use the atomic increment function to keep track of how many times we've greeted each person.
 
+:::info[Missing Imports]
+
+At the time of writing, JCO does not generate types for `wasi:logging` or `wasi:keyvalue`. This is
+a known issue and will be resolved in a future release. For now, you can tell the TypeScript
+compiler to ignore the missing types by adding `//@ts-expect-error` before each import statement.
+Simply including the import statement will allow the host to provider the functionality at runtime.
+
+:::
+
 ```typescript
 import {
   IncomingRequest,
   ResponseOutparam,
   OutgoingResponse,
   Fields,
-} from 'wasi:http/types@0.2.0';
+} from "wasi:http/types@0.2.0";
 
-//highlight-start
-//@ts-expect-error -- these types aren't currently known by JCO
-import { log } from "wasi:logging/logging";
-//@ts-expect-error -- these types aren't currently known by JCO
-import { increment } from "wasi:keyvalue/atomic@0.1.0";
-//@ts-expect-error -- these types aren't currently known by JCO
-import { Bucket } from "wasi:keyvalue/types@0.1.0";
-//highlight-end
+//@ts-expect-error -- these types aren't currently generated by JCO // [!code ++]
+import { log } from "wasi:logging/logging"; // [!code ++]
+//@ts-expect-error -- these types aren't currently generated by JCO // [!code ++]
+import { increment } from "wasi:keyvalue/atomic@0.1.0"; // [!code ++]
+//@ts-expect-error -- these types aren't currently generated by JCO // [!code ++]
+import { Bucket } from "wasi:keyvalue/types@0.1.0"; // [!code ++]
 
 // Implementation of wasi-http incoming-handler
 //
@@ -388,20 +376,18 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
   let outgoingBody = outgoingResponse.body();
   // Create a stream for the response body
   let outputStream = outgoingBody.write();
-  //highlight-start
-  // Write to the response stream
-  const name = getNameFromPath(req.pathWithQuery() || "")
-
-  log("info", "", `Greeting ${name}`);
-
-  // Increment the bucket's count
-  const bucket = Bucket.openBucket("");
-  const count = increment(bucket, name, 1);
-
-  outputStream.blockingWriteAndFlush(
-    new Uint8Array(new TextEncoder().encode(`Hello x${count}, ${name}!\n`))
-  );
-  //highlight-end
+  // Write to the response stream // [!code ++]
+  const name = getNameFromPath(req.pathWithQuery() || "") // [!code ++]
+// [!code ++]
+  log("info", "", `Greeting ${name}`); // [!code ++]
+// [!code ++]
+  // Increment the bucket's count // [!code ++]
+  const bucket = Bucket.openBucket(""); // [!code ++]
+  const count = increment(bucket, name, 1); // [!code ++]
+// [!code ++]
+  outputStream.blockingWriteAndFlush( // [!code ++]
+    new Uint8Array(new TextEncoder().encode(`Hello x${count}, ${name}!\n`)) // [!code ++]
+  ); // [!code ++]
 
   // Set the status code for the response
   outgoingResponse.setStatusCode(200);
@@ -422,12 +408,11 @@ from hello import exports
 from hello.types import Ok
 from hello.imports.types import (
     IncomingRequest, ResponseOutparam,
-#highlight-start
-    OutgoingResponse, Fields, OutgoingBody, Bucket
+    OutgoingResponse, Fields, OutgoingBody # [!code --]
+    OutgoingResponse, Fields, OutgoingBody, Bucket # [!code ++]
 )
-from hello.imports.atomic import increment
-from hello.imports.logging import (log, Level)
-#highlight-end
+from hello.imports.atomic import increment # [!code ++]
+from hello.imports.logging import (log, Level) # [!code ++]
 
 class IncomingHandler(exports.IncomingHandler):
     def handle(self, request: IncomingRequest, response_out: ResponseOutparam):
@@ -439,13 +424,11 @@ class IncomingHandler(exports.IncomingHandler):
 
         # Write our Hello message to the response body
         name = get_name_from_path(request.path_with_query())
-#highlight-start
-        log(Level.INFO, "", "Greeting {}".format(name))
-        bucket = Bucket.open_bucket("")
-        count = increment(bucket, name, 1)
-
-        outgoingBody.write().blocking_write_and_flush(bytes("Hello x{}, {}!\n".format(count, name), "utf-8"))
-#highlight-end
+        log(Level.INFO, "", "Greeting {}".format(name)) # [!code ++]
+        bucket = Bucket.open_bucket("") # [!code ++]
+        count = increment(bucket, name, 1) # [!code ++]
+# [!code ++]
+        outgoingBody.write().blocking_write_and_flush(bytes("Hello x{}, {}!\n".format(count, name), "utf-8")) # [!code ++]
         OutgoingBody.finish(outgoingBody, None)
         # Set and send the HTTP response
         ResponseOutparam.set(response_out, Ok(outgoingResponse))
@@ -488,9 +471,7 @@ kind: Application
 metadata:
   name: http-hello-world
   annotations:
-//highlight-start
-    version: v0.0.3
-//highlight-end
+    version: v0.0.3 # Increment the version number # [!code ++]
     description: "HTTP hello world demo, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)"
     experimental: true
 spec:
@@ -508,26 +489,24 @@ spec:
             target: httpserver
             values:
               address: 0.0.0.0:8080
-//highlight-start
-        # The new key-value link configuration
-        - type: linkdef
-          properties:
-            target: keyvalue
-            values:
-              address: redis://127.0.0.1:6379
+        # The new key-value link configuration # [!code ++]
+        - type: linkdef # [!code ++]
+          properties: # [!code ++]
+            target: keyvalue # [!code ++]
+            values: # [!code ++]
+              address: redis://127.0.0.1:6379 # [!code ++]
 
     - name: httpserver
       type: capability
       properties:
         image: wasmcloud.azurecr.io/httpserver:0.19.1
         contract: wasmcloud:httpserver
-    # The new capability provider
-    - name: keyvalue
-      type: capability
-      properties:
-        image: wasmcloud.azurecr.io/kvredis:0.22.0
-        contract: wasmcloud:keyvalue
-//highlight-end
+    # The new capability provider # [!code ++]
+    - name: keyvalue # [!code ++]
+      type: capability # [!code ++]
+      properties: # [!code ++]
+        image: wasmcloud.azurecr.io/kvredis:0.22.0 # [!code ++]
+        contract: wasmcloud:keyvalue # [!code ++]
 ```
 
 For the last step, we can deploy the `v0.0.3` version of our application. Then, again, we can test our new functionality.

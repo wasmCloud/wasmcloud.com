@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 import { Config } from '@docusaurus/types';
 import {
   Options as PresetClassicOptions,
@@ -5,7 +6,43 @@ import {
 } from '@docusaurus/preset-classic';
 import { Options as PluginContentBlogOptions } from '@docusaurus/plugin-content-blog';
 import { Options as PluginGoogleAnalyticsOptions } from '@docusaurus/plugin-google-analytics';
-import { themes } from 'prism-react-renderer';
+import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
+import { bundledLanguages } from 'shiki';
+import {
+  transformerMetaHighlight,
+  transformerNotationDiff,
+  transformerNotationHighlight,
+  transformerNotationFocus,
+} from '@shikijs/transformers';
+
+const rehypeShikiPlugin = [
+  rehypeShiki,
+  {
+    themes: {
+      dark: 'github-dark',
+      light: 'github-light',
+    },
+    transformers: [
+      {
+        name: 'meta',
+        code(node) {
+          const language = this.options.lang ?? 'plaintext';
+          this.addClassToHast(node, `language-${language}`);
+          return node;
+        },
+      },
+      transformerMetaHighlight(),
+      transformerNotationDiff(),
+      transformerNotationHighlight(),
+      transformerNotationFocus(),
+    ],
+    langs: [
+      ...(Object.keys(bundledLanguages) as Array<keyof typeof bundledLanguages>),
+      async () => JSON.parse(await fs.readFile('./languages/wit.tmLanguage.json', 'utf-8')),
+      async () => JSON.parse(await fs.readFile('./languages/smithy.tmLanguage.json', 'utf-8')),
+    ],
+  } as RehypeShikiOptions,
+];
 
 const config: Config = {
   title: 'wasmCloud',
@@ -43,9 +80,14 @@ const config: Config = {
       {
         blog: {
           blogSidebarCount: 100,
+          beforeDefaultRehypePlugins: [rehypeShikiPlugin],
         },
         docs: {
           editUrl: 'https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/',
+          beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+        },
+        pages: {
+          beforeDefaultRehypePlugins: [rehypeShikiPlugin],
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
@@ -67,6 +109,7 @@ const config: Config = {
         blogTitle: 'wasmCloud Community Content',
         blogDescription: 'wasmCloud community meetings agendas, notes, and recordings',
         blogSidebarTitle: 'Community Meetings',
+        beforeDefaultRehypePlugins: [rehypeShikiPlugin],
       } satisfies PluginContentBlogOptions,
     ],
     [
@@ -177,32 +220,6 @@ const config: Config = {
       apiKey: 'f0ef30f3d98ce5e9a7dd7579bb221dfc',
       indexName: 'wasmcloud',
       appId: '2IM4TMH501',
-    },
-    prism: {
-      additionalLanguages: [
-        // this is all the currently supported and enabled languages. To add more, see https://prismjs.com/#supported-languages
-        'bash',
-        'cpp',
-        'css',
-        'elixir',
-        'go',
-        'javascript',
-        'json',
-        'makefile',
-        'powershell',
-        'python',
-        'rust',
-        'toml',
-        'typescript',
-        'yaml',
-        // unsupported languages
-        // TODO: switch to http://shiki.style/
-        // 'grpc',
-        // 'smithy',
-        // 'wit',
-      ],
-      theme: themes.dracula,
-      darkTheme: themes.dracula,
     },
   } satisfies PresetClassicThemeConfig,
 
