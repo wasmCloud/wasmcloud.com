@@ -27,36 +27,35 @@ Before we get started, props to Fermyon's Joel Dice and all the other contributo
 
 You'll need to [install wasmCloud](https://wasmcloud.com/docs/installation), [Python 3.10 or higher](https://www.python.org/), and [`pip`](https://pip.pypa.io/en/stable/installation/) if you haven't already. 
 
-Once `pip` is in place, you'll also need to install `componentize-py`:
+Once `pip` is in place, you'll also need to install `componentize-py` (v0.11 or later):
 
 ```bash
 pip install componentize-py
 ```
 
-Next, we'll download the **`componentize-py`** repo from GitHub. For now, this demo is easiest if you [download the repo ZIP from this pre-WASI 0.2.0 commit](https://github.com/bytecodealliance/componentize-py/tree/6535546d2bbe7f9857fbe50bd6a79fad97c6188a). The GitHub repo gives us a directory of Python examples, including an app that makes and receives HTTP requests. If we open `examples/http/app.py`, we find a nifty demo that returns an echo or hash depending on your request. 
+Next, we'll download the **`componentize-py`** repo from GitHub. The GitHub repo gives us a directory of Python examples, including an app that makes and receives HTTP requests. If we open `examples/http/app.py`, we find a nifty demo that returns an echo or hash depending on your request. 
 
 In the repo we also find a `wit` directory with WebAssembly Interface Type (WIT) definitions for an HTTP interface. Types like `IncomingRequest` in the Python code bind to these standard WIT definitions. (Feel free to explore files like `wit/deps/http/types.wit` to get a sense for how these work.) Using APIs standardized around WIT definitions means that the actual HTTP *functionality* can be delivered by another component compiled from a different language&mdash;in this case, we'll be using wasmCloud's first-party HTTP capability providers (written in Rust). But we don't have to worry about the specifics of the providers just yet. 
 
-For now, we'll simply create a `wasmcloud.toml` manifest that makes **claims** on the **`httpclient`** and **`httpserver`** capabilities. Building from this manifest&mdash;and explicitly, declaratively enabling the capabilities the component will use&mdash;guarantees both the identity of the component and a contract layer of security: the component can only access capabilities that it requires. 
-
-Create a file called `wasmcloud.toml` in the `componentize-py/examples/http` directory and add:
+For now, we'll simply create an application manifest. Create a file called `wasmcloud.toml` in the `componentize-py/examples/http` directory and add:
 
 ```toml
 name = "PythonExample"
-language = "rust"
+language = "python"
 type = "actor"
 version = "0.1.0"
 
 [actor]
-claims = ["wasmcloud:httpclient", "wasmcloud:httpserver"]
-build_command = "componentize-py -d ../../wit -w wasi:http/proxy@0.2.0-rc-2023-12-05 componentize app -o http.wasm"
+build_command = "componentize-py -d ../../wit -w wasi:http/proxy@0.2.0 componentize app -o http.wasm"
 build_artifact = "http.wasm"
+destination = "http_s.wasm"
 ```
 
-Up top, we provide basic metadata for our component and define it as an **actor**&mdash;a component running original logic. The `wash` error-checker hasn't caught up to the bleeding edge and will fuss if we specify Python, so we're fibbing about the language and calling it Rust. In the `claims` field, we give our actor access to HTTP capabilities. This is all standard wasmCloud procedure (other than the fibbing), but now in the last two lines we have two fields enabling a "bring your own Wasm component" approach:
+Up top, we provide basic metadata for our component and define it as an **actor**&mdash;a component running original logic. In the last three lines we have two fields enabling a "bring your own Wasm component" approach:
 
 * **`build_command`** defines the underlying command that `wash` will use to build the component when we run `wash build`. In this case, `wash` will run `componentize-py`.
-* **`build_artifact`** defines the name for the final `.wasm` artifact that will be produced by `wash build`. 
+* **`build_artifact`** specifies the `.wasm` artifact to be signed by `wash build`. 
+* **`destination`** defines the name and location of the final, signed Wasm artifact for the component.
 
 If we wanted to produce a `.wasm` artifact from another language, we would simply replace the `build_command` value with the appropriate procedure for creating a component from that source language. 
 
@@ -76,7 +75,7 @@ spec:
     - name: python-http
       type: actor
       properties:
-        image: file:///path/to/http_s.wasm // Change this!
+        image: file://./http_s.wasm
       traits:
         - type: spreadscaler
           properties:
@@ -101,15 +100,13 @@ spec:
         contract: wasmcloud:httpclient
 ```
 
-If you're familiar with wasmCloud, this should all look perfectly standard: we're defining deployment metadata, two components (the actor and the first-party `httpserver` capability provider).
+If you're familiar with wasmCloud, this should all look perfectly standard: we're defining deployment metadata and two components (the actor and the first-party `httpserver` capability provider).
 
 Now let's build our Wasm artifact:
 
 ```bash
-wash build -o json
+wash build
 ```
-
-Replace the value of the `image` field for the `python-http` actor with the filepath to `http_s.wasm` (the signed artifact) on your machine. You can quickly copy the path from the `actor_path` field of your `wash build` output&mdash;just prepend it with `file://` in `wadm.yaml`.
 
 If you haven't already, run `wash up` to start a wasmCloud host. Then, from `examples/http`, run:
 
@@ -126,6 +123,10 @@ curl -i -H 'content-type: text/plain' --data-binary @- http://localhost:8080/ech
 All mimsy were the borogoves,
       And the mome raths outgrabe.
 EOF
+```
+The response:
+
+```bash
 HTTP/1.1 200 OK
 content-type: text/plain
 content-length: 142
