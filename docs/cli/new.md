@@ -14,17 +14,18 @@ This command creates a new project from an existing template. A user may create 
 ### `actor`
 When creating a new actor project, a user may select from the following templates to create a skeleton:
 
-- hello: A hello-world actor in Rust thay responds over an HTTP connection
-- echo-tinygo: A hello-world actor in TinyGo that responds over an HTTP connection
-- echo-messaging: A hello-world actor in Rust that echoes a request back over a NATS connection
-- kvcounter: An example actor in Rust that increments a counter in a key-value store
+- hello-world-rust: A hello-world actor in Rust thay responds over an HTTP connection
+- hello-world-tinygo: A hello-world actor in TinyGo that responds over an HTTP connection
+- hello-world-typescript: A hello-world actor in TypeScript that responds over an HTTP connection
+- hello-world-python: A hello-world actor in Python that responds over an HTTP connection
 
-The user will then have to specify the name of the project and a new project template will be created in the current directory. The project name can also be specified earlier and be passed to `wash new actor <project-name>`.
+If you do not specify a template with the `--template-name` argument, you will be prompted to select one. You will then have to name the project, and a new project template will be created in the current directory. The project name can also be specified earlier and be passed to `wash new actor <project-name>`.
 
 #### Usage
-```
+```shell
 wash new actor
 wash new actor example-project
+wash new actor example-project --template-name hello-world-rust
 ```
 
 ### `provider`
@@ -36,9 +37,10 @@ When creating a new provider project, a user may select from the following templ
 The user will then have to specify the name of the project and a vendor name, and a new project template will be created in the current directory. The project name can also be specified earlier and be passed to `wash new provider <project-name>`.
 
 #### Usage
-```
+```shell
 wash new provider
 wash new provider example-project
+wash new provider example-project --template-name factorial-provider
 ```
 
 ### `interface`
@@ -50,9 +52,10 @@ When creating a new interface project, a user may select from the following temp
 The user will then have to provide details such as project name, interface name and namespace prefix, and a new project template will be created in the current directory. The project name can also be specified earlier and be passed to `wash new interface <project-name>`.
 
 #### Usage
-```
+```shell
 wash new interface
 wash new interface example-project
+wash new interface example-project --template-name factorial-interface
 ```
 
 #### Options
