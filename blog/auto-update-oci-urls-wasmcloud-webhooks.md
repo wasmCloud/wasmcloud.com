@@ -67,7 +67,7 @@ The full, completed, source code for this example can be found in the GitHub rep
 I started using the wasmCloud "hello world" template, since it scaffolds out a basic HTTP server handler. If you're following along with this blog, make sure you have [wash](https://wasmcloud.com/docs/installation) installed.
 
 ```bash
-wash new actor webhook-handler --template-name hello
+wash new actor webhook-handler --template-name hello-world-rust
 ```
 
 From there, a new actor project is generated in `./webhook-handler` with a barebones HTTP handler.
