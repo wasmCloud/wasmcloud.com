@@ -48,7 +48,7 @@ const config: Config = {
   title: 'wasmCloud',
   tagline: 'Build applications in any language. Deploy them anywhere.',
   customFields: {
-    description: 'The secure, distributed, WebAssembly Actor runtime',
+    description: 'The secure, distributed, WebAssembly application platform',
     tagline_1: 'Build applications in any language.',
     tagline_2: 'Deploy them anywhere.',
   },
