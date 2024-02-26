@@ -34,7 +34,7 @@ Specifically, when it comes to wasmCloud, all of our actors are stateless, at le
 
 ## Actor Supervision
 
-The general approach, thus far, has been that actor supervision is something the wasmCloud runtime takes care of by default. So, when you run an actor, we're responsible for making sure that it comes back from the dead after it dies and that, if you want to scale out 10 copies of it, you can.
+The general approach, thus far, has been that actor supervision is something the wasmCloud application platform takes care of by default. So, when you run an actor, we're responsible for making sure that it comes back from the dead after it dies and that, if you want to scale out 10 copies of it, you can.
 
 If you want to communicate between actors, we make that happen without you needing to have a supervisory relationship. One of the ways we can manage workflows that typically require people to be able to create their own actors comes from our declarative application deployment manager, or wadm. So, if you want to declare that you need to maintain 10 instances of this actor across a spread of five hosts, all of which have a certain set of characteristics, Wadm will do that for you. More importantly, the actors don't know that's how things are being done.
 
