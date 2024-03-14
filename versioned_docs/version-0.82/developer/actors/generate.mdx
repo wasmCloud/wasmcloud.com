@@ -1,0 +1,252 @@
+---
+title: "Create"
+date: 2018-12-29T11:00:00+00:00
+sidebar_position: 0
+draft: false
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+import HubspotForm from 'react-hubspot-form';
+
+We provide example templates for creating [actors](/docs/concepts/actors) in Rust and TinyGo. You can use these templates to create a new actor project, or you can use them as a reference for creating your own actor from scratch. As other languages are updated to use the same component APIs that wasmtime uses, we will add templates for those languages as well.
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust" default>
+Creating the scaffold for a new actor in Rust is easy. We will create an actor that accepts an HTTP request and responds with "Hello from Rust!". To create your new actor project, change to the directory where you want the project to be created, and enter the command below. The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+
+```bash
+wash new actor hello --template-name hello-world-rust
+```
+
+Let's change into the newly-created folder `hello` and take a look at the generated project. The file `src/lib.rs` includes a `wit-bindgen` generate macro, an imports section, a struct `HttpServer`, and an `impl` block that implements the `Guest` trait for the actor struct. Let's walk through these sections in detail.
+
+```rust
+wit_bindgen::generate!({
+    world: "hello",
+    exports: {
+        "wasi:http/incoming-handler": HttpServer,
+    },
+});
+```
+
+This shows us that we're using a core wasmCloud package called `wit-bindgen` to generate the types and bindings for our actor. The `world` term is the name of the wit world we're generating from under `./wit`, and the `exports` term declares the functions the component will export. In this case, we're declaring that the actor will implement the `wasi:http/incoming-handler` capability interface, and that the implementation struct is named `HttpServer`.
+
+
+Note the two lines near the top of the source code file:
+
+```rust
+use exports::wasi::http::incoming_handler::Guest;
+use wasi::http::types::*;
+```
+
+These two imports are bringing in the `Guest` trait to implement our function to be called whenever an incoming HTTP request is received, and the types that we'll use to interact with the HTTP request and response. These are the only two imports that we need to interact with the HTTP server capability.
+
+```rust
+struct HttpServer;
+
+impl Guest for HttpServer {
+    fn handle(_request: IncomingRequest, response_out: ResponseOutparam) {
+        let response = OutgoingResponse::new(Fields::new());
+        response.set_status_code(200).unwrap();
+        let response_body = response.body().unwrap();
+        response_body
+            .write()
+            .unwrap()
+            .blocking_write_and_flush(b"Hello from Rust!\n")
+            .unwrap();
+        OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+        ResponseOutparam::set(response_out, Ok(response));
+    }
+}
+```
+
+Within the `handle` method, the actor receives the HTTP request, creates an `OutgoingResponse` and writes that response out back to the requesting http client (such as a `curl` command or a web browser).
+
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo">
+Creating the scaffold for a new actor in TinyGo is easy. We will create an actor that accepts an HTTP request and responds with "Hello from Go!". To create your new actor project, change to the directory where you want the project to be created, and enter the command below. The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+
+```bash
+wash new actor hello --template-name hello-world-tinygo
+```
+
+Let's change into the newly-created folder `hello` and take a look at the generated project. The file `hello.go` will include imports, a `main` function, a `Hello` struct, and an HTTP handler. Let's walk through these pieces in depth.
+
+```go
+package main
+
+import (
+	http "github.com/wasmcloud/wasmcloud/examples/golang/actors/http-hello-world/gen"
+)
+
+// Helper type aliases to make code more readable
+type HttpRequest = http.ExportsWasiHttp0_2_0_IncomingHandlerIncomingRequest
+type HttpResponseWriter = http.ExportsWasiHttp0_2_0_IncomingHandlerResponseOutparam
+type HttpOutgoingResponse = http.WasiHttp0_2_0_TypesOutgoingResponse
+type HttpError = http.WasiHttp0_2_0_TypesErrorCode
+```
+
+The import section of this file is simple, we just import our generated types and bindings from the `gen` directory and create some type aliases to make the code more readable. These type aliases will go away once we aren't working with pinned release candidate versions of WASI interfaces.
+
+```go
+type HttpServer struct{}
+
+func init() {
+	httpserver := HttpServer{}
+	// Set the incoming handler struct to HttpServer
+	http.SetExportsWasiHttp0_2_0_IncomingHandler(httpserver)
+}
+```
+
+The `init` section of this file is where we set the incoming handler struct to `HttpServer`. This is the struct that will handle incoming HTTP requests.
+
+```go
+func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
+	// Construct HttpResponse to send back
+	headers := http.NewFields()
+	httpResponse := http.NewOutgoingResponse(headers)
+	httpResponse.SetStatusCode(200)
+	httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap()
+
+	// Send HTTP response
+	okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+	http.StaticResponseOutparamSet(responseWriter, okResponse)
+}
+```
+
+The business logic of our actor is contained within the `Handle` method. Within the `Handle` method, the actor receives the HTTP request, creates an `OutgoingResponse` and writes that response out back to the requesting http client (such as a `curl` command or a web browser).
+
+```go
+//go:generate wit-bindgen tiny-go wit --out-dir=gen --gofmt
+func main() {}
+```
+
+Lastly, this Go directive will ensure that when we build our project with `tinygo build`, the `wit-bindgen` tool will be run to generate the types and bindings for our actor. 
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+Creating the scaffold for a new actor in TypeScript is easy. We will create an actor that accepts an HTTP request and responds with "Hello from TypeScript!". To create your new actor project, change to the directory where you want the project to be created, and enter the command below. The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+
+```bash
+wash new actor hello --template-name hello-world-typescript
+```
+
+Let's change into the newly-created folder `hello` and take a look at the generated project. The file `http-hello-world.ts` will include imports and a `handle` function exported under `incomingHandler`. Let's walk through these pieces in depth.
+
+```typescript
+import {
+  IncomingRequest,
+  ResponseOutparam,
+  OutgoingResponse,
+  Fields,
+} from "wasi:http/types@0.2.0";
+```
+
+The import section of this file is simple, we just import our generated types (from `jco`) for the WASI HTTP interface.
+
+```typescript
+// Implementation of wasi-http incoming-handler
+//
+// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
+function handle(req: IncomingRequest, resp: ResponseOutparam) {
+  // Start building an outgoing response
+  const outgoingResponse = new OutgoingResponse(new Fields());
+
+  // Access the outgoing response body
+  let outgoingBody = outgoingResponse.body();
+  // Create a stream for the response body
+  let outputStream = outgoingBody.write();
+  // // Write hello world to the response stream
+  outputStream.blockingWriteAndFlush(
+    new Uint8Array(new TextEncoder().encode("Hello from Typescript!\n"))
+  );
+
+  // Set the status code for the response
+  outgoingResponse.setStatusCode(200);
+
+  // Set the created response
+  ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
+}
+```
+
+The business logic of our actor is contained within the `handle` function. Within the `handle` function, the actor receives the HTTP request, creates an `OutgoingResponse` and writes that response back out to the requesting HTTP client (such as a `curl` command or a web browser).
+
+```typescript
+export const incomingHandler = {
+  handle,
+};
+```
+
+Lastly, this export statement includes the `handle` function under the `incomingHandler` interface, which matches the `wasi:http/incoming-handler` interface declared in the application's [wit file](https://github.com/wasmCloud/wasmCloud/blob/main/examples/typescript/actors/http-hello-world/wit/index.wit).
+
+  </TabItem>
+  <TabItem value="python" label="Python">
+Creating the scaffold for a new actor in Python is easy. We will create an actor that accepts an HTTP request and responds with "Hello from Python!". To create your new actor project, change to the directory where you want the project to be created, and enter the command below. The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+
+```bash
+wash new actor hello --template-name hello-world-python
+```
+
+Let's change into the newly-created folder `hello` and take a look at the generated project. The file `app.py` will include imports and a `handle` function on a `IncomingHandler` class. Let's walk through these pieces in depth.
+
+```python
+from hello import exports
+from hello.types import Ok
+from hello.imports.types import (
+    IncomingRequest, ResponseOutparam,
+    OutgoingResponse, Fields, OutgoingBody
+)
+```
+
+The import section of this file is simple, we just import our generated types (from `componentize-py`) for the WASI HTTP interface.
+
+```python
+class IncomingHandler(exports.IncomingHandler):
+    def handle(self, _: IncomingRequest, response_out: ResponseOutparam):
+        # Construct the HTTP response to send back 
+        outgoingResponse = OutgoingResponse(Fields.from_list([]))
+        # Set the status code to OK
+        outgoingResponse.set_status_code(200)
+        outgoingBody = outgoingResponse.body()
+        # Write our Hello World message to the response body
+        outgoingBody.write().blocking_write_and_flush(bytes("Hello from Python!\n", "utf-8"))
+        OutgoingBody.finish(outgoingBody, None)
+        # Set and send the HTTP response
+        ResponseOutparam.set(response_out, Ok(outgoingResponse))
+```
+
+The business logic of our actor is contained within the `handle` method. Within the `handle` method, the actor receives the HTTP request, creates an `OutgoingResponse` and writes that response back out to the requesting HTTP client (such as a `curl` command or a web browser).
+
+This method is defined on the `IncomingHandler` class, which matches the `wasi:http/incoming-handler` interface declared in the application's [wit file](https://github.com/wasmCloud/wasmCloud/blob/main/examples/python/actors/http-hello-world/wit/world.wit).
+  </TabItem>
+  <TabItem value="unlisted" label="My Language Isn't Listed">
+
+  We're looking to add more examples in languages that support Wasm components. If you prefer working in a language that isn't listed here, let us know!
+  <div style={{ display: "flex", flexDirection: "row" }}>
+    <div style={{ width: "100%" }}>
+        <HubspotForm
+            portalId='20760433'
+            formId='71e74f55-cc30-41de-9d41-e3d9dc159c71'
+            onSubmit={() => console.log('Submitted form')}
+            onReady={(form) => console.log('Form ready for submit')}
+            region="na1"
+            loading={<div>Loading...</div>}
+        />
+    </div>
+  </div>
+
+  </TabItem>
+</Tabs>
+
+If you use an IDE that comes with code completion and hover-tooltips, you'll be able to see documentation and get strongly-typed guidance as you develop code to interact with the WASI interfaces.
+
+:::info
+The above component example works without any modification in wasmCloud, but is specifically built using standard WebAssembly tooling. You do not need to use a wasmCloud specific SDK to build actors, and the above example will work directly with any WebAssembly runtime that supports the Wasm component model.
+:::
+
+### Something's missing
+
+Before we get into modifying the scaffolding to create the rest of this actor, take a look at what's _not_ included in this code. This code returns an abstraction of an HTTP response. It is _not_ tightly coupled to any particular HTTP server. Furthermore, you don't see the port number or server configuration options anywhere in the code. Finally, you can scale and compose this actor any way you see fit without ever having to recompile or redeploy it.
+
+This method of [interface driven development](/docs/concepts/interface-driven-development) is a core piece of the wasmCloud project philosophy. You should be able to write business logic in a language of your choice without having to worry about the non-functional requirements of your application, letting you configure loosely coupled abstractions at runtime. Moving on past our project scaffolding, the next step is to build and run our actor.

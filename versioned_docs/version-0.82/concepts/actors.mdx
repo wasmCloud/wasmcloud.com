@@ -1,0 +1,95 @@
+---
+title: "Actors"
+date: 2020-05-01T00:00:00+00:00
+icon: "ti-anchor" # themify icon pack : https://themify.me/themify-icons
+description: "Small building blocks of business logic"
+sidebar_position: 3
+type: "docs"
+---
+
+## Overview
+
+The [actor model](https://en.wikipedia.org/wiki/Actor_model) is a model of concurrent computation that informs the way to build applications on wasmCloud. In this model, the **actor** is the primitive building block of concurrent computation. Actors are "black-box" computational entities that can only communicate with other actors by passing messages.
+
+The academic definition of actors calls for them to be able to perform the following tasks _concurrently_:
+
+- Send messages to other actors
+- Create new actors
+- Alter their own internal state
+- Make local decisions
+- Choose how to react to the next message
+
+Implicit in this list is the rule that actors can't change or directly read the state of other actors. The only way entities exchange data in this system is through messages. There are a _ton_ of amazing resources on this concept, and if you're interested, check out the references in the [Wikipedia article](https://en.wikipedia.org/wiki/Actor_model).
+
+**Note:** While it's possible to implement the actor model using these strict, academic constraints, wasmCloud tempers them with practical concerns around managing **secure** and **resilient** distributed workloads.
+
+### Stateless by design
+
+wasmCloud actors are **stateless**, allowing hundreds or thousands of copies of an actor to be horizontally scaled across a cluster to meet compute demands.
+
+When an actor needs state, it obtains state through the use of a [capability provider](/docs/concepts/capabilities). Leaving state to capability providers enables wasmCloud to orchestrate invocations in complex applications without regard to specific instances of actors or where they're running.
+
+Providers like the [concordance](https://github.com/cosmonic/concordance) event sourcing provider create a developer experience that feels like internally stateful actors, while still optimized for distributed systems.
+
+### Centralized supervision
+
+Actor supervision is a hallmark of the actor model. In some systems, like [Akka](https://akka.io/), an application is one big supervision tree, and the only way to start an actor is from inside another actor. wasmCloud's supervision model is different.
+
+wasmCloud actors don't supervise other actors. In a zero trust environment, allowing actors to spawn others is a security risk. wasmCloud hosts maintain the horizontal scale of actors with an entirely flat hierarchy.
+
+### Actor components
+
+An **_actor_ component** is the smallest unit of deployable, portable compute within the wasmCloud ecosystem.
+
+Actor components are small [WebAssembly components](/docs/concepts/webassembly-components) that can handle messages delivered to them by the host runtime and can invoke functions on [capability providers](/docs/concepts/capabilities).
+
+### Single-threaded
+
+_Concurrency is hard_.
+
+Even with systems designed correctly for concurrency, it's still hard. Building systems that work either through multi-threading or through so-called "green threads" or "coroutines" is difficult and error-prone. Concurrency and parallelism introduce friction in writing new code, maintaining old code, and troubleshooting applications. They routinely wreak havoc on production systems.
+
+Developers want to write business logic without having to worry about the intricate details of the threading model of the surrounding environment. In alignment with the actor model, wasmCloud actor components are single-threaded _internally_. The surrounding environment of the host runtime may have varying levels of concurrency support. This support may differ depending on whether the host is running in a browser, on a constrained device, or in a VM somewhere. However, the code for actor components should be independent of these conditions and _never have to change_, even if the surrounding environment adopts a different concurrency model.
+
+While it's nice not worrying about the underlying concurrency model, it's important to understand that single-threaded code has the potential to create bottlenecks. Therefore, when developing _message handlers_ for actor components, embrace the design of performing small amounts of work in a "get in and get out fast" approach. Divide the work into the smallest bits possible, and perform each bit as fast as possible. This approach maximizes the benefits of _external concurrency_ while still keeping the code simple and synchronous.
+
+Again, these kinds of patterns occur in all actor systems, not just wasmCloud.
+
+### Reactive
+
+Actor components are [reactive](https://en.wikipedia.org/wiki/Reactive_programming). An actor can't start any flow on its own. Actors can only _react_ to outside stimuli in the form of messages delivered by the host.
+
+Developers declare which messages their actor components handle as input and return messages as output. The following example implements a handler that receives a bank account query and responds with the bank account value:
+
+```rust
+#[async_trait]
+impl BankServer for BankActor {
+    async fn handle_inquiry(&self,
+        ctx: &Context,
+        query: &BalanceInquiry) -> RpcResult<Balance> {
+
+        // queried using another capability provider
+        let balance = get_balance()?;
+        Ok(Balance{
+            account: query.account,
+            balance
+        })
+    }
+}
+```
+
+The preceding actor code could communicate with capability providers (for example, a _key-value store_ to retrieve the account balance), but only in response to a message from the host.
+
+### Communication by abstraction
+
+wasmCloud actor components are _loosely coupled_ with the capability providers they use for non-functional requirements. An actor doesn't communicate with **Redis** or **Cassandra** or **Consul**, instead it communicates with a generalized abstraction over _key-value stores_.
+
+A contract or [interface](/docs/concepts/interface-driven-development) represents each of these abstractions. As long as the capability provider implements the correct interface contract, it's considered compatible with your actor. An actor written using the key-value store abstraction should be able to work with _any_ key-value store. This decoupling also enables swapping the store at runtime without requiring a rebuild or redeploy!
+
+There are a number of _first-party_ [interfaces](https://github.com/wasmcloud/interfaces) in the wasmCloud GitHub organization. Additionally, the community can build their own public capability providers, and enterprises are free to build their own internal, proprietary capability providers that expose private enterprise or corporate functionality.
+
+### Secure
+
+Actor components are secure by default. Because actor components are WebAssembly components that can't use WASI capabilities directly, actors are physically incapable of interacting with any operating system functionality on their own. The only way actor components can affect their external environment is through the use of a capability provider.
+
+The host runtime will only allow calls between [linked](/docs/concepts/runtime-linking) actors and providers.
