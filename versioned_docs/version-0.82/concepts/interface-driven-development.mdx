@@ -1,0 +1,132 @@
+---
+title: "Interface Driven Development"
+date: 2020-05-01T00:00:00+00:00
+icon: "ti-anchor" # themify icon pack : https://themify.me/themify-icons
+description: "A quick guide to interface-driven development"
+sidebar_position: 5
+type: "docs"
+---
+
+## Overview
+
+Interface Driven Development (**IDD**), aka contract-driven development, is a development approach that _focuses on defining **what** components need before **how** to meet those needs_.
+
+Systems developed using IDD—especially distributed systems—are _more loosely coupled, robust and maintainable_.
+
+By default, [WebAssembly components](/docs/concepts/webassembly-components) operate in a completely isolated sandbox, meaning that they can only perform logical operations with no access to system resources like I/O, networking, and syscalls.
+
+In functional programming terminology we might call these modules "pure", as they can only map inputs to outputs without producing side-effects. 
+
+But without any side-effects, how can we use WebAssembly components to do anything useful in our applications?
+
+Interface driven development is the core that makes wasmCloud possible. 
+
+### Separate Functional and Non-Functional Requirements
+
+wasmCloud embraces interface driven development and separation of concerns in its design of [actors](/docs/concepts/actors) and [capability providers](/docs/concepts/capabilities). Actors implement the functional requirements of (part of) an application: compute a result, allow access, respond to requests, etc. Capability providers implement the non-functional requirements, such as connecting to a data store, serving HTTP requests, or sending a message to a queue. Actors and providers communicate through interfaces called capabilities.
+
+### WebAssembly Interface Type (WIT)
+
+wasmCloud uses [WIT][wit-spec] as its [Interface Definition Language (IDL)][wiki-idl] for interfaces (similar to [gRPC][grpc], [Smithy][smithy]). 
+
+WIT is designed to allow WebAssembly components to define the interfaces they support ("exports") and the capabilities they need ("imports"). wasmCloud also uses WIT to define the interface/contract provided by capability providers.
+
+:::info
+
+wasmCloud is in the process of migrating interfaces from Smithy to WIT. If you see references to Smithy in the wasmCloud ecosytem, they are referring to the [stable ABI](/docs/hosts/abis/wasmbus/)
+
+:::
+
+### Example: A `greeter` interface defined in WIT
+
+WIT interfaces are developed in the open and are simple to understand and read:
+
+```wit
+package local:greeter-demo; // <namespace>:<package>
+
+interface greet { // interface <name of interface>
+  greet: func(name: string) -> string; // a function named "greet"
+}
+
+world greeter {
+  export greet; // make the `greet` function available to other components/the runtime
+}
+```
+
+While reading the [spec][wit-spec] is the best way to learn about WIT, it is also reasonably simple to understand at a glance.
+
+How to *use* WIT in your WebAssembly components is beyond the scope of this document, but [`wit-bindgen`][wit-bindgen] is a great place to start if you are interested.
+
+[wit-bindgen]: https://github.com/bytecodealliance/wit-bindgen
+
+### Compare: WIT vs. gRPC
+
+For those familiar with [gRPC][grpc], the above WIT interface would look something like the following:
+
+```proto
+syntax = "proto3";
+
+package greeter;
+
+service Greeter {
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}
+```
+
+Similar to gRPC, WIT defines both a schema and a method for serialization/movement across abstraction boundaries (via the Component Model).
+
+:::warning
+
+A key difference: while gRPC is meant to perform over network boundaries, WIT is *in-process*, and performs at near-native speed.
+
+:::
+
+### Compare: WIT vs. Smithy
+
+For those familiar with [smithy][smithy], the above WIT interface would look something like the following:
+
+```smithy
+namespace com.example.greeter
+
+service GreeterService {
+    version: "2022-01-01",
+    operations: [Greet]
+}
+
+operation Greet {
+    input: GreetRequest,
+    output: GreetResponse
+}
+
+structure GreetRequest {
+    @required
+    name: String
+}
+
+structure GreetResponse {
+    // Required string field
+    @required
+    message: String
+}
+```
+
+Similar to Smithy, WIT defines both a schema and a method for serialization/movement across abstraction boundaries (via the Component Model).
+
+:::warning
+
+A key difference: while Smithy is meant to perform over network boundaries, WIT is *in-process*, and performs at near-native speed.
+
+:::
+
+[wit-spec]: https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md
+[wiki-idl]: https://en.wikipedia.org/wiki/Interface_description_language
+[smithy]: https://smithy.io
+[grpc]: https://grpc.io/
