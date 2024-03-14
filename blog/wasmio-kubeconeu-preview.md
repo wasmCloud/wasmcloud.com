@@ -1,8 +1,8 @@
 ---
 title: WASM I/O and KubeCon + CloudNativeCon Europe 2024, What to Expect!
-image: './wasmio-kubeconeu-post-header.jpg'
+image: '/img/wasmio-kubeconeu-post-header.jpg'
 date: 2024-03-14T09:00:00+05:00
-authors: [liam]
+author: 'Liam Randall'
 description: All roads lead to Europe; find out what we have planned at WASM I/O and KubeCon EU!
 tags: ['Cosmonic', 'wasmCloud', 'Cloud Native', 'WebAssembly', 'Wasm']
 draft: false
@@ -10,7 +10,7 @@ draft: false
 
 We’re excited to see our friends again as we embark on a whistle-stop tour of two of our favorite European events (and cities) in the 2024 conference calendar: WASM I/O, Barcelona and KubeCon + CloudNativeCon Europe 2024, Paris. With the release of WASI 0.2 and the WebAssembly component model, we’re taking wasmCloud 1.0 on tour—introducing it to cloud native developers, and platform engineers, as the best place to bring components to life in production environments.
 
-{/* truncate */}
+<!--truncate-->
 
 ## WASM I/O, Barcelona, 14-15 March
 
