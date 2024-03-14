@@ -8,6 +8,8 @@ tags: ['Cosmonic', 'wasmCloud', 'Cloud Native', 'WebAssembly', 'Wasm']
 draft: false
 ---
 
+![wasmio-kubecon-header](/img/wasmio-kubeconeu-post-header.jpg)
+
 We’re excited to see our friends again as we embark on a whistle-stop tour of two of our favorite European events (and cities) in the 2024 conference calendar: WASM I/O, Barcelona and KubeCon + CloudNativeCon Europe 2024, Paris. With the release of WASI 0.2 and the WebAssembly component model, we’re taking wasmCloud 1.0 on tour—introducing it to cloud native developers, and platform engineers, as the best place to bring components to life in production environments.
 
 <!--truncate-->
