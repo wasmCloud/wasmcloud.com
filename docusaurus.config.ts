@@ -159,12 +159,13 @@ const config: Config = {
         },
       ],
     },
- //   announcementBar: {
- //     id: '1.0 alpha',
- //     content: `🎉️ <b>The wasmCloud v1.0 alpha</b> is available! Read the <a href="/docs/1.0/intro">alpha documentation</a> and try it out now.`,
- //     backgroundColor: '#20232a',
- //     textColor: '#fff',
- //   },
+    announcementBar: {
+      id: '1.0 alpha', // Increment on change
+      // content: `⭐️ If you like Docusaurus, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/facebook/docusaurus">GitHub</a> and follow us on <a target="_blank" rel="noopener noreferrer" href="https://twitter.com/docusaurus">Twitter ${TwitterSvg}</a>`,
+      content: `🎉️ <b>The wasmCloud v1.0 alpha</b> is available! Read the <a href="/docs/1.0/intro">alpha documentation</a> and try it out now.`,
+      backgroundColor: '#20232a',
+      textColor: '#fff',
+    },
     footer: {
       style: 'dark',
       links: [
