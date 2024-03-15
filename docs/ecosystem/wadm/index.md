@@ -9,12 +9,14 @@ sidebar_position: 0
 
 ![wadm logo](https://raw.githubusercontent.com/wasmCloud/wadm/main/wadm.png)
 
-If you've been reading the tutorials or going through the reference guide in order, then by now you should be pretty familiar with what we call _imperative deployment_. This involves using the `wash` tool (or invoking the control interface directly) to send imperatives or _commands_ to a lattice. These commands are things like telling a host to start or stop an actor, start or stop a provider, etc.
+In wasmCloud, we use the `wash` tool (or invoking the control interface directly) to send commands "imperatively" to a lattice. These commands are things like telling a host to start or stop a component, start or stop a provider, etc.
 
-Imperative deployments are good for debugging and experimentation, but when it comes time to deploy an application to production, you're usually managing many actors and providers. You also need to manage the configuration information for the bindings between actors and providers. If you want to scale your application out to handle more load or you want to relocate actors or providers to optimize for certain conditions, just using the wasmCloud host and `wash` means you're doing that all by hand.
+**Imperative deployment** is useful for debugging and experimentation, but when it comes time to deploy an application to production, you're usually managing many components and providers. You also need to manage the configuration information for the bindings between components and providers. If you want to scale your application out to handle more load or you want to relocate components or providers to optimize for certain conditions, just using the wasmCloud host and `wash` means you're doing that all by hand.
+
+At this stage, you need a way to issue commands **declaratively**, using a static configuration file that can be versioned, shared, edited, and otherwise used as a source of truth.
 
 :::info[For the Kubernetes Developer]
-You can think of a wadm application like a Kubernetes Deployment: define your application components and wadm will ensure that your application reaches desired state based on your manifest.
+You can think of a wadm deployment as roughly analogous to a Kubernetes deployment: once you define your application components in a declarative manifest, wadm will ensure that your application reaches desired state based on the manifest.
 :::
 
 ## Introduction

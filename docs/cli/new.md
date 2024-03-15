@@ -5,27 +5,27 @@ sidebar_position: 16
 description: "wash new command reference"
 --- 
 
-This command creates a new project from an existing template. A user may create an actor, provider or an interface project. This command takes you through the process in an interactive way. Following are the subcommands available under `wash new`:
+This command creates a new project from an existing template. A user may create a component, provider or an interface project. This command takes you through the process in an interactive way. Following are the subcommands available under `wash new`:
 
-- `actor`
+- `component`
 - `provider`
 - `interface`
 
-### `actor`
-When creating a new actor project, a user may select from the following templates to create a skeleton:
+### `component`
+When creating a new component project, a user may select from the following templates to create a skeleton:
 
-- hello-world-rust: A hello-world actor in Rust thay responds over an HTTP connection
-- hello-world-tinygo: A hello-world actor in TinyGo that responds over an HTTP connection
-- hello-world-typescript: A hello-world actor in TypeScript that responds over an HTTP connection
-- hello-world-python: A hello-world actor in Python that responds over an HTTP connection
+- hello-world-rust: A hello-world component in Rust thay responds over an HTTP connection
+- hello-world-tinygo: A hello-world component in TinyGo that responds over an HTTP connection
+- hello-world-typescript: A hello-world component in TypeScript that responds over an HTTP connection
+- hello-world-python: A hello-world component in Python that responds over an HTTP connection
 
-If you do not specify a template with the `--template-name` argument, you will be prompted to select one. You will then have to name the project, and a new project template will be created in the current directory. The project name can also be specified earlier and be passed to `wash new actor <project-name>`.
+If you do not specify a template with the `--template-name` argument, you will be prompted to select one. You will then have to name the project, and a new project template will be created in the current directory. The project name can also be specified earlier and be passed to `wash new component <project-name>`.
 
 #### Usage
 ```shell
-wash new actor
-wash new actor example-project
-wash new actor example-project --template-name hello-world-rust
+wash new component
+wash new component example-project
+wash new component example-project --template-name hello-world-rust
 ```
 
 ### `provider`
@@ -46,7 +46,7 @@ wash new provider example-project --template-name factorial-provider
 ### `interface`
 When creating a new interface project, a user may select from the following templates to create a skeleton:
 
-- convertor-interface: An interface for actor-to-actor messages with a single convert method
+- convertor-interface: An interface for component-to-component messages with a single convert method
 - factorial-interface: An interface for a capability provider with capability contract
 
 The user will then have to provide details such as project name, interface name and namespace prefix, and a new project template will be created in the current directory. The project name can also be specified earlier and be passed to `wash new interface <project-name>`.

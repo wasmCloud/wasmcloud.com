@@ -4,9 +4,13 @@ sidebar_position: 0
 
 # What is wasmCloud?
 
-wasmCloud helps you build and run globally distributed applications on any cloud and any edge.
+wasmCloud is a **universal application platform** that helps you build and run globally distributed WebAssembly applications on any cloud and any edge.
 
-Our goal is to make developers more productive by allowing them to write only the code that matters.
+Our goal is to make development more joyful and efficient by giving developers the tools to write only the code that matters&mdash;and making it easy to run that code anywhere.
+
+:::warning[Under Construction]
+🚧 This is alpha documentation for wasmCloud 1.0 under active construction. The v1.0 alpha release of the wasmCloud host is [available on GitHub](https://github.com/wasmCloud/wasmCloud/releases/tag/v1.0.0-alpha.1). Some details on these pages may not be aligned with v1.0 during the alpha period. 🚧
+:::
 
 wasmCloud leverages WebAssembly's security, portability, and performance to compose applications from tiny, independent building blocks.
 
@@ -21,6 +25,6 @@ wasmCloud is designed around the following core tenets:
 
 **Move from concept to production without changing your design, architecture, or your programming environment.**
 
-### Still Have Questions?
+### Still have questions?
 
 Check out our [FAQ](/docs/reference/faq).

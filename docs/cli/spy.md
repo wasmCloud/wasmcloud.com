@@ -5,12 +5,12 @@ sidebar_position: 21
 description: "wash spy command reference"
 --- 
 
-This command will spy on all invocations between an actor and its linked providers. This is an experimental command and needs the `--experimental` flag passed to it. The user will pass the actor ID or actor name to this command to spy on. If an actor name is passed, it will be resolved to an ID. If multiple actors have the same name, the user will be prompted to pick the desired one.
+This command will spy on all invocations between an component and its linked providers. This is an experimental command and needs the `--experimental` flag passed to it. The user will pass the component ID or component name to this command to spy on. If a component name is passed, it will be resolved to an ID. If multiple components have the same name, the user will be prompted to pick the desired one.
 
 ### Usage
 ```
-wash spy <actor-id> --experimental
-wash spy <actor-name> --experimental
+wash spy <component-id> --experimental
+wash spy <component-name> --experimental
 ```
 
 ### Options

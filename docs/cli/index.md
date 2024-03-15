@@ -12,7 +12,7 @@ type: "docs"
 wash --help
 ```
 
-`wash` has built-in help and you can follow any subcommand with `--help` to get more information about options available. For example `wash --help`, `wash ctl --help`, `wash up --help`, and `wash start actor --help` all provide contextual help.
+`wash` has built-in help and you can follow any subcommand with `--help` to get more information about options available. For example `wash --help`, `wash ctl --help`, `wash up --help`, and `wash start component --help` all provide contextual help.
 
 To check the version of wash on you are running, run:
 

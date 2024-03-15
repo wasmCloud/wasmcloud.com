@@ -5,7 +5,7 @@ sidebar_position: 12
 description: "wash inspect command reference"
 ---
 
-Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud actor or provider and prints out the properties of that component.
+Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud component or provider and prints out the properties of that component.
 
 #### Usage
 

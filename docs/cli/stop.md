@@ -5,19 +5,19 @@ sidebar_position: 24
 description: "wash stop command reference"
 --- 
 
-`wash stop` allows you to stop an actor, provider or a host. The user may specify if they want to stop an actor or a provider and pass the OCI reference of that entity to the command. To specify a host to stop the actor or provider, pass the host ID using the `--host-id` flag. Following are the available subcommads:
+`wash stop` allows you to stop a component, provider or a host. The user may specify if they want to stop a component or a provider and pass the OCI reference of that entity to the command. To specify a host to stop the component or provider, pass the host ID using the `--host-id` flag. Following are the available subcommads:
 
-- `actor`
+- `component`
 - `provider`
 - `host`
 
 
-### `actor`
-Stop an actor running in a host 
+### `component`
+Stop an component running in a host 
 
 #### Usage
 ```
-wash stop actor <host-id> <actor-id>
+wash stop component <host-id> <component-id>
 ```
 
 ### `provider`
@@ -25,7 +25,7 @@ Stop a provider running in a host
 
 #### Usage
 ```
-wash stop provider <host-id> <actor-id> <link-name> <contract-id>
+wash stop provider <host-id> <component-id> <link-name> <contract-id>
 ```
 
 ### `host`
@@ -61,5 +61,5 @@ The following options can be used for all subcommands of `wash stop`.
 
 `--context` Path to a context with values to use for CTL connection and authentication
 
-`--skip-wait` By default, the command will wait until the actor/provider has been started. If this flag is passed, the command will return immediately after acknowledgement from the host, without waiting for the provider to start. If this flag is omitted, the timeout will be adjusted to 30 seconds to account for provider download times and  5 seconds to account for actor download times.
+`--skip-wait` By default, the command will wait until the component/provider has been started. If this flag is passed, the command will return immediately after acknowledgement from the host, without waiting for the provider to start. If this flag is omitted, the timeout will be adjusted to 30 seconds to account for provider download times and  5 seconds to account for component download times.
 
