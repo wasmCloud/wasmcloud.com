@@ -1,5 +1,5 @@
 ---
-title: "Actor Troubleshooting"
+title: "Component Troubleshooting"
 date: 2022-01-19T11:02:05+06:00
 sidebar_position: 3
 draft: false
@@ -11,17 +11,17 @@ Before you follow this section, consider [configuring the log level](/docs/devel
 
 :::
 
-When developing actors, there are a few common errors that can cause your actor to fail to run or properly operate. Below we'll walk through a few of these scenarios with accompanying error messages.
+When developing components, there are a few common errors that can cause your component to fail to run or properly operate. Below we'll walk through a few of these scenarios with accompanying error messages.
 
-### Failing to start an actor from a local registry over HTTP
+### Failing to start a component from a local registry over HTTP
 
-The following error can happen when attempting to start an actor from a local registry server over HTTP: 
+The following error can happen when attempting to start a component from a local registry server over HTTP: 
 
 ```
-2023-12-19T22:31:26.154791Z ERROR wasmcloud_host::wasmbus: failed to scale actor actor_ref=127.0.0.1:5000/v2/hello:0.1.0 err=failed to fetch actor
+2023-12-19T22:31:26.154791Z ERROR wasmcloud_host::wasmbus: failed to scale component actor_ref=127.0.0.1:5000/v2/hello:0.1.0 err=failed to fetch component
 
 Caused by:
-    0: failed to fetch actor under OCI reference `127.0.0.1:5000/v2/hello:0.1.0`
+    0: failed to fetch component under OCI reference `127.0.0.1:5000/v2/hello:0.1.0`
     1: failed to fetch OCI path
     2: failed to fetch OCI bytes
     3: error sending request for url (https://127.0.0.1:5000/v2/): error trying to connect: received corrupt message of type InvalidContentType
@@ -35,51 +35,25 @@ When accessing a local registry from within a docker compose network, you should
 Even though port 5000 may be available on your host's network, networking works differently within docker, and you should use the name of the container instead of localhost.
 :::
 
-### Failing to invoke an actor
-
-#### Missing Capability Claims
-
-When a wasmCloud actor needs access to a capability provider, we require cryptographically signed claims embedded in that actor. The host runtime operates on a deny-by-default basis and require claims to be an allow-list to ensure our actors are secure.
-
-Adding these capability claims is mostly managed for you with `wash` when you build your actor and the list of capability claims in `wasmcloud.toml` included with any actor project.
-
-Consider the `KVCounter` example actor, which uses:
-- the `wasmcloud:httpserver` capability to receive HTTP requests
-- the `wasmcloud:keyvalue` capability to issue requests to a keyvalue database
-
-Omitting either of these capabilities from the actor's claims will cause errors at runtime, as the wasmCloud host will deny the invocation:
-
-```
-2023-12-19T22:34:56.110198Z ERROR handle_rpc_message: wasmcloud_host::wasmbus: failed to handle request origin=WasmCloudEntity { public_key: "VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M", link_name: "default", contract_id: "wasmcloud:httpserver" } target=WasmCloudEntity { public_key: "MAKSODTVGPWU7AJ7F6CW2L4YNDBHU7MH2F6TX363TZKID32V2RURFNLP", link_name: "", contract_id: "" } operation="HttpServer.HandleRequest" invocation_id="08555444d0e84c6593d06fc5abb66e3f" e=failed to handle invocation
-
-Caused by:
-    actor does not have capability claim `wasmcloud:httpserver`
-```
-
-To fix this error, make sure the actor's `wasmcloud.toml` file includes the appropriate capability claims:
-
-```toml
-[actor]
-claims = ["wasmcloud:httpserver"]
-```
+### Failing to invoke a component
 
 #### Missing Runtime Links
 
-Invocations are only allowed between actors and providers that have been [linked](/docs/concepts/runtime-linking). Omitting a link will result in a runtime error when the host denies the invocation:
+Invocations are only allowed between components and providers that have been [linked](/docs/concepts/runtime-linking). Omitting a link will result in a runtime error when the host denies the invocation:
 
 ```
-{"error":"Host send error failed to call `wasmcloud:bus/host.call`: failed to call linked provider: unknown actor call alias"}
+{"error":"Host send error failed to call `wasmcloud:bus/host.call`: failed to call linked provider: unknown component call alias"}
 ```
 
-To fix this error, make sure actors and providers are linked to each other appropriately. To inspect the current set of runtime links, run:
+To fix this error, make sure components and providers are linked to each other appropriately. To inspect the current set of runtime links, run:
 
 ```bash
 wash get links
 ```
 
-The command line wasmCloud shell (aka [wash](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-cli)) attempts to safeguard against misspellings, though it is unable to determine if a particular link is between the intended actor and provider.
+The command line wasmCloud shell (aka [wash](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-cli)) attempts to safeguard against misspellings, though it is unable to determine if a particular link is between the intended component and provider.
 
-If any of the actor ID, provider ID, link name, or contract ID are misspelled or omitted, then the host will deny the invocation.
+If any of the component ID, provider ID, link name, or contract ID are misspelled or omitted, then the host will deny the invocation.
 
 ## Debugging Invocations
 
@@ -91,22 +65,22 @@ Note that the following commands are experimental and may change in the future. 
 
 ### `wash spy`
 
-`wash spy` monitors all invocations to/from a given actor. This can be useful for debugging communication issues and identifying logic bugs. To use it, run:
+`wash spy` monitors all invocations to/from a given component. This can be useful for debugging communication issues and identifying logic bugs. To use it, run:
 
 ```bash
-wash spy <actor name or ID>
+wash spy <component name or ID>
 ```
 
 :::info
 
-You can pass the actual actor ID if you wish, but for ease of use, `wash` will attempt to resolve the input to an ID by checking if the `actor_name` or `call_alias` fields from the actor's claims contains the given string (case-insensitive). If more than one matches, then an error will be returned, indicating the options to choose from.
+You can pass the actual component ID if you wish, but for ease of use, `wash` will attempt to resolve the input to an ID by checking if the `actor_name` or `call_alias` fields from the component's claims contains the given string (case-insensitive). If more than one matches, then an error will be returned, indicating the options to choose from.
 
 :::
 
 You can try out this command with the KV Counter example:
 
 ```bash
-$ wget https://raw.githubusercontent.com/wasmCloud/examples/main/actor/kvcounter/wadm.yaml
+$ wget https://raw.githubusercontent.com/wasmCloud/examples/main/component/kvcounter/wadm.yaml
 $ wash app put wadm.yaml
 
 Successfully put manifest
@@ -115,7 +89,7 @@ $ wash app deploy kvcounter
 Deployed model
 $ wash spy kvcounter
 
-Spying on actor kvcounter
+Spying on component kvcounter
 
 [2023-06-21 11:24:32.397138 -06:00]
 From: HTTP Server              To: kvcounter                Host: NC7XZN5VJW2EOK6E565MSRY3JW2WU5ABUA6HTSPY6O7MVKGZTFCR3TDM
@@ -221,8 +195,8 @@ Message: {
 }
 ```
 
-This output has the timestamp the invocation was observed, the source and target of the invocation, and the content of the invocation itself. `wash spy` will attempt to decode the invocation and output it to JSON, but if it is unable to, it will output the raw bytes instead. Because this can be done offline, `wash capture` does not attempt to fetch friendly names for each of the providers and actors. 
+This output has the timestamp the invocation was observed, the source and target of the invocation, and the content of the invocation itself. `wash spy` will attempt to decode the invocation and output it to JSON, but if it is unable to, it will output the raw bytes instead. Because this can be done offline, `wash capture` does not attempt to fetch friendly names for each of the providers and components. 
 
-You can also filter the output by passing the `--provider-id` and `--actor-id` flags. If you pass just one of the flags, it will filter all invocations that were set to or from that actor/provider. If both flags are passed, it will only output invocations _between_ that actor and provider.
+You can also filter the output by passing the `--provider-id` and `--component-id` flags. If you pass just one of the flags, it will filter all invocations that were set to or from that component/provider. If both flags are passed, it will only output invocations _between_ that component and provider.
 
 Lastly, there is an interactive mode, which can be enabled by passing the `--interactive` flag. You can then step through each invocation by pressing the Enter key.

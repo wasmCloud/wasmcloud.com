@@ -5,13 +5,13 @@ sidebar_position: 3
 description: "wash call command reference"
 --- 
 
-Wash call can be used to directly invoke an actor. This can be useful when debugging, especially when the actor isn't directly accessible via external channels such as HTTP. It is not recommended to use wash call in production environments.
+`wash call` can be used to directly invoke an component. This can be useful when debugging, especially when the component isn't directly accessible via external channels such as HTTP. It is not recommended to use `wash call` in production environments.
 
 ### Usage
 ```
 export CLUSTER_SEED=$(wash keys gen cluster -o json | jq -r .seed)
 wash up --detached --cluster-seed $CLUSTER_SEED
-wash start actor wasmcloud.azurecr.io/echo:0.3.8
+wash start component wasmcloud.azurecr.io/echo:0.3.8
 wash call --cluster-seed $CLUSTER_SEED MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5 HttpServer.HandleRequest '{"method": "GET", "path": "/", "body": "", "queryString":"","header":{}}' -o json --bin s
 ```
 
@@ -39,4 +39,4 @@ wash call --cluster-seed $CLUSTER_SEED MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5
 
 `--bin` When using JSON output, display binary as binary ('b'), string ('s'), or both ('2'). Defaults to binary
 
-`--test` When invoking a test actor, interpret the response as TestResults
+`--test` When invoking a test component, interpret the response as TestResults

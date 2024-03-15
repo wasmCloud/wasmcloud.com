@@ -5,11 +5,11 @@ sidebar_position: 27
 description: "wash update command reference"
 ---
 
-`wash update` updates an actor running in a host to a new reference. The user may supply the actor ID, its host ID and the new OCI reference of the actor that needs to replace the actor in this actor ID.
+`wash update` updates a component running in a host to a new reference. The user may supply the component ID, its host ID and the new OCI reference of the component that needs to replace the component in this component ID.
 
 #### Usage
 ```
-wash update actor <host-id> <actor-id> <new-actor-reference>
+wash update component <host-id> <component-id> <new-component-reference>
 ```
 
 #### Options

@@ -85,6 +85,14 @@ const config: Config = {
         docs: {
           editUrl: 'https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/',
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+          lastVersion: '0.82',
+          versions: {
+            current: {
+              label: '1.0 (alpha)',
+              path: '1.0',
+              banner: 'unreleased'
+            },
+          },
         },
         pages: {
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
@@ -150,6 +158,13 @@ const config: Config = {
           position: 'right',
         },
       ],
+    },
+    announcementBar: {
+      id: '1.0 alpha', // Increment on change
+      // content: `⭐️ If you like Docusaurus, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/facebook/docusaurus">GitHub</a> and follow us on <a target="_blank" rel="noopener noreferrer" href="https://twitter.com/docusaurus">Twitter ${TwitterSvg}</a>`,
+      content: `🎉️ <b>The wasmCloud v1.0 alpha</b> is available! Read the <a href="/docs/1.0/intro">alpha documentation</a> and try it out now.`,
+      backgroundColor: '#20232a',
+      textColor: '#fff',
     },
     footer: {
       style: 'dark',

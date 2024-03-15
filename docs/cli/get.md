@@ -14,7 +14,7 @@ Wash get helps you in retrieving information about your lattice. It can help you
 
 ### `links`
 
-This subcommand will retrieve all the known links in the lattice. It will give you information about them such as the link name, the associated actor and provider ID and its contract ID.
+This subcommand will retrieve all the known links in the lattice. It will give you information about them such as the link name, the associated component and provider ID and its contract ID.
 
 #### Usage
 ```
