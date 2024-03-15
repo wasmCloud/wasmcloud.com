@@ -253,4 +253,4 @@ rustup component add rustfmt
 ```
 :::
 
-Now that we have a Rust crate that we can use from both our actor and our capability provider, let's move on to the next step: [_Creating a Capability Provider in Rust_](/docs/developer/providers/rust.md).
+Now that we have a Rust crate that we can use from both our actor and our capability provider, let's move on to the next step: [_Creating a Capability Provider in Rust_](/docs/developer/providers/rust).
