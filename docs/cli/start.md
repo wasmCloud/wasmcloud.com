@@ -5,17 +5,17 @@ sidebar_position: 23
 description: "wash start command reference"
 ---
 
-`wash start` assists in launching an actor or a provider from an OCI reference on a host. The user may specify if they want to start an actor or a provider and pass the OCI reference of that entity to the command. By default, the actor or provider are auctioned in the lattice for a suitable host. To specify a host to launch the actor or provider, pass the host ID using the `--host-id` flag. Actors or providers can also be started from local files using the prefix `file://` followed by the file path. By default, loading from files is permitted when you start the host using `wash up` and can be disabled using the `WASMCLOUD_ALLOW_FILE_LOAD` environment variable. If the host is started from the binary instead of `wash up`, loading from files is disabled. Following are the available subcommads under `wash start`:
+`wash start` assists in launching a component or a provider from an OCI reference on a host. The user may specify if they want to start a component or a provider and pass the OCI reference of that entity to the command. By default, the component or provider are auctioned in the lattice for a suitable host. To specify a host to launch the component or provider, pass the host ID using the `--host-id` flag. Components or providers can also be started from local files using the prefix `file://` followed by the file path. By default, loading from files is permitted when you start the host using `wash up` and can be disabled using the `WASMCLOUD_ALLOW_FILE_LOAD` environment variable. If the host is started from the binary instead of `wash up`, loading from files is disabled. Following are the available subcommads under `wash start`:
 
-- `actor`
+- `component`
 - `provider`
 
 #### Usage
 
 ```
-wash start actor wasmcloud.azurecr.io/echo:0.3.7
+wash start component wasmcloud.azurecr.io/echo:0.3.7
 
-wash start actor file://<path-to-actor>
+wash start component file://<path-to-component>
 
 wash start provider wasmcloud.azurecr.io/httpserver:0.19.1
 
@@ -46,12 +46,12 @@ wash start provider file://<path-to-provider>
 
 `--context` Path to a context with values to use for CTL connection and authentication
 
-`--host-id` Id of host, if omitted the actor will be auctioned in the lattice to find a suitable host
+`--host-id` ID of host, if omitted the applicationcomponent will be auctioned in the lattice to find a suitable host
 
-`--max-concurrent` Maximum number of instances this actor can run concurrently. Setting this value to 0 means there is no maximum [default: 1]
+`--max-concurrent` Maximum number of instances this component can run concurrently. Setting this value to 0 means there is no maximum [default: 1]
 
-`--constraint` (Alias `-c`) Constraints for actor auction in the form of "label=value". If host-id is supplied, this list is ignored
+`--constraint` (Alias `-c`) Constraints for application component auction in the form of "label=value". If host-id is supplied, this list is ignored
 
 `--auction-timeout-ms` Timeout to await an auction response, defaults to 2000 milliseconds [default: 2000]
 
-`--skip-wait` By default, the command will wait until the actor has been started. If this flag is passed, the command will return immediately after acknowledgement from the host, without waiting for the actor to start. If this flag is omitted, the timeout will be adjusted to 30 seconds to account for provider download times and 5 seconds to account for actor download times.
+`--skip-wait` By default, the command will wait until the component has been started. If this flag is passed, the command will return immediately after acknowledgement from the host, without waiting for the component to start. If this flag is omitted, the timeout will be adjusted to 30 seconds to account for provider download times and 5 seconds to account for component download times.

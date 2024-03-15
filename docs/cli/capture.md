@@ -52,8 +52,8 @@ wash capture replay --experimental /path/to/captured-file
 
 The following options can be passed for the `replay` subcommand.
 
-`--actor-id` An actor ID to filter captured invocations by. This will filter anywhere the actor is the source or the target of the invocation. If provided with an provider ID, it will filter down to interactions only between the actor and provider
+`--component-id` An component ID to filter captured invocations by. This will filter anywhere the component is the source or the target of the invocation. If provided with an provider ID, it will filter down to interactions only between the component and provider
 
-`--provider-id` A provider ID to filter captured invocations by. This will filter anywhere the provider is the source or the target of the invocation. If provided with an actor ID, it will filter down to interactions only between the actor and provider
+`--provider-id` A provider ID to filter captured invocations by. This will filter anywhere the provider is the source or the target of the invocation. If provided with an component ID, it will filter down to interactions only between the component and provider
 
 `--interactive` Whether or not to step through the replay one message at a time

@@ -12,7 +12,7 @@ This command will assist you to add remove and query all the links in the lattic
 - `del`
 
 ### `query`
-Queries all the links in the lattice. Links persist in the lattice even if the associated actor or provider are stopped.
+Queries all the links in the lattice. Links persist in the lattice even if the associated component or provider are stopped.
 
 #### Usage
 ```
@@ -20,11 +20,11 @@ wash link query
 ```
 
 ### `put`
-Adds a link definition in the lattice associated with an actor and provider and having an associated contract. If you want to name the link, you may pass a value to the `--link-name` flag. Be default, the link name is "default".
+Adds a link definition in the lattice associated with a component and provider and having an associated contract. If you want to name the link, you may pass a value to the `--link-name` flag. Be default, the link name is "default".
 
 #### Usage
 ```
-wash link put <actor-id> <provider-id> <contract-id>
+wash link put <component-id> <provider-id> <contract-id>
 ```
 
 ### `del`
@@ -32,7 +32,7 @@ Deletes a link definition in the lattice. If it is named other than "default" th
 
 #### Usage
 ```
-wash link del <actor-id> <contract-id>
+wash link del <component-id> <contract-id>
 ```
 
 #### Options

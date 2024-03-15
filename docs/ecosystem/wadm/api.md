@@ -165,7 +165,7 @@ to fetch a specific version
       "components": [
         {
           "name": "echo",
-          "type": "actor",
+          "type": "component",
           "properties": {
             "image": "wasmcloud.azurecr.io/echo:0.3.7"
           },

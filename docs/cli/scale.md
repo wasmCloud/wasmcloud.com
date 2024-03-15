@@ -5,15 +5,15 @@ sidebar_position: 22
 description: "wash scale command reference"
 --- 
 
-`wash scale` supports scaling the actors in your lattice to handle concurrent requests. It accepts the host ID on which the actor is running and the reference of the actor to scale as required arguments. It also accepts a `--max-concurrent` value that specifies the maximum number of instances this actor can run concurrently. By default, the value is an unbounded level of concurrency. A value of zero is equivalent to stopping the actor.
+`wash scale` supports scaling the components in your lattice to handle concurrent requests. It accepts the host ID on which the component is running and the reference of the component to scale as required arguments. It also accepts a `--max-concurrent` value that specifies the maximum number of instances this component can run concurrently. By default, the value is an unbounded level of concurrency. A value of zero is equivalent to stopping the component.
 
 ### Usage
 ```
-wash scale actor <your-host-id> wasmcloud.azurecr.io/echo:0.3.7
-wash scale actor <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concurrent=20
+wash scale component <your-host-id> wasmcloud.azurecr.io/echo:0.3.7
+wash scale component <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concurrent=20
 
-# Stopping the actor
-wash scale actor <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concurrent=0
+# Stopping the component
+wash scale component <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concurrent=0
 ```
 
 ### Options
@@ -39,6 +39,6 @@ wash scale actor <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concurrent
 
 `--context` Path to a context with values to use for CTL connection and authentication
 
-`--max-concurrent` (Alias `-c`) Maximum number of instances this actor can run concurrently. Omitting this value means there is no maximum
+`--max-concurrent` (Alias `-c`) Maximum number of instances this component can run concurrently. Omitting this value means there is no maximum
 
-`--annotations` (Alias `-a`) Optional set of annotations used to describe the nature of this actor scale command. For example, autonomous agents may wish to “tag” scale requests as part of a given deployment
+`--annotations` (Alias `-a`) Optional set of annotations used to describe the nature of this component scale command. For example, autonomous agents may wish to “tag” scale requests as part of a given deployment
