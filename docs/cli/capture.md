@@ -52,7 +52,7 @@ wash capture replay --experimental /path/to/captured-file
 
 The following options can be passed for the `replay` subcommand.
 
-`--component-id` a component ID to filter captured invocations by. This will filter anywhere the component is the source or the target of the invocation. If provided with an provider ID, it will filter down to interactions only between the component and provider
+`--component-id` A component ID to filter captured invocations by. This will filter anywhere the component is the source or the target of the invocation. If provided with an provider ID, it will filter down to interactions only between the component and provider
 
 `--provider-id` A provider ID to filter captured invocations by. This will filter anywhere the provider is the source or the target of the invocation. If provided with a component ID, it will filter down to interactions only between the component and provider
 
