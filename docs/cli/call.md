@@ -5,7 +5,7 @@ sidebar_position: 3
 description: "wash call command reference"
 --- 
 
-`wash call` can be used to directly invoke an component. This can be useful when debugging, especially when the component isn't directly accessible via external channels such as HTTP. It is not recommended to use `wash call` in production environments.
+`wash call` can be used to directly invoke a component. This can be useful when debugging, especially when the component isn't directly accessible via external channels such as HTTP. It is not recommended to use `wash call` in production environments.
 
 ### Usage
 ```

@@ -34,7 +34,7 @@ When application specifications are stored, they are keyed by name and a history
 
 While OAM allows us to define any component in a specification, there are only a few components with which wadm is concerned:
 
-- `component` - represents a specification of an component
+- `component` - represents a specification of a component
 - `capability` - represents a specification of a capability provider
 
 Within the `components` field of a specification, you define an application component as follows:

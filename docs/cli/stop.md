@@ -13,7 +13,7 @@ description: "wash stop command reference"
 
 
 ### `component`
-Stop an component running in a host 
+Stop a component running in a host 
 
 #### Usage
 ```

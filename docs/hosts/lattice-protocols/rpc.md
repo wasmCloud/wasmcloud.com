@@ -40,8 +40,8 @@ These are the fields on the `WasmCloudEntity` structure:
 | Field | Type | Description |
 | :--- | --- | :--- |
 | `public_key` | String | The public key of the entity. Will begin with **M** for components, **V** for providers |
-| `contract_id` | String | The contract ID of the entity. Left blank if this entity is an component. |
-| `link_name` | String | Link name of the entity. Left blank if this entity is an component. |
+| `contract_id` | String | The contract ID of the entity. Left blank if this entity is a component. |
+| `link_name` | String | Link name of the entity. Left blank if this entity is a component. |
 
 ### Invocation Claims
 

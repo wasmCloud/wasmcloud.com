@@ -5,7 +5,7 @@ sidebar_position: 21
 description: "wash spy command reference"
 --- 
 
-This command will spy on all invocations between an component and its linked providers. This is an experimental command and needs the `--experimental` flag passed to it. The user will pass the component ID or component name to this command to spy on. If a component name is passed, it will be resolved to an ID. If multiple components have the same name, the user will be prompted to pick the desired one.
+This command will spy on all invocations between a component and its linked providers. This is an experimental command and needs the `--experimental` flag passed to it. The user will pass the component ID or component name to this command to spy on. If a component name is passed, it will be resolved to an ID. If multiple components have the same name, the user will be prompted to pick the desired one.
 
 ### Usage
 ```
