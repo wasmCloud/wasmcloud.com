@@ -5,7 +5,7 @@ sidebar_position: 8
 description: "wash dev command reference"
 --- 
 
-Starts a local dev loop for an component. Takes a local `wasmcloud.toml` file to deploy the sepcified component and accepts a host ID to specify the host to deploy on. This is an experimental feature and needs `--experimental` flag to run.
+Starts a local dev loop for a component. Takes a local `wasmcloud.toml` file to deploy the sepcified component and accepts a host ID to specify the host to deploy on. This is an experimental feature and needs `--experimental` flag to run.
 
 ### Usage
 ```
