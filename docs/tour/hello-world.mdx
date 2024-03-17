@@ -424,7 +424,73 @@ spec:
       properties:
         image: wasmcloud.azurecr.io/httpserver:0.19.1
         contract: wasmcloud:httpserver
+````
+
+## Scaling up 📈
+
+WebAssembly can be easily scaled due to its small size, portability, and [wasmtime](https://wasmtime.dev/)'s ability to efficiently instantiate multiple instances of a single WebAssembly component. We leverage these aspects to make it simple to scale your applications with wasmCloud. Components only use resources when they're actively processing requests, so you can specify the number of replicas you want to run and wasmCloud will automatically scale up and down to meet demand. Let's scale up our hello world application to 50 replicas by editing `wadm.yaml`:
+
+```yaml {17-19}
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello
+  annotations:
+    # Make sure to bump the version so wadm knows to update the application
+    version: v0.0.2
+    description: 'wasmCloud Hello World Example'
+spec:
+  components:
+    - name: hello
+      type: actor
+      properties:
+        image: wasmcloud.azurecr.io/hello:0.1.7
+      traits:
+        - type: spreadscaler
+          properties:
+            # Update the scale to 50
+            replicas: 50
 ```
+
+Now your hello application is ready to deploy v0.0.2 with 50 replicas, meaning it can handle up to 50 concurrent incoming HTTP requests. Just run `wash app deploy wadm.yaml` again, wasmCloud will be configured to automatically scale your actor component based on incoming load. It's a little easier to visualize this in the wasmCloud dashboard, so let's take a look at that next.
+
+## Viewing the wasmCloud dashboard
+
+To view the wasmCloud dashboard, you'll have to launch `wash` with the option `--nats-websocket-port 4001`. Go ahead and `CTRL+c` or `wash down` to stop your previous host, and then relaunch it with the new option:
+
+```bash
+wash up --nats-websocket-port 4001
+```
+
+:::info[What will happen to my application?]
+Treat wasmCloud hosts as cattle, not pets. Stopping your host will stop all of the components running on it, and **wadm** will look for other available hosts to reschedule your application on. As soon as you launch your new host with the `--nats-websocket-port` option, your application will be rescheduled on it and work just as it did before.
+:::
+
+Then, you can launch the wasmCloud dashboard using `wash ui`, which will launch the dashboard on [http://localhost:3030](http://localhost:3030).
+This is a great way to visualize what is running on your host, even multiple hosts that are connected to the same NATS server.
+
+<img src={washboard_hello} width="800" alt="wasmCloud dashboard with hello world application" />
+
+## Log files
+
+If you encounter any problems, the host log files may contain useful error
+messages, and it's good to know how to find them. The tabs below, organized by how you started the
+wasmCloud host, show you where to find logs:
+
+<Tabs groupId="env" queryString >
+  <TabItem value="local" label="Local" default>
+
+By default, logs from `wash up` are automatically output to your terminal. If you ran the command
+with the `--detached` flag, logs can be found in `~/.wash/downloads/wasmcloud.log`
+
+  </TabItem>
+  <TabItem value="docker" label="Docker">
+
+Logs from hosts running in Docker, if started with our docker compose, can be found by running
+`docker logs wasmcloud`.
+
+  </TabItem>
+</Tabs>
 
 ## Next steps
 
