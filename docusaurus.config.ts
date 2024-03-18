@@ -148,6 +148,9 @@ const config: Config = {
           label: 'Docs',
         },
         {
+          type: 'docsVersionDropdown',
+        },
+        {
           href: 'https://ostif.org/ostif-has-completed-a-security-audit-of-wasmcloud/',
           label: 'Security Assessment',
           position: 'right',
@@ -160,8 +163,7 @@ const config: Config = {
       ],
     },
     announcementBar: {
-      id: '1.0 alpha', // Increment on change
-      // content: `⭐️ If you like Docusaurus, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/facebook/docusaurus">GitHub</a> and follow us on <a target="_blank" rel="noopener noreferrer" href="https://twitter.com/docusaurus">Twitter ${TwitterSvg}</a>`,
+      id: '1.0 alpha', 
       content: `🎉️ <b>The wasmCloud v1.0 alpha</b> is available! Read the <a href="/docs/1.0/intro">alpha documentation</a> and try it out now.`,
       backgroundColor: '#20232a',
       textColor: '#fff',
