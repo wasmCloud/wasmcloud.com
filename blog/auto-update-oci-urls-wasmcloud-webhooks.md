@@ -107,11 +107,8 @@ Next, in `wasmcloud.toml`, modify the actor claims section to include our new ca
 ```toml
 name = "webhook-handler"
 language = "rust"
-type = "actor"
+type = "component"
 version = "0.1.0"
-
-[actor]
-claims = ["wasmcloud:httpserver", "wasmcloud:keyvalue", "wasmcloud:builtin:logging"]
 ```
 
 ### Handling the webhook payload

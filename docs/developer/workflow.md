@@ -10,9 +10,9 @@ As a developer using wasmCloud, there are a number of common day-to-day workflow
 
 The following is a list of developer workflows _sorted_ from **_most to least common_**.
 
-### Building Actors
+### Building Components
 
-The most common thing application developers will do is build actors. Actors encompass pure business logic, and only communicate with non-functional requirements through capability providers and abstract [interfaces](/docs/concepts/interface-driven-development).
+The most common thing application developers will do is build [components](/docs/concepts/components). Components encompass pure business logic in wasmCloud, and only communicate with non-functional requirements through capability providers and abstract [interfaces](/docs/concepts/interface-driven-development).
 
 Once you've established a dependency on a library that exposes the interface abstraction you're looking for, you can start your iteration loop.
 
