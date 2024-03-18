@@ -20,7 +20,7 @@ In `wasmcloud.toml`, the `build_command` field can specify a custom build comman
 ```toml
 name = "PythonExample"
 language = "python"
-type = "actor"
+type = "component"
 version = "0.1.0"
 
 [actor]

@@ -12,11 +12,8 @@ You can think of `wasmcloud.toml` as the `package.json` or `Cargo.toml` of the w
 ```toml
 name = "echo"
 language = "rust"
-type = "actor"
+type = "component"
 version = "0.1.0"
-
-[actor]
-claims = ["wasmcloud:httpserver"]
 
 [rust]
 cargo_path = "/tmp/cargo"
