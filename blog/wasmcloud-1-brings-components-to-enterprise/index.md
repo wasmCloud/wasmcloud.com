@@ -50,7 +50,3 @@ Interest in wasmCloud has grown rapidly in the last couple of years. The project
 **wasmCloud Booth:** Open Source Project Pavilion, Wed 20th, 3 - 9pm (during booth crawl)
 
 [See where we’re talking](https://cosmonic.com/blog/industry/wasmio-kubeconeu2024-preview)
-
-**About Cosmonic**
-
-Powered by [wasmCloud](https://wasmcloud.com/), the universal application platform, Cosmonic allows the seamless reuse of code as components&mdash;written in any language and deployed to any location. Cosmonic helps enterprises rapidly adopt, scale, execute, and operate distributed applications at scale...with all the enterprise-class services engineers expect. Compatible with modern Kubernetes and container-based ecosystems, it is not dependent upon them. With Cosmonic you can assemble your applications from reusable, composable components and run constellations of code across diverse devices, CPUs, and clouds&mdash;even your own&mdash;in a few clicks. [www.cosmonic.com](http://www.cosmonic.com/)
