@@ -5,7 +5,7 @@ sidebar_position: 8
 description: "wash dev command reference"
 --- 
 
-Starts a local dev loop for an actor. Takes a local `wasmcloud.toml` file to deploy the sepcified actor and accepts a host ID to specify the host to deploy on. This is an experimental feature and needs `--experimental` flag to run.
+Starts a local dev loop for a component. Takes a local `wasmcloud.toml` file to deploy the sepcified component and accepts a host ID to specify the host to deploy on. This is an experimental feature and needs `--experimental` flag to run.
 
 ### Usage
 ```
@@ -79,7 +79,7 @@ wash dev --experimental --host-id=<your-host-id>
 
 `--config-service-enabled` Denotes if a wasmCloud host should issue requests to a config service on startup [env: WASMCLOUD_CONFIG_SERVICE=]
 
-`--allow-file-load` Denotes if a wasmCloud host should allow starting actors from the file system [env: WASMCLOUD_ALLOW_FILE_LOAD=] [default: true] [possible values: true, false]
+`--allow-file-load` Denotes if a wasmCloud host should allow starting components from the file system [env: WASMCLOUD_ALLOW_FILE_LOAD=] [default: true] [possible values: true, false]
 
 `--enable-structured-logging` Enable JSON structured logging from the wasmCloud host [env: WASMCLOUD_STRUCTURED_LOGGING_ENABLED=]
 

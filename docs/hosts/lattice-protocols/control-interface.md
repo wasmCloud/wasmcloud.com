@@ -69,12 +69,12 @@ you'll need to set `--replies 0 --timeout <your timeout>`. An example response i
 }
 ```
 
-#### Actor
+#### Component
 
-`nats req wasmbus.ctl.{lattice}.auction.actor <json_body>`
+`nats req wasmbus.ctl.{lattice}.auction.component <json_body>`
 
-Hold an auction for starting an actor. This allows all hosts that match a given list of requirements
-to respond whether or not they can run the actor
+Hold an auction for starting a component. This allows all hosts that match a given list of requirements
+to respond whether or not they can run the component
 
 ##### Request
 
@@ -138,14 +138,14 @@ omit the field entirely.
 ```
 
 If the response has an `accepted` value of `true`, this means the host has accepted the request and
-will attempt to start the actor. This _does not_ guarantee the actor has started. To determine if
-the actor has started, you should monitor the lattice event stream for the `actors_started` event.
+will attempt to start the component. This _does not_ guarantee the component has started. To determine if
+the component has started, you should monitor the lattice event stream for the `actors_started` event.
 
-#### Stop Actor
+#### Stop component
 
 `nats req wasmbus.ctl.{lattice}.cmd.{host-id}.sa <json_body>`
 
-Stops an actor on a host, terminating any pre-instantiated instances.
+Stops a component on a host, terminating any pre-instantiated instances.
 
 ##### Request
 
@@ -160,7 +160,7 @@ Stops an actor on a host, terminating any pre-instantiated instances.
 ```
 
 The `annotations` field is optional and can be omitted entirely. However, annotations must match the
-running annotations of the actor in order for the stop command to actually stop the actors. This is
+running annotations of the component in order for the stop command to actually stop the actors. This is
 critical for applications such as `wadm` that use annotations to indicate ownership
 
 ##### Response
@@ -173,19 +173,19 @@ critical for applications such as `wadm` that use annotations to indicate owners
 ```
 
 If the response has an `accepted` value of `true`, this means the host has accepted the request and
-will attempt to stop the actor. This _does not_ guarantee the actor has stopped. To determine if
-the actor has stopped, you should monitor the lattice event stream for the `actors_stopped` event.
+will attempt to stop the component. This _does not_ guarantee the component has stopped. To determine if
+the component has stopped, you should monitor the lattice event stream for the `actors_stopped` event.
 
-#### Scale Actor
+#### Scale component
 
 `nats req wasmbus.ctl.{lattice}.cmd.{host-id}.scale <json_body>`
 
-Scales an actor on a host to a specific max amount of instances that can run. This means that the
+Scales a component on a host to a specific max amount of instances that can run. This means that the
 host will automatically scale up to the specified number of actors as requests come in. Put more
-simply, this makes sure an actor is "hot" (using that term loosely) and ready to handle requests on
+simply, this makes sure a component is "hot" (using that term loosely) and ready to handle requests on
 a given host
 
-This command is idempotent, meaning that if you issue a scale command for an actor (with the same
+This command is idempotent, meaning that if you issue a scale command for a component (with the same
 annotations) that is already at the desired scale, the host will respond with an `accepted` value of
 `true`.
 
@@ -213,14 +213,14 @@ The `annotations` field is optional and can be omitted entirely.
 }
 ```
 If the response has an `accepted` value of `true`, this means the host has accepted the request and
-will attempt to start the actor. This _does not_ guarantee the actor has started. To determine if
-the actor has started, you should monitor the lattice event stream for the `actors_started` event.
+will attempt to start the component. This _does not_ guarantee the component has started. To determine if
+the component has started, you should monitor the lattice event stream for the `actors_started` event.
 
-#### Live Update Actor
+#### Live update component
 
 `nats req wasmbus.ctl.{lattice}.cmd.{host-id}.upd <json_body>`
 
-Live updates an actor on a host. This means that the host will attempt to update the actor (if it is
+Live updates a component on a host. This means that the host will attempt to update the component (if it is
 running on the host) with the newer version specified.
 
 ##### Request
@@ -237,7 +237,7 @@ running on the host) with the newer version specified.
 ```
 
 The `annotations` field is optional and can be omitted entirely. However, annotations must match the
-running annotations of the actor in order for the update command to actually update the actor.
+running annotations of the component in order for the update command to actually update the component.
 
 ##### Response
 
@@ -249,10 +249,10 @@ running annotations of the actor in order for the update command to actually upd
 ```
 
 If the response has an `accepted` value of `true`, this means the host has accepted the request and
-will attempt to update the actor. This _does not_ guarantee the actor has updated. To determine if
-the actor has updated, you should monitor the lattice event stream for the `actor_updated` event.
+will attempt to update the component. This _does not_ guarantee the component has updated. To determine if
+the component has updated, you should monitor the lattice event stream for the `actor_updated` event.
 
-#### Launch Provider
+#### Launch provider
 
 `nats req wasmbus.ctl.{lattice}.cmd.{host-id}.lp <json_body>`
 
@@ -291,7 +291,7 @@ will attempt to start the provider. This _does not_ guarantee the provider has s
 if the provider has started, you should monitor the lattice event stream for the `provider_started`
 event
 
-#### Stop Provider
+#### Stop provider
 
 `nats req wasmbus.ctl.{lattice}.cmd.{host-id}.sp <json_body>`
 
@@ -325,7 +325,7 @@ will attempt to stop the provider. This _does not_ guarantee the provider has st
 if the provider has stopped, you should monitor the lattice event stream for the `provider_stopped`
 event.
 
-#### Stop Host
+#### Stop host
 
 `nats req wasmbus.ctl.{lattice}.cmd.stop <json_body>`
 
@@ -358,18 +358,18 @@ when the host has stopped, you should monitor the lattice event stream for the `
 
 ### Config
 
-wasmCloud has support for pull based config for an actor. Currently this is something that can be
+wasmCloud has support for pull based config for a component. Currently this is something that can be
 set using the following set of topics. In the future we may consider adding support for other
 sources of config.
 
 In general all config data consists of a string key with arbitrary bytes as a value. It makes no
 other guarantees about the kind of data that is stored in the config.
 
-#### Set Actor Config
+#### Set component config
 
 `nats req wasmbus.ctl.{lattice}.config.put.{actor_id}.{key} <arbitrary_bytes>`
 
-Sets the value of a config key for an actor. This will overwrite any value that is currently set
+Sets the value of a config key for a component. This will overwrite any value that is currently set
 
 ##### Request
 
@@ -387,11 +387,11 @@ Arbitrary bytes. This could be a string or other encoded data.
 This means the config data has been accepted, but there may be a small delay before it is available
 across the whole lattice
 
-#### Delete Specific Actor Config Key
+#### Delete specific component config key
 
 `nats req wasmbus.ctl.{lattice}.config.del.{actor_id}.{key} ''`
 
-Deletes a specific config key for an actor.
+Deletes a specific config key for a component.
 
 ##### Request
 
@@ -409,11 +409,11 @@ Empty body
 This means the config data deletion has been accepted, but there may be a small delay before it is
 deleted across the whole lattice
 
-#### Delete All Actor Config
+#### Delete all component config
 
 `nats req wasmbus.ctl.{lattice}.config.del.{actor_id} ''`
 
-Deletes all config data for an actor.
+Deletes all config data for a component.
 
 ##### Request
 
@@ -550,7 +550,7 @@ Empty body
 }
 ```
 
-Please note that actor instances are grouped by annotations. So in the example output above, if
+Please note that component instances are grouped by annotations. So in the example output above, if
 blobby had also been started with the annotations `foo=bar`, then there would be a second instance
 group with the annotations `{ "foo": "bar" }`.
 
@@ -589,11 +589,11 @@ Empty body
 }
 ```
 
-### Get All Actor Config
+### Get All component Config
 
 `nats req wasmbus.ctl.{lattice}.get.config.{actor_id} ''`
 
-Fetches all config data for an actor
+Fetches all config data for a component
 
 ##### Request
 
@@ -618,11 +618,11 @@ Empty body
 
 If no data is set an empty JSON object (`{}`) will be returned
 
-#### Get Actor Config Key
+#### Get component config key
 
 `nats req wasmbus.ctl.{lattice}.get.config.{actor_id}.{key} ''`
 
-Fetches a single config key for an actor
+Fetches a single config key for a component
 
 ##### Request
 
@@ -654,11 +654,11 @@ If the key does not exist, the following body will be returned:
 
 ### Linkdef operations
 
-#### Put Link Definition
+#### Put link definition
 
 `nats req wasmbus.ctl.{lattice}.linkdefs.put <json_body>`
 
-Puts a link definition into the lattice. This defines a connection between an actor and a provider
+Puts a link definition into the lattice. This defines a connection between a component and a provider
 along with a unique set of configuration values.
 
 ##### Request
@@ -689,7 +689,7 @@ will attempt to add the link definition. This _does not_ guarantee the link defi
 added. To determine if and when the link definition has been added, you should monitor the lattice
 event stream for the `linkdef_set` event.
 
-#### Delete Link Definition
+#### Delete link definition
 
 `nats req wasmbus.ctl.{lattice}.linkdefs.del <json_body>`
 
@@ -719,7 +719,7 @@ will attempt to delete the link definition. This _does not_ guarantee the link d
 deleted. To determine if and when the link definition has been deleted, you should monitor the
 lattice event stream for the `linkdef_deleted` event.
 
-## Lattice Events
+## Lattice events
 
 Lattice events are published on `wasmbus.evt.{lattice}.>` subjects, where `lattice` is
 the lattice name (also referred to as the "lattice ID"). Lattice events are

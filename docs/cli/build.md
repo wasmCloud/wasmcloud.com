@@ -5,7 +5,7 @@ sidebar_position: 2
 description: "wash build command reference"
 ---
 
-`wash build` enables you to build and sign custom wasmCloud entities like actors, providers, or interfaces. You can bring in your own project containing some business logic and build these entities by simply providing the path to the project or its associated `wasmcloud.toml` file. The built artifact is signed using automatically generated keys. Alternatively, you may use your own keys to sign the build.
+`wash build` enables you to build and sign custom wasmCloud entities like components, providers, or interfaces. You can bring in your own project containing some business logic and build these entities by simply providing the path to the project or its associated `wasmcloud.toml` file. The built artifact is signed using automatically generated keys. Alternatively, you may use your own keys to sign the build.
 
 ### Usage
 
@@ -20,10 +20,10 @@ In `wasmcloud.toml`, the `build_command` field can specify a custom build comman
 ```toml
 name = "PythonExample"
 language = "python"
-type = "actor"
+type = "component"
 version = "0.1.0"
 
-[actor]
+[component]
 build_command = "componentize-py -d ../../wit -w wasi:http/proxy@0.2.0 componentize app -o http.wasm"
 build_artifact = "http.wasm"
 destination = "http_s.wasm"

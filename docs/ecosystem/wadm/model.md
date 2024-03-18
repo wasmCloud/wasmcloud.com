@@ -34,51 +34,49 @@ When application specifications are stored, they are keyed by name and a history
 
 While OAM allows us to define any component in a specification, there are only a few components with which wadm is concerned:
 
-- `actor` - represents a specification of an actor
+- `component` - represents a specification of a component
 - `capability` - represents a specification of a capability provider
 
-Within the `components` field of a specification, you define an `actor` as follows:
+Within the `components` field of a specification, you define an application component as follows:
 
 ```yaml
 spec:
   components:
     - name: echo
-      type: actor
+      type: component
       properties:
         image: wasmcloud.azurecr.io/echo:0.3.8
       traits: ...
 ```
 
-The `image` property of the `actor` component contains a file reference, an OCI image reference URL, or a Bindle image reference. When you attempt to store this model, wadm will reach out to the artifact repository and attempt to pull some metadata about that image (such as its primary key, embedded security information, etc). This means that storing application specifications with invalid/unreachable OCI references is not allowed.
+The `image` property of the `component` component contains a file reference, an OCI image reference URL, or a Bindle image reference. When you attempt to store this model, wadm will reach out to the artifact repository and attempt to pull some metadata about that image (such as its primary key, embedded security information, etc). This means that storing application specifications with invalid/unreachable OCI references is not allowed.
 
-To launch an actor from a local file, you should prefix the path with `file://`, as follows:
+To launch a component from a local file, you should prefix the path with `file://`, as follows:
 
 ```yaml
 spec:
   components:
     - name: echo
-      type: actor
+      type: component
       properties:
         image: file:///Users/wasmcloud/echo/build/echo_s.wasm
       traits: ...
 ```
 
 :::info
-When launching an actor from a local file, ensure that the environment variable `WASMCLOUD_ALLOW_FILE_LOAD=true` is set when you launch wasmCloud. This is the default for hosts ran with `wash up`. At this time, only absolute paths are supported, since clients cannot reliably assume which directory the target host was started from.
+When launching a component from a local file, ensure that the environment variable `WASMCLOUD_ALLOW_FILE_LOAD=true` is set when you launch wasmCloud. This is the default for hosts running with `wash up`. Only absolute paths are supported, since clients cannot reliably assume which directory the target host was started from. When running hosts locally with `wash up` for development, however, it is possible to use relative paths (which the host then converts to an absolute path) for convenience.
 :::
 
-To define a capability provider, we include a `capability` component, as follows:
+To define a **capability provider**, we include a `capability` component, as follows:
 
 ```yaml
-- name: webcap
-  type: capability
-  properties:
-    contract: wasmcloud:httpserver
-    image: wasmcloud.azurecr.io/httpserver:0.19.1
-    link_name: default
+- name: keyvalue
+      type: capability
+      properties:
+        image: wasmcloud.azurecr.io/kvredis:0.22.0
 ```
 
-Just like when manipulating a lattice _imperatively_, the things that differentiate one capability provider from another are its contract, its public key (which we obtain by looking up the `image`), and its link name.
+Just like when manipulating a lattice _imperatively_, the things that differentiate one capability provider from another are its contract and its public key (which we obtain by looking up the `image`).
 
 ## Traits
 
@@ -86,11 +84,11 @@ Traits are, as their name applies, metadata associated with a `component`. The O
 
 - `spreadscaler`
 - `daemonscaler`
-- `linkdef`
+- `link`
 
 ### Spread Scaler
 
-The `spreadscaler` trait contains a specification for how you would like to scale a set number of instances of an actor. We call it a _spread_ scaler because you declare how you would like the instances of that actor spread across the hosts within your lattice by specifying targets with host _labels_. You can think of this like affinity and anti-affinity rules combined with a scale specification.
+The `spreadscaler` trait contains a specification for how you would like to scale a set number of instances of a component. We call it a _spread_ scaler because you declare how you would like the instances of that component spread across the hosts within your lattice by specifying targets with host _labels_. You can think of this like affinity and anti-affinity rules combined with a scale specification.
 
 Take a look at the following sample `spreadscaler` spec:
 
@@ -110,7 +108,7 @@ traits:
         weight: 20
 ```
 
-This definition states that, for this component (a spread scaler can apply to an `actor` or `capability`), you want a total of 4 instances, with 80% of them going to hosts with the `zone` label set to `us-east-1` and 20% of them going to hosts with the `zone` label set to `us-west-1`. Because this system uses labels as selectors, and you can set any arbitrary label on your hosts, you can define practically any conditions for the spread rules.
+This definition states that, for this component (a spread scaler can apply to a `component` or `capability`), you want a total of 4 instances, with 80% of them going to hosts with the `zone` label set to `us-east-1` and 20% of them going to hosts with the `zone` label set to `us-west-1`. Because this system uses labels as selectors, and you can set any arbitrary label on your hosts, you can define practically any conditions for the spread rules.
 
 If you leave the `requirements` section blank then all hosts will be considered possible targets for that component. You can also leave the `spread` definition off so you can simply state that you would like `n` replicas and you don't care where or how you get them:
 
@@ -149,81 +147,88 @@ The `daemonscaler` works just like a Kubernetes DaemonSet, spreading components 
 
 ### Link Definition
 
-The `linkdef` trait links two components together with a set of configuration values.
+The `link` trait links two components together with a set of configuration values.
 
 ```yaml
-- type: linkdef
-    properties:
-    target: webcap
-    values:
-        port: '8080'
+# Link to KVredis with local connection
+- type: link
+  properties:
+    target: keyvalue
+    namespace: wasi
+    package: keyvalue
+    interfaces:
+      - atomic
+      - eventual
+    target_config:
+      - name: redis-connect-local
+        properties:
+          URL: redis://127.0.0.1:6379
 ```
-
-Quite possibly one of the best features of specifying link definitions in a wadm file as opposed to using imperative `wash` commands is that you do _not need to use the source or target's public key_. If you've used `wash` to specify link definitions before, you know the syntax can be verbose.
 
 The value of the `target` field is a _component_ whose `name` field matches that. The `values` is a simple key-value map that will be passed as link definition configuration data at deployment time. Note that the value here **must be a string**, so if you're passing a value like "false" or "125" ensure that you wrap it in single or double quotes.
 
 ### Putting it All Together
 
-So far we've seen bits and pieces of the application specification YAML. The following yaml is from one of our [sample applications](https://github.com/wasmCloud/examples/blob/main/actor/kvcounter/wadm.yaml), the key-value counter:
+So far we've seen bits and pieces of the application specification YAML. The following is an example of a complete manifest:
 
 ```yaml
-# This is a full example of how to run the kvcounter actor exposed with an HTTP server. Using this
-# example requires you to have a Redis server running locally (though the linkdef can be modified to
-# use a Redis server you have running elsewhere) and WADM running:
-# https://github.com/wasmCloud/wadm/tree/main/wadm. You can deploy this example with two simple
-# commands:
-#
-# `wash app put wadm.yaml`
-# `wash app deploy kvcounter 0.0.1`
-
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: kvcounter
+  name: kvcounter-rust
   annotations:
     version: v0.0.1
-    description: "wasmCloud Key Value Counter Example"
+    description: "Kvcounter demo"
+    experimental: true
 spec:
   components:
     - name: kvcounter
       type: actor
       properties:
-        image: wasmcloud.azurecr.io/kvcounter:0.4.2
+        image: file://./build/http_hello_world_s.wasm
       traits:
-        - type: linkdef
-          properties:
-            target: redis
-            values:
-              URL: redis://0.0.0.0:6379/
-        - type: linkdef
-          properties:
-            target: httpserver
-            values:
-              ADDRESS: 127.0.0.1:8081
+        # Govern the spread/scheduling of the actor
         - type: spreadscaler
           properties:
             replicas: 1
+        # Link to KVredis with local connection
+        - type: link
+          properties:
+            target: keyvalue
+            namespace: wasi
+            package: keyvalue
+            interfaces:
+              - atomic
+              - eventual
+            target_config:
+              - name: redis-connect-local
+                properties:
+                  URL: redis://127.0.0.1:6379
 
+    # Add a capability provider that mediates HTTP access
     - name: httpserver
       type: capability
       properties:
         image: wasmcloud.azurecr.io/httpserver:0.19.1
-        contract: wasmcloud:httpserver
       traits:
-        - type: spreadscaler
+        # Link the HTTP server, and inform it to listen on port 8080
+        # on the local machine
+        - type: link
           properties:
-            replicas: 1
-
-    - name: redis
+            target: http-hello-world
+            namespace: wasi
+            package: http
+            interfaces:
+              - incoming-handler
+            source_config:
+              - name: listen-config
+                properties:
+                  ADDRESS: 127.0.0.1:8080
+    # Add a capability provider that interfaces with the Redis key-value store
+    - name: keyvalue
       type: capability
       properties:
-        image: wasmcloud.azurecr.io/kvredis:0.21.0
-        contract: wasmcloud:keyvalue
-      traits:
-        - type: spreadscaler
-          properties:
-            replicas: 1
+        image: wasmcloud.azurecr.io/kvredis:0.22.0
 ```
 
-⚠️ _NOTE_: while wadm can "claim" resources like actors and providers and differentiate between wadm-managed versus unmanaged, this is not so with link definitions. If you manually push new link definition information that overrides or conflicts with the link definitions in your wadm spec, you could experience unexpected behavior until wadm corrects for it. You must take extreme care that wadm-managed link definitions don't conflict with external link definitions.
+⚠️ _NOTE_: while wadm can "claim" resources like components and providers and differentiate between wadm-managed versus unmanaged, this is not so with link definitions. If you manually push new link definition information that overrides or conflicts with the link definitions in your wadm spec, you could experience unexpected behavior until wadm corrects for it. You must take extreme care that wadm-managed link definitions don't conflict with external link definitions.

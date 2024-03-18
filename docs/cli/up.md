@@ -122,7 +122,7 @@ Jetstream domain name, configures a host to properly connect to a NATS superclus
 Denotes if a wasmCloud host should issue requests to a config service on startup [env: WASMCLOUD_CONFIG_SERVICE=]
 
 #### --allow-file-load  
-Denotes if a wasmCloud host should allow starting actors from the file system [env: WASMCLOUD_ALLOW_FILE_LOAD=] [default: true] [possible values: true, false]
+Denotes if a wasmCloud host should allow starting components from the file system [env: WASMCLOUD_ALLOW_FILE_LOAD=] [default: true] [possible values: true, false]
 
 #### --enable-structured-logging
 Enable JSON structured logging from the wasmCloud host [env: WASMCLOUD_STRUCTURED_LOGGING_ENABLED=]

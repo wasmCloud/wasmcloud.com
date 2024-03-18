@@ -10,9 +10,9 @@ is enabled, participants in lattice RPC must conform to a set of standards in or
 
 Lattice RPC supports the following interaction modes:
 
-- Actor-to-Actor
-- Actor-to-Provider
-- Provider-to-Actor
+- Component-to-Component
+- Component-to-Provider
+- Provider-to-Component
 
 ℹ️ All RPC interactions take place on a NATS client connection that is separate from the control interface for security reasons. All requests and replies on the RPC connection are serialized via [message pack](https://msgpack.org/index.html).
 
@@ -39,9 +39,9 @@ These are the fields on the `WasmCloudEntity` structure:
 
 | Field | Type | Description |
 | :--- | --- | :--- |
-| `public_key` | String | The public key of the entity. Will begin with **M** for actors, **V** for providers |
-| `contract_id` | String | The contract ID of the entity. Left blank if this entity is an actor. |
-| `link_name` | String | Link name of the entity. Left blank if this entity is an actor. |
+| `public_key` | String | The public key of the entity. Will begin with **M** for components, **V** for providers |
+| `contract_id` | String | The contract ID of the entity. Left blank if this entity is a component. |
+| `link_name` | String | Link name of the entity. Left blank if this entity is a component. |
 
 ### Invocation Claims
 
@@ -60,23 +60,23 @@ Monitoring tools could be configuted to detect faked invocations in real time an
 
 The claims data structure can be found in the [wascap](https://github.com/wasmCloud/wascap/blob/main/src/jwt.rs) crate.
 
-### Actor subscriptions
+### Component subscriptions
 
-All actors that are in hosts connected to a lattice will **queue** subscribe to incoming invocations on the following topic:
+All components that are in hosts connected to a lattice will **queue** subscribe to incoming invocations on the following topic:
 
-`wasmbus.rpc.{lattice}.{actor public key}`
+`wasmbus.rpc.{lattice}.{component public key}`
 
 For example, the `echo` sample in wasmCloud's official OCI registry would subscribe to the following topic in the `default` lattice:
 
 `wasmbus.rpc.default.MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5YR5MITIU7HD3WD5`
 
-The use of a queue subscription is important because it causes NATS to randomly choose a target from among all running instances of a subscriber. That's the key piece of networking mechanics that allows actors to scale horizontally within a lattice.
+The use of a queue subscription is important because it causes NATS to randomly choose a target from among all running instances of a subscriber. That's the key piece of networking mechanics that allows components to scale horizontally within a lattice.
 
 If you have sufficient access and want to see _exactly_ which subjects are being used for lattice communication, you can simply launch NATS with verbose and debug options enabled.
 
 ### Capability provider subscriptions
 
-Capability providers also **queue** subscribe to incoming invocations from _linked_ actors on the following topic pattern:
+Capability providers also **queue** subscribe to incoming invocations from _linked_ components on the following topic pattern:
 
 `wasmbus.rpc.{namespace}.{provider public key}.{provider link name}`
 
@@ -85,7 +85,7 @@ a `prod` lattice, the subscription topic for the capability provider would be:
 
 `wasmbus.rpc.prod.VADNMSIML2XGO2X4TPIONTIC55R2UUQGPPDZPAVSC2QD7E76CR77SPW7.backend`
 
-The link names allow multiple instances of the same capability provider to be started with different configurations or purposes. For example, one common use of link names we've used is to use the NATS message broker with a `backend` and a `frontend` set of logical link names, so the same actor can be bound to the NATS provider twice with two logical purposes. Other times you may want to use two different link names for the same provider contract to support two logically different database purposes.
+The link names allow multiple instances of the same capability provider to be started with different configurations or purposes. For example, one common use of link names we've used is to use the NATS message broker with a `backend` and a `frontend` set of logical link names, so the same component can be bound to the NATS provider twice with two logical purposes. Other times you may want to use two different link names for the same provider contract to support two logically different database purposes.
 
 #### Additional topics
 

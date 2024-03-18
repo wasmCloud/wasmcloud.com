@@ -1,0 +1,75 @@
+---
+title: "Preventing Untrusted Workloads"
+description: "Deploying and managing a policy service"
+sidebar_position: 4
+---
+
+wasmCloud hosts will always enforce a certain level of security by default that _cannot be loosened_. For example, hosts will always validate [invocations](/docs/deployment/security/zero-trust-invocations) and [runtime links](/docs/developer/debugging/actors#missing-runtime-links).
+
+A _policy service_ can be used to restrict starting/communicating with untrusted actors and providers on particular hosts.
+
+**The policy service is disabled by default**. When enabled, the policy service will be called by a host when:
+- a particular actor or provider is started for the first time
+- an invocation is received between two entities for the first time
+
+The policy service evaluates the provided action and returns a response indicating whether it is permitted. This response is cached by the host, so subsequent requests for the same action will not incur any overhead.
+
+### Policy Requests and Responses
+
+Policy requests are made on a NATS subject, which is specified by the `--policy-topic` [host config](/docs/reference/host-config) option.
+
+<details>
+<summary>Policy request schema</summary>
+```json
+{
+    "requestId": "... unique ID used for correlation ...",
+    "source": {
+        "publicKey": "Mxxx",
+        "contractId": "...",
+        "linkName": "default",
+        "capabilities": ["..."], 
+        "issuer": "Nxxx",
+        "issuedOn" : "...",
+        "expiresAt": 0,
+        "expired": false,
+    },
+    "target": {
+        "publicKey": "Vxxx",
+        "issuer": "Nxxx",
+        "contractId": "...",
+        "linkName": "default",
+    },
+    "host": {
+        "publicKey": "Nxxx",
+        "latticeId": "default",
+        "labels": {
+            "hostcore.os": "mac",        
+        },
+        "clusterIssuers": ["Cxxx", "Cxxy"]
+    },  
+    "action": "[start_provider | start_actor | perform_invocation]"
+}
+```
+</details>
+
+
+<details>
+<summary>Policy response schema</summary>
+```
+{
+    "requestId": "...",
+    "permitted": true,
+    "message": "..." (optional)
+}
+```
+</details>
+
+### Revoking Policy Decisions
+
+Past policy decisions can be revoked/overridden by the policy service by publishing on the `--policy-changes-topic` NATS subject.
+
+### Hosting a Policy Service
+
+Since the policy service API is over NATS, it can be implemented by anything that can subscribe and publish responses to the configured policy topic (including a wasmCloud actor!).
+
+An example policy service is available as a [wasmCloud actor](https://github.com/wasmCloud/examples/tree/main/actor/policy).

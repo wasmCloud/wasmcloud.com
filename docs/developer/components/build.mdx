@@ -1,0 +1,116 @@
+---
+title: "Build"
+date: 2023-12-29T11:00:00+00:00
+sidebar_position: 1
+draft: false
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+The [wash CLI](/docs/1.0/installation) includes a `build` command that is used to build all [application components](/docs/1.0/concepts/components). The [wash build](/docs/1.0/cli/build) CLI reference page has more information on each of the command's flags. The rest of this page will focus on practical examples of using the `wash build` command.
+
+You can see the list of supported [languages](/docs/1.0/reference/config#wasmcloudtoml-spec) in the wasmcloud.toml specification. At the time of writing this guide, this included Rust and TinyGo. If a language is supported in the wasmcloud.toml specification, then you can build it simply with:
+
+```bash
+wash build
+```
+
+<Tabs groupId="lang" queryString>
+    <TabItem value="rust" label="Rust" default>
+
+In a Rust project, the wash build command encapsulates a few commands. You can always use the standard Rust toolchain and Bytecode Alliance tools to build your application components. However, the wash build command will automatically use the necessary tools and build your component for you. Under the hood, the wash build command will run the following commands:
+
+```bash
+# Build the Wasm module
+cargo build --release --target wasm32-wasi
+# Create a Wasm component from the Wasm module by using the wasmtime adapter
+wasm-tools component new ./target/wasm32-wasi/release/module.wasm -o ./build/component.wasm --adapt ./wasi_snapshot_preview1.wasm
+# Sign the Wasm component with your generated keys, using information in wasmcloud.toml
+wash claims sign ./build/component.wasm --destination ./build/component_s.wasm
+```
+
+    </TabItem>
+    <TabItem value="tinygo" label="TinyGo">
+
+In a TinyGo project, the wash build command encapsulates a few commands. You can always use the standard Go and TinyGo toolchain and Bytecode Alliance tools to build your application components. However, the wash build command will automatically use the necessary tools and build your component for you. Under the hood, the wash build command will run the following commands:
+
+```bash
+# Generate the types and bindings for the Wasm module
+go generate
+# Build the Wasm module
+tinygo build -o ./build/module.wasm -target wasm32-wasi -scheduler none -no-debug .
+# Embed the component wit metadata into the module
+wasm-tools component embed wit ./build/module.wasm > ./build/embed.wasm
+# Create a Wasm component from the embedded Wasm module by using the wasmtime adapter
+wasm-tools component new ./build/embed.wasm -o ./build/component.wasm --adapt ./wasi_snapshot_preview1.wasm
+# Sign the Wasm component with your generated keys, using information in wasmcloud.toml
+wash claims sign ./build/component.wasm --destination ./build/component_s.wasm
+# Remove temporarily created files
+rm ./build/embed.wasm ./build/module.wasm
+```
+
+    </TabItem>
+
+    <TabItem value="typescript" label="TypeScript">
+In a TypeScript project, the wash build command must be overridden in the [wasmcloud.toml](/docs/1.0/reference/config) component section to use external tools. TypeScript builds require an [npm](https://github.com/npm/cli) installation and, after running `npm install`, use [ComponentizeJS](https://github.com/bytecodealliance/ComponentizeJS/) to compile transpiled JavaScript code into a WebAssembly Component.
+
+```toml
+[component]
+build_command = "npm run build"
+```
+
+In our quickstart example, `wash build` runs a few commands for you in order to turn TypeScript code into a WebAssembly component:
+
+```bash
+# You must run `npm install` first
+npm install
+# Transpile TypeScript code to JavaScript
+tsc
+# Componentize JavaScript code
+jco componentize -w wit -o dist/index.wasm dist/index.js
+# Sign the Wasm component with your generated keys, using information in wasmcloud.toml
+wash build --sign-only --config-path wasmcloud.toml
+```
+
+    </TabItem>
+
+    <TabItem value="python" label="Python">
+In a Python project, the wash build command must be overridden in the [wasmcloud.toml](/docs/1.0/reference/config) component section to use external tools. Python builds require a [Python](https://www.python.org/), [pip](https://pip.pypa.io/en/stable/installation/) installation and a [componentize-py](https://github.com/bytecodealliance/componentize-py/) to compile Python code into a WebAssembly Component.
+
+```toml
+[component]
+build_command = "componentize-py -d ./wit -w hello componentize app -o build/http_hello_world.wasm"
+```
+
+In our quickstart example, `wash build` runs a few commands for you in order to turn Python code into a WebAssembly component:
+
+```bash
+# Componentize Python code into a WebAssembly Component
+componentize-py -d ./wit -w hello componentize app -o build/http_hello_world.wasm
+# Sign the Wasm component with your generated keys, using information in wasmcloud.toml
+wash build --sign-only --config-path wasmcloud.toml
+```
+    </TabItem>
+
+    <TabItem value="unlisted" label="My Language Isn't Listed">
+
+`wash build` has an escape hatch in the `wasmcloud.toml` specification which will let you specify your own build command for languages that we don't have official support for. For example, following the [ComponentizeJS](https://github.com/bytecodealliance/ComponentizeJS/blob/main/EXAMPLE.md) example to build a JavaScript Component, you can set up your `wasmcloud.toml` file like so:
+
+```toml
+name = "componentize-js"
+language = "rust"
+type = "component"
+
+[component]
+claims = ["wasmcloud:httpserver"]
+build_command = "node componentize.mjs"
+build_artifact = "hello.component.wasm"
+destination = "hello_s.component.wasm"
+```
+
+Overriding the `build_command` allows you to use an external script or command to build the component, then specifying where the `build_artifact` is (wherever the component should be after the build command completes) lets `wash` still sign the component using your generated keys and information in the `wasmcloud.toml` file. Note that this command does not have full support for environment variables or multiple commands and should be in the form of "command arg1 arg2 arg...". It's recommended to use an external script to handle more complex build commands.
+
+    </TabItem>
+</Tabs>
+

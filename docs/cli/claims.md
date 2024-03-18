@@ -5,7 +5,7 @@ sidebar_position: 5
 description: "wash claims command reference"
 ---
 
-Every actor in a wasmCloud environment claims its capabilities or the features it can interact with to supplement its current behavior. These capabilities are claimed in the form of JSON Web Tokens (JWTs). `wash claims` will assist you to generate, manage and view these JWTs for wasmCloud actors. Following are the subcommands available under `wash claims`.
+Every component in a wasmCloud environment claims its capabilities or the features it can interact with to supplement its current behavior. These capabilities are claimed in the form of JSON Web Tokens (JWTs). `wash claims` will assist you to generate, manage and view these JWTs for wasmCloud components. Following are the subcommands available under `wash claims`.
 
 - `inspect`
 - `sign`
@@ -17,7 +17,7 @@ Every actor in a wasmCloud environment claims its capabilities or the features i
 This subcommand will be deprecated in future versions. Please use `wash inspect` instead.
 :::
 
-Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud actor or provider and prints out the properties of that component.
+Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud component or provider and prints out the properties of that component.
 
 #### Usage
 
@@ -119,13 +119,13 @@ wash claims sign /path/to/wasm-module --name=component-name -q -k
 
 `--tag` (Alias `-t`) A list of arbitrary tags to be embedded in the token
 
-`--prov` (Alias `-p`) Indicates whether the signed module is a capability provider instead of an actor (the default is actor)
+`--prov` (Alias `-p`) Indicates whether the signed module is a capability provider instead of a component (the default is component)
 
 `--rev` (Alias `-r`) Revision number
 
 `--ver` (Alias `-v`) Human-readable version string
 
-`--call-alias` (Alias `-a`) Developer or human friendly unique alias used for invoking an actor, consisting of lowercase alphanumeric characters, underscores '\_' and slashes '/'
+`--call-alias` (Alias `-a`) Developer or human friendly unique alias used for invoking a component, consisting of lowercase alphanumeric characters, underscores '\_' and slashes '/'
 
 `--issuer` (Alias `-i`) Path to issuer seed key (account). If this flag is not provided, the will be sourced from $WASH_KEYS ($HOME/.wash/keys) or generated for you if it cannot be found [env: WASH_ISSUER_KEY]
 
@@ -141,21 +141,21 @@ wash claims sign /path/to/wasm-module --name=component-name -q -k
 
 ## `token`
 
-Using this subcommand, a user can generate signed JWTs for actors, operators, accounts and providers by supplying basic token information, a signing seed key and metadata. Following are the subcommands available under token.
+Using this subcommand, a user can generate signed JWTs for components, operators, accounts and providers by supplying basic token information, a signing seed key and metadata. Following are the subcommands available under token.
 
-- `actor`
+- `component`
 - `operator`
 - `account`
 - `provider`
 
-### `actor`
+### `component`
 
-Generate a signed JWT for an actor
+Generate a signed JWT for a component
 
 #### Usage
 
 ```
-wash claims token actor --name=example -k
+wash claims token component --name=example -k
 ```
 
 #### Options
@@ -186,13 +186,13 @@ wash claims token actor --name=example -k
 
 `--tag` (Alias `-t`) A list of arbitrary tags to be embedded in the token
 
-`--prov` (Alias `-p`) Indicates whether the signed module is a capability provider instead of an actor (the default is actor)
+`--prov` (Alias `-p`) Indicates whether the signed module is a capability provider instead of a component (the default is component)
 
 `--rev` (Alias `-r`) Revision number
 
 `--ver` (Alias `-v`) Human-readable version string
 
-`--call-alias` (Alias `-a`) Developer or human friendly unique alias used for invoking an actor, consisting of lowercase alphanumeric characters, underscores '\_' and slashes '/'
+`--call-alias` (Alias `-a`) Developer or human friendly unique alias used for invoking a component, consisting of lowercase alphanumeric characters, underscores '\_' and slashes '/'
 
 `--issuer` (Alias `-i`) Path to issuer seed key (account). If this flag is not provided, the will be sourced from $WASH_KEYS ($HOME/.wash/keys) or generated for you if it cannot be found [env: WASH_ISSUER_KEY]
 

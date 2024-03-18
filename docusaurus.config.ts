@@ -85,6 +85,14 @@ const config: Config = {
         docs: {
           editUrl: 'https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/',
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+          lastVersion: '0.82',
+          versions: {
+            current: {
+              label: '1.0 (alpha)',
+              path: '1.0',
+              banner: 'unreleased'
+            },
+          },
         },
         pages: {
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
@@ -140,6 +148,9 @@ const config: Config = {
           label: 'Docs',
         },
         {
+          type: 'docsVersionDropdown',
+        },
+        {
           href: 'https://ostif.org/ostif-has-completed-a-security-audit-of-wasmcloud/',
           label: 'Security Assessment',
           position: 'right',
@@ -150,6 +161,12 @@ const config: Config = {
           position: 'right',
         },
       ],
+    },
+    announcementBar: {
+      id: '1.0 alpha', 
+      content: `🎉️ <b>The wasmCloud v1.0 alpha</b> is available! Read the <a href="/docs/1.0/intro">alpha documentation</a> and try it out now.`,
+      backgroundColor: '#20232a',
+      textColor: '#fff',
     },
     footer: {
       style: 'dark',
