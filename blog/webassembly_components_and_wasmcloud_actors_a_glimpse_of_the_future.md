@@ -29,7 +29,7 @@ are able to glue together arbitrary Wasm modules that import or export functions
 interface file. These interface files are called `wit` files (Wasm Interface Types) and allow for
 language agnostic code generation. This code is what handles converting the raw numbers of plain
 Wasm (i.e. integers and bytes) into concrete types. If you are familiar with wasmCloud already, this
-is [very similar](https://wasmcloud.dev/interfaces/) to what we call "contract driven development,"
+is [very similar](https://wasmcloud.com/docs/1.0/concepts/interfaces) to what we call "contract driven development,"
 which we use to separate non-functional requirements from business logic. Still confused? Don't
 worry, we'll be using some specific examples below. If this topic interests you and you'd like more
 information, we highly recommend you check out all of the
@@ -543,8 +543,8 @@ current users.
 We will also need to rely more heavily on [Bindle](https://github.com/deislabs/bindle) and
 eventually on the forthcoming component registry work from the Bytecode Alliance. These tools are
 designed specifically to account for assembling various parts of a final application (like the
-various interfaces and different modules). We already have [experimental support for
-bindles](https://wasmcloud.dev/reference/bindle/) in wasmCloud, but they have to be hand rolled
+various interfaces and different modules). We already have experimental support for
+bindles in wasmCloud, but they have to be hand rolled
 rather than being automatically created. There also needs to be a place from which you can fetch the
 necessary interfaces for use in building. All of these elements of developer experience are
 important to have before we roll this out.
