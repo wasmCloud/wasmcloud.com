@@ -9,4 +9,4 @@ draft: false
 🚧 This page is under heavy renovation for wasmCloud 1.0. Check back soon! 🚧
 :::
 
-We maintain a list of all officially supported, continually updated, first-party images managed by the wasmcloud team in our Github repositories. Refer to the [providers directory](https://github.com/wasmCloud/wasmCloud/tree/release/v0.82.0/crates/providers) (this refers to version 0.82) for the latest updated versions of our first party capability providers, and the [examples directory](https://github.com/wasmCloud/wasmCloud/tree/main/examples) for the latest updated versions of our example actors and providers.
+We maintain all officially supported, continually updated, first-party images managed by the wasmCloud team in our GitHub repositories. Refer to the [providers](https://github.com/wasmCloud/wasmCloud/tree/main/crates) (available in `crates/provider-*` directories) for the latest updated versions of our first-party capability providers, and the [examples directory](https://github.com/wasmCloud/wasmCloud/tree/main/examples) for the latest updated versions of our example components and providers.
