@@ -5,7 +5,11 @@ sidebar_position: 5
 description: "wash claims command reference"
 ---
 
-Every component in a wasmCloud environment claims its capabilities or the features it can interact with to supplement its current behavior. These capabilities are claimed in the form of JSON Web Tokens (JWTs). `wash claims` will assist you to generate, manage and view these JWTs for wasmCloud components. Following are the subcommands available under `wash claims`.
+Every component in a wasmCloud environment contains metadata which are called claims, in the form of JSON Web Tokens (JWTs).
+
+`wash claims` helps generate, manage and view these JWTs for wasmCloud components.
+
+The following are the subcommands available under `wash claims`.
 
 - `inspect`
 - `sign`
@@ -17,7 +21,7 @@ Every component in a wasmCloud environment claims its capabilities or the featur
 This subcommand will be deprecated in future versions. Please use `wash inspect` instead.
 :::
 
-Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud component or provider and prints out the properties of that component.
+`wash inspect` helps you to examine the stored metadata of a wasmCloud component. `wash inspect` accepts the path to the wasmCloud component or provider and prints out the properties of that component.
 
 #### Usage
 
@@ -32,9 +36,6 @@ Inspect helps you to examine the capabilities of a wasmCloud component. It accep
   Can Be Used                                                immediately
   Version                                                      0.3.7 (4)
   Call Alias                                                   (Not set)
-                               Capabilities
-  HTTP Server
-  Logging
                                    Tags
   None
 
@@ -81,12 +82,12 @@ Inspect helps you to examine the capabilities of a wasmCloud component. It accep
 
 ## `sign`
 
-`wash claims sign` assists you in signing a WebAssembly component by specifying some standard capabilities available in the wasmCloud environment. A user may also specify custom capabilities and other metadata such as expiration, tags, etc.
+`wash claims sign` assists you in signing a WebAssembly component with metadata about the component. Users may specify metadata such as expiration, tags, etc.
 
 #### Usage
 
 ```
-wash claims sign /path/to/wasm-module --name=component-name -q -k
+wash claims sign /path/to/wasm-module --name=component-name
 ```
 
 #### Options
@@ -97,25 +98,9 @@ wash claims sign /path/to/wasm-module --name=component-name -q -k
 
 `--experimental` Whether or not to enable experimental features [env: WASH_EXPERIMENTAL=]
 
-`--keyvalue` (Alias `-k`) Enable the Key/Value Store standard capability
-
 `--msg` (Alias `-g`) Enable the Message broker standard capability
 
-`--http_server` (Alias `-q`) Enable the HTTP server standard capability
-
-`--http_client` Enable the HTTP client standard capability
-
-`--blob_store` (Alias `-f`) Enable access to the blob store capability
-
-`--extras` (Alias `-z`) Enable access to the extras functionality (random nos, guids, etc)
-
-`--logging` (Alias `-l`) Enable access to logging capability
-
-`--events` (Alias `-e`) Enable access to an append-only event stream provider
-
 `--name` (Alias `-n`) A human-readable, descriptive name for the token
-
-`--cap` (Alias `-c`) Add custom capabilities
 
 `--tag` (Alias `-t`) A list of arbitrary tags to be embedded in the token
 
@@ -160,29 +145,13 @@ wash claims token component --name=example -k
 
 #### Options
 
-`--keyvalue` (Alias `-k`) Enable the Key/Value Store standard capability
-
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
 
 `--experimental` Whether or not to enable experimental features [env: WASH_EXPERIMENTAL=]
 
 `--msg` (Alias `-g`) Enable the Message broker standard capability
 
-`--http_server` (Alias `-q`) Enable the HTTP server standard capability
-
-`--http_client` Enable the HTTP client standard capability
-
-`--blob_store` (Alias `-f`) Enable access to the blob store capability
-
-`--extras` (Alias `-z`) Enable access to the extras functionality (random nos, guids, etc)
-
-`--logging` (Alias `-l`) Enable access to logging capability
-
-`--events` (Alias `-e`) Enable access to an append-only event stream provider
-
 `--name` (Alias `-n`) A human-readable, descriptive name for the token
-
-`--cap` (Alias `-c`) Add custom capabilities
 
 `--tag` (Alias `-t`) A list of arbitrary tags to be embedded in the token
 
@@ -275,7 +244,7 @@ Generate a signed JWT for a capability provider
 #### Usage
 
 ```
-wash claims token provider --name=example --capid=your-capid --vendor=vendor-name
+wash claims token provider --name=example --vendor=vendor-name
 ```
 
 #### Options
@@ -285,8 +254,6 @@ wash claims token provider --name=example --capid=your-capid --vendor=vendor-nam
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
 
 `--experimental` Whether or not to enable experimental features [env: WASH_EXPERIMENTAL=]
-
-`--capid` (Alias `-c`) Capability contract ID that this provider supports
 
 `--vendor` (Alias `-v`) A human-readable string identifying the vendor of this provider (e.g. Redis or Cassandra or NATS etc)
 

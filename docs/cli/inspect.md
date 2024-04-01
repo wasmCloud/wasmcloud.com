@@ -5,7 +5,9 @@ sidebar_position: 12
 description: "wash inspect command reference"
 ---
 
-Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud component or provider and prints out the properties of that component.
+`wash inspect` helps you to examine the metadata of a wasmCloud component. 
+
+`wash inspect` accepts the path to the wasmCloud component or provider and prints out the properties of that component.
 
 #### Usage
 
@@ -20,9 +22,6 @@ Inspect helps you to examine the capabilities of a wasmCloud component. It accep
   Can Be Used                                                immediately
   Version                                                      0.3.7 (4)
   Call Alias                                                   (Not set)
-                               Capabilities
-  HTTP Server
-  Logging
                                    Tags
   None
 

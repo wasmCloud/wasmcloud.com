@@ -45,15 +45,10 @@ In addition to the standard claims required by all [JSON Web Token (JWT)](https:
     "name": "Key Value Counter",
     "hash": "4B4BCE3588955E068DC9D32382C8727CBF46819C907AB3A1630ED7B97C530D13",
     "tags": [],
-    "caps": ["wasmcloud:keyvalue", "wasmcloud:httpserver"],
     "prov": false
   }
 }
 ```
-
-Here one of the most important fields in the `wascap` object is the `caps` field, which contains an array of _capability contract IDs_. Each capability provider must conform to a single, globally unique contract identifier. This ID is typically prefixed with a namespace or vendor prefix, but is not a requirement.
-
-The preceding token indicates that the _Key Value Counter_ component has been granted access to the Key-Value and HTTP Server capabilities, _without regard_ for which specific provider is used to satisfy those capabilities. In other words, this component can use _any_ key-value provider, be it Redis or Cassandra or Consul. If you want to further limit which capabilities can be used by actors at runtime, you can define and utlize an [OPA](https://www.openpolicyagent.org/) policy.
 
 ### Managing Keys
 
