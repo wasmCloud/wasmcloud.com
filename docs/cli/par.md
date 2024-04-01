@@ -18,12 +18,10 @@ This subcommand creates a provider archive using an architecture target, provide
 #### Usage
 
 ```
-wash par create --capid <CAPID> --vendor <VENDOR> --name <NAME> --arch <ARCH> --binary /path/to/binary
+wash par create --vendor <VENDOR> --name <NAME> --arch <ARCH> --binary /path/to/binary
 ```
 
 #### Options
-
-`--capid` (Alias `-c`) Capability contract ID (e.g. wasmcloud:messaging or wasmcloud:keyvalue)
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
 

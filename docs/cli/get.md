@@ -44,7 +44,7 @@ wash get inventory <your-host-ID>
 
 ### `claims`
 
-This subcommand queries the lattice for its claims cache. It retrieves the issuer, subject, associated capabilities, version and revision for all the claims.
+This subcommand queries the lattice for its claims cache. It retrieves the issuer, subject, version and revision for all the claims.
 
 #### Usage
 
