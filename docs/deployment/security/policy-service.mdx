@@ -1,20 +1,21 @@
 ---
-title: "Policy Service"
-description: "Extending security and preventing untrusted workloads"
+title: 'Policy Service'
+description: 'Extending security and preventing untrusted workloads'
 sidebar_position: 3
 ---
 
-wasmCloud hosts will always enforce a certain level of security by default that _cannot be loosened_. For example, hosts will always validate [invocations](/docs/deployment/security/zero-trust-invocations) and [runtime links](/docs/developer/debugging/actors#missing-runtime-links). Additionally, the wasmCloud **policy service API** can be used to extend and customize policy evaluation, such as by restricting untrusted application components and providers on particular hosts. 
+wasmCloud hosts will always enforce a certain level of security by default that _cannot be loosened_. For example, hosts will always validate [invocations](/docs/deployment/security/zero-trust-invocations) and [runtime links](/docs/developer/debugging/actors#missing-runtime-links). Additionally, the wasmCloud **policy service API** can be used to extend and customize policy evaluation, such as by restricting untrusted application components and providers on particular hosts.
 
 ### Policy evaluation flow
 
-The policy service API provides a simple mechanism for communicating with an external policy server. External servers can be created using standard engines such as **[Open Policy Agent](https://www.openpolicyagent.org/)**. 
+The policy service API provides a simple mechanism for communicating with an external policy server. External servers can be created using standard engines such as **[Open Policy Agent](https://www.openpolicyagent.org/)**.
 
-Once the wasmCloud policy service is enabled, the host will send policy requests on a dedicated NATS topic (for example, `wasmcloud.policy`) to the external server. The policy server, in turn, returns responses on the same NATS topic, determining whether the host is allowed to start an application component, start a capability provider, or let a component invoke a capability provider. 
+Once the wasmCloud policy service is enabled, the host will send policy requests on a dedicated NATS topic (for example, `wasmcloud.policy`) to the external server. The policy server, in turn, returns responses on the same NATS topic, determining whether the host is allowed to start an application component, start a capability provider, or let a component invoke a capability provider.
 
 ![Diagram of policy evaluation flow](../../images/opa-diagram.png)
 
 **The policy service is disabled by default**. When enabled, the policy service will be called by a host when:
+
 - a particular component or provider is started for the first time
 - an invocation is received between two entities for the first time
 
@@ -33,28 +34,31 @@ Request schemes vary according to whether the request is to start an application
 
 ```json
 {
-	"requestId": "... unique ID used for correlation ..."
-	"kind": "startComponent",
+  "requestId": "... unique ID used for correlation ...",
+  "kind": "startComponent",
   "version": "v1",
-	"request": {
-		"component": {
-        "publicKey": "Mxxx",
-        "reference": "mycloud/echo:0.3.4",
-        "issuer": "Axxx",
-        "issuedOn": "xxxx",
-        "expiresAt": 0,
-        "expired": false,
-		},
-		"host": {
-       "publicKey": "Nxxxx",
-       "latticeId": "default",
-       "labels": [
-           "(key)": "value",
-					 ..
-       ],
-       "clusterIssuers": [ "Cxxxx", "Cxxxy" ],
-        }
-	}
+  "request": {
+    "componentId": "componentId",
+    "imageRef": "... OCI or file reference ...",
+    "maxInstances": 1,
+    "annotations": {
+      "key": "value"
+    },
+    "claims": {
+      "publicKey": "Mxxx",
+      "issuer": "Axxx",
+      "issuedAt": "1711993586",
+      "expiresAt": 1711993587,
+      "expired": true
+    }
+  },
+  "host": {
+    "publicKey": "Nxxxx",
+    "lattice": "default",
+    "labels": {
+      "key": "value"
+    }
+  }
 }
 ```
 
@@ -62,81 +66,82 @@ Request schemes vary according to whether the request is to start an application
 
 ```json
 {
-	"requestId": "... unique ID used for correlation ..."
-	"kind": "startProvider",
+  "requestId": "... unique ID used for correlation ...",
+  "kind": "startProvider",
   "version": "v1",
-	"request": {
-		"provider": {
-        "publicKey": "Vxxx",
-        "reference": "mycloud/provider:0.3.4",
-        "contractId": "provider:cloud",
-        "linkName": "default",
-        "issuer": "Axxx",
-        "issuedOn": "xxxx",
-        "expiresAt": 0,
-        "expired": false,
-		},
-		"host": {
-       "publicKey": "Nxxxx",
-       "latticeId": "default",
-       "labels": [
-           "(key)": "value",
-					 ..
-       ],
-       "clusterIssuers": [ "Cxxxx", "Cxxxy" ],
-        }
-	}
+  "request": {
+    "providerId": "component ID",
+    "imageRef": "... OCI or file reference ...",
+    "annotations": {
+      "key": "value"
+    },
+    "claims": {
+      "publicKey": "Vxxx",
+      "issuer": "Axxx",
+      "issuedAt": "1711993586",
+      "expiresAt": 1711993587,
+      "expired": true
+    }
+  },
+  "host": {
+    "publicKey": "Nxxxx",
+    "lattice": "default",
+    "labels": {
+      "key": "value"
+    }
+  }
 }
 ```
 
-**`Schema for invocation**: 
+**Schema for invocation**:
+
+For example, invoking a component on the WASI HTTP standard handler `wasi:http/incoming-handler.handle`:
 
 ```json
 {
-	"requestId": "... unique ID used for correlation ..."
-	"kind": "performInvocation",
+  "requestId": "... unique ID used for correlation ...",
+  "kind": "performInvocation",
   "version": "v1",
   "request": {
-    "source": {
-      "publicKey": "Mxxx or Vxxx",
-      "contractId": "nullable",
-      "linkName": "nullable",
-      "issuer": "Axxx",
-      "issuedOn": "xxxx",
-      "expiresAt": 1660608232,
-      "expired": false, 
-    },
+    "interface": "wasi:http/incoming-handler",
+    "function": "handle",
     "target": {
-        "publicKey": "Mxxxx or Vxxxx",
-        "issuer": "Axxxx",
-        "contractId": "nullable",
-        "linkName": "nullable"
-	      "issuer": "Axxx",
-	      "issuedOn": "xxxx",
-	      "expiresAt": 1660608232,
-	      "expired": false, 
+      "componentId": "componentId",
+      "imageRef": "... OCI or file reference ...",
+      "maxInstances": 1,
+      "annotations": {
+        "key": "value"
+      }
     },
-    "host": {
-         "publicKey": "Nxxxx",
-         "latticeId": "01234...",
-         "labels": [
-             "(key)" : "value"
-         ],
-        "clusterIssuers": [ "Cxxxx", "Cxxxy" ],
-     }
+    "claims": {
+      "publicKey": "Mxxx",
+      "issuer": "Axxx",
+      "issuedAt": "1711993586",
+      "expiresAt": 1711993587,
+      "expired": true
+    }
+  },
+  "host": {
+    "publicKey": "Nxxxx",
+    "lattice": "default",
+    "labels": {
+      "key": "value"
+    }
+  }
 }
 ```
 
 </details>
 
+Note that in all requests claims are optional and may be omitted if the component is not signed. This is a useful check for a policy server to determine whether a component is signed by a trusted issuer.
 
 <details>
 <summary>Policy response schema</summary>
-```
+```json
 {
-    "requestId": "...",
-    "permitted": true,
-    "message": "..." (optional)
+  "requestId": "... unique ID used for correlation ...",
+  "permitted": true|false,
+  "message": "... optional detailed message ..."
 }
 ```
 </details>
