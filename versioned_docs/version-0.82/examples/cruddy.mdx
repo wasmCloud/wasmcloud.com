@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-title: "CRUD with WASI (Key-Value)"
+title: "CRUD with WASI Key-Value"
 toc_min_heading_level: 2
 toc_max_heading_level: 2
 ---
@@ -103,7 +103,7 @@ WASI is especially useful for building and maintaining standard and popular libr
 
 Take a look at the contents of `wit`:
 
-```
+```shell
 ├── deps
 ├── deps.toml
 └── world.wit
@@ -190,9 +190,9 @@ This will create a `build` directory with a compiled `.wasm` artifact for the ap
 In Rust, using WASI APIs is fairly intuitive, especially with IDE suggestions and autofills. If we've read through the `keyvalue` WIT, we know that we will need an instance of the `OutgoingValue` type later. We can create it this way:
 
 ```rust
-	// In the language of WASI, here we're creating a new outgoing-value resource
-    let value: OutgoingValue = 
-        wasi::keyvalue::types::OutgoingValue::new_outgoing_value();
+// In the language of WASI, here we're creating a new outgoing-value resource
+let value: OutgoingValue = 
+  wasi::keyvalue::types::OutgoingValue::new_outgoing_value();
 ```
 
 At each stage from `wasi::` to `keyvalue::` to `types::` and beyond, our IDE can provide us with the available options as documented in the WIT. Taken in conjunction, our WIT files and code completion gives us the tools we need to use the API and put the pieces together. For now, put this at the top of our handler function.
@@ -309,7 +309,7 @@ let value: OutgoingValue = // [!code ++]
 Now we'll add a switch case that **creates/updates**, **reads**, or **destroys** guestbook records based on the HTTP method of the incoming request. For this rudimentary app, each case will send an appropriate HTTP response:
 
 ```rust
-// Switch case on method
+// Switch case on method // [!code ++]
         match method { // [!code ++]
             wasi::http::types::Method::Get => { // [!code ++]
             // [!code ++]
@@ -362,19 +362,33 @@ Now we'll add a switch case that **creates/updates**, **reads**, or **destroys**
                 OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
                 ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
             }, // [!code ++]
-            wasi::http::types::Method::Delete => { // [!code ++]
-                // Delete key // [!code ++]
-                let _ = wasi::keyvalue::eventual::delete(&bucket, &name); // [!code ++]
-// [!code ++]
-                // Send HTTP response // [!code ++]
-                response_body // [!code ++]
-                    .write() // [!code ++]
-                    .unwrap() // [!code ++]
-                    .blocking_write_and_flush(format!("It's like {name} was never there").as_bytes()) // [!code ++]
-                    .unwrap(); // [!code ++]
-                OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
-                ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
-// [!code ++]
+            wasi::http::types::Method::Delete => { // [!code ++:27]
+
+                // If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors
+                let none = wasi::keyvalue::eventual::get(&bucket, &name).unwrap().is_none();
+
+                if none {
+                    // Send error message if the value is none
+                    response_body
+                        .write()
+                        .unwrap()
+                        .blocking_write_and_flush(format!("{name} not found").as_bytes())
+                        .unwrap();
+                    OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+                    ResponseOutparam::set(response_out, Ok(response));
+                } else {
+                    // Delete key
+                    let _ = wasi::keyvalue::eventual::delete(&bucket, &name);
+
+                    // Send HTTP response
+                    response_body
+                        .write()
+                        .unwrap()
+                        .blocking_write_and_flush(format!("It's like {name} was never there").as_bytes())
+                        .unwrap();
+                    OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+                    ResponseOutparam::set(response_out, Ok(response));
+                };
             } // [!code ++]
             _ => { // [!code ++]
                 // Handle other cases // [!code ++]
@@ -386,8 +400,8 @@ Now we'll add a switch case that **creates/updates**, **reads**, or **destroys**
                     .unwrap(); // [!code ++]
                 OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
                 ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
-            }
-        };
+            } // [!code ++]
+        }; // [!code ++]
 ```
 
 Most of our application logic is happening in this block, so let's pause to consider a few important elements. 
@@ -500,18 +514,32 @@ impl Guest for HttpServer {
                 ResponseOutparam::set(response_out, Ok(response));
             },
             wasi::http::types::Method::Delete => {
-                // Delete key
-                let _ = wasi::keyvalue::eventual::delete(&bucket, &name);
 
-                // Send HTTP response
-                response_body
-                    .write()
-                    .unwrap()
-                    .blocking_write_and_flush(format!("It's like {name} was never there").as_bytes())
-                    .unwrap();
-                OutgoingBody::finish(response_body, None).expect("failed to finish response body");
-                ResponseOutparam::set(response_out, Ok(response));
+                // If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors
+                let none = wasi::keyvalue::eventual::get(&bucket, &name).unwrap().is_none();
 
+                if none {
+                    // Send error message if the value is none
+                    response_body
+                        .write()
+                        .unwrap()
+                        .blocking_write_and_flush(format!("{name} not found").as_bytes())
+                        .unwrap();
+                    OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+                    ResponseOutparam::set(response_out, Ok(response));
+                } else {
+                    // Delete key
+                    let _ = wasi::keyvalue::eventual::delete(&bucket, &name);
+
+                    // Send HTTP response
+                    response_body
+                        .write()
+                        .unwrap()
+                        .blocking_write_and_flush(format!("It's like {name} was never there").as_bytes())
+                        .unwrap();
+                    OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+                    ResponseOutparam::set(response_out, Ok(response));
+                };
             }
             _ => {
                 // Handle other cases
@@ -2449,3 +2477,6 @@ To completely remove all versions of the application from wasmCloud:
 ```shell
 wash app delete cruddy --delete-all
 ```
+## Conclusion
+
+In this tutorial, you've learned how to create a guestbook application component that uses WASI APIs including HTTP and Key-Value. In doing so, you've also learned how to read the WIT definitions for those APIs and utilize idiomatic bindings for our chosen language. With these fundamentals in place, a good next step might be to try building more complex components, [explore other WASI APIs](https://github.com/WebAssembly/WASI/blob/main/Proposals.md), or create your own interfaces and providers. If you have questions or feedback, join the [wasmCloud Slack](https://slack.wasmcloud.com/) and let us know. Happy coding!
