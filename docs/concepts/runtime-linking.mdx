@@ -5,51 +5,49 @@ sidebar_position: 6
 draft: false
 ---
 
-:::warning[Under Construction]
-🚧 This page is under active renovation for wasmCloud 1.0. Some details may not be aligned with v1.0 during the alpha period. 🚧
-:::
-
 ## Overview
 
-A **_runtime link_** is a declared connection from a component to a provider, a provider to a component, or a component to a component. Link definitions are a tuple composed of the component's identity, the provider's identity, and a link name. (If not provided, link names default to `default`.) There are three different consumers of this relationship: 
+A **runtime link** is a declared connection from a component to a provider, a provider to a component, or a component to a component. Link definitions are unidirectional, having both a **source** and a **target**, and specifying the relevant WASI interfaces. 
 
-* the component
-* the provider
-* the host runtime
+From the [component's](/docs/1.0/concepts/components) point of view, code _only_ refers to an interface, e.g. `wasi-keyvalue`. This is because components do not know about (nor should they) _which_ specific provider is on the other side of a link. 
 
-### From a component's perspective
+From a provider's point of view, it only ever dispatches messages to&mdash;or receives messages from&mdash;components. When a link is established for a particular component, the provider can remember that component's identity and use it for subsequent dispatches. As a result, the only information a provider needs is the component's identity. This identity is typically used for managing specific resources on behalf of the component, such as database connections, open TCP sockets, etc.
 
-From the [component's](/docs/1.0/concepts/components) point of view, code written using an interface _only_ refers to a [contract ID](/docs/1.0/concepts/providers), e.g. `wasmcloud:keyvalue` (and optionally, a link name, e.g. `default`). This is because components do not know about (nor should they) _which_ specific provider is responsible for fulfilling the contract. The choice of which provider satisfies a contract for a component is a choice that is always made at _runtime_.
+## Exploring a link definition
 
-### From a provider's perspective
+Runtime links are defined in [wadm manifests](/docs/1.0/ecosystem/wadm/). Here is an example of a definition for a link from a component to a provider:
 
-From the capability provider's point of view, it only ever dispatches messages to&mdash;or receives messages from&mdash;components. When a link is established for a particular component, the capability provider can remember that component's identity and use it for subsequent dispatches. As a result, the only information a capability provider needs is the component's identity. This identity typically used for managing specific resources on behalf of the component, such as database connections, open TCP sockets, etc.
+```yaml
+- type: link
+  properties:
+    target: kvredis
+    namespace: wasi
+    package: keyvalue
+    interfaces:
+      - atomic
+      - eventual
+    target_config:
+      - name: redis-connect-local
+        properties:
+          URL: redis://127.0.0.1:6379
+```
+In addition to a target, the link definition has properties including...
 
-### From the host's perspective
+* `namespace`, which in the example above refers to `wasi`
+* `package`, which specifies the particular interface group used
+* `interfaces`, which lists specific interfaces from `wasi-keyvalue` 
+* `target_config`, defining configuration data to pass to a provider
 
-From the wasmCloud [host's](/docs/1.0/concepts/hosts) point of view, it must know the following information when establishing a link between capability provider and a component:
+### Designed for flexibility at runtime
 
-- The component's identity. When a request is dispatched to a component, the host receives the RPC message and passes it to the appropriate component
-- The contract ID (e.g. `wasmcloud:keyvalue` or `wasmcloud:httpserver`)
-- The capability provider's identity. When a component makes a request, the host handles dispatching the RPC message to the appropriate provider
-- The link name of the provider, which is defined at provider start-time.
-
-To illustrate the need for link names to disambiguate providers, consider the following scenario:
-
-Assume that we have two capability providers in the lattice that implement the `wasmcloud:keyvalue` contract: a **Redis** capability provider with the link name `default`, an **in-memory cache** provider running with the link name `cache`, and a **Vault** key-value provider with the link name `secrets`. If the link connecting a component and provider only contained the contract ID, the host runtime would not have enough information to determine where to route the component's request.
-
-### Designed for Flexibility at Runtime
-
-Links are first-class citizens of a [lattice](/docs/1.0/concepts/lattice). A link can be declared (or removed) _before or after_ any of the parties of that link are running. Each time a capability provider is started, it is provided with a list of pre-existing links. Additionally, the provider is notified whenever a new link is declared, or an existing link is removed.
+Links are first-class citizens of a [lattice](/docs/1.0/concepts/lattice). A link can be declared (or removed) _before or after_ any of the parties of that link are running. Each time a provider is started, it is provided with a list of pre-existing links. Additionally, the provider is notified whenever a new link is declared, or an existing link is removed.
 
 The ability to update links at runtime is a powerful feature of wasmCloud. There are several scenarios where this is useful, including:
 
-- swapping to an alternate capability provider implementation, such as an in-memory cache vs. an external data store
-- upgrading a provider, or failing over to a backup provider
-- routing requests to a provider running with specific characteristics, such as locality or configuration
+- Swapping to an alternate capability provider implementation, such as an in-memory cache vs. an external data store.
+- Upgrading a provider, or failing over to a backup provider.
+- Routing requests to a provider running with specific characteristics, such as locality or configuration.
 
 :::note
-
-This design has a couple interesting implications. The first is that "order of operations" does not matter: while configuring an [application](/docs/1.0/concepts/applications), low-level commands to set links and start resources can arrive in any order. The second is that all capability providers must treat messages to set/remove links as idempotent.
-
+"Order of operations" doesn't matter in runtime linking: while configuring an [application](/docs/1.0/concepts/applications), low-level commands to set links and start resources can arrive in any order. Additionally, all providers must treat messages to set/remove links as idempotent.
 :::
