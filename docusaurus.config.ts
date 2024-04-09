@@ -88,9 +88,9 @@ const config: Config = {
           lastVersion: '0.82',
           versions: {
             current: {
-              label: '1.0 (alpha)',
+              label: '1.0 (rc)',
               path: '1.0',
-              banner: 'unreleased'
+              banner: 'unreleased',
             },
           },
         },
@@ -163,7 +163,7 @@ const config: Config = {
       ],
     },
     announcementBar: {
-      id: '1.0 alpha', 
+      id: '1.0 alpha',
       content: `🎉️ <b>The wasmCloud v1.0 alpha</b> is available! Read the <a href="/docs/1.0/intro">alpha documentation</a> and try it out now.`,
       backgroundColor: '#20232a',
       textColor: '#fff',
