@@ -1,5 +1,5 @@
 ---
-title: "Add Capabilities"
+title: 'Add Capabilities'
 sidebar_position: 2
 ---
 
@@ -15,10 +15,6 @@ import TabItem from '@theme/TabItem';
 Going from "Hello World" to a full-fledged application requires just identifying what capabilities your application needs, and then adding them to your component. Capabilities in wasmCloud can invoke a function handler in your component in response to some external trigger (like HTTP Server and Messaging) and components can invoke capabilities as a part of handling a request (like key-value store and logging). "Hello World" already has the HTTP Server capability, so let's add more features to this application with functional code and more capabilities.
 
 ## Adding Functionality
-
-:::caution
-Component examples are experimental and likely to require recompilation with each new release of wasmCloud.
-:::
 
 <Tabs groupId="lang" queryString>
   <TabItem value="rust" label="Rust">
@@ -48,31 +44,32 @@ use wasi::http::types::*;
 struct HttpServer;
 
 impl Guest for HttpServer {
-    fn handle(_request: IncomingRequest, response_out: ResponseOutparam) { // [!code --]
-    fn handle(request: IncomingRequest, response_out: ResponseOutparam) { // [!code ++]
-        let response = OutgoingResponse::new(Fields::new());
-        response.set_status_code(200).unwrap();
-        let response_body = response.body().unwrap();
-        let name = match request // [!code ++:11]
-            .path_with_query()
-            .unwrap()
-            .split("=")
-            .collect::<Vec<&str>>()[..]
-        {
-            // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
-            ["/?name", name] => name.to_string(),
-            // query string is anything else or empty e.g. localhost:8080
-            _ => "World".to_string(),
-        };
-        response_body
-            .write()
-            .unwrap()
-            .blocking_write_and_flush(b"Hello from Rust!\n") // [!code --]
-            .blocking_write_and_flush(format!("Hello, {}!\n", name).as_bytes()) // [!code ++]
-            .unwrap();
-        OutgoingBody::finish(response_body, None).expect("failed to finish response body");
-        ResponseOutparam::set(response_out, Ok(response));
-    }
+  fn handle(_request: IncomingRequest, response_out: ResponseOutparam) { // [!code --]
+  fn handle(request: IncomingRequest, response_out: ResponseOutparam) { // [!code ++]
+      let response = OutgoingResponse::new(Fields::new());
+      response.set_status_code(200).unwrap();
+      let response_body = response.body().unwrap();
+      let name = match request // [!code ++:11]
+          .path_with_query()
+          .unwrap()
+          .split("=")
+          .collect::<Vec<&str>>()[..]
+      {
+          // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
+          ["/?name", name] => name.to_string(),
+          // query string is anything else or empty e.g. localhost:8080
+          _ => "World".to_string(),
+      };
+      response_body
+          .write()
+          .unwrap()
+          .blocking_write_and_flush(b"Hello from Rust!\n") // [!code --]
+          .blocking_write_and_flush(format!("Hello, {}!\n", name).as_bytes()) // [!code ++]
+          .unwrap();
+      OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+      ResponseOutparam::set(response_out, Ok(response));
+  }
+}
 ```
 
   </TabItem>
@@ -277,8 +274,8 @@ In your template, we already included the `wasi:keyvalue` interface for interact
 package wasmcloud:hello;
 
 world hello {
-  import wasi:keyvalue/atomic@0.1.0; // [!code ++]
-  import wasi:keyvalue/eventual@0.1.0; // [!code ++]
+  import wasi:keyvalue/atomic@0.2.0-draft; // [!code ++]
+  import wasi:keyvalue/eventual@0.2.0-draft; // [!code ++]
   import wasi:logging/logging; // [!code ++]
 
   export wasi:http/incoming-handler@0.2.0;
@@ -303,7 +300,7 @@ Let's use the atomic increment function to keep track of how many times we've gr
         _ => "World".to_string(),
     };
 
-    wasi::logging::logging::log( // [!code ++:11]
+    wasi::logging::logging::log( // [!code ++:16]
         wasi::logging::logging::Level::Info,
         "",
         &format!("Greeting {name}"),
@@ -385,13 +382,13 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
   let outputStream = outgoingBody.write();
   // Write to the response stream // [!code ++:12]
   const name = getNameFromPath(req.pathWithQuery() || '');
- 
+
   log('info', '', `Greeting ${name}`);
- 
+
   // Increment the bucket's count
   const bucket = Bucket.openBucket('');
   const count = increment(bucket, name, 1);
- 
+
   outputStream.blockingWriteAndFlush(
     new Uint8Array(new TextEncoder().encode(`Hello x${count}, ${name}!\n`)),
   );
@@ -446,7 +443,7 @@ class IncomingHandler(exports.IncomingHandler):
 
 ### Deploying a Key-Value Store Provider
 
-Our component is prepared to use a key-value store, and now that we've built it we're ready to choose an implementation. A great option for local development and testing is the [Redis provider](https://github.com/wasmCloud/capability-providers/tree/main/kvredis), and will only require you to have `redis-server` or Docker installed.
+Our component is prepared to use a key-value store, and now that we've built it we're ready to choose an implementation. A great option for local development and testing is the [Redis provider](https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-keyvalue-redis), and will only require you to have `redis-server` or Docker installed.
 
 <Tabs groupId="env" queryString>
   <TabItem value="local" label="Local Redis Server" default>
@@ -475,17 +472,17 @@ We can modify our `wadm.yaml` to include the Redis provider and configure a link
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: http-hello-world
+  name: hello-world
   annotations:
     version: v0.0.2 # Increment the version number # [!code ++]
     description: 'HTTP hello world demo, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)'
     experimental: true
 spec:
   components:
-    - name: http-hello-world
+    - name: http-component
       type: component
       properties:
-        image: file://./build/http_hello_world_s.wasm
+        image: wasmcloud.azurecr.io/http-hello-world:0.1.0
       traits:
         - type: spreadscaler
           properties:
@@ -495,27 +492,31 @@ spec:
             target: httpserver
             values:
               address: 0.0.0.0:8080
-        # The new key-value link configuration # [!code ++:6]
-        - type: linkdef
+        # The new key-value link configuration # [!code ++:11]
+        - type: link
           properties:
-            target: keyvalue
-            values:
-              address: redis://127.0.0.1:6379
+            target: kvredis
+            namespace: wasi
+            package: keyvalue
+            interfaces: [atomic, eventual]
+            target_config:
+              - name: redis-url
+                properties:
+                  url: redis://127.0.0.1:6379
 
-    - name: httpserver
-      type: capability
-      properties:
-        image: wasmcloud.azurecr.io/httpserver:0.19.1
-        contract: wasmcloud:httpserver
-    # The new capability provider # [!code ++:6]
+    # The new capability provider # [!code ++:5]
     - name: keyvalue
       type: capability
       properties:
-        image: wasmcloud.azurecr.io/kvredis:0.22.0
-        contract: wasmcloud:keyvalue
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.23.0
+    - name: httpserver
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.20.0
+    # ...
 ```
 
-For the last step, we can deploy the `v0.0.2` version of our application. Then, again, we can test our new functionality.
+For the last step, we can deploy the `v0.0.3` version of our application. Then, again, we can test our new functionality.
 
 ```bash
 > wash app deploy wadm.yaml
