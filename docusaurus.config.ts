@@ -163,8 +163,8 @@ const config: Config = {
       ],
     },
     announcementBar: {
-      id: '1.0 alpha',
-      content: `🎉️ <b>The wasmCloud v1.0 alpha</b> is available! Read the <a href="/docs/1.0/intro">alpha documentation</a> and try it out now.`,
+      id: '1.0 release candidate',
+      content: `🎉️ <b>The wasmCloud v1.0 release candidate</b> is available! Read the <a href="/docs/1.0/intro">1.0 documentation</a> and try it out now.`,
       backgroundColor: '#20232a',
       textColor: '#fff',
     },

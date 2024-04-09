@@ -1,9 +1,9 @@
 ---
-title: "Defining Applications"
+title: 'Defining Applications'
 date: 2020-01-19T00:00:00+00:00
-icon: "ti-map" # themify icon pack : https://themify.me/themify-icons
-description: "Declaring your application models"
-type: "docs"
+icon: 'ti-map' # themify icon pack : https://themify.me/themify-icons
+description: 'Declaring your application models'
+type: 'docs'
 sidebar_position: 2
 ---
 
@@ -22,7 +22,7 @@ metadata:
   name: my-example-app
   annotations:
     version: v0.0.1
-    description: "This is my app"
+    description: 'This is my app'
 spec: ...
 ```
 
@@ -73,7 +73,7 @@ To define a **capability provider**, we include a `capability` component, as fol
 - name: keyvalue
       type: capability
       properties:
-        image: wasmcloud.azurecr.io/kvredis:0.22.0
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.23.0
 ```
 
 Just like when manipulating a lattice _imperatively_, the things that differentiate one capability provider from another are its contract and its public key (which we obtain by looking up the `image`).
@@ -178,7 +178,7 @@ metadata:
   name: kvcounter-rust
   annotations:
     version: v0.0.1
-    description: "Kvcounter demo"
+    description: 'Kvcounter demo'
     experimental: true
 spec:
   components:
@@ -228,7 +228,7 @@ spec:
     - name: keyvalue
       type: capability
       properties:
-        image: wasmcloud.azurecr.io/kvredis:0.22.0
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.23.0
 ```
 
 ⚠️ _NOTE_: while wadm can "claim" resources like components and providers and differentiate between wadm-managed versus unmanaged, this is not so with link definitions. If you manually push new link definition information that overrides or conflicts with the link definitions in your wadm spec, you could experience unexpected behavior until wadm corrects for it. You must take extreme care that wadm-managed link definitions don't conflict with external link definitions.
