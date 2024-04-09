@@ -9,7 +9,14 @@ wasmCloud is a **universal application platform** that helps you build and run g
 Our goal is to make development more joyful and efficient by giving developers the tools to write only the code that matters&mdash;and making it easy to run that code anywhere.
 
 :::warning[Under Construction]
-🚧 This is alpha documentation for wasmCloud 1.0 under active construction. The v1.0 alpha release of the wasmCloud host is [available on GitHub](https://github.com/wasmCloud/wasmCloud/releases/tag/v1.0.0-alpha.1). Some details on these pages may not be aligned with v1.0 during the alpha period. 🚧
+🚧 This is pre-release documentation for wasmCloud 1.0 under active construction. 
+
+* The most current pre-release version of the **wasmCloud 1.0 host** is **v1.0.0-alpha.4**, which is [available on GitHub](https://github.com/wasmCloud/wasmCloud/releases/tag/v1.0.0-alpha.4).
+* The most current pre-release version of **`wash-cli`** is **0.27.0-alpha.1**, which is available to install with [cargo](https://github.com/rust-lang/cargo): `cargo install wash-cli --version 0.27.0-alpha.1`
+
+The `wash` pre-release enables you to test build functionality. Deployment functionality requires a 1.0-compatible version of `wadm`, which is not yet available but will release very soon.
+
+Some details on these pages may not be aligned with v1.0 during the pre-release period. 🚧
 :::
 
 wasmCloud leverages WebAssembly's security, portability, and performance to compose applications from tiny, independent building blocks.

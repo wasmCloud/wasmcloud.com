@@ -1,0 +1,145 @@
+---
+title: 2024-04-03 Community Meeting
+authors: [brooks]
+tags: [community, meeting]
+description: Agenda, notes, and recording for the 2024-04-03 community meeting
+---
+
+import ReactPlayer from 'react-player/youtube';
+
+### Agenda
+
+- DEMO: The 1.0 Wadm manifest 
+- DISCUSSION: Capability providers in GHCR
+- DISCUSSION: 1.0 Roadmap Check-in
+
+{/* truncate */}
+
+### Meeting Notes
+
+#### Updates to wadm
+
+Brooks discussed changes to wadm for wasmCloud 1.0. With capability providers now communicating over WIT interfaces, wadm manifests now define links differently. Brooks compared the old version of a wadm manifest to the forthcoming version:
+
+**Old version**:
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: rust-http-hello-world
+  annotations:
+    version: v0.0.1
+    description: "HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)"
+    experimental: true
+spec:
+  components:
+    - name: http-hello-world
+      type: actor
+      properties:
+        image: file://./build/http_hello_world_s.wasm
+      traits:
+        # Govern the spread/scheduling of the actor
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        # Link the HTTP server, and inform it to listen on port 8080
+        # on the local machine
+        - type: linkdef
+          properties:
+            target: httpserver
+            values:
+              ADDRESS: 127.0.0.1:8080
+
+    # Add a capability provider that mediates HTTP access
+    - name: httpserver
+      type: capability
+      properties:
+        image: wasmcloud.azurecr.io/httpserver:0.19.1
+        contract: wasmcloud:httpserver
+```
+
+**New version**:
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: kvcounter-rust
+  annotations:
+    version: v0.0.1
+    description: "Kvcounter demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)"
+    experimental: true
+spec:
+  components:
+    - name: kvcounter
+      type: actor
+      properties:
+        image: file:///Users/brooks/github.com/wasmcloud/wasmcloud/examples/rust/actors/http-hello-world/build/http_hello_world_s.wasm
+      traits:
+        # Govern the spread/scheduling of the actor
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        # Compose with KVRedis for wasi:keyvalue calls
+        - type: link
+          properties:
+            target: kvredis
+            namespace: wasi
+            package: keyvalue
+            interfaces:
+              - atomic
+              - eventual
+            target_config:
+              - name: redis-connect-local
+                properties:
+                  URL: redis://127.0.0.1:6379
+
+    # Add a capability provider that mediates HTTP access
+    - name: httpserver
+      type: capability
+      properties:
+        image: wasmcloud.azurecr.io/httpserver:0.19.1
+      traits:
+        # Compose with component to handle wasi:http calls
+        - type: link
+          properties:
+            target: http-hello-world
+            namespace: wasi
+            package: http
+            interfaces:
+              - incoming-handler
+            source_config:
+              - name: listen-config
+                properties:
+                  ADDRESS: 127.0.0.1:8080
+    # Add a capability provider that interfaces with the Redis key-value store
+    - name: kvredis
+      type: capability
+      properties:
+        image: wasmcloud.azurecr.io/kvredis:0.22.0
+```
+
+In this example, the kvcounter component has a link to the kvredis provider, and the httpserver provider also has a link to the component. The new link definitions are unidirectional&mdash;they have a source and a target. We no longer specify wasmCloud contracts (since those no longer exist in their previous form), and instead specify WASI interfaces. In the `target_config` field we can also provide configuration data that we give to a provider. 
+
+Folks in attendance were interested to explore configuration data and secrets management in more depth. Brooks and Taylor discussed how configuration data is decoupled from links themselves to facilitate more flexible secrets management, and to ensure that secrets aren't just sitting out on plaintext. Moving forward, Taylor expects the community will develop an extension to wasi:config to handle secrets in a more granular way. 
+
+#### First-party capability providers in ghcr and Azure
+
+In the past, we've used Azure registries for provider images, but there are some visibility challenges there. Today we include crates in the wasmCloud monorepo, but more importantly, you can now go to the packages section in ghcr and find all of the capability providers we distribute. 
+
+If you're looking for the latest version of the http-server, you can simply head to [https://github.com/orgs/wasmCloud/packages?repo_name=wasmCloud](https://github.com/orgs/wasmCloud/packages?repo_name=wasmCloud) to find it (or any other capability provider). You can reach the ghcr page quickly at [https://ghcr.io/wasmcloud/wasmcloud](https://ghcr.io/wasmcloud/wasmcloud).
+
+Taylor asked: "Say I'm writing my own third-party provider and I want to share it with everybody. How should I do that?" 
+
+The answer: ghcr is a great solution, but anything OCI-compatible works! 
+
+Attendees suggested that it would be cool to have a centralized, searchable registry of providers for provider discovery. 
+
+#### One more RFC
+
+After some group discussion, Brooks closed his [April 1st RFC for "Emoji-Based Conventional Commits"](https://github.com/wasmCloud/wasmCloud/issues/1790) as not planned. :cry:
+
+### Recording
+
+<ReactPlayer url='https://www.youtube.com/watch?v=GimScJY9S-0' controls />

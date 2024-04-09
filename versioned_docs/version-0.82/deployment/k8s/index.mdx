@@ -1,31 +1,202 @@
 ---
-title: "wasmCloud and Kubernetes"
+title: "Deploying wasmCloud on Kubernetes"
 description: "Integrating wasmCloud with Kubernetes"
 sidebar_position: 1
 ---
 
-wasmCloud is **compatible with, but not dependent on**, Kubernetes. We think the future of WebAssembly is bright, _and_ we also know there are plenty of systems already running in Kubernetes.
+wasmCloud is **compatible with, but not dependent on**, Kubernetes. We think the future of WebAssembly is bright, _and_ we also know there are plenty of systems already running in Kubernetes. For this reason, we provide the wasmCloud operator to help users run wasmCloud hosts on a Kubernetes cluster&mdash;and thereby run WebAssembly components on Kubernetes.
 
-### Official wasmCloud Helm Chart
+For high-level discussion of our approach to Kubernetes and compatibility with common cloud native tooling, see [wasmCloud on Kubernetes](/docs/kubernetes/).
 
-To make it easy to try out wasmCloud and/or integrate it with existing deployments, wasmCloud publishes an [official Helm chart][helm-chart].
+On **this** page, you can find documentation for operators wishing to deploy wasmCloud with Kubernetes, including details on prerequisites such as NATS and how to deploy the operator. 
 
-To get started quickly and see usage examples, read the ["Running the Chart" guide][helm-chart-quickstart] on the [chart README][helm-chart-docs].
+## Getting started with the wasmCloud operator
 
-For a complete listing of configuration for the Helm chart, jump straight to the [`values.yaml`][helm-chart-values.yaml].
+The wasmCloud operator can be found on GitHub at [https://github.com/wasmCloud/wasmcloud-operator](https://github.com/wasmCloud/wasmcloud-operator). It uses custom resource definitions (CRDs) to define wasmCloud hosts as Kubernetes resources. 
 
-[helm-chart]: https://github.com/wasmCloud/wasmCloud/blob/main/chart/Chart.yaml
-[helm-chart-docs]: https://github.com/wasmCloud/wasmCloud/tree/main/chart
-[helm-chart-values.yaml]: https://github.com/wasmCloud/wasmCloud/blob/main/chart/values.yaml
-[helm-chart-quickstart]: https://github.com/wasmCloud/wasmCloud/tree/main/chart#running-the-chart
+In order to follow the instructions on this page, you will need a Kubernetes cluster and appropriate access credentials as well as a [Helm](https://helm.sh/) installation.
 
-### Kubernetes Service Applier
+### Deploying the operator
 
-Cosmonic has open sourced a basic connector that enables bridging services running in Kubernetes with services running in wasmCloud.
+A wasmCloud cluster requires a few things to run:
 
-The interface, provider, and actor can be found at [on Github under `cosmonic/kubernetes-applier`][k8s-applier].
+- A NATS cluster with Jetstream enabled
+- WADM connected to the NATS cluster in order to support applications
 
-Check out the project's [documentation][k8s-applier-readme] for a complete example architecture and instructions on how to run it.
+If you are running locally, the following steps will help you start a NATS cluster and wadm in your Kubernetes cluster, then deploy the operator.
 
-[k8s-applier]: https://github.com/cosmonic/kubernetes-applier
-[k8s-applier-readme]: https://github.com/cosmonic/kubernetes-applier/tree/main/service-applier#readme
+:::info[Testing]
+Make sure you have a Kubernetes cluster running locally. Some good options include [kind](https://kind.sigs.k8s.io/), [minikube](https://minikube.sigs.k8s.io/docs/), or Docker Desktop.
+:::
+
+#### Running NATS
+
+Add the NATS Helm repo:
+
+```shell
+helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+```
+
+Install the upstream NATS Helm chart to start a cluster with the following
+`values.yaml` file:
+
+```yaml
+config:
+  cluster:
+    enabled: true
+    replicas: 3
+  leafnodes:
+    enabled: true
+  jetstream:
+    enabled: true
+    fileStore:
+      pvc:
+        size: 10Gi
+    merge:
+      domain: default
+```
+
+```shell
+helm upgrade --install -f values.yaml nats-cluster nats/nats
+```
+
+#### Running wadm
+
+You can deploy wadm to your Kubernetes cluster with the wadm Helm chart. First, clone the wadm repo from GitHub:
+
+```shell
+git clone https://github.com/wasmCloud/wadm.git
+```
+
+In the cloned repo, find the chart at `wadm/charts/wadm`. In your `values.yaml` file, the `server` field for NATS should be set to: 
+
+```yaml
+server: "nats-cluster.default.svc.cluster.local:4222"
+```
+
+Run `helm install` from `wadm/charts/wadm` in the cloned repo:
+
+```shell
+helm install wadm -f values.yaml ./
+```
+
+#### Setting up Secrets
+
+The `WasmCloudHostConfig` CRD describes the desired state of a set of wasmCloud hosts connected to the same lattice:
+
+```yaml
+apiVersion: k8s.wasmcloud.dev/v1alpha1
+kind: WasmCloudHostConfig
+metadata:
+  name: my-wasmcloud-cluster
+spec:
+  # The number of wasmCloud host pods to run
+  hostReplicas: 2
+  # The cluster issuers to use for each host
+  issuers:
+    # This needs to be the public key of a cluster seed generated by
+    # `wash keys gen cluster`
+    - CDK...
+  # The lattice to connect the hosts to
+  lattice: 83a5b52e-17cf-4080-bac8-f844099f142e
+  # Additional labels to apply to the host other than the defaults set in the operator
+  hostLabels:
+    some-label: value
+  # Which wasmCloud version to use
+  version: 0.82.0
+  # The name of a secret in the same namespace that provides the required secrets.
+  secretName: cluster-secrets
+  # Enable the following to run the wasmCloud hosts as a DaemonSet
+  #daemonset: true
+  # The name of the image pull secret to use with wasmCloud hosts so that they
+  # can authenticate to a private registry to pull components.
+  # registryCredentialsSecret: my-registry-secret
+```
+
+The CRD requires a Kubernetes Secret with the following keys:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-wasmcloud-cluster
+data:
+  # You can generate this with wash:
+  # `wash keys gen cluster`
+  # For more on wash see https://wasmcloud.com/docs/installation
+  WASMCLOUD_CLUSTER_SEED: <seed>
+  # Only required if using a NATS creds file
+  # nats.creds: <base64 encoded creds file>
+```
+You can apply Secrets with `kubectl`:
+
+```shell
+kubectl apply -f your-secret-manifest.yaml
+```
+
+:::info[Secrets required]
+The operator will fail to provision the wasmCloud Deployment if any of these secrets are missing.
+:::
+
+#### Image pull secrets (Optional)
+
+You can also specify an image pull secret to use use with the wasmCloud hosts so that they can pull components from a private registry. This secret needs to be in the same namespace as the WasmCloudHostConfig CRD and must be a
+`kubernetes.io/dockerconfigjson` type secret. See the [Kubernetes documentation](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials) for more information on how to provision that secret.
+
+Once it is created, you can reference an image pull secret in the `WasmCloudHostConfig` CRD by
+setting the `registryCredentialsSecret` field to the name of the secret.
+
+
+#### Start the operator
+
+```shell
+kubectl kustomize build deploy/local | kubectl apply -f -
+```
+
+
+#### Argo CD Health Check (Optional)
+
+Argo CD provides a way to define a [custom health check](https://argo-cd.readthedocs.io/en/stable/operator-manual/health/#custom-health-checks) that it then runs against a given resource to determine whether or not the resource is in healthy state.
+
+For this purpose, we specifically expose a `status.phase` field, which exposes the underlying status information from wadm.
+
+With the following ConfigMap, a custom health check can be added to an existing
+Argo CD installation for tracking the health of wadm applications.
+
+```yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  resource.customizations: |
+    core.oam.dev/Application:
+      health.lua: |
+        hs = {}
+        hs.status = "Progressing"
+        hs.message = "Reconciling application state"
+        if obj.status ~= nil and obj.status.phase ~= nil then
+          if obj.status.phase == "Deployed" then
+            hs.status = "Healthy"
+            hs.message = "Application is ready"
+          end
+          if obj.status.phase == "Reconciling" then
+            hs.status = "Progressing"
+            hs.message = "Application has been deployed"
+          end
+          if obj.status.phase == "Failed" then
+            hs.status = "Degraded"
+            hs.message = "Application failed to deploy"
+          end
+          if obj.status.phase == "Undeployed" then
+            hs.status = "Suspended"
+            hs.message = "Application is undeployed"
+          end
+        end
+        return hs
+```
