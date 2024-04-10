@@ -309,99 +309,98 @@ let value: OutgoingValue = // [!code ++]
 Now we'll add a switch case that **creates/updates**, **reads**, or **destroys** guestbook records based on the HTTP method of the incoming request. For this rudimentary app, each case will send an appropriate HTTP response:
 
 ```rust
-// Switch case on method // [!code ++]
-        match method { // [!code ++]
-            wasi::http::types::Method::Get => { // [!code ++]
-            // [!code ++]
-                // If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors // [!code ++]
-                let none = wasi::keyvalue::eventual::get(&bucket, &name).unwrap().is_none(); // [!code ++]
+match method { // [!code ++]
+    wasi::http::types::Method::Get => { // [!code ++]
+    // [!code ++]
+        // If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors // [!code ++]
+        let none = wasi::keyvalue::eventual::get(&bucket, &name).unwrap().is_none(); // [!code ++]
 // [!code ++]
-                if none { // [!code ++]
-                    // Send error message if the value is none // [!code ++]
-                    response_body // [!code ++]
-                        .write() // [!code ++]
-                        .unwrap() // [!code ++]
-                        .blocking_write_and_flush(format!("{name} not found").as_bytes()) // [!code ++]
-                        .unwrap(); // [!code ++]
-                    OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
-                    ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
-                } else { // [!code ++]
+        if none { // [!code ++]
+            // Send error message if the value is none // [!code ++]
+            response_body // [!code ++]
+                .write() // [!code ++]
+                .unwrap() // [!code ++]
+                .blocking_write_and_flush(format!("{name} not found").as_bytes()) // [!code ++]
+                .unwrap(); // [!code ++]
+            OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
+            ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
+        } else { // [!code ++]
 // [!code ++]
-                    let result = wasi::keyvalue::eventual::get(&bucket, &name).unwrap().unwrap(); // [!code ++]
+            let result = wasi::keyvalue::eventual::get(&bucket, &name).unwrap().unwrap(); // [!code ++]
 // [!code ++]
-                    // Take this result (of the IncomingValue type) and consume that value to get a uint8 byte array, which we will then send as part of http response // [!code ++]
+            // Take this result (of the IncomingValue type) and consume that value to get a uint8 byte array, which we will then send as part of http response // [!code ++]
 // [!code ++]
-                    let in_val = wasi::keyvalue::types::IncomingValue::incoming_value_consume_sync(result).unwrap(); // [!code ++]
-                // [!code ++]
-                    // Send HTTP response // [!code ++]
-                    response_body // [!code ++]
-                        .write() // [!code ++]
-                        .unwrap() // [!code ++]
-                        .blocking_write_and_flush(&in_val).unwrap(); // [!code ++]
-                    OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
-                    ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
-                }; // [!code ++]
- // [!code ++]
-            }, // [!code ++]
-            wasi::http::types::Method::Put => { // [!code ++]
-                // Assign value as byte array // [!code ++]
-                let writval = format!("attending").as_bytes().to_vec(); // [!code ++]
-         // [!code ++]
-                // Use outgoingvaluewritebodysync to actually write the value // [!code ++]
-                let _ = value.outgoing_value_write_body_sync(&writval); // [!code ++]
-                        // [!code ++]
-                wasi::keyvalue::eventual::set(&bucket, &name, &value) // [!code ++]
-                        .expect("failed to set"); // [!code ++]
-                // [!code ++]
-                // Send HTTP response // [!code ++]
-                response_body // [!code ++]
-                    .write() // [!code ++]
-                    .unwrap() // [!code ++]
-                    .blocking_write_and_flush(format!("Added {name}").as_bytes()) // [!code ++]
-                    .unwrap(); // [!code ++]
-                OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
-                ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
-            }, // [!code ++]
-            wasi::http::types::Method::Delete => { // [!code ++:27]
-
-                // If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors
-                let none = wasi::keyvalue::eventual::get(&bucket, &name).unwrap().is_none();
-
-                if none {
-                    // Send error message if the value is none
-                    response_body
-                        .write()
-                        .unwrap()
-                        .blocking_write_and_flush(format!("{name} not found").as_bytes())
-                        .unwrap();
-                    OutgoingBody::finish(response_body, None).expect("failed to finish response body");
-                    ResponseOutparam::set(response_out, Ok(response));
-                } else {
-                    // Delete key
-                    let _ = wasi::keyvalue::eventual::delete(&bucket, &name);
-
-                    // Send HTTP response
-                    response_body
-                        .write()
-                        .unwrap()
-                        .blocking_write_and_flush(format!("It's like {name} was never there").as_bytes())
-                        .unwrap();
-                    OutgoingBody::finish(response_body, None).expect("failed to finish response body");
-                    ResponseOutparam::set(response_out, Ok(response));
-                };
-            } // [!code ++]
-            _ => { // [!code ++]
-                // Handle other cases // [!code ++]
-                // Send HTTP response // [!code ++]
-                response_body // [!code ++]
-                    .write() // [!code ++]
-                    .unwrap() // [!code ++]
-                    .blocking_write_and_flush(format!("Try sending a GET, PUT, or DELETE").as_bytes()) // [!code ++]
-                    .unwrap(); // [!code ++]
-                OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
-                ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
-            } // [!code ++]
+            let in_val = wasi::keyvalue::types::IncomingValue::incoming_value_consume_sync(result).unwrap(); // [!code ++]
+        // [!code ++]
+            // Send HTTP response // [!code ++]
+            response_body // [!code ++]
+                .write() // [!code ++]
+                .unwrap() // [!code ++]
+                .blocking_write_and_flush(&in_val).unwrap(); // [!code ++]
+            OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
+            ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
         }; // [!code ++]
+ // [!code ++]
+    }, // [!code ++]
+    wasi::http::types::Method::Put => { // [!code ++]
+        // Assign value as byte array // [!code ++]
+        let writval = format!("attending").as_bytes().to_vec(); // [!code ++]
+ // [!code ++]
+        // Use outgoingvaluewritebodysync to actually write the value // [!code ++]
+        let _ = value.outgoing_value_write_body_sync(&writval); // [!code ++]
+                // [!code ++]
+        wasi::keyvalue::eventual::set(&bucket, &name, &value) // [!code ++]
+                .expect("failed to set"); // [!code ++]
+        // [!code ++]
+        // Send HTTP response // [!code ++]
+        response_body // [!code ++]
+            .write() // [!code ++]
+            .unwrap() // [!code ++]
+            .blocking_write_and_flush(format!("Added {name}").as_bytes()) // [!code ++]
+            .unwrap(); // [!code ++]
+        OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
+        ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
+    }, // [!code ++]
+    wasi::http::types::Method::Delete => { // [!code ++:27]
+
+        // If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors
+        let none = wasi::keyvalue::eventual::get(&bucket, &name).unwrap().is_none();
+
+        if none {
+            // Send error message if the value is none
+            response_body
+                .write()
+                .unwrap()
+                .blocking_write_and_flush(format!("{name} not found").as_bytes())
+                .unwrap();
+            OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+            ResponseOutparam::set(response_out, Ok(response));
+        } else {
+            // Delete key
+            let _ = wasi::keyvalue::eventual::delete(&bucket, &name);
+
+            // Send HTTP response
+            response_body
+                .write()
+                .unwrap()
+                .blocking_write_and_flush(format!("It's like {name} was never there").as_bytes())
+                .unwrap();
+            OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+            ResponseOutparam::set(response_out, Ok(response));
+        };
+    } // [!code ++]
+    _ => { // [!code ++]
+        // Handle other cases // [!code ++]
+        // Send HTTP response // [!code ++]
+        response_body // [!code ++]
+            .write() // [!code ++]
+            .unwrap() // [!code ++]
+            .blocking_write_and_flush(format!("Try sending a GET, PUT, or DELETE").as_bytes()) // [!code ++]
+            .unwrap(); // [!code ++]
+        OutgoingBody::finish(response_body, None).expect("failed to finish response body"); // [!code ++]
+        ResponseOutparam::set(response_out, Ok(response)); // [!code ++]
+    } // [!code ++]
+}; // [!code ++]
 ```
 
 Most of our application logic is happening in this block, so let's pause to consider a few important elements. 
