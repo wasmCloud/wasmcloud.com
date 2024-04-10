@@ -273,21 +273,21 @@ We can follow the same procedure we used for `wasi-http` to explore the wasi-key
 In `/wit/deps/keyvalue/types.wit`, we see that collections of key-value pairs are referenced as `buckets` in the API:
 
 ```wit
-	/// A bucket is a collection of key-value pairs. Each key-value pair is stored
-	/// as a entry in the bucket, and the bucket itself acts as a collection of all
-	/// these entries.
-	///
-	/// It is worth noting that the exact terminology for bucket in key-value stores
-	/// can very depending on the specific implementation. For example,
-	/// 1. Amazon DynamoDB calls a collection of key-value pairs a table
-	/// 2. Redis has hashes, sets, and sorted sets as different types of collections
-	/// 3. Cassandra calls a collection of key-value pairs a column family
-	/// 4. MongoDB calls a collection of key-value pairs a collection
-	/// 5. Riak calls a collection of key-value pairs a bucket
-	/// 6. Memcached calls a collection of key-value pairs a slab
-	/// 7. Azure Cosmos DB calls a collection of key-value pairs a container
-	///
-	/// In this interface, we use the term `bucket` to refer to a collection of key-value
+/// A bucket is a collection of key-value pairs. Each key-value pair is stored
+/// as a entry in the bucket, and the bucket itself acts as a collection of all
+/// these entries.
+///
+/// It is worth noting that the exact terminology for bucket in key-value stores
+/// can very depending on the specific implementation. For example,
+/// 1. Amazon DynamoDB calls a collection of key-value pairs a table
+/// 2. Redis has hashes, sets, and sorted sets as different types of collections
+/// 3. Cassandra calls a collection of key-value pairs a column family
+/// 4. MongoDB calls a collection of key-value pairs a collection
+/// 5. Riak calls a collection of key-value pairs a bucket
+/// 6. Memcached calls a collection of key-value pairs a slab
+/// 7. Azure Cosmos DB calls a collection of key-value pairs a container
+///
+/// In this interface, we use the term `bucket` to refer to a collection of key-value
 ```
 We'd like to open a bucket to store the names of our guests, so we'll add the following to our handler function between the `method` and `value` assignments:
 
@@ -856,8 +856,8 @@ func getName(path string) string {
 Call `getName` at the top of the handler function. We'll use the `PathWithQuery` method from the WASI HTTP API to grab the path and query from the incoming request:
 
 ```go
-	// Get any name appended to the path via query
-	name := getName(request.PathWithQuery().Unwrap())
+// Get any name appended to the path via query
+name := getName(request.PathWithQuery().Unwrap())
 ```
 
 This is the first time we're actually implementing a new WASI method in this component, so we should pause to consider exactly what we're doing: 
@@ -871,8 +871,8 @@ In order to guide our CRUD operations for the guestbook, we'd also like to know 
 If you guessed that you could use a method on `request` again, well done! Below the previous line add:
 
 ```go
-	// Detect request method
-	method := request.Method()
+// Detect request method
+method := request.Method()
 ```
 
 This will return a method of the `WasiHttp0_2_0_TypesMethod` type, which we will be able to use directly.
@@ -886,116 +886,116 @@ We can follow the same procedure we used for `wasi-http` to explore the wasi-key
 In `/wit/deps/keyvalue/types.wit`, we see that collections of key-value pairs are referenced as `buckets` in the API:
 
 ```wit
-	/// A bucket is a collection of key-value pairs. Each key-value pair is stored
-	/// as a entry in the bucket, and the bucket itself acts as a collection of all
-	/// these entries.
-	///
-	/// It is worth noting that the exact terminology for bucket in key-value stores
-	/// can very depending on the specific implementation. For example,
-	/// 1. Amazon DynamoDB calls a collection of key-value pairs a table
-	/// 2. Redis has hashes, sets, and sorted sets as different types of collections
-	/// 3. Cassandra calls a collection of key-value pairs a column family
-	/// 4. MongoDB calls a collection of key-value pairs a collection
-	/// 5. Riak calls a collection of key-value pairs a bucket
-	/// 6. Memcached calls a collection of key-value pairs a slab
-	/// 7. Azure Cosmos DB calls a collection of key-value pairs a container
-	///
-	/// In this interface, we use the term `bucket` to refer to a collection of key-value
+/// A bucket is a collection of key-value pairs. Each key-value pair is stored
+/// as a entry in the bucket, and the bucket itself acts as a collection of all
+/// these entries.
+///
+/// It is worth noting that the exact terminology for bucket in key-value stores
+/// can very depending on the specific implementation. For example,
+/// 1. Amazon DynamoDB calls a collection of key-value pairs a table
+/// 2. Redis has hashes, sets, and sorted sets as different types of collections
+/// 3. Cassandra calls a collection of key-value pairs a column family
+/// 4. MongoDB calls a collection of key-value pairs a collection
+/// 5. Riak calls a collection of key-value pairs a bucket
+/// 6. Memcached calls a collection of key-value pairs a slab
+/// 7. Azure Cosmos DB calls a collection of key-value pairs a container
+///
+/// In this interface, we use the term `bucket` to refer to a collection of key-value
 ```
 Peruse the `/gen/hello.go` file to explore the Go bindings. (Searching `bucket` in the file is a quick way to find the relevant details.) We'd like to open a bucket to store the names of our guests, so we'll add the following to our handler function below the `getName` call:
 
 ```go
-	// Open keyvaluestore bucket
-	// In the language of WASI, here we're creating a new bucket resource
-	bucket := http.StaticBucketOpenBucket("").Unwrap()
+// Open keyvaluestore bucket
+// In the language of WASI, here we're creating a new bucket resource
+bucket := http.StaticBucketOpenBucket("").Unwrap()
 ```
 This is another case where we need to use the `Unwrap()` method, because on its own `StaticBucketOpenBucket("")` returns an object containing both the bucket and an error (if applicable).
 
 Next we'll create a variable called `outVal` that will hold the new values assigned to keys in PUT/set operations. This is a `wasi-keyvalue` pattern that we would use in any language: the `StaticOutgoingValueNewOutgoingValue()` method is creating a new resource, which we can use to perform synchronous write operations. 
 
 ```go
-	// Create a variable for outgoing values - Put/sets will use this
-	// In the language of WASI, here we're creating a new outgoing-value resource
-	outVal := OutgoingValue(http.StaticOutgoingValueNewOutgoingValue())
+// Create a variable for outgoing values - Put/sets will use this
+// In the language of WASI, here we're creating a new outgoing-value resource
+outVal := OutgoingValue(http.StaticOutgoingValueNewOutgoingValue())
 ```
 
 Now we'll replace our existing response with a switch case that **creates/updates**, **reads**, or **destroys** guestbook records based on the HTTP method of the incoming request. For this rudimentary app, each case will send an appropriate HTTP response:
 
 ```go
-	// Build the HttpResponse to send back
-	headers := http.NewFields()
-	httpResponse := http.NewOutgoingResponse(headers)
-	httpResponse.SetStatusCode(200)
+// Build the HttpResponse to send back
+headers := http.NewFields()
+httpResponse := http.NewOutgoingResponse(headers)
+httpResponse.SetStatusCode(200)
 
-	switch method {
-	case http.WasiHttp0_2_0_TypesMethodGet():
+switch method {
+case http.WasiHttp0_2_0_TypesMethodGet():
 
-		// If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors
-		none := http.WasiKeyvalue0_1_0_EventualGet(bucket, name).Unwrap().IsNone()
+	// If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors
+	none := http.WasiKeyvalue0_1_0_EventualGet(bucket, name).Unwrap().IsNone()
 
-		if none {
-			// Send error message if value is none
-			httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(name + " not found\n")).Unwrap()
-			okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-			http.StaticResponseOutparamSet(responseWriter, okResponse)
-
-		} else {
-
-			result := http.WasiKeyvalue0_1_0_EventualGet(bucket, name).Unwrap().Unwrap()
-
-			// Take this result (of the IncomingValue type) and consume that value to get a uint8 byte array, which we will then send as part of http response
-
-			incomingValue := http.StaticIncomingValueIncomingValueConsumeSync(result).Unwrap()
-
-			httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush(incomingValue).Unwrap()
-			okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-			http.StaticResponseOutparamSet(responseWriter, okResponse)
-		}
-
-	case http.WasiHttp0_2_0_TypesMethodPut():
-
-		// Write the desired value (as byte array) in our variable
-		outVal.OutgoingValueWriteBodySync([]uint8(fmt.Sprintf("attending")))
-
-		// Set the value
-		http.WasiKeyvalue0_1_0_EventualSet(bucket, name, outVal)
-
-		// Send HTTP response
-		httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(fmt.Sprintf("Added " + name))).Unwrap()
+	if none {
+		// Send error message if value is none
+		httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(name + " not found\n")).Unwrap()
 		okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
 		http.StaticResponseOutparamSet(responseWriter, okResponse)
 
-	case http.WasiHttp0_2_0_TypesMethodDelete():
+	} else {
 
-		// If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors
-		none := http.WasiKeyvalue0_1_0_EventualGet(bucket, name).Unwrap().IsNone()
+		result := http.WasiKeyvalue0_1_0_EventualGet(bucket, name).Unwrap().Unwrap()
 
-		if none {
-			// Send error message if value is none
-			httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(name + " not found\n")).Unwrap()
-			okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-			http.StaticResponseOutparamSet(responseWriter, okResponse)
+		// Take this result (of the IncomingValue type) and consume that value to get a uint8 byte array, which we will then send as part of http response
 
-		} else {
+		incomingValue := http.StaticIncomingValueIncomingValueConsumeSync(result).Unwrap()
 
-			result := http.WasiKeyvalue0_1_0_EventualGet(bucket, name).Unwrap().Unwrap()
+		httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush(incomingValue).Unwrap()
+		okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+		http.StaticResponseOutparamSet(responseWriter, okResponse)
+	}
 
-			// Delete the key value pair
-			http.WasiKeyvalue0_1_0_EventualDelete(bucket, name)
+case http.WasiHttp0_2_0_TypesMethodPut():
 
-			// Send HTTP response
-			message := "It's like " + name + " was never there"
-			httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(message + "\n")).Unwrap()
-			okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-			http.StaticResponseOutparamSet(responseWriter, okResponse)
-		}
+	// Write the desired value (as byte array) in our variable
+	outVal.OutgoingValueWriteBodySync([]uint8(fmt.Sprintf("attending")))
 
-	default:
-		message := "Try sending a GET, PUT, or DELETE"
+	// Set the value
+	http.WasiKeyvalue0_1_0_EventualSet(bucket, name, outVal)
+
+	// Send HTTP response
+	httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(fmt.Sprintf("Added " + name))).Unwrap()
+	okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+	http.StaticResponseOutparamSet(responseWriter, okResponse)
+
+case http.WasiHttp0_2_0_TypesMethodDelete():
+
+	// If the key doesn't exist, then the value will be returned as none, so we're checking for noneness to handle errors
+	none := http.WasiKeyvalue0_1_0_EventualGet(bucket, name).Unwrap().IsNone()
+
+	if none {
+		// Send error message if value is none
+		httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(name + " not found\n")).Unwrap()
+		okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+		http.StaticResponseOutparamSet(responseWriter, okResponse)
+
+	} else {
+
+		result := http.WasiKeyvalue0_1_0_EventualGet(bucket, name).Unwrap().Unwrap()
+
+		// Delete the key value pair
+		http.WasiKeyvalue0_1_0_EventualDelete(bucket, name)
+
+		// Send HTTP response
+		message := "It's like " + name + " was never there"
 		httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(message + "\n")).Unwrap()
 		okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
 		http.StaticResponseOutparamSet(responseWriter, okResponse)
 	}
+
+default:
+	message := "Try sending a GET, PUT, or DELETE"
+	httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8(message + "\n")).Unwrap()
+	okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+	http.StaticResponseOutparamSet(responseWriter, okResponse)
+}
 ```
 
 Most of our application logic is happening in this block, so let's pause to consider a few important elements. 
@@ -1388,14 +1388,14 @@ _Note that the bindings are based on the imports and exports defined in your WIT
 In our `types` directory we have a variety of bindings in `.d.ts` files. Open `types/wasi-http-types.d.ts`. You will find definitions of the bindings between HTTP types in your WIT world and their implementations in TypeScript. Take, for example, the `outgoing-response` type that we observed in `types.wit`. We can find the binding in `types/wasi-http-types.d.ts` on lines 280-287:
 
 ```typescript
-  /**
-   * Construct an `outgoing-response`, with a default `status-code` of `200`.
-   * If a different `status-code` is needed, it must be set via the
-   * `set-status-code` method.
-   *
-   * * `headers` is the HTTP Headers for the Response.
-   */
-  export { OutgoingResponse };
+/**
+ * Construct an `outgoing-response`, with a default `status-code` of `200`.
+ * If a different `status-code` is needed, it must be set via the
+ * `set-status-code` method.
+ *
+ * * `headers` is the HTTP Headers for the Response.
+ */
+export { OutgoingResponse };
 ```
 
 Taken in conjunction, our WIT files and our generated bindings give us the tools we need to use the API and put the pieces together. If you return to our root `http-hello-world.ts` project file, you'll notice that we're importing a variety of types from the `hello` world, including `OutgoingResponse`:
@@ -1435,23 +1435,23 @@ function handle(req: IncomingRequest, resp: ResponseOutparam)
 Next we have the code for sending HTTP responses. Let's go ahead and delete that, since we'll be replacing it soon.
 
 ```typescript
-  // Start building an outgoing response // [!code --:17]
-  const outgoingResponse = new OutgoingResponse(new Fields());
+// Start building an outgoing response // [!code --:17]
+const outgoingResponse = new OutgoingResponse(new Fields());
 
-  // Access the outgoing response body
-  let outgoingBody = outgoingResponse.body();
-  // Create a stream for the response body
-  let outputStream = outgoingBody.write();
-  // // Write hello world to the response stream
-  outputStream.blockingWriteAndFlush(
-    new Uint8Array(new TextEncoder().encode("Hello from Typescript!\n"))
-  );
+// Access the outgoing response body
+let outgoingBody = outgoingResponse.body();
+// Create a stream for the response body
+let outputStream = outgoingBody.write();
+// Write hello world to the response stream
+outputStream.blockingWriteAndFlush(
+  new Uint8Array(new TextEncoder().encode("Hello from Typescript!\n"))
+);
 
-  // Set the status code for the response
-  outgoingResponse.setStatusCode(200);
+// Set the status code for the response
+outgoingResponse.setStatusCode(200);
 
-  // Set the created response
-  ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
+// Set the created response
+ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
 ```
 
 Now, below the `handle` function and above the `export` for `incomingHandler`, add a new function called `getNameFromPath`&mdash;much like in the [Quickstart](/docs/tour/hello-world). This will extract and return a name provided in incoming HTTP queries. 
@@ -1499,21 +1499,21 @@ Typically, we would follow the same procedure we used for `wasi-http` to explore
 In `/wit/deps/keyvalue/types.wit`, we see that collections of key-value pairs are referenced as `buckets` in the API:
 
 ```wit
-	/// A bucket is a collection of key-value pairs. Each key-value pair is stored
-	/// as a entry in the bucket, and the bucket itself acts as a collection of all
-	/// these entries.
-	///
-	/// It is worth noting that the exact terminology for bucket in key-value stores
-	/// can very depending on the specific implementation. For example,
-	/// 1. Amazon DynamoDB calls a collection of key-value pairs a table
-	/// 2. Redis has hashes, sets, and sorted sets as different types of collections
-	/// 3. Cassandra calls a collection of key-value pairs a column family
-	/// 4. MongoDB calls a collection of key-value pairs a collection
-	/// 5. Riak calls a collection of key-value pairs a bucket
-	/// 6. Memcached calls a collection of key-value pairs a slab
-	/// 7. Azure Cosmos DB calls a collection of key-value pairs a container
-	///
-	/// In this interface, we use the term `bucket` to refer to a collection of key-value
+/// A bucket is a collection of key-value pairs. Each key-value pair is stored
+/// as a entry in the bucket, and the bucket itself acts as a collection of all
+/// these entries.
+///
+/// It is worth noting that the exact terminology for bucket in key-value stores
+/// can very depending on the specific implementation. For example,
+/// 1. Amazon DynamoDB calls a collection of key-value pairs a table
+/// 2. Redis has hashes, sets, and sorted sets as different types of collections
+/// 3. Cassandra calls a collection of key-value pairs a column family
+/// 4. MongoDB calls a collection of key-value pairs a collection
+/// 5. Riak calls a collection of key-value pairs a bucket
+/// 6. Memcached calls a collection of key-value pairs a slab
+/// 7. Azure Cosmos DB calls a collection of key-value pairs a container
+///
+/// In this interface, we use the term `bucket` to refer to a collection of key-value
 ```
 If you make an import error when building with JCO, you get a list of available imports, an excerpt of which we'll list here as a useful reference:
 
@@ -1859,7 +1859,8 @@ Take a look at `/deps/http/types.wit`. Here you'll find a detailed explanation o
 
 ```wit
 /// Represents an outgoing HTTP Request.
-resource outgoing-request 
+resource outgoing-request
+```
 
 With our WIT dependencies in place, we can specify interface imports and exports in `world.wit`. A **WIT world** is a set of standard interfaces that you can use to interact with components via defined functions and types. The WIT interfaces don't provide functionality in themselves&mdash;instead, they provide a common language for the *contracts* between components. 
 
@@ -1869,9 +1870,7 @@ Remember that we targeted the `hello` world in our `wasmcloud.toml` file; this i
 package wasmcloud:hello;
 
 world hello {
-  import wasi:keyvalue/atomic@0.1.0; // [!code ++]
   import wasi:keyvalue/eventual@0.1.0; // [!code ++]
-  import wasi:logging/logging; // [!code ++]
   // [!code ++]
   export wasi:http/incoming-handler@0.2.0;
 }
@@ -2036,21 +2035,21 @@ We can follow the same procedure we used for `wasi-http` to explore the wasi-key
 In `/wit/deps/keyvalue/types.wit`, we see that collections of key-value pairs are referenced as `buckets` in the API:
 
 ```wit
-	/// A bucket is a collection of key-value pairs. Each key-value pair is stored
-	/// as a entry in the bucket, and the bucket itself acts as a collection of all
-	/// these entries.
-	///
-	/// It is worth noting that the exact terminology for bucket in key-value stores
-	/// can very depending on the specific implementation. For example,
-	/// 1. Amazon DynamoDB calls a collection of key-value pairs a table
-	/// 2. Redis has hashes, sets, and sorted sets as different types of collections
-	/// 3. Cassandra calls a collection of key-value pairs a column family
-	/// 4. MongoDB calls a collection of key-value pairs a collection
-	/// 5. Riak calls a collection of key-value pairs a bucket
-	/// 6. Memcached calls a collection of key-value pairs a slab
-	/// 7. Azure Cosmos DB calls a collection of key-value pairs a container
-	///
-	/// In this interface, we use the term `bucket` to refer to a collection of key-value
+/// A bucket is a collection of key-value pairs. Each key-value pair is stored
+/// as a entry in the bucket, and the bucket itself acts as a collection of all
+/// these entries.
+///
+/// It is worth noting that the exact terminology for bucket in key-value stores
+/// can very depending on the specific implementation. For example,
+/// 1. Amazon DynamoDB calls a collection of key-value pairs a table
+/// 2. Redis has hashes, sets, and sorted sets as different types of collections
+/// 3. Cassandra calls a collection of key-value pairs a column family
+/// 4. MongoDB calls a collection of key-value pairs a collection
+/// 5. Riak calls a collection of key-value pairs a bucket
+/// 6. Memcached calls a collection of key-value pairs a slab
+/// 7. Azure Cosmos DB calls a collection of key-value pairs a container
+///
+/// In this interface, we use the term `bucket` to refer to a collection of key-value
 ```
 Peruse the `/hello/imports/types.py` file to explore the Python bindings. (Searching `bucket` in the file is a quick way to find the relevant details.) You might also recall that we imported the `Bucket` type. The syntax to open a bucket is pretty intuitive&mdash;add the following below the `method` detection:
 
@@ -2476,6 +2475,6 @@ To completely remove all versions of the application from wasmCloud:
 ```shell
 wash app delete cruddy --delete-all
 ```
-## Conclusion
+## Next steps
 
 In this tutorial, you've learned how to create a guestbook application component that uses WASI APIs including HTTP and Key-Value. In doing so, you've also learned how to read the WIT definitions for those APIs and utilize idiomatic bindings for our chosen language. With these fundamentals in place, a good next step might be to try building more complex components, [explore other WASI APIs](https://github.com/WebAssembly/WASI/blob/main/Proposals.md), or create your own interfaces and providers. If you have questions or feedback, join the [wasmCloud Slack](https://slack.wasmcloud.com/) and let us know. Happy coding!
