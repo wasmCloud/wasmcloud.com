@@ -1,9 +1,9 @@
 ---
-title: "Defining Applications"
+title: 'Defining Applications'
 date: 2020-01-19T00:00:00+00:00
-icon: "ti-map" # themify icon pack : https://themify.me/themify-icons
-description: "Declaring your application models"
-type: "docs"
+icon: 'ti-map' # themify icon pack : https://themify.me/themify-icons
+description: 'Declaring your application models'
+type: 'docs'
 sidebar_position: 2
 ---
 
@@ -22,7 +22,7 @@ metadata:
   name: my-example-app
   annotations:
     version: v0.0.1
-    description: "This is my app"
+    description: 'This is my app'
 spec: ...
 ```
 
@@ -100,14 +100,14 @@ traits:
     properties:
     replicas: 4
     spread:
-        - name: eastcoast
-        requirements:
-            zone: us-east-1
-        weight: 80
-        - name: westcoast
-        requirements:
-            zone: us-west-1
-        weight: 20
+      - name: eastcoast
+      requirements:
+          zone: us-east-1
+      weight: 80
+      - name: westcoast
+      requirements:
+          zone: us-west-1
+      weight: 20
 ```
 
 This definition states that, for this component (a spread scaler can apply to an `actor` or `capability`), you want a total of 4 instances, with 80% of them going to hosts with the `zone` label set to `us-east-1` and 20% of them going to hosts with the `zone` label set to `us-west-1`. Because this system uses labels as selectors, and you can set any arbitrary label on your hosts, you can define practically any conditions for the spread rules.
@@ -183,7 +183,7 @@ metadata:
   name: kvcounter
   annotations:
     version: v0.0.1
-    description: "wasmCloud Key Value Counter Example"
+    description: 'wasmCloud Key Value Counter Example'
 spec:
   components:
     - name: kvcounter
