@@ -42,7 +42,7 @@ world root {
 
 ## Imports
 
-When looking at an [actor component](/docs/concepts/actors)'s wit world, like in the above example, you'll see a list of imports. Each import here needs to be exported by the [host](/docs/concepts/hosts), which in our case is wasmCloud. You can see a list of supported imports by checking the [guest](/reference/wasi/guest.md), [logging](/reference/wasi/logging.md), and [incoming-http](/reference/wasi/incoming-http.md) pages.
+When looking at an [actor component](/docs/concepts/actors)'s wit world, like in the above example, you'll see a list of imports. Each import here needs to be exported by the [host](/docs/concepts/hosts), which in our case is wasmCloud. You can see a list of supported imports by checking the [messaging-handler](/reference/wasi/messaging-handler.md), [logging](/reference/wasi/logging.md), and [incoming-http](/reference/wasi/incoming-http.md) pages.
 
 ## Exports
 
