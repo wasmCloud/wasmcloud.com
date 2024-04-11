@@ -109,7 +109,9 @@ WIT uses the following built-in data types:
 
 wasmCloud supports **all standard data types** in custom WIT interfaces. For more information on using these types, as well as user-defined types, see the [WIT documentation](https://component-model.bytecodealliance.org/design/wit.html). 
 
+:::warning[Warning]
 **Streams**, **futures**, and **resources** will not work in a distributed way in custom interfaces, so exercise caution when using these types. You may notice that several WASI 0.2 interfaces use resources&mdash;note that the wasmCloud host adapts well-known resources from `wasi-http`, `wasi-keyvalue`, `wasi-messaging`, and `wasi-blobstore` into concrete types that we can send over the lattice, meaning those standard interfaces are fully supported for distributed applications.
+:::
 
 ## Functions
 
@@ -135,18 +137,39 @@ Within the `handle` function, the two parameters `request` and `response-out` ar
 To indicate that a function returns a value, include an arrow symbol after the parentheses and the type of the returned value:
 
 ```wit
-exclaim: func() -> string;
+shout: func() -> string;
 ```
 
 If a function has multiple return values, the values must be named.
 
-## Example: Putting it all together
+## Example: Greeter
 
-Start with initial example from our template, anything beyond the basics link out to component model 
+Let's create a very simple interface called `greeter` that passes a string between components. Create a directory called `greeter` and inside that directory a file called `greeter.wit`. Add the following to the file:
 
- - then talk about how you use it with component, custom with provider
+```wit
+package local:greeter-demo; // <namespace>:<package>
 
- ### Creating WIT worlds
+interface greet { // interface <name of interface>
+  greet: func(message: string) -> string; // a function named "greet"
+}
 
-Talk about creating worlds
-When you create an interface, it's all about facilitating communication between two WebAssembly components
+world greeter {
+  export greet; // make the `greet` function available to other components/the runtime
+}
+```
+This interface will take one string parameter called `message` and return a string value. 
+
+To add this interface to a component, simply copy the `greeter` directory over to the component's `wit/deps` directory and add it to the project's `wit/world.wit` file:
+
+```wit
+package wasmcloud:hello;
+
+world hello {
+  export local:greeter-demo/greet; // [!code ++]
+}
+```
+Congratulations&mdash;you've written a simple custom interface and added it to a component. For more details on implementing custom interfaces with components and providers, see the [Provider section of the Developer Guide](/docs/1.0/developer/providers/). 
+
+## Further reading
+
+For more on WIT, see the [community documentation for the Component Model](https://component-model.bytecodealliance.org/design/wit.html). You may also wish to read the [full specification for WIT on GitHub](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md).
