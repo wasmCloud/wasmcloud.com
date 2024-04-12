@@ -1,18 +1,20 @@
 ---
-title: "wash dev"
+title: 'wash dev'
 draft: false
 sidebar_position: 8
-description: "wash dev command reference"
---- 
+description: 'wash dev command reference'
+---
 
 Starts a local dev loop for a component. Takes a local `wasmcloud.toml` file to deploy the sepcified component and accepts a host ID to specify the host to deploy on. This is an experimental feature and needs `--experimental` flag to run.
 
 ### Usage
+
 ```
 wash dev --experimental --host-id=<your-host-id>
 ```
 
 ### Options
+
 `--nats-credsfile`Optional path to a NATS credentials file to authenticate and extend existing NATS infrastructure [env: NATS_CREDSFILE=]
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
@@ -29,7 +31,7 @@ wash dev --experimental --host-id=<your-host-id>
 
 `--nats-port` NATS server port to connect to. This will be used as the NATS listen port if `--nats-connect-only` isn't set [env: NATS_PORT=] [default: 4222]
 
-`--nats-websocket-port` NATS websocket port to use. Websocket support will not be enabled if this option isn't set. TLS is not supported. This is required for the wash ui to connect from localhost [env: NATS_WEBSOCKET_PORT=]
+`--nats-websocket-port` NATS websocket port to use. TLS is not supported. This is required for the wash ui to connect from localhost [env: NATS_WEBSOCKET_PORT=] [default: 4223]
 
 `--nats-js-domain` NATS Server Jetstream domain, defaults to `core` [env: NATS_JS_DOMAIN=]
 
