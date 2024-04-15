@@ -41,6 +41,7 @@ wasmCloud 1.0 realizes the dream of abstracting away vendor and language conside
 Final release candidates will be released throughout the March timeframe with the final cut planned for release early April. As they become available, release candidates are available in the [wasmCloud repository](https://github.com/wasmCloud/wasmCloud/releases).
 
 ### In Production
+
 Interest in wasmCloud has grown rapidly in the last couple of years. The project has attracted over 2,300 organization stars and more than 80 contributors across the organization’s 50 repositories. [Adobe](https://www.cncf.io/blog/2022/11/17/better-together-a-kubernetes-and-wasm-case-study/) and [BMW](https://www.techtarget.com/searchitoperations/news/252527414/Server-side-WebAssembly-prepares-for-takeoff-in-2023) have been running wasmCloud in production for some time, with [new industry projects](https://www.cncf.io/blog/2024/01/05/bringing-webassembly-to-telecoms-with-cncf-wasmcloud/) emerging all the time. The project is expected to reach incubation status within the CNCF this Spring.
 
 **Visit us at KubeCon + CloudNativeCon Europe 2024:**

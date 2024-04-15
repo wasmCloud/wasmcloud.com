@@ -9,9 +9,10 @@ description: "wash reg command reference"
 
 - `push`
 - `pull`
-- `ping` 
+- `ping`
 
 ### `push`
+
 Push an artifact to an OCI compliant registry. A user needs to provide a registry URL and the path to the artifact that needs to be pushed.
 
 :::warning
@@ -19,6 +20,7 @@ This subcommand will be deprecated in future versions. Please use `wash push` in
 :::
 
 #### Usage
+
 ```
 wash reg push wasmcloud.azurecr.io/example:0.0.1 /path/to/artifact
 ```
@@ -42,6 +44,7 @@ wash reg push wasmcloud.azurecr.io/example:0.0.1 /path/to/artifact
 `--insecure` Allow insecure (HTTP) registry connections
 
 ### `pull`
+
 Pull an artifact from an OCI compliant registry
 
 :::warning
@@ -49,6 +52,7 @@ This subcommand will be deprecated in future versions. Please use `wash pull` in
 :::
 
 #### Usage
+
 ```
 wash reg pull wasmcloud.azurecr.io/echo:0.3.7
 ```
@@ -72,9 +76,11 @@ wash reg pull wasmcloud.azurecr.io/echo:0.3.7
 `--insecure` Allow insecure (HTTP) registry connections
 
 ### `ping`
+
 Ping (test url) to see if the OCI url has an artifact
 
 #### Usage
+
 ```
 wash reg ping wasmcloud.azurecr.io/echo:0.3.7
 ```

@@ -26,7 +26,7 @@ Turns out, there's a great mechanism for this with [Azure Container Registry Web
 
 :::info
 
-A webhook is an HTTP-based callback function that allows lightweight, event-driven communication between 2 application programming interfaces (APIs). source: https://www.redhat.com/en/topics/automation/what-is-a-webhook
+A webhook is an HTTP-based callback function that allows lightweight, event-driven communication between 2 application programming interfaces (APIs). source: <https://www.redhat.com/en/topics/automation/what-is-a-webhook>
 
 :::
 

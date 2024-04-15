@@ -11,7 +11,6 @@ draft: false
 
 ![map - zoom in for easter eggs](/img/dist-star-system.jpg)
 
-
 When we model data structures and encode business logic into our applications, we generally use either a functional programming model or an object-oriented one. In a single process, this choice can be a matter of personal preference, but in distributed systems this choice can actually have significant impact.
 
 <!-- truncate -->
@@ -29,6 +28,7 @@ sword = new Sword();
 sword->set_condition(12);
 chest->add(sword);
 ```
+
 When everything is in a single monolithic process, we don't have to worry too much about the consequences of writing code like this. But now let's imagine this is a massively distributed backend. The `sword`, `chest`, `room`, and `player` instances could all theoretically be in different processes or even on different nodes.
 
 ![instance diagram](/img/ds_object_instances.png)
@@ -59,6 +59,6 @@ If you want to run everything like a bunch of ad-hoc activated functions that ne
 
 If you want to run your actors with state associated with each one, you can do that as well, but you can also have the modules with that code scaled out as much as you need, and state delivered to the actor when needed. Combining the power of WebAssembly components, the wasmCloud lattice clustering technology, and flexible and extensible capability providers (which can provide state) means you don't have to pick a paradigm and be stuck with it forever. You can get the best of both worlds, and have a solution that leverages the best ideas from both Akka and Erlang/OTP.
 
-You can pick one, or both, and adjust over time as your application, customer base, and capacity needs evolve. 
+You can pick one, or both, and adjust over time as your application, customer base, and capacity needs evolve.
 
 Take a look at our [getting started](/docs/tour/hello-world) guide and decide for yourself what kind of paradigm you want to use to build your next amazing distributed application.

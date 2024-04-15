@@ -57,6 +57,6 @@ We've been leaning in heavily into the [wasmCloud application deployment manager
 
 Additionally, we've been working hard on our local development story with utilities like [wash dev](https://wasmcloud.com/docs/fundamentals/actors/create-actor/update#wash-dev) which supports hot reloading actors as you write code, `wash spy` for watching all invocations that go to and from an individual actor, and `wash ui` for launching a wasmCloud dashboard from anywhere that you can establish a NATS websocket connection to your lattice. Some of these features are still marked as `--experimental` in `wash` as we iron out the ideal developer experience, and they are available for you to [try](https://wasmcloud.com/docs/installation)!
 
-## Join the Community!
+## Join the Community
 
 If you're evaluating or using wasmCloud today, please come join us in our [Community Slack](https://slack.wasmcloud.com/) to take part in the conversation, or join our community meetings [every Wednesday at 1pm](https://calendar.google.com/calendar/u/0/embed?src=c_6cm5hud8evuns4pe5ggu3h9qrs@group.calendar.google.com). This release is a milestone for wasmCloud and is infinitely better thanks to our wonderful community, and we look forward to using all your feedback into the stabilization effort.

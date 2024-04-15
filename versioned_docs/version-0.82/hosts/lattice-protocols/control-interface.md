@@ -51,8 +51,7 @@ requirements to respond whether or not they can run the provider
 }
 ```
 
-
-##### Response 
+##### Response
 
 An auction is a "scatter/gather" type operation. This means that you'll receive multiple json
 responses from all hosts until your configured timeout. If using a nats client (like the NATS CLI),
@@ -212,6 +211,7 @@ The `annotations` field is optional and can be omitted entirely.
     "error": ""
 }
 ```
+
 If the response has an `accepted` value of `true`, this means the host has accepted the request and
 will attempt to start the actor. This _does not_ guarantee the actor has started. To determine if
 the actor has started, you should monitor the lattice event stream for the `actors_started` event.
@@ -373,7 +373,7 @@ Sets the value of a config key for an actor. This will overwrite any value that 
 
 ##### Request
 
-Arbitrary bytes. This could be a string or other encoded data. 
+Arbitrary bytes. This could be a string or other encoded data.
 
 ##### Response
 

@@ -7,4 +7,4 @@ description: "Full, in-depth reference material on all aspects of wasmCloud."
 type : "docs"
 ---
 
-Here you'll find detailed reference materials on all aspects of wasmCloud. 
+Here you'll find detailed reference materials on all aspects of wasmCloud.

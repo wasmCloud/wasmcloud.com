@@ -26,12 +26,14 @@ Directories are scanned recursively for all model files ending in `.smithy` or `
 Examples:
 
 - single path
+
   ```
   # Load a model from an absolute or relative path.
   # Relative paths are relative to the location of codegen.toml.
   [[models]]
   path = "models/foo.smithy"
   ```
+
 - folder
 
   ```

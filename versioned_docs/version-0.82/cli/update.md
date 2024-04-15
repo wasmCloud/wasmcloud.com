@@ -8,6 +8,7 @@ description: "wash update command reference"
 `wash update` updates an actor running in a host to a new reference. The user may supply the actor ID, its host ID and the new OCI reference of the actor that needs to replace the actor in this actor ID.
 
 #### Usage
+
 ```
 wash update actor <host-id> <actor-id> <new-actor-reference>
 ```
@@ -26,7 +27,7 @@ wash update actor <host-id> <actor-id> <new-actor-reference>
 
 `--ctl-seed` Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
+`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details [env: WASH_CTL_CREDS]
 
 `--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 

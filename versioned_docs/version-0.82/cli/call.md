@@ -8,6 +8,7 @@ description: "wash call command reference"
 Wash call can be used to directly invoke an actor. This can be useful when debugging, especially when the actor isn't directly accessible via external channels such as HTTP. It is not recommended to use wash call in production environments.
 
 ### Usage
+
 ```
 export CLUSTER_SEED=$(wash keys gen cluster -o json | jq -r .seed)
 wash up --detached --cluster-seed $CLUSTER_SEED
@@ -29,7 +30,7 @@ wash call --cluster-seed $CLUSTER_SEED MBCFOPM6JW2APJLXJD3Z5O4CN7CPYJ2B4FTKLJUR5
 
 `--rpc-seed` Seed file or literal for RPC authentication. Must be supplied with rpc_jwt
 
-`--rpc-credsfile` Credsfile for RPC authentication. Combines rpc_seed and rpc_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details
+`--rpc-credsfile` Credsfile for RPC authentication. Combines rpc_seed and rpc_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details
 
 `--lattice-prefix`(Alias `-x`) Lattice name for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 

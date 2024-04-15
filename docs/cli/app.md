@@ -16,15 +16,17 @@ When deploying apps using [wadm](../ecosystem/wadm/index.md), the easiest way to
 - `undeploy`
 
 ### `list`
+
 This will retrieve a list of all applications that wadm knows about. Application specifications (also referred to in our documentation and code as "models") are stored in a model store and are associated to your lattice.
 
-Usage: 
+Usage:
 
 ```
 wash app list
 ```
 
 ### `get`
+
 The `get` command is used to retrieve the details for a specific version of a model. You can retrieve both the original text (e.g. YAML) that you submitted and the vetted and normalized model in JSON format.
 
 Usage:
@@ -36,6 +38,7 @@ wash app get petclinic 0.0.1 -o json
 ```
 
 ### `history`
+
 The `history` command is used to retrieve the version history of a given model. You can view all the previous versions available in store and their respective status for a given app.
 
 Usage:
@@ -46,6 +49,7 @@ wash app history petclinic
 ```
 
 ### `delete`
+
 The `delete` command is used to delete an application model of a specific version. You can optionally delete _all_ versions of a specification as well.
 
 Usage:
@@ -68,6 +72,7 @@ wash app put petclinic.yaml
 ```
 
 ### `deploy`
+
 When a version of an application specification is deployed, wadm will start monitoring the state of your lattice. Wadm will compare the desired state of an application with its current state and issue the appropriate commands to reconcile the state.
 
 Usage:
@@ -78,6 +83,7 @@ wash app deploy petclinic v0.0.1
 ```
 
 ### `undeploy`
+
 Undeploying an application spec tells wadm to stop monitoring that deployment. By default, all resources originally provisioned for an application will be removed after that application is undeployed.
 
 Usage:
@@ -87,44 +93,55 @@ wash app undeploy <name>
 wash app undeploy petclinic
 ```
 
-
 ### Options
+
 The following options can be specified with all of the above subcommands for a finer control of your environment.
 
-#### --output 
+#### --output
+
 Alias: `-o`.
         Specify output format (text or json). The default value is text.
-        
-#### --ctl-host 
+
+#### --ctl-host
+
 Alias: `-r`.
         CTL Host for connection. The default value is 127.0.0.1 for local nats [env: WASMCLOUD_CTL_HOST=]
 
 #### --experimental
+
 Whether or not to enable experimental features [env: WASH_EXPERIMENTAL=]
 
-#### --ctl-port 
+#### --ctl-port
+
 Alias: `-p`.
         CTL Port for connections, defaults to 4222 for local nats [env: WASMCLOUD_CTL_PORT=]
 
-#### --ctl-jwt 
+#### --ctl-jwt
+
 JWT file for CTL authentication. Must be supplied with ctl_seed [env: WASMCLOUD_CTL_JWT]
 
-#### --ctl-seed 
+#### --ctl-seed
+
 Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-#### --ctl-credsfile 
-Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
+#### --ctl-credsfile
 
-#### --js-domain 
+Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details [env: WASH_CTL_CREDS]
+
+#### --js-domain
+
 JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-#### --lattice-prefix 
+#### --lattice-prefix
+
 Alias: `-x`.
         Lattice name for wasmCloud control interface. The default value is "default". [env: WASMCLOUD_LATTICE_PREFIX=]
 
-#### --timeout-ms 
+#### --timeout-ms
+
 Alias: `-t`.
         Timeout length to await a control interface response. The default value is 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
-#### --context 
+#### --context
+
 Path to a context with values to use for CTL connection and authentication

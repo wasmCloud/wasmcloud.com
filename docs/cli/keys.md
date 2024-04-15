@@ -11,8 +11,8 @@ This command helps a user to generate NATS keys and manage them. Following are t
 - `get`
 - `list`
 
-
 ### `gen`
+
 `gen`, short for generate. will generate a secret and public key pair. The type of key pair needs to be specified. The following key types can be used:
 
 - account
@@ -24,28 +24,34 @@ This command helps a user to generate NATS keys and manage them. Following are t
 - cluster
 
 #### Usage
+
 ```
 wash keys gen user
 wash keys gen server
 ```
 
 ### `get`
+
 This subcommand retrieves a key pair and prints its contents.
 
 #### Usage
+
 ```
 wash keys get example_module
 ```
 
 ### `list`
+
 Keys generated are stored in `$HOME/.wash/keys`. This subcommand retrieves all the keys stored in this directory. A different keys directory can be specified using the `--directory` flag.
 
 #### Usage
+
 ```
 wash keys list
 ```
 
 #### Options
+
 `--directory` (Alias `-d`) Absolute path to where keypairs are stored. Defaults to `$HOME/.wash/keys` [env: WASH_KEYS]
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]

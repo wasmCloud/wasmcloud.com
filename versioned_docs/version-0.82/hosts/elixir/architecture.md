@@ -19,7 +19,7 @@ In this diagram, `Mxxx` represents an actor (an actor's public key is a 56-chara
 
 The unit of deployment is the single OTP application. See the [GitHub repository](https://github.com/wasmcloud/wasmcloud-otp) for details and specifics of how this application is deployed, including instructions for use with Docker.
 
-Inside each deployed Elixir wasmCloud host, there is a process supervisor called the **Virtual Host**. Beneath this supervisor are two more supervisors: the **Actor Supervisor** and the **Provider Supervisor**. In turn, each of these supervise individual processes for actors and providers. 
+Inside each deployed Elixir wasmCloud host, there is a process supervisor called the **Virtual Host**. Beneath this supervisor are two more supervisors: the **Actor Supervisor** and the **Provider Supervisor**. In turn, each of these supervise individual processes for actors and providers.
 
 The actor process contains a [NIF](https://www.erlang.org/doc/tutorial/nif.html)-based instance of the [Rust](https://github.com/wasmcloud/wasmcloud) runtime responsible for loading and managing WebAssembly modules and components.
 

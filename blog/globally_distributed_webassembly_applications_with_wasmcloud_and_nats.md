@@ -39,9 +39,9 @@ A [Leaf Node](https://docs.nats.io/running-a-nats-service/configuration/leafnode
 
 wasmCloud uses NATS in a multitude of ways. To name a few:
 
-1.  Request/reply messaging for remote procedure calls between actors and capability providers. Additionally this is used for the [control interface](https://github.com/wasmCloud/control-interface-client/), which allows for remote managing of actors, providers, and hosts via [wash](https://github.com/wasmCloud/wash).
-2.  Jetstream to persist link definitions and claims so that they are durable and automatically delivered to new wasmCloud hosts joining an existing lattice
-3.  Communication with a wasmCloud configuration service and the soon-to-come application deployment manager ([wadm](https://github.com/wasmCloud/wadm))
+1. Request/reply messaging for remote procedure calls between actors and capability providers. Additionally this is used for the [control interface](https://github.com/wasmCloud/control-interface-client/), which allows for remote managing of actors, providers, and hosts via [wash](https://github.com/wasmCloud/wash).
+2. Jetstream to persist link definitions and claims so that they are durable and automatically delivered to new wasmCloud hosts joining an existing lattice
+3. Communication with a wasmCloud configuration service and the soon-to-come application deployment manager ([wadm](https://github.com/wasmCloud/wadm))
 
 # Gathering Prerequisites
 
@@ -183,7 +183,6 @@ See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/
 
 Once everything completes, check out a pet picture at [http://127.0.0.1:8081](http://127.0.0.1:8081)! You can refresh to your heart's desire to see pictures of cats and dogs, and you've deployed your application on wasmCloud.
 
-[^2]: When using Jetstream domains, NATS maps some internally used topics to use the topic specific to that Jetstream domain. At the wasmCloud level, this would enable you to reuse the same NATS infrastructure on completely different domains and lattice names for multi-tenancy, but it's not necessary to know these details for today's example.
 
 # Turning the Knob from Local to Global
 

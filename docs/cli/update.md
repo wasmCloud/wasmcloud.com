@@ -8,6 +8,7 @@ description: "wash update command reference"
 `wash update` updates a component running in a host to a new reference. The user may supply the component ID, its host ID and the new OCI reference of the component that needs to replace the component in this component ID.
 
 #### Usage
+
 ```
 wash update component <host-id> <component-id> <new-component-reference>
 ```
@@ -26,7 +27,7 @@ wash update component <host-id> <component-id> <new-component-reference>
 
 `--ctl-seed` Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
+`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details [env: WASH_CTL_CREDS]
 
 `--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 

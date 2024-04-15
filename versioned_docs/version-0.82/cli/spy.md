@@ -8,12 +8,14 @@ description: "wash spy command reference"
 This command will spy on all invocations between an actor and its linked providers. This is an experimental command and needs the `--experimental` flag passed to it. The user will pass the actor ID or actor name to this command to spy on. If an actor name is passed, it will be resolved to an ID. If multiple actors have the same name, the user will be prompted to pick the desired one.
 
 ### Usage
+
 ```
 wash spy <actor-id> --experimental
 wash spy <actor-name> --experimental
 ```
 
 ### Options
+
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
 
 `--ctl-host` (Alias `-r`) CTL Host for connection, defaults to 127.0.0.1 for local nats [env: WASMCLOUD_CTL_HOST=]
@@ -26,7 +28,7 @@ wash spy <actor-name> --experimental
 
 `--ctl-seed` Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
+`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details [env: WASH_CTL_CREDS]
 
 `--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 

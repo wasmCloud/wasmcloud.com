@@ -5,7 +5,7 @@ sidebar_position: 12
 description: "wash inspect command reference"
 ---
 
-`wash inspect` helps you to examine the metadata of a wasmCloud component. 
+`wash inspect` helps you to examine the metadata of a wasmCloud component.
 
 `wash inspect` accepts the path to the wasmCloud component or provider and prints out the properties of that component.
 

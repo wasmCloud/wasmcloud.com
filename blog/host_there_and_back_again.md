@@ -20,6 +20,7 @@ Code that came before isn't intrinsically bad. Decisions made before that result
 This post is a blameless reflection on our host's journey so far.
 
 ## The Journey Begins
+
 The first version of wasmCloud's host runtime predates the name **wasmCloud**. It was a wafer thin Rust application that loaded wasmCloud actors built with WebAssembly and our own proprietary ABI (because there weren't any proposals for robust guest/host communication back then). It didn't have any networking support, and so our nearly 3-year old runtime resembles some of the runtimes currently available today that offer microservice or serverless options in silo'd runtime hosts.
 
 We then added the ability for multiple hosts to coexist within the same logical network (called a `lattice`), which created two code paths for every action the host performed: local or remote.
@@ -29,6 +30,7 @@ From here we added more and more functionality, including support for a control 
 Roughly two years ago we made a choice to try and reverse that effort ratio. Back in June of 2021, we decided to switch from Rust to Elixir, as outlined in this [Architectural Decision Record](https://wasmcloud.github.io/adr/0010-otp.html). Since then, we've had two years to experience Elixir/OTP in real-world, production scenarios. We've gathered evidence, used that ecosystem "in anger", and exposed that codebase to more and more people as our team has grown from the original 2021 creators to the large community we enjoy today.
 
 ## The Journey Continues
+
 Today we're revisiting the decision to switch from Rust to Elixir, but why? As I mentioned at the beginning of the post, successful teams constantly revisit the assumptions that led them down their current path.
 
 In our case, the assumptions come down to environment, knowledge, experience, and learning things the hard way. One of the main lessons we learned is that Elixir applications aren't really designed to be run and deployed like "consumer apps", shrink-wrapped and distributed ready to go. Elixir apps are find far more suitable homes on curated server environments. The developer experience of running an Elixir app and the team experience of building, testing, deploying (and lately cross-compiling), is very high-friction.
@@ -46,4 +48,5 @@ Given the current circumstances, the current makeup of the team, the current int
 This doesn't mean that Elixir/OTP was the wrong choice 2 years ago. It means that we've applied two years of learning and critical thinking to our decisions. This is why we've created [this RFC](https://github.com/wasmCloud/wasmCloud/issues/324), where we'd love to hear from the community about this decision and the road that led us here.
 
 ## The Bright Future
+
 Everything that we've learned up to this point, including the things we've learned the hard way, has paved the road for what lies ahead. We couldn't be more excited about the tools, technologies, and frameworks available to use today to build the future of distributed computing.

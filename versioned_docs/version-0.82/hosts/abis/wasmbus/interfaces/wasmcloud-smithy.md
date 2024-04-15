@@ -93,7 +93,7 @@ structure Point {
 
 Most structure members are optional by default.
 
-The [`@box` trait ](https://awslabs.github.io/smithy/1.0/spec/core/type-refinement-traits.html#box-trait) for a structure member means that it is not required to be present, and there is no default value. A boxed structure member would be emitted in Rust code with an `Option<>` wrapper.
+The [`@box` trait](https://awslabs.github.io/smithy/1.0/spec/core/type-refinement-traits.html#box-trait) for a structure member means that it is not required to be present, and there is no default value. A boxed structure member would be emitted in Rust code with an `Option<>` wrapper.
 
 The types boolean, byte, short, integer, long, float, and double types are not boxed unless they have an explicit `@box` annotation, in other words, without `@box` these types are required. All other types (string, list, map, structure, etc.) are implicitly boxed and without annotation would be optional.
 

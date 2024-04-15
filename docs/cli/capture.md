@@ -5,13 +5,14 @@ sidebar_position: 4
 description: "wash capture command reference"
 --- 
 
-Wash capture helps in capturing snapshots of the state of a lattice and assists in debugging cluster invocations using operations like replay. This is currently an experimental feature and you would have to pass the `--experimental` flag or set the `WASH_EXPERIMENTAL` environment variable to true. This tool provides three options - enable capture mode, disable capture mode or replay a captured file. A user must first enable capture mode by passing the `--enable` flag. Once capture mode is enabled, a user can capture snapshots at any time by running `wash capture --experimental`, which will download the snapshot file to the current directory. The snapshot files can be viewed by passing the file path to the `replay` subcommand. To disable capture mode, pass the `--disable` flag. 
+Wash capture helps in capturing snapshots of the state of a lattice and assists in debugging cluster invocations using operations like replay. This is currently an experimental feature and you would have to pass the `--experimental` flag or set the `WASH_EXPERIMENTAL` environment variable to true. This tool provides three options - enable capture mode, disable capture mode or replay a captured file. A user must first enable capture mode by passing the `--enable` flag. Once capture mode is enabled, a user can capture snapshots at any time by running `wash capture --experimental`, which will download the snapshot file to the current directory. The snapshot files can be viewed by passing the file path to the `replay` subcommand. To disable capture mode, pass the `--disable` flag.
 
 :::info
 This is an experimental command so some features may not work as expected. Please drop a bug fix or feature request in the form of a pull request in our [GitHub repository](https://github.com/wasmCloud/wasmCloud).
 :::
 
 ### Usage
+
 ```
 wash capture --enable --experimental
 wash capture --experimental
@@ -39,7 +40,7 @@ wash capture replay --experimental /path/to/captured-file
 
 `--ctl-seed` Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
+`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details [env: WASH_CTL_CREDS]
 
 `--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
@@ -48,7 +49,6 @@ wash capture replay --experimental /path/to/captured-file
 `--timeout-ms` Timeout length to await a control interface response, defaults to 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
 `--context` Path to a context with values to use for CTL connection and authentication
-
 
 The following options can be passed for the `replay` subcommand.
 

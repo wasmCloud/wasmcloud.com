@@ -38,28 +38,28 @@ This is the actor we get "out of the box":
 package main
 
 import (
-	"github.com/wasmcloud/actor-tinygo"
-	"github.com/wasmcloud/interfaces/httpserver/tinygo"
+ "github.com/wasmcloud/actor-tinygo"
+ "github.com/wasmcloud/interfaces/httpserver/tinygo"
 )
 
 func main() {
-	me := Kvcounter{}
-	actor.RegisterHandlers(httpserver.HttpServerHandler(&me))
+ me := Kvcounter{}
+ actor.RegisterHandlers(httpserver.HttpServerHandler(&me))
 }
 
 type Kvcounter struct{}
 
 func (e *Kvcounter) HandleRequest(
-	ctx *actor.Context,
-	req httpserver.HttpRequest)
-	(*httpserver.HttpResponse, error) {
-	r := httpserver.HttpResponse{
-		StatusCode: 200,
-		Header:     make(httpserver.HeaderMap, 0),
-		Body:       []byte("hello"),
-	}
+ ctx *actor.Context,
+ req httpserver.HttpRequest)
+ (*httpserver.HttpResponse, error) {
+ r := httpserver.HttpResponse{
+  StatusCode: 200,
+  Header:     make(httpserver.HeaderMap, 0),
+  Body:       []byte("hello"),
+ }
 
-	return &r, nil
+ return &r, nil
 }
 ```
 
@@ -77,36 +77,36 @@ This will modify our `go.mod` file to contain the new interface. Now let's creat
 
 ```go
 func (e *Kvcounter) HandleRequest(
-	ctx *actor.Context,
-	req httpserver.HttpRequest) (*httpserver.HttpResponse, error) {
+ ctx *actor.Context,
+ req httpserver.HttpRequest) (*httpserver.HttpResponse, error) {
 
-	key := strings.Replace(req.Path, "/", "_", -1)
+ key := strings.Replace(req.Path, "/", "_", -1)
 
-	kv := keyvalue.NewProviderKeyValue()
+ kv := keyvalue.NewProviderKeyValue()
 
-	count, err := kv.Increment(ctx, keyvalue.IncrementRequest{
-		Key: key, Value: 1,
-	})
-	if err != nil {
-		return InternalServerError(err), nil
-	}
+ count, err := kv.Increment(ctx, keyvalue.IncrementRequest{
+  Key: key, Value: 1,
+ })
+ if err != nil {
+  return InternalServerError(err), nil
+ }
 
-	res := "{\"counter\": " + strconv.Itoa(int(count)) + "}"
+ res := "{\"counter\": " + strconv.Itoa(int(count)) + "}"
 
-	r := httpserver.HttpResponse{
-		StatusCode: 200,
-		Header:     make(httpserver.HeaderMap, 0),
-		Body:       []byte(res),
-	}
-	return &r, nil
+ r := httpserver.HttpResponse{
+  StatusCode: 200,
+  Header:     make(httpserver.HeaderMap, 0),
+  Body:       []byte(res),
+ }
+ return &r, nil
 }
 
 func InternalServerError(err error) *httpserver.HttpResponse {
-	return &httpserver.HttpResponse{
-		StatusCode: 500,
-		Header:     make(httpserver.HeaderMap, 0),
-		Body:       []byte(err.Error()),
-	}
+ return &httpserver.HttpResponse{
+  StatusCode: 500,
+  Header:     make(httpserver.HeaderMap, 0),
+  Body:       []byte(err.Error()),
+ }
 }
 ```
 

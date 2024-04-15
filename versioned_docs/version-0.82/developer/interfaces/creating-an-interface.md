@@ -248,9 +248,11 @@ You can type `make` to generate the code and build the Rust library.
 
 :::info[Note]
 You will need [`rustfmt`](https://github.com/rust-lang/rustfmt) installed to successfully run `make`. To install with `rustup`:  
+
 ```shell
 rustup component add rustfmt
 ```
+
 :::
 
 Now that we have a Rust crate that we can use from both our actor and our capability provider, let's move on to the next step: [_Creating a Capability Provider in Rust_](/docs/developer/providers/rust).

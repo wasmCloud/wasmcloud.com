@@ -8,6 +8,7 @@ description: "wash down command reference"
 This command will stop all the resources started by `wash up`. Primarily, it will stop the wasmCloud host and NATS leaf that were started on your local machine. If there is a single host running on your machine, `wash down` will stop that singular host. In case of multiple hosts, the user gets a choice to stop a specific host or all the running hosts on the system. To stop a specific host in a multiple host scenario, pass the `--host-id` flag to the command. To stop currently running hosts, pass the `--all` flag.
 
 ### Usage
+
 ```
 # For a singular host
 wash down 
@@ -20,6 +21,7 @@ wash down --all
 ```
 
 ### Options
+
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
 
 `--lattice-prefix` (Alias `-x`) A lattice name is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE_PREFIX=] [default: default]

@@ -29,9 +29,9 @@ build_artifact = "http.wasm"
 destination = "http_s.wasm"
 ```
 
-If you use the `build_command` field, you must also specify the `build_artifact`: the Wasm artifact that will be produced by the build command. This provides `wash build` with a target for signing the artifact. You can use the `destination` field to specify a filename and location for the signed artifact. 
+If you use the `build_command` field, you must also specify the `build_artifact`: the Wasm artifact that will be produced by the build command. This provides `wash build` with a target for signing the artifact. You can use the `destination` field to specify a filename and location for the signed artifact.
 
-:::info[Note] 
+:::info[Note]
 The `build_command` field does not have full support for environment variables or multiple commands and should be in the form of "command arg1 arg2 arg...". Use an external script to handle more complex build commands.  
 :::
 

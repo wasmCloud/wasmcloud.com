@@ -8,11 +8,13 @@ description: "wash dev command reference"
 Starts a local dev loop for a component. Takes a local `wasmcloud.toml` file to deploy the sepcified component and accepts a host ID to specify the host to deploy on. This is an experimental feature and needs `--experimental` flag to run.
 
 ### Usage
+
 ```
 wash dev --experimental --host-id=<your-host-id>
 ```
 
 ### Options
+
 `--nats-credsfile`Optional path to a NATS credentials file to authenticate and extend existing NATS infrastructure [env: NATS_CREDSFILE=]
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
@@ -23,7 +25,7 @@ wash dev --experimental --host-id=<your-host-id>
 
 `--nats-connect-only` If a connection can't be established, exit and don't start a NATS server. Will be ignored if a remote_url and credsfile are specified [env: NATS_CONNECT_ONLY=]
 
-`--nats-version` NATS server version to download, e.g. `v2.7.2`. See https://github.com/nats-io/nats-server/releases/ for releases [env: NATS_VERSION=] [default: v2.9.14]
+`--nats-version` NATS server version to download, e.g. `v2.7.2`. See <https://github.com/nats-io/nats-server/releases/> for releases [env: NATS_VERSION=] [default: v2.9.14]
 
 `--nats-host` NATS server host to connect to [env: NATS_HOST=] [default: 127.0.0.1]
 
@@ -33,7 +35,7 @@ wash dev --experimental --host-id=<your-host-id>
 
 `--nats-js-domain` NATS Server Jetstream domain, defaults to `core` [env: NATS_JS_DOMAIN=]
 
-`--wasmcloud-version` wasmCloud host version to download, e.g. `v0.80.0`. See https://github.com/wasmCloud/wasmCloud/releases for releases [env: WASMCLOUD_VERSION=] [default: v0.80.0]
+`--wasmcloud-version` wasmCloud host version to download, e.g. `v0.80.0`. See <https://github.com/wasmCloud/wasmCloud/releases> for releases [env: WASMCLOUD_VERSION=] [default: v0.80.0]
 
 `--lattice-prefix` (Alias `-x`) ALattice name for wasmCloud control interface, defaults to "default" [env: WASMCLOUD_LATTICE_PREFIX=]
 
@@ -89,7 +91,7 @@ wash dev --experimental --host-id=<your-host-id>
 
 `--wasmcloud-start-only` If enabled, wasmCloud will not be downloaded if it's not installed
 
-`--wadm-version` wadm version to download, e.g. `v0.4.0`. See https://github.com/wasmCloud/wadm/releases for releases [env: WADM_VERSION=] [default: v0.7.1]
+`--wadm-version` wadm version to download, e.g. `v0.4.0`. See <https://github.com/wasmCloud/wadm/releases> for releases [env: WADM_VERSION=] [default: v0.7.1]
 
 `--disable-wadm` Disables wadm
 

@@ -17,6 +17,7 @@ Wash get helps you in retrieving information about your lattice. It can help you
 This subcommand will retrieve all the known links in the lattice. It will give you information about them such as the link name, the associated component and provider ID and its contract ID.
 
 #### Usage
+
 ```
 wash get links
 ```
@@ -52,8 +53,8 @@ This subcommand queries the lattice for its claims cache. It retrieves the issue
 wash get claims
 ```
 
-
 #### Options
+
 The following options can be used for all subcommands under `wash get`:
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
@@ -68,7 +69,7 @@ The following options can be used for all subcommands under `wash get`:
 
 `--ctl-seed` Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/developing-with-nats/security/creds for details [env: WASH_CTL_CREDS]
+`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See <https://docs.nats.io/developing-with-nats/security/creds> for details [env: WASH_CTL_CREDS]
 
 `--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 

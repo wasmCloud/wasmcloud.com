@@ -12,31 +12,38 @@ This command will assist you to add remove and query all the links in the lattic
 - `del`
 
 ### `query`
+
 Queries all the links in the lattice. Links persist in the lattice even if the associated component or provider are stopped.
 
 #### Usage
+
 ```
 wash link query
 ```
 
 ### `put`
+
 Adds a link definition in the lattice associated with a component and provider and having an associated contract. If you want to name the link, you may pass a value to the `--link-name` flag. Be default, the link name is "default".
 
 #### Usage
+
 ```
 wash link put <component-id> <provider-id> <contract-id>
 ```
 
 ### `del`
+
 Deletes a link definition in the lattice. If it is named other than "default" the link name can be passed to the `--link-name` flag.
 
 #### Usage
+
 ```
 wash link del <component-id> <contract-id>
 ```
 
 #### Options
-These options can be used for all of the `wash link` subcommands. 
+
+These options can be used for all of the `wash link` subcommands.
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
 
@@ -50,7 +57,7 @@ These options can be used for all of the `wash link` subcommands.
 
 `--ctl-seed` Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
+`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details [env: WASH_CTL_CREDS]
 
 `--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 

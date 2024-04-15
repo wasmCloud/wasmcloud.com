@@ -27,7 +27,7 @@ wash call echo wasi:cli/run.run --bin s
 
 `--rpc-seed` Seed file or literal for RPC authentication. Must be supplied with rpc_jwt
 
-`--rpc-credsfile` Credsfile for RPC authentication. Combines rpc_seed and rpc_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_RPC_CREDS]
+`--rpc-credsfile` Credsfile for RPC authentication. Combines rpc_seed and rpc_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details [env: WASH_RPC_CREDS]
 
 `--lattice`(Alias `-x`) Lattice for wasmcloud command interface, defaults to "default" [env: WASMCLOUD_LATTICE=]
 

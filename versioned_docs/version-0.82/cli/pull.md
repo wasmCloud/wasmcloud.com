@@ -8,6 +8,7 @@ description: "wash pull command reference"
 This command pulls an artifact from an OCI compliant registry.
 
 #### Usage
+
 ```
 wash pull wasmcloud.azurecr.io/echo:0.3.7
 ```

@@ -8,6 +8,7 @@ description: "wash push command reference"
 Push an artifact to an OCI compliant registry. A user needs to provide a registry URL and the path to the artifact that needs to be pushed.
 
 #### Usage
+
 ```
 wash push wasmcloud.azurecr.io/example:0.0.1 /path/to/artifact
 ```

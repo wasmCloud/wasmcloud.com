@@ -11,32 +11,38 @@ description: "wash stop command reference"
 - `provider`
 - `host`
 
-
 ### `component`
-Stop a component running in a host 
+
+Stop a component running in a host
 
 #### Usage
+
 ```
 wash stop component <host-id> <component-id>
 ```
 
 ### `provider`
-Stop a provider running in a host 
+
+Stop a provider running in a host
 
 #### Usage
+
 ```
 wash stop provider <host-id> <component-id> <link-name> <contract-id>
 ```
 
 ### `host`
+
 Purge and stop a running host. You may pass the `--host-timeout` flag to specify the time to give the host for a graceful shutdown. By default it is 2000 ms.
 
 #### Usage
+
 ```
 wash stop host <host-id>
 ```
 
 #### Options
+
 The following options can be used for all subcommands of `wash stop`.
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
@@ -51,7 +57,7 @@ The following options can be used for all subcommands of `wash stop`.
 
 `--ctl-seed` Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
+`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details [env: WASH_CTL_CREDS]
 
 `--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
@@ -62,4 +68,3 @@ The following options can be used for all subcommands of `wash stop`.
 `--context` Path to a context with values to use for CTL connection and authentication
 
 `--skip-wait` By default, the command will wait until the component/provider has been started. If this flag is passed, the command will return immediately after acknowledgement from the host, without waiting for the provider to start. If this flag is omitted, the timeout will be adjusted to 30 seconds to account for provider download times and  5 seconds to account for component download times.
-

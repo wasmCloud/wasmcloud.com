@@ -8,6 +8,7 @@ description: "wash scale command reference"
 `wash scale` supports scaling the components in your lattice to handle concurrent requests. It accepts the host ID on which the component is running and the reference of the component to scale as required arguments. It also accepts a `--max-concurrent` value that specifies the maximum number of instances this component can run concurrently. By default, the value is an unbounded level of concurrency. A value of zero is equivalent to stopping the component.
 
 ### Usage
+
 ```
 wash scale component <your-host-id> wasmcloud.azurecr.io/echo:0.3.7
 wash scale component <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concurrent=20
@@ -17,6 +18,7 @@ wash scale component <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concur
 ```
 
 ### Options
+
 `--output` (Alias `-o`) Specify output format (`text` or `json`) [default: `text`]
 
 `--ctl-host` (Alias `-r`) CTL Host for connection, defaults to 127.0.0.1 for local nats [env: WASMCLOUD_CTL_HOST=]
@@ -29,7 +31,7 @@ wash scale component <your-host-id> wasmcloud.azurecr.io/echo:0.3.7 --max-concur
 
 `--ctl-seed` Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
+`--ctl-credsfile` Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See <https://docs.nats.io/using-nats/developer/connecting/creds> for details [env: WASH_CTL_CREDS]
 
 `--js-domain` JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
