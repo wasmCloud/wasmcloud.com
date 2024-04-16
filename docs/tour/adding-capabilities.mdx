@@ -156,18 +156,23 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
 
   // Access the outgoing response body
   let outgoingBody = outgoingResponse.body();
-  // Create a stream for the response body
-  let outputStream = outgoingBody.write();
-  // Write "hello [name]" to the response stream // [!code ++]
-  const name = getNameFromPath(req.pathWithQuery() || "") // [!code ++]
-  outputStream.blockingWriteAndFlush(
-    new Uint8Array(new TextEncoder().encode("hello from Typescript")) // [!code --]
-    new Uint8Array(new TextEncoder().encode(`hello ${name}!`)) // [!code ++]
-  );
+  {
+    // Create a stream for the response body
+    let outputStream = outgoingBody.write();
+    const name = getNameFromPath(req.pathWithQuery() || "") // [!code ++]
+    // Write "hello [name]" to the response stream // [!code ++]
+    outputStream.blockingWriteAndFlush(
+      new Uint8Array(new TextEncoder().encode("hello from Typescript")) // [!code --]
+      new Uint8Array(new TextEncoder().encode(`hello ${name}!`)) // [!code ++]
+    );
+    // @ts-ignore: This is required in order to dispose the stream before we return
+    outputStream[Symbol.dispose]();
+  }
 
   // Set the status code for the response
   outgoingResponse.setStatusCode(200);
-
+  // Finish the response body
+  OutgoingBody.finish(outgoingBody, undefined);
   // Set the created response
   ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
 }
@@ -381,9 +386,7 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
 
   // Access the outgoing response body
   let outgoingBody = outgoingResponse.body();
-  // Create a stream for the response body
-  let outputStream = outgoingBody.write();
-  // Write to the response stream // [!code ++:12]
+  // Write to the response stream // [!code ++:8]
   const name = getNameFromPath(req.pathWithQuery() || '');
 
   log('info', '', `Greeting ${name}`);
@@ -392,13 +395,21 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
   const bucket = open('');
   const count = increment(bucket, name, 1);
 
-  outputStream.blockingWriteAndFlush(
-    new Uint8Array(new TextEncoder().encode(`Hello x${count}, ${name}!\n`)),
-  );
+  {
+    // Create a stream for the response body
+    let outputStream = outgoingBody.write();
+    // Write hello world to the response stream
+    outputStream.blockingWriteAndFlush(
+      new Uint8Array(new TextEncoder().encode(`Hello x${count}, ${name}!\n`)), // [!code ++]
+    );
+    // @ts-ignore: This is required in order to dispose the stream before we return
+    outputStream[Symbol.dispose]();
+  }
 
   // Set the status code for the response
   outgoingResponse.setStatusCode(200);
-
+  // Finish the response body
+  OutgoingBody.finish(outgoingBody, undefined);
   // Set the created response
   ResponseOutparam.set(resp, { tag: 'ok', val: outgoingResponse });
 }
