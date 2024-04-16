@@ -46,10 +46,15 @@ spec:
       type: component
       properties:
         image: wasmcloud.azurecr.io/echo:0.3.8
+        id: echo
+        config:
+          - name: default-language
+            properties:
+              lang: en-US
       traits: ...
 ```
 
-The `image` property of the `component` component contains a file reference, an OCI image reference URL, or a Bindle image reference. When you attempt to store this model, wadm will reach out to the artifact repository and attempt to pull some metadata about that image (such as its primary key, embedded security information, etc). This means that storing application specifications with invalid/unreachable OCI references is not allowed.
+The `image` property of the `component` component contains a file reference, an OCI image reference URL, or a Bindle image reference. The `id` property is an optional unique identifier you can assign your component. Generally, unless you have a reason to, it's recommended to omit the `id` property and let wadm assign a generated identifier for you which is a combination of the manifest name and the component name. Configuration specified here for the component will be available to the component at runtime via the [wasi-runtime-config](https://github.com/WebAssembly/wasi-runtime-config) interface.
 
 To launch a component from a local file, you should prefix the path with `file://`, as follows:
 
@@ -64,7 +69,7 @@ spec:
 ```
 
 :::info
-When launching a component from a local file, ensure that the environment variable `WASMCLOUD_ALLOW_FILE_LOAD=true` is set when you launch wasmCloud. This is the default for hosts running with `wash up`. Only absolute paths are supported, since clients cannot reliably assume which directory the target host was started from. When running hosts locally with `wash up` for development, however, it is possible to use relative paths (which the host then converts to an absolute path) for convenience.
+When launching a component from a local file, ensure that the environment variable `WASMCLOUD_ALLOW_FILE_LOAD=true` is set when you launch wasmCloud. This is the default for hosts running with `wash up`. Only absolute paths are supported, since clients cannot reliably assume which directory the target host was started from. When running hosts locally with `wash up` for development, however, it is possible to use relative paths (which is converted to an absolute path) for convenience.
 :::
 
 To define a **capability provider**, we include a `capability` component, as follows:
@@ -74,9 +79,14 @@ To define a **capability provider**, we include a `capability` component, as fol
       type: capability
       properties:
         image: ghcr.io/wasmcloud/keyvalue-redis:0.23.0
+        id: kvredis
+        config:
+          - name: url
+            properties:
+              url: redis://127.0.0.1:6379
 ```
 
-Just like when manipulating a lattice _imperatively_, the things that differentiate one capability provider from another are its contract and its public key (which we obtain by looking up the `image`).
+Just like when manipulating a lattice _imperatively_, the thing that differentiate one capability provider from another is its `id`, which can be specified here or ommitted in favor of wadm generating an identifier (recommended.). Configuration can be specified here for the provider and it will be accessible at runtime via the data passed to the provider, see the [keyvalue-redis](https://github.com/wasmCloud/wasmCloud/blob/main/crates/provider-keyvalue-redis/src/lib.rs#L64) provider for example usage.
 
 ## Traits
 
@@ -99,13 +109,13 @@ traits:
     replicas: 4
     spread:
         - name: eastcoast
-        requirements:
+          weight: 80
+          requirements:
             zone: us-east-1
-        weight: 80
         - name: westcoast
-        requirements:
+          weight: 20
+          requirements:
             zone: us-west-1
-        weight: 20
 ```
 
 This definition states that, for this component (a spread scaler can apply to a `component` or `capability`), you want a total of 4 instances, with 80% of them going to hosts with the `zone` label set to `us-east-1` and 20% of them going to hosts with the `zone` label set to `us-west-1`. Because this system uses labels as selectors, and you can set any arbitrary label on your hosts, you can define practically any conditions for the spread rules.
@@ -145,7 +155,7 @@ Note that this looks similar to the above `spreadscaler` spec, but the `daemonsc
 The `daemonscaler` works just like a Kubernetes DaemonSet, spreading components across all hosts that match the label requirements.
 :::
 
-### Link Definition
+### Links
 
 The `link` trait links two components together with a set of configuration values.
 
@@ -157,8 +167,8 @@ The `link` trait links two components together with a set of configuration value
     namespace: wasi
     package: keyvalue
     interfaces:
-      - atomic
-      - eventual
+      - atomics
+      - store
     target_config:
       - name: redis-connect-local
         properties:
@@ -166,6 +176,10 @@ The `link` trait links two components together with a set of configuration value
 ```
 
 The value of the `target` field is a _component_ whose `name` field matches that. The `values` is a simple key-value map that will be passed as link definition configuration data at deployment time. Note that the value here **must be a string**, so if you're passing a value like "false" or "125" ensure that you wrap it in single or double quotes.
+
+:::info[Target vs source configuration]
+Links include both a `target_config` and a `source_config` field for providing configuration. This can be used to provide configuration values to just the component that needs them. For example, in the above snippet, the _target_ of the link is the Redis provider which needs to know what URL to connect to, and the _source_ of the link is a component that doesn't need that configuration. This is very important for security sensitive configuration that you don't want to expose unnecessarily to additional components.
+:::
 
 ### Putting it All Together
 
@@ -198,8 +212,8 @@ spec:
             namespace: wasi
             package: keyvalue
             interfaces:
-              - atomic
-              - eventual
+              - atomics
+              - store
             target_config:
               - name: redis-connect-local
                 properties:
@@ -230,5 +244,3 @@ spec:
       properties:
         image: ghcr.io/wasmcloud/keyvalue-redis:0.23.0
 ```
-
-⚠️ _NOTE_: while wadm can "claim" resources like components and providers and differentiate between wadm-managed versus unmanaged, this is not so with link definitions. If you manually push new link definition information that overrides or conflicts with the link definitions in your wadm spec, you could experience unexpected behavior until wadm corrects for it. You must take extreme care that wadm-managed link definitions don't conflict with external link definitions.
