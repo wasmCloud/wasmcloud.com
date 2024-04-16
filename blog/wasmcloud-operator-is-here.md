@@ -1,6 +1,6 @@
 ---
 title: 'wasmCloud-operator: Cosmonic Open Sources Controller to Bring Community Wasm to K8s'
-image: '/img/wasmcloud.operator.kubernetes.jpg'
+image: '/img/wasmcloud-operator-kubernetes.jpg'
 date: 2024-04-16T11:00:00-05:00
 author: 'Brooks Townsend'
 description: "OSSNA: Cosmonic releases wasmCloud-operator to Bring Community Wasm to K8s"
