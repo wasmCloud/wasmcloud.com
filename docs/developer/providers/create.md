@@ -76,7 +76,7 @@ world provider-messaging-nats {
 }
 ```
 
-For each `import` in the provider's `world`, you'll use an external trigger in order to invoke that function on a WebAssembly component dynamically at runtime. Here we import the `handler` interface, and we're going to invoke a [linked](/docs/1.0/concepts/runtime-linking) component any time we receive a message on a NATS subscription.
+For each `import` in the provider's `world`, you'll use an external trigger in order to invoke that function on a WebAssembly component dynamically at runtime. Here we import the `handler` interface, and we're going to invoke a [linked](/docs/concepts/runtime-linking) component any time we receive a message on a NATS subscription.
 
 For each `export` in the provider's `world`, you'll need to implement a function to handle the functionality of that interface. WebAssembly components will be able to invoke exported functions dynamically at runtime. Here, we export the entire `consumer` interface, so we'll need to implement the `publish` and `request` functionality in the provider.
 
