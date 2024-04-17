@@ -16,3 +16,5 @@ To test a provider, we can run it in a local wasmCloud environment, interacting 
 4. Link the component in your Wadm manifest.
 
 5. Invoke the component.
+
+To see an example of this, refer to the [create](/docs/developer/providers/create.md#testing-the-provider) section for capability providers.
