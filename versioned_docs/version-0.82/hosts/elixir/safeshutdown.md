@@ -1,5 +1,5 @@
 ---
-title: "Safe Shutdown"
+title: 'Safe Shutdown'
 date: 2021-08-18T11:02:05+06:00
 sidebar_position: 12
 draft: false
@@ -13,7 +13,7 @@ In most cases, initiating a safe shutdown of the wasmCloud host runtime is quick
 
 ### Stopping the Background Daemon
 
-If you started the wasmCloud host runtime via [wash](/docs/installation), you can simply run `wash down` in order to clean up running processes in the background. If you started the host runtime using the [manual host guide](/docs/hosts/elixir/running), you'll need to send the process a `SIGTERM`.
+If you started the wasmCloud host runtime via [wash](/docs/0.82/installation), you can simply run `wash down` in order to clean up running processes in the background. If you started the host runtime using the [manual host guide](/docs/0.82/hosts/elixir/running), you'll need to send the process a `SIGTERM`.
 
 ### Exiting a Console
 

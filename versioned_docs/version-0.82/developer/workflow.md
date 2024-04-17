@@ -12,7 +12,7 @@ The following is a list of developer workflows _sorted_ from **_most to least co
 
 ### Building Actors
 
-The most common thing application developers will do is build actors. Actors encompass pure business logic, and only communicate with non-functional requirements through capability providers and abstract [interfaces](/docs/concepts/interface-driven-development).
+The most common thing application developers will do is build actors. Actors encompass pure business logic, and only communicate with non-functional requirements through capability providers and abstract [interfaces](/docs/0.82/concepts/interface-driven-development).
 
 Once you've established a dependency on a library that exposes the interface abstraction you're looking for, you can start your iteration loop.
 
@@ -28,7 +28,7 @@ The developer's _iteration loop_ for building an actor looks something like this
    1. Leverage the `wasmcloud:testing` interface and the [test provider](https://github.com/wasmCloud/wasmcloud-test)
 1. _Repeat_
 
-As of wash 0.18.0, there is now a `wash dev` command that automates this process for you. See the [Customizing the actor](/docs/developer/actors/update) section for more details on how to use it.
+As of wash 0.18.0, there is now a `wash dev` command that automates this process for you. See the [Customizing the actor](/docs/0.82/developer/actors/update) section for more details on how to use it.
 
 ### Building Providers
 
@@ -49,7 +49,7 @@ Creating a new wasmCloud _interface_ is probably the least commonly performed ta
 Once you've created the scaffolding for a new interface library (which is available as a `wash new` command), the _iteration loop_ looks something like this:
 
 1. Make changes to the **Smithy** model (`.smithy` file)
-2. [Check it](/docs/hosts/abis/wasmbus/interfaces/tips/lint-validate/) with `wash lint` and `wash validate`
+2. [Check it](/docs/0.82/hosts/abis/wasmbus/interfaces/tips/lint-validate/) with `wash lint` and `wash validate`
 3. Build it (`make` or `cargo build`, if it has Rust code)
 4. Test the library
 

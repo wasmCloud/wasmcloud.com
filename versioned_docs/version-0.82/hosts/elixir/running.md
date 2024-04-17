@@ -13,7 +13,7 @@ The wasmCloud host runtime is an [Elixir burrito](https://github.com/burrito-eli
 
 ## Installing
 
-If you'd like to run the host without using [wash](/docs/installation), simply download the host according to your machine's operating system and architecture from the [wasmcloud-otp Releases page](https://github.com/wasmCloud/wasmcloud-otp/releases), add the executable flag, and then run it.
+If you'd like to run the host without using [wash](/docs/0.82/installation), simply download the host according to your machine's operating system and architecture from the [wasmcloud-otp Releases page](https://github.com/wasmCloud/wasmcloud-otp/releases), add the executable flag, and then run it.
 
 For example, on a Linux machine with the x86_64 architecture:
 

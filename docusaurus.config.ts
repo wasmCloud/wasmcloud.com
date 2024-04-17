@@ -83,14 +83,17 @@ const config: Config = {
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
         },
         docs: {
-          editUrl: 'https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/',
+          editUrl: 'https://github.com/wasmCloud/wasmcloud.com/edit/main/',
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
-          lastVersion: '0.82',
+          lastVersion: 'current',
           versions: {
             current: {
               label: '1.0',
-              path: '1.0',
-              banner: 'unreleased',
+            },
+            0.82: {
+              label: '0.82',
+              path: '0.82',
+              banner: 'unmaintained',
             },
           },
         },

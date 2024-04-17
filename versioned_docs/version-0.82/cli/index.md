@@ -1,9 +1,9 @@
 ---
-title: "Introduction"
+title: 'Introduction'
 draft: false
 sidebar_position: 0
-description: "The wasmCloud Shell (wash) CLI"
-type: "docs"
+description: 'The wasmCloud Shell (wash) CLI'
+type: 'docs'
 ---
 
 **_wash_** (the _wasmCloud Shell_) is a single command-line interface (CLI) to handle all of your wasmCloud tooling needs. This CLI has a number of sub-commands that help you interact with the wasmCloud ecosystem.
@@ -23,4 +23,4 @@ wash -V
 
 ## Installation
 
-`wash` can be installed from a binary release, or with cargo. See [installation](/docs/installation) for details.
+`wash` can be installed from a binary release, or with cargo. See [installation](/docs/0.82/installation) for details.

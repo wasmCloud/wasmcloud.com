@@ -19,7 +19,7 @@ notes for wadm
 :::
 
 Please note that in production deployments, you will likely be using separate NATS credentials for
-accessing wadm. Please see the [deployment guide](/docs/deployment/wadm/) for more information for running
+accessing wadm. Please see the [deployment guide](/docs/0.82/deployment/wadm/) for more information for running
 wadm in production.
 
 ## Topic Space
