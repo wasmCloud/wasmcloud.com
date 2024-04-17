@@ -5,13 +5,13 @@ sidebar_position: 2
 draft: false
 ---
 
-A [provider archive](/docs/1.0/reference/glossary#provider-archive) (also called a _par file_) is an archive file (in unix 'tar' format) containing platform-specific executable files for a variety of CPU and OS combinations. A typical provider archive file contains executables for 64-bit Linux, x86_64 macOs, aarch64 macOs, and other supported platforms. The par file includes a cryptographically signed JSON Web Token (JWT) that contains a set of claims attestations for the capability provider.
+A [provider archive](/docs/reference/glossary#provider-archive) (also called a _par file_) is an archive file (in unix 'tar' format) containing platform-specific executable files for a variety of CPU and OS combinations. A typical provider archive file contains executables for 64-bit Linux, x86_64 macOs, aarch64 macOs, and other supported platforms. The par file includes a cryptographically signed JSON Web Token (JWT) that contains a set of claims attestations for the capability provider.
 
 A provider archive can be uploaded to, or downloaded from, OCI registries.
 
 ## Build
 
-Providers are always compiled in "release" mode. `wash` has support to compile a capability provider for your native target with `wash build`, as long as a [wasmcloud.toml](/docs/1.0/reference/config) file is present. The following section will continue on from the [Create](./create.md) page where we built a NATS messaging provider, but you can follow the same steps for any capability provider project.
+Providers are always compiled in "release" mode. `wash` has support to compile a capability provider for your native target with `wash build`, as long as a [wasmcloud.toml](/docs/reference/config) file is present. The following section will continue on from the [Create](./create.md) page where we built a NATS messaging provider, but you can follow the same steps for any capability provider project.
 
 ```bash
 > wash build

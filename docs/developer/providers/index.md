@@ -5,7 +5,7 @@ sidebar_position: 0
 draft: false
 ---
 
-Providers are executable host plug-ins&mdash;stateful, standalone processes that fulfill non-functional requirements for stateless components. For a high-level introduction to providers and why you might want to build one, see [Providers in the Concepts](/docs/1.0/concepts/providers) section.
+Providers are executable host plug-ins&mdash;stateful, standalone processes that fulfill non-functional requirements for stateless components. For a high-level introduction to providers and why you might want to build one, see [Providers in the Concepts](/docs/concepts/providers) section.
 
 Here, you can learn how to build your own provider. We'll walk you through implementing your own messaging provider for NATS, and you can use the same process to implement a capability provider using standard interfaces like `wasi:http`, `wasi:keyvalue`, `wasi:blobstore`, and `wasmcloud:messaging`.
 
