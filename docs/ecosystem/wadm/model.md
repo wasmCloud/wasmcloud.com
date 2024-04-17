@@ -78,7 +78,7 @@ To define a **capability provider**, we include a `capability` component, as fol
 - name: keyvalue
       type: capability
       properties:
-        image: ghcr.io/wasmcloud/keyvalue-redis:0.23.0
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.24.0
         id: kvredis
         config:
           - name: url
@@ -242,5 +242,5 @@ spec:
     - name: keyvalue
       type: capability
       properties:
-        image: ghcr.io/wasmcloud/keyvalue-redis:0.23.0
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.24.0
 ```
