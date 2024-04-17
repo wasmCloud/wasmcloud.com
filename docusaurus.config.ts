@@ -88,7 +88,7 @@ const config: Config = {
           lastVersion: '0.82',
           versions: {
             current: {
-              label: '1.0 (rc)',
+              label: '1.0',
               path: '1.0',
               banner: 'unreleased',
             },
@@ -163,8 +163,8 @@ const config: Config = {
       ],
     },
     announcementBar: {
-      id: '1.0 release candidate',
-      content: `🎉️ <b>The wasmCloud v1.0 release candidate</b> is available! Read the <a href="/docs/1.0/intro">1.0 documentation</a> and try it out now.`,
+      id: '1.0',
+      content: `🎉️ <b>wasmCloud v1.0</b> is available! Read the <a href="/docs/1.0/intro">1.0 documentation</a> and try it out now.`,
       backgroundColor: '#20232a',
       textColor: '#fff',
     },
