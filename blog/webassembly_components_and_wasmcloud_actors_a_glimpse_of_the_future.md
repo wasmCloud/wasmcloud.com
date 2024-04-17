@@ -29,7 +29,7 @@ are able to glue together arbitrary Wasm modules that import or export functions
 interface file. These interface files are called `wit` files (Wasm Interface Types) and allow for
 language agnostic code generation. This code is what handles converting the raw numbers of plain
 Wasm (i.e. integers and bytes) into concrete types. If you are familiar with wasmCloud already, this
-is [very similar](https://wasmcloud.com/docs/1.0/concepts/interfaces) to what we call "contract driven development,"
+is [very similar](https://wasmcloud.com/docs/concepts/interfaces) to what we call "contract driven development,"
 which we use to separate non-functional requirements from business logic. Still confused? Don't
 worry, we'll be using some specific examples below. If this topic interests you and you'd like more
 information, we highly recommend you check out all of the

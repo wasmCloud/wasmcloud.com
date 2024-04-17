@@ -1,11 +1,11 @@
 ---
-title: "wasmCloud Capabilities are Managed Algebraic Effects for WebAssembly Functions"
-image: "/img/algebra.jpg"
+title: 'wasmCloud Capabilities are Managed Algebraic Effects for WebAssembly Functions'
+image: '/img/algebra.jpg'
 date: 2022-05-25T9:00:00-04:00
-author: "Kevin Hoffman"
-author_profile: "https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/"
-description: "wasmCloud Capabilities are a managed, distributed implementation of algebraic effects"
-categories: ["webassembly", "wasmcloud"]
+author: 'Kevin Hoffman'
+author_profile: 'https://www.linkedin.com/in/%F0%9F%A6%80-kevin-hoffman-9252669/'
+description: 'wasmCloud Capabilities are a managed, distributed implementation of algebraic effects'
+categories: ['webassembly', 'wasmcloud']
 draft: false
 ---
 
@@ -49,7 +49,7 @@ A lot of us are used to patterns like (micro)services, abstractions, anti-corrup
 
 In a traditional object-oriented language or framework, we might treat each of these "effect providers" as an interface and then use something like dependency injection to shunt in an implementation for the effect at runtime (and presumably shunt in a mock during test time).
 
-In wasmCloud, we manage algebraic effects through <u>[capability providers](https://wasmcloud.com/docs/concepts/capabilities)</u>. Here the capability provider, as seen by the WebAssembly module (<u>[actor](https://wasmcloud.com/docs/concepts/actors)</u>), is just an abstraction. It's a versioned contract through which the WebAssembly function gets its effects.
+In wasmCloud, we manage algebraic effects through <u>[capability providers](https://wasmcloud.com/docs/0.82/concepts/capabilities)</u>. Here the capability provider, as seen by the WebAssembly module (<u>[actor](https://wasmcloud.com/docs/0.82/concepts/actors)</u>), is just an abstraction. It's a versioned contract through which the WebAssembly function gets its effects.
 
 The host runtime is responsible for providing an implementation for those effects or effect providers. This implementation is hot-swappable and dynamically configurable. This means that in our preceding international withdrawal example, we could provide a "test market" at unit test time and then a real connection to the market service when running in production. We could also configure the market connection so it could be "real", but point to a different service in staging than in production.
 

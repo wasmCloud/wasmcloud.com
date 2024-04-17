@@ -3,7 +3,7 @@ title: 'wasmCloud-operator: Cosmonic Open Sources Controller to Bring Community 
 image: '/img/wasmcloud-operator-kubernetes.jpg'
 date: 2024-04-16T11:00:00-05:00
 author: 'Brooks Townsend'
-description: "OSSNA: Cosmonic releases wasmCloud-operator to Bring Community Wasm to K8s"
+description: 'OSSNA: Cosmonic releases wasmCloud-operator to Bring Community Wasm to K8s'
 categories: ['webassembly', 'wasmcloud', 'Cloud Native', 'CNCF', engineering, cloud native]
 draft: false
 ---
@@ -14,7 +14,7 @@ draft: false
 
 <!--truncate-->
 
-Built by Kubernetes experts to conform to standard Kubernetes integration patterns, the [wasmCloud-operator](https://wasmcloud.com/docs/1.0/deployment/k8s/) brings the extensibility of WebAssembly to Kubernetes. It simplifies the deployment *and distribution of* wasmCloud applications to even the most remote locations; something Kubernetes struggles to do well. Unlike alternative solutions that insist on lower level infrastructure integration—forcing engineers to change the way they manage their clusters—the wasmCloud-operator offers a way to layer wasmCloud on top of Kubernetes without sacrificing preferred solutions. As a result, the value of major Kubernetes investments is extended and enhanced, without costly and complex integration.
+Built by Kubernetes experts to conform to standard Kubernetes integration patterns, the [wasmCloud-operator](https://wasmcloud.com/docs/deployment/k8s/) brings the extensibility of WebAssembly to Kubernetes. It simplifies the deployment _and distribution of_ wasmCloud applications to even the most remote locations; something Kubernetes struggles to do well. Unlike alternative solutions that insist on lower level infrastructure integration—forcing engineers to change the way they manage their clusters—the wasmCloud-operator offers a way to layer wasmCloud on top of Kubernetes without sacrificing preferred solutions. As a result, the value of major Kubernetes investments is extended and enhanced, without costly and complex integration.
 
 Taylor Thomas, wasmCloud maintainer and Cosmonic’s Director of Customer Engineering says: "Kubernetes works brilliantly for managing infrastructure, but it isn’t great at running applications—particularly those operating at the edge. Engineers see the value of Wasm, especially its portability, but are worried about the technical path to get there; they want to protect their Kubernetes investments. The wasmCloud-operator allows platform engineers to manage and run Wasm on their existing Kubernetes clusters in a way that feels familiar to them, bringing the kind of extensibility to Kubernetes that was previously impossible.”
 
@@ -24,7 +24,7 @@ Industrial analytics company [MachineMetrics](https://www.youtube.com/watch?v=fQ
 
 ### Deploying wasmCloud Applications with Kubernetes
 
-The wasmCloud-operator closely integrates with [Wadm](https://wasmcloud.com/docs/1.0/deployment/wadm/), wasmCloud’s component-native orchestrator, so engineers can directly manage the lifecycle of wasmCloud hosts and applications with tooling that already exists in Kubernetes.
+The wasmCloud-operator closely integrates with [Wadm](https://wasmcloud.com/docs/deployment/wadm/), wasmCloud’s component-native orchestrator, so engineers can directly manage the lifecycle of wasmCloud hosts and applications with tooling that already exists in Kubernetes.
 
 For those working with GitOps in Kubernetes—particularly Argo CD or Flux enthusiasts—they can check a Wadm manifest into Git and deploy their wasmCloud applications in the same way they would for any other Kubernetes application. Dan Norris, wasmCloud maintainer and creator of the wasmCloud-operator, explains: “By providing a Kubernetes-native API for interfacing with wasmCloud applications, all the familiar deployment tools just work. There’s nothing special for users to do—it’s just a kubectl apply with Wadm.”
 
