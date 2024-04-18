@@ -167,7 +167,7 @@ const config: Config = {
     },
     announcementBar: {
       id: '1.0',
-      content: `🎉️ <b>wasmCloud v1.0</b> is available! Read the <a href="/docs/1.0/intro">1.0 documentation</a> and try it out now.`,
+      content: `🎉️ <b>wasmCloud v1.0</b> is available! Read the <a href="/docs/intro">1.0 documentation</a> and try it out now.`,
       backgroundColor: '#20232a',
       textColor: '#fff',
     },
