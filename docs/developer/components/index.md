@@ -12,5 +12,6 @@ The following pages will take you through the process of developing application 
 - [Create](./generate)
 - [Build](./build)
 - [Run](./run)
+- [Configure](./configure)
 - [Iterate](./update)
 - [Publish](./publish)
