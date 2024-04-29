@@ -1,5 +1,5 @@
 ---
-title: "Wash plugins"
+title: "Wash Plugins"
 date: 2024-04-26T11:02:05+06:00
 draft: false
 sidebar_position: 3
@@ -8,23 +8,22 @@ description: "Using wash plugins"
 
 :::tip
 
-Wash plugins are available starting with version 0.28
+Wash plugins are available starting with version 0.28.
 
 :::
 
-Wash plugins are a way to extend the functionality of wash. They are Wasm components that can be
-used to add new subcommands to wash. This functionality is experimental, but enabled by default.
-What this means is that we may change the plugin API based on feedback of those using it. However,
-due to the power of the component model, it is very easy to adapt an older version of a plugin to a
-newer version of the API, likely with no changes to the plugin's code and transparent to users.
+Plugins are Wasm components that can extend the functionality of wash with new subcommands. This
+functionality is experimental but enabled by default, meaning we may change the plugin API based on
+feedback from those using it. The component model will make it very easy to adapt an older version
+of a plugin to a newer version of the API, with full transparency to users and few if any changes to
+the plugin code.
 
 ## Managing and consuming plugins
 
 ### Installing a plugin
 
-Installation of a plugin is a relatively straightforward process. A plugin can be installed from a
-local file, a URL, or from an OCI registry. This is done by specifying it in URI format. Some
-examples of this follow:
+A plugin can be installed from a local file, a URL, or from an OCI registry. This is done by
+specifying it in URI format. Some examples of this follow:
 
 - `file:///path/to/plugin.wasm`
 - `https://github.com/myuser/plugins/releases/download/v0.1.0/wash-plugin.wasm`
