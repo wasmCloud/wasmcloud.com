@@ -1,0 +1,312 @@
+---
+title: 'Linking at runtime'
+icon: 'ti-anchor' # themify icon pack : https://themify.me/themify-icons
+description: 'Declaring connections for runtime'
+sidebar_position: 1
+type: 'docs'
+---
+
+## Overview
+
+A **runtime link** is a declared connection between a component and another entity. Runtime links are typically defined in [Wadm deployment manifests](/docs/ecosystem/wadm/) and resolved on instantiation, regardless of where the linked entities are running. 
+
+Link definitions have both a **source** and a **target**, corresponding to the [component imports and exports](/docs/concepts/linking-components/), and specify the relevant WASI interfaces.
+
+* In a link declaration, the **source** is the **importer**. You can think of it as the source of the requirement that needs to be fulfilled. 
+* The **target** is the **exporter**. Specifically, it is the function exposed in an export that the source will call.
+
+Link definitions are **unidirectional**: the source (importer) can call the target (exporter), but not the other way around.From a [component's](/docs/concepts/components) point of view, code _only_ refers to an interface, e.g. `wasi-keyvalue`. Components do not know which specific entity is on the other side of a link.
+
+## Exploring a link definition
+
+Runtime links are typically defined in [Wadm deployment manifests](/docs/ecosystem/wadm/). Here is an example of a definition for a link from a component (importing on the `keyvalue` interface) to a provider (exporting on the same interface):
+
+```yaml {7-16}
+components:
+  - name: http-component
+    type: component
+    properties:
+      image: file://./build/http_hello_world_s.wasm
+    traits:
+      - type: link
+        properties:
+          target: kvredis
+          namespace: wasi
+          package: keyvalue
+          interfaces: [store]
+          target_config:
+          - name: redis-url
+            properties:
+              url: redis://127.0.0.1:6379
+```
+
+**A link is always defined as a trait of the source**&mdash;that is, the importer. In addition to a target, the link definition has properties including...
+
+- `target`, which specifies the name of the exporting entity to be called
+- `namespace`, which in the example above refers to `wasi`
+- `package`, which specifies the particular interface group used
+- `interfaces`, which lists specific `store` interface from `wasi-keyvalue`
+- `target_config`, defining configuration data to pass to a provider
+
+When a provider acts as a source rather than a target, it can instead take a `source_config` field. You can find configuration options for first-party providers in the [repositories for the specific providers in GitHub](https://github.com/wasmCloud/wasmCloud/tree/main/crates).
+
+You can use the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool to automatically generate a Wadm deployment manifest for a given component.
+
+## What can I link with a component?
+
+In wasmCloud, components may be linked to...
+
+### Host functions
+
+The wasmCloud host provides several functions available for import by components:
+
+* Logging
+* Random number generation
+* Clocks
+
+For example, the wasmCloud host's built-in logging function could satisfy a component's logging import. Host functions form wasmCloud's **trusted compute base**&mdash;they represent highly-vetted code that provides basic, commonly-used functionalities. 
+
+To use a host function, you need *only* include the import in a component's `world.wit` and call it using the interface in question. It is not necessary to include host functions in a deployment manifest&mdash;since they are already present on any wasmCloud host, the host will fulfill the imports automatically.
+
+<details>
+<summary>Example: Logging</summary>
+
+Generate a new Rust project:
+
+```shell
+wash new component hello --template-name hello-world-rust
+```
+Add logging to the project's `world.wit` file in the `wit` directory:
+
+```wit
+package wasmcloud:hello;
+
+world hello {
+  import wasi:logging/logging; // [!code ++]
+
+  export wasi:http/incoming-handler@0.2.0;
+}
+```
+Update the Rust code to add a logging message:
+
+```rust
+wit_bindgen::generate!();
+
+use exports::wasi::http::incoming_handler::Guest;
+use wasi::http::types::*;
+
+struct HttpServer;
+
+impl Guest for HttpServer {
+    fn handle(_request: IncomingRequest, response_out: ResponseOutparam) {
+        // Add logging // [!code ++:6]
+        wasi::logging::logging::log( 
+            wasi::logging::logging::Level::Info,
+            "",
+            &format!("Hello to your logs from Rust"),
+        );
+        let response = OutgoingResponse::new(Fields::new());
+        response.set_status_code(200).unwrap();
+        let response_body = response.body().unwrap();
+        response_body
+            .write()
+            .unwrap()
+            .blocking_write_and_flush(b"Hello from Rust!\n")
+            .unwrap();
+        OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+        ResponseOutparam::set(response_out, Ok(response));
+    }
+}
+
+export!(HttpServer);
+```
+Remember: it is not necessary to include host functions in a deployment manifest.
+
+Launch a local wasmCloud host with `wash up` and deploy:
+
+```shell
+wash app deploy wadm.yaml
+```
+
+When you invoke the component with `curl localhost:8080`, in addition to an HTTP response you will see a log message:
+
+```shell
+INFO handle_invocation{params=IncomingHttpHandle component_id="http_hello_world-http_component" component_ref="file:///Users/egregory/wasmcloud/wip/linking/logtest/build/http_hello_world_s.wasm"}:log: wasmcloud_host::wasmbus::handler: Hello to your logs from Rust component_id="http_hello_world-http_component" level=Level::Info context=""
+```
+</details>
+
+### Other components
+
+A component may be linked to another component at runtime (over the [lattice](/docs/concepts/lattice)) or [build (via composition)](/docs/concepts/linking-components/linking-at-build). 
+
+Linking components at runtime is a two-step process:
+
+1. Imports and exports must be declared in the components' `world.wit`.
+2. Links must be defined in your Wadm deployment manifest.
+
+<details><summary>Example: Two Components</summary>
+
+Here is an example manifest for a hypothetical application comprised of two components and an http-server provider:
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: foobar
+  annotations:
+    version: v0.0.1 
+    description: 'Multi-component demo'
+    experimental: true
+spec:
+  components:
+    # The first component
+    - name: foo-component
+      type: component
+      properties:
+        image: fooimage
+      traits:
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        # Link definition for foo-component -> bar-component
+        - type: link
+          properties:
+            target: bar-component
+            namespace: custom
+            package: bar
+            interfaces: [bar]
+    # The second component
+    - name: bar-component
+      type: component
+      properties:
+        image: barimage
+      traits:
+        - type: spreadscaler
+          properties:
+            replicas: 1
+    # The httpserver provider
+    - name: httpserver
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.20.0
+      traits:
+        # Link definition for httpserver -> bar-component
+        - type: link
+          properties:
+            target: foo-component
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler] 
+            source_config: 
+              - name: default-http
+                properties: 
+                  address: 127.0.0.1:8080
+
+```
+
+* The foo-component is **exporting on the wasi-http interface** and **importing on a custom "bar" interface**. It is the importer in relation to the bar-component, so it is the source for that link. 
+* The bar-component is **exporting on the custom "bar" interface**. This is its only link relationship, and it is the exporter, so no links are defined as a trait of bar-component. 
+* The httpserver provider is **importing on the wasi-http interface**. It is the importer in relation to foo-component, so it is the source for that link, and basic configuration is performed in the `source_config`.
+
+Remember that the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool is available to help you automatically generate a Wadm deployment manifest for a given component. Because it extrapolates link definitions from a component's WIT interfaces, it can be very helpful for not only generating manifests but understanding linking relationships in your application. 
+</details>
+
+### Providers
+
+[Providers](/docs/concepts/providers) are longer-lived host plugins which may facilitate connections to external resources. A component may be linked at runtime to a provider, which may be running either on the same wasmCloud host or another host on the lattice. 
+
+A provider only ever dispatches messages to&mdash;or receives messages from&mdash;components. When a link is established for a particular component, the provider can remember that component's identity and use it for subsequent dispatches. As a result, the only information a linked provider needs is the component's identity. This identity is typically used for managing specific resources on behalf of the component, such as database connections, open TCP sockets, etc.
+
+<details><summary>Example: Unpacking the Quickstart</summary>
+
+The wasmCloud Quickstart (running through the "Adding capabilities" section) provides a great example of a component using two different providers. The component you build in the tutorial exports on the **wasi-http** interface (linking with the `http-server` provider) and imports on the **wasi-keyvalue** interface (linking with the `kvredis` provider).
+
+Here's the manifest for the completed Quickstart example:
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello-world
+  annotations:
+    version: v0.0.1 
+    description: 'HTTP hello world demo'
+    experimental: true
+spec:
+  components:
+    # The component with our business logic
+    - name: http-component
+      type: component
+      properties:
+        image: wasmcloud.azurecr.io/http-hello-world:0.1.0
+      traits:
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        # Link definition for http-component -> kvredis
+        - type: link
+          properties:
+            target: kvredis
+            namespace: wasi
+            package: keyvalue
+            interfaces: [atomics, store]
+            target_config:
+              - name: redis-url
+                properties:
+                  url: redis://127.0.0.1:6379
+    # The kvredis provider
+    - name: kvredis
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.24.0
+    # The httpserver provider
+    - name: httpserver
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.20.0
+      traits:
+        # Link definition for httpserver -> http-component
+        - type: link
+          properties:
+            target: http-component
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler] 
+            source_config: 
+              - name: default-http
+                properties: 
+                  address: 127.0.0.1:8080
+
+```
+
+* The http-component is **importing functions on the keyvalue interface**. It is the **importer** in relation to **kvredis**, meaning that it is the source for the link definition: the link is defined as a trait of http-component. 
+
+* The http-component is **exposing a function on the http interface**. It is the **exporter** in relation to the **http-server** provider&mdash;in this case, the http-server provider is the source and the http-component is the target.
+
+* Both the kvredis and httpserver providers are configured in the link definition, using a `target_config` field (if the provider is the target) or a `source_config` field (if the provider is the source).
+
+Remember that the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool is available to help you automatically generate a Wadm deployment manifest for a given component. Because it extrapolates link definitions from a component's WIT interfaces, it can be very helpful for not only generating manifests but understanding linking relationships in your application. 
+</details>
+
+## Designed for flexibility at runtime
+
+Links are first-class citizens of a [lattice](/docs/concepts/lattice). A link can be declared (or removed) _before or after_ any of the parties of that link are running. Each time a provider is started, it is provided with a list of pre-existing links. Additionally, the provider is notified whenever a new link is declared, or an existing link is removed.
+
+The ability to update links at runtime is a powerful feature of wasmCloud. There are several scenarios where this is useful, including:
+
+- Swapping to an alternate provider implementation, such as an in-memory cache vs. an external data store.
+- Upgrading a provider, or failing over to a backup provider.
+- Routing requests to a provider running with specific characteristics, such as locality or configuration.
+
+Runtime links can be created **imperatively** using the `wash` CLI, which can be helpful for development workflows and use-cases such as those above. See the [`wash link` subcommand documentation](/docs/cli/link) for more information.
+
+:::note
+"Order of operations" doesn't matter in runtime linking: while configuring an [application](/docs/concepts/applications), low-level commands to set links and start resources can arrive in any order. Additionally, all providers must treat messages to set/remove links as idempotent.
+:::
+
+## Keep reading
+
+- For more on Wadm deployment manifests, see the Toolchain section for [Declarative Application Deployment (Wadm)](/docs/category/declarative-application-deployment-wadm).
+- For more information about linking at build, including a step-by-step example of composing components, check out [Linking at build](/docs/concepts/linking-components/linking-at-build).
+
+
