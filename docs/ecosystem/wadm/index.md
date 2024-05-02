@@ -16,7 +16,7 @@ In wasmCloud, we use the `wash` tool (or invoking the control interface directly
 At this stage, you need a way to issue commands **declaratively**, using a static configuration file that can be versioned, shared, edited, and otherwise used as a source of truth.
 
 :::info[For the Kubernetes Developer]
-You can think of a wadm deployment as roughly analogous to a Kubernetes deployment: once you define your application components in a declarative manifest, wadm will ensure that your application reaches desired state based on the manifest.
+You can think of a wadm deployment as roughly analogous to a Kubernetes deployment: once you define your application components in a declarative manifest, wadm will ensure that your application reaches desired state based on the manifest. If you're interested in deploying on Kubernetes, checkout [our operator](/docs/kubernetes) that makes it easy to deploy and leverage declarative wadm manifests.
 :::
 
 ## Introduction
