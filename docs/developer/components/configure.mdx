@@ -159,3 +159,88 @@ If your language supports bindings generation (either via [wit-bindgen](https://
     </TabItem>
 
 </Tabs>
+
+## Supplying multiple configurations
+
+In both the above `wadm` and `wash` methods of defining configuration, you can actually supply multiple named configurations to components, providers, and links. This is useful both to reuse common pieces of configuration and provide overrides for specific instances.
+
+Let's a case where we have a set of reasonable defaults for connections to a database that we want multiple components to use, but we also want to be able to override the connection string for specific instances. This can be accomplished by defining the default configuration and then overriding it for specific instances.
+
+We'll use the [wasmCloud HTTP Server settings](https://github.com/wasmCloud/wasmCloud/blob/main/crates/provider-http-server/settings.md) as an example. We'll [link](/docs/concepts/runtime-linking.mdx) the HTTP server to a component, supplying a default configuration with reasonable values and an additional configuration to change the address for that specific component. To create the default configuration, we can use the `wash config put` command:
+
+```bash
+wash config put default-http max_content_len=5M readonly_mode=true address=0.0.0.0:80
+```
+
+By default, we'll limit the max content length to 5MB and ensure that components are only accepting **GET** and **HEAD** requests using the `readonly_mode` configuration. We'll also supply a default listen address of `0.0.0.0:80`.
+
+For our component, we can use the default configuration by supplying the `default-http` configuration name, and then override the `address` configuration for this specific instance:
+
+<Tabs groupId="tool" queryString>
+    <TabItem value="wadm" label="wadm" default>
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello-world
+  annotations:
+    version: v0.0.1
+    description: 'Component that uses wasi:http'
+spec:
+  components:
+    - name: http-component
+      type: component
+      properties:
+        image: file://./build/http_hello_world_s.wasm
+      traits:
+        # Govern the spread/scheduling of the component
+        - type: spreadscaler
+          properties:
+            replicas: 1
+    # Add a capability provider that enables HTTP access
+    - name: httpserver
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.20.0
+      traits:
+        - type: link
+          properties:
+          target: http-component
+          namespace: wasi
+          package: http
+          interfaces: [incoming-handler]
+          source_config:
+            - name: default-http # [!code ++]
+            - name: custom-config # [!code ++]
+              properties: # [!code ++]
+                address: 0.0.0.0:4000 # [!code ++]
+```
+
+    </TabItem>
+    <TabItem value="wash" label="wash">
+
+```bash
+wash config put custom-config address=0.0.0.0:4000
+```
+
+Then, when linking the HTTP server with your component with `wash`, you can supply the configuration using the `--source-config` flag:
+
+```bash
+# wash link put <source_id> <target> <namespace> <package> ...
+wash link put http-server http-component wasi http --interface incoming-handler --source-config default-http --source-config custom-config
+```
+
+    </TabItem>
+
+</Tabs>
+
+Configuration is merged together in a left-folding manner, meaning that the last configuration supplied will override any previous configurations. In the above example, the `address` configuration will be overridden to `0.0.0.0:4000`, but the `max_content_len` and `readonly_mode` configurations will remain the same as the default configuration. Put another way, the configuration this provider will receive with the link is:
+
+```json
+{
+  "max_content_len": "5M",
+  "readonly_mode": true,
+  "address": "0.0.0:4000"
+}
+```
