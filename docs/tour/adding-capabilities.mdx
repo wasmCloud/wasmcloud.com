@@ -247,7 +247,7 @@ wash build
 
 ## Deploying your component
 
-Now that you've made an update to your component, you can use wash to stop the previous version. You can stop the component based on its unique identifier, which **wadm** automatically assigned based on the name of your application and the name of your component. Once stopped, **wadm** will take care of starting the new local copy from the updated file.
+Now that you've made an update to your component, you can use wash to stop the previous version. You can stop the component based on its unique identifier, which **Wadm** automatically assigned based on the name of your application and the name of your component. Once stopped, **Wadm** will take care of starting the new local copy from the updated file.
 
 <Tabs groupId="lang" queryString>
   <TabItem value="rust" label="Rust">
@@ -295,7 +295,7 @@ Hello, Bob!
 
 To further enhance our application, let's add persistent storage to keep a record of each person that this application greeted. We'll use the key-value store capability for this, and just like HTTP server, you won't need to pick a library or a specific vendor implementation yet. You'll just need to add the capability to your component, and then you can pick a capability provider at runtime.
 
-In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/hello.wit` file:
+In your template, we already included the `wasi:keyvalue` interface for interacting with a key value store. We can also use the `wasi:logging` interface to log the name of each person we greet. Before you can use the functionality of those interfaces, you'll need to add a few imports to your `wit/world.wit` file:
 
 ```wit
 package wasmcloud:hello;
@@ -484,6 +484,12 @@ class IncomingHandler(exports.IncomingHandler):
   </TabItem>
 </Tabs>
 
+We've made changes, so run `wash build` again to compile the Wasm component.
+
+```bash
+wash build
+```
+
 ### Deploying a Key-Value Store Provider
 
 Our component is prepared to use a key-value store, and now that we've built it we're ready to choose an implementation. A great option for local development and testing is the [Redis provider](https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-keyvalue-redis), and will only require you to have `redis-server` or Docker installed.
@@ -509,7 +515,7 @@ docker run -d --name redis -p 6379:6379 redis
   </TabItem>
 </Tabs>
 
-We can modify our `wadm.yaml` to include the Redis provider and configure a link for our component. Since we're nearing the end of this tutorial, we'll provide the full manifest here:
+The Redis server will mediate a connection to the Redis server, which is running external to wasmCloud. We can modify our `wadm.yaml` to include the Redis provider and configure a link for our component. Since we're nearing the end of this tutorial, we'll provide the full manifest here:
 
 ```yaml
 apiVersion: core.oam.dev/v1beta1
@@ -525,16 +531,13 @@ spec:
     - name: http-component
       type: component
       properties:
+        # Your manifest will point to the path of the built component, you can also
+        # start published components from OCI registries
         image: wasmcloud.azurecr.io/http-hello-world:0.1.0
       traits:
         - type: spreadscaler
           properties:
             replicas: 1
-        - type: linkdef
-          properties:
-            target: httpserver
-            values:
-              address: 0.0.0.0:8080
         # The new key-value link configuration # [!code ++:11]
         - type: link
           properties:
@@ -546,7 +549,6 @@ spec:
               - name: redis-url
                 properties:
                   url: redis://127.0.0.1:6379
-
     # The new capability provider # [!code ++:5]
     - name: kvredis
       type: capability
@@ -556,8 +558,23 @@ spec:
       type: capability
       properties:
         image: ghcr.io/wasmcloud/http-server:0.20.0
-    # ...
+      traits:
+        - type: link
+          properties:
+            target: http-component
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler] 
+            source_config: 
+              - name: default-http
+                properties: 
+                  address: 127.0.0.1:8080
 ```
+
+:::note[What are those images in the deployment manifest?]
+You'll notice that the kvredis and httpserver providers are pulled from images hosted on GitHub Packages. The wasmCloud ecosystem uses the [OCI image specification](https://github.com/opencontainers/image-spec) to package components and providers&mdash;these component and provider images are not container images, but conform to OCI standards and may be stored on any OCI-compatible registry.
+:::
+
 
 For the last step, we can deploy the `v0.0.3` version of our application. Then, again, we can test our new functionality.
 
