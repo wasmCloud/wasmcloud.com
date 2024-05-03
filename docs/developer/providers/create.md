@@ -61,7 +61,7 @@ Feel free to take a look around the provider project. The important files are:
 
 1. `src/nats.rs`: We're going to be primarily implementing functionality here.
 1. `wasmcloud.toml`: Build information and metadata for the provider
-1. `wit/provider.wit`: The [interface](/docs/concepts/interfaces.mdx) this provider implements and uses
+1. `wit/provider.wit`: The [interface](/docs/concepts/interfaces) this provider implements and uses
 
 ## Implementing the interface
 
@@ -76,7 +76,7 @@ world provider-messaging-nats {
 }
 ```
 
-For each `import` in the provider's `world`, you'll use an external trigger in order to invoke that function on a WebAssembly component dynamically at runtime. Here we import the `handler` interface, and we're going to invoke a [linked](/docs/concepts/runtime-linking) component any time we receive a message on a NATS subscription.
+For each `import` in the provider's `world`, you'll use an external trigger in order to invoke that function on a WebAssembly component dynamically at runtime. Here we import the `handler` interface, and we're going to invoke a [linked](/docs/concepts/linking-components/) component any time we receive a message on a NATS subscription.
 
 For each `export` in the provider's `world`, you'll need to implement a function to handle the functionality of that interface. WebAssembly components will be able to invoke exported functions dynamically at runtime. Here, we export the entire `consumer` interface, so we'll need to implement the `publish` and `request` functionality in the provider.
 
@@ -161,7 +161,7 @@ async fn publish(
 After retrieving the NATS client that is configured for the requesting component, we can simply `publish` the message to the provided subject and return the result. An optional recommended step is included to flush the NATS client after publishing, which ensures that the message is sent immediately and improves performance.
 
 :::info
-We created the NATS client for the requesting component inside of the `receive_link_config_as_target` function provided by the provider SDK. At runtime, when a component [links](/docs/concepts/linking-components.mdx) to this capability provider, it will provide configuration for connecting to a NATS server. Check the implementation of that function to see how we use that configuration to create and store a client for lookups later.
+We created the NATS client for the requesting component inside of the `receive_link_config_as_target` function provided by the provider SDK. At runtime, when a component [links](/docs/concepts/linking-components/) to this capability provider, it will provide configuration for connecting to a NATS server. Check the implementation of that function to see how we use that configuration to create and store a client for lookups later.
 :::
 
 Next we can do a similar step for implementing `request`:
