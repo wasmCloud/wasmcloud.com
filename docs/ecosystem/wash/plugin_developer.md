@@ -33,6 +33,19 @@ A plugin can be any component that exports `wasi:cli/run` and the wasmCloud-defi
 WIT, but is defined below for convenience:
 
 ```wit
+/// Information about an argument
+record argument {
+    /// The description of the argument. Used for documentation in the CLI
+    description: string,
+    /// Whether or not the argument is a path. If the argument is a path, wash will load this
+    // path (with access to only the file if it is a file path and access to the directory if
+    /// it is a directory path) and pass it as a preopened dir at the exact same path
+    is-path: bool,
+    /// Whether or not the argument is required. 
+    required: bool,
+}
+
+/// The metadata for a plugin used for registration and setup
 record metadata {
     /// The friendly name of the plugin
     name: string,
@@ -46,11 +59,11 @@ record metadata {
     /// The description of the plugin. This will be used as the top level help text for the plugin
     description: string,
     /// The list of flags and their documentation that can be used with this plugin. The key is
-    /// the name of the flag and the value is the documentation for the flag.
-    %flags: list<tuple<string, string>>,
+    /// the name of the flag.
+    %flags: list<tuple<string, argument>>,
     /// The list of positional arguments that can be used with this plugin. The key is the name
-    /// of the argument and the value is the documentation for the argument.
-    arguments: list<tuple<string, string>>,
+    /// of the argument.
+    arguments: list<tuple<string, argument>>,
 }
 ```
 
@@ -58,12 +71,15 @@ Most of these fields are fairly straightforward, but the `%flags` and `arguments
 more complicated. These fields are used to define the flags and positional arguments that can be
 used with the plugin. These fields are defined as a list of tuples (as WIT doesn't have support for
 a `map` type yet) where the first element of the tuple is the name of the flag or argument and the
-second element is the documentation for the flag or argument. For `arguments`, the order matters as
-they are positional arguments. This data is used to hook in to the CLI parsing library, meaning that
-when the plugin is run, the CLI will automatically parse the flags and arguments to make sure they
-are valid. There is not currently any way to inform the CLI parsing library which arguments are
-required and which are optional, so it only provides a basic sanity check (such as if an unknown
-flag is passed) and to hook in help text to `wash`.
+second element is additional configuration for an argument. Every argument should have a description
+and can also indicate to `wash` whether the argument is required and if it is a path (which matters
+for accessing files. See [`run` function section](#run-function-implementation-details) for more
+information). For `arguments`, the order matters as they are positional arguments. This data is used
+to hook in to the CLI parsing library, meaning that when the plugin is run, the CLI will
+automatically parse the flags and arguments to make sure they are valid. There is not currently any
+way to inform the CLI parsing library which arguments are required and which are optional, so it
+only provides a basic sanity check (such as if an unknown flag is passed) and to hook in help text
+to `wash`.
 
 Because a plugin just uses `wasi:cli/run`, any component that already implements that interface can
 be used by composing it with another component that exports the `wasmcloud:wash/subcommand`
@@ -93,13 +109,46 @@ A plugin has access to the following resourses while it is running:
 - Stdin
 - Stdout
 - Stderr
-- A single directory with full write privileges at `$WASH_DIR/plugins/scratch/<plugin_id>`
+- A single directory with full read/write privileges at `$WASH_DIR/plugins/scratch/<plugin_id>`
+- Write access to any directories passed as an argument (if the argument is marked as a path)
+- Read access to any directory containing a file path passed as an argument as well as full
+  read/write access to the files in that directory (if the argument is marked as a path)
 - The ability to do outbound HTTP requests to any address
 - Environment variable passthrough for all environment variables that start with
   `WASH_PLUGIN_<plugin_id_uppercase>_` (e.g. `WASH_PLUGIN_FOO_` for a plugin with the id of "foo")
 
 Just like a normal CLI, the plugin can read the incoming stdin and should write any
 messages/logs/etc to stdout/stderr.
+
+#### Accessing files in the plugin
+
+When defining your arguments returned from the `register` function for the plugin, you are able to 
+indicate that any given argument should be treated as a path. If a user passes that argument to the
+plugin, it will be configured to allow access for the plugin using a Wasi preopen directory. Please
+note that the directory (whether it is the directory containing a file or a directory itself) must 
+exist before the plugin can actually load it.
+
+The default plugin scratch directory is "mounted" into the plugin at `/`. Every other directory/file
+path goes through a canonicalization step before it is passed to the plugin. This canonicalization
+step ensures that the plugin is only given access to the directories/files that it is explicitly
+allowed to access. For example, if the following example plugin accepted two arguments, one a
+directory, and the other one a path, this is how things would be parsed:
+
+```shell
+wash my-plugin ./bar ../other/baz.txt
+```
+
+For purposes of this example, we'll assume `./bar` is at a fully qualified path of `/foo/bar` and
+`../other/baz.txt` has a fully qualified path of `/my-files/other/baz.txt`. Before running your
+plugin, wash will normalize the paths to `/foo/bar` and `/my-files/other/baz.txt` respectively. It
+will then replace the path arguments passed to the plugin with the canonicalized paths. So with the
+example above, the arguments array given to the plugin would be `["my-plugin", "/foo/bar",
+"/my-files/other/baz.txt"]`. 
+
+Each of the paths passed as arguments will be "mounted" at the exact same paths in the plugin. In
+the case of a file path, it will mount the file's parent directory. So for the example above, you
+will be able to access `/foo/bar` and `/my-files/other/` from within the plugin. The example plugin
+template has code that shows how you can access each of the files.
 
 ### Configuring your plugin
 

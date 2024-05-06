@@ -115,7 +115,11 @@ enumerates exactly which resources are granted to each plugin:
 - Stdin
 - Stdout
 - Stderr
-- A single directory with full write privileges at `$WASH_DIR/plugins/scratch/<plugin_id>`
+- A single directory with full read/write privileges at `$WASH_DIR/plugins/scratch/<plugin_id>`
+- Write access to any directories passed as an argument (the plugin can indicate certain arguments
+  as paths)
+- Read access to any directory containing a file path passed as an argument as well as full
+  read/write access to the files in that directory (these are also indicated as paths by the plugin)
 - The ability to do outbound HTTP requests to any address
 - Environment variable passthrough for all environment variables that start with
   `WASH_PLUGIN_<plugin_id_uppercase>_` (e.g. `WASH_PLUGIN_FOO_` for a plugin with the id of "foo")
@@ -126,8 +130,12 @@ client (the ability to access and interact with a lattice).
 To summarize, wash plugins are much more locked down than standard plugin models thanks to Wasm.
 However, they still have access to some more privileged resources so they can actually do some
 useful things. So, still be careful that your plugin is coming from a trusted source before
-installing. As the plugin ecosystem continues to evolve we will add more ways to fine tune what a
-plugin is allowed access to at any given time.
+installing. In particular, DO NOT pass it any paths that you do not want to grant it access to (i.e.
+you probably shouldn't pass `/` or `/etc`) as wash will assume that you meant to give the plugin
+access. Unfortunately, the WASI filesystem preopen API is not flexible or granular enough yet to
+restrict access on a per-file basis (as everything is handled as a directory). So for now, this is
+the best option available. As the plugin and WASI ecosystems continue to evolve we will add more
+ways to fine tune what a plugin is allowed access to at any given time.
 
 ### Disabling plugins
 
