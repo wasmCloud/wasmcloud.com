@@ -51,6 +51,6 @@ wash par inspect build/fakepay_provider.par.gz
 ╚══════════════════════════════════════════════════════════════════════╝
 ```
 
-At this point we've decided on a logical contract for actors and capability providers to use for the Payments service. We created a (mostly) code-generated interface crate that can be declared as a dependency by both provider and actor, and we created a dummy implementation of the payments provider.
+At this point we've decided on a logical contract for actors and capability providers to use for the Payments service. We created a (mostly) code-generated interface crate that can be declared as a dependency by both provider and actor, and we created a placeholder implementation of the payments provider.
 
 Next we'll write an actor that communicates with any payment provider, regardless of whether it's our fake implementation or not.
