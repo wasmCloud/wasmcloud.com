@@ -62,7 +62,7 @@ second element is the documentation for the flag or argument. For `arguments`, t
 they are positional arguments. This data is used to hook in to the CLI parsing library, meaning that
 when the plugin is run, the CLI will automatically parse the flags and arguments to make sure they
 are valid. There is not currently any way to inform the CLI parsing library which arguments are
-required and which are optional, so it only provides a basic sanity check (such as if an unknown
+required and which are optional, so it only provides a basic coherence check (such as if an unknown
 flag is passed) and to hook in help text to `wash`.
 
 Because a plugin just uses `wasi:cli/run`, any component that already implements that interface can
