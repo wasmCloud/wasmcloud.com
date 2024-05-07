@@ -24,7 +24,7 @@ Adds a link definition in the lattice associated with a component and provider a
 
 #### Usage
 ```
-wash link put <component-id> <provider-id> <contract-id>
+wash link put --interface <INTERFACES> <source-id> <target> <wit-namespace> <wit-package>
 ```
 
 ### `del`
@@ -32,7 +32,7 @@ Deletes a link definition in the lattice. If it is named other than "default" th
 
 #### Usage
 ```
-wash link del <component-id> <contract-id>
+wash link del [OPTIONS] --namespace <WIT_NAMESPACE> --package <WIT_PACKAGE> <source-id>
 ```
 
 #### Options
