@@ -150,6 +150,16 @@ the case of a file path, it will mount the file's parent directory. So for the e
 will be able to access `/foo/bar` and `/my-files/other/` from within the plugin. The example plugin
 template has code that shows how you can access each of the files.
 
+##### Windows Paths
+
+Because Wasm is platform agnostic, some languages (such as Rust) will not be able to parse file
+paths properly that do not use the standard unix file separator (i.e. `/`). On Windows systems, in
+addition to fully canonicalizing the paths, `wash` will also convert all file paths to use the
+standard unix file separator (`/`). For example, if you pass a path like `.\my\files` to the plugin,
+it will be normalized, mounted in the plugin, and passed as an argument in the form
+`//?//C://fully/qualified/path/to/my/files`. The `?` prefix is an artifact of the canonicalization
+and shouldn't effect your loading of the path
+
 ### Configuring your plugin
 
 All plugins are expected to document their configuration options (whether it be a file, environment
