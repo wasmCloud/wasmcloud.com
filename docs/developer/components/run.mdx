@@ -19,19 +19,36 @@ Building the component is as easy as running `wash build` in the project's root 
 
 ### Start the component
 
+:::info
+If you don't have a host running, you can start one with `wash up`.
+:::
+
 The simplest way to get a component running is by starting it from a locally built file. wasmCloud has support for starting built and signed components from absolute paths in addition to starting from OCI registries.
 
-Use `wash build -o json` to get the absolute path to the locally built component. You can then use `wash` to start the component.
+The `wash build` output will include the path to the locally built component. You can then use `wash` to start the component.
 
 ```bash
-# Replace the path below with the path to your component
-wash start component file:///Users/wasmcloud/hello/build/hello_s.wasm
+# wash start component <path-to-component> <component-id>
+wash start component file:///Users/wasmcloud/hello/build/http_hello_world_s.wasm hello
 ```
 
-If you're running the wasmCloud dashboard, you can take a look at your running component by visiting [localhost:3000](http://localhost:3000) in your browser. Alternatively, you can use `wash` to query the inventory of your running hosts:
+If you're running the wasmCloud dashboard with `wash ui`, you can take a look at your running component by visiting [localhost:3000](http://localhost:3000) in your browser. Alternatively, you can use `wash` to query the inventory of your running hosts:
 
 ```bash
 wash get inventory
+```
+
+```console
+➜ wash get inventory
+
+  Host Inventory (NBPDHEE4FT75YJ7DLY2Y6W6WA2Z26ISRHSO5X3XBFBPAV53EI3GCPBHV)
+
+  hostcore.os                        macos
+  hostcore.arch                      aarch64
+  hostcore.osfamily                  unix
+
+  Component ID                       Name                      Image Reference
+  hello                              http-hello-world          file:///Users/wasmcloud/hello/build/http_hello_world_s.wasm
 ```
 
 ### Start the web server
@@ -39,77 +56,50 @@ wash get inventory
 We know our new component needs a web server, so let's start the HTTP server capability provider.
 
 ```bash
-wash start provider wasmcloud.azurecr.io/httpserver:0.19.1
+wash start provider ghcr.io/wasmcloud/http-server:0.20.1 http-server
 ```
 
-### Add a link definition
-
-With both the provider and the component running, the next step is to _link_ the two. This provides a set of configuration values that is unique for each component's use of a provider. To link your component, you'll need the component's public key. You can get that by inspecting your local component file and making note of the `Component` key in the output (yours will be different from the output below).
+### Add a link
 
 ```bash
-wash inspect ./build/hello_s.wasm
-                              hello - Component
-  Account       ACVKDPI2B3GFBAKURMYXBBDDTMJR3UQ7QLMAGE5Z6NNMTLAR276MZ2WF
-  Component     MDLP5JLL7XMHGAYBUHGRBZHDVE4FIQLB6ONC2ZZG6HPNHPX6HZJ7EAJD
-  Expires                                                          never
-  Can Be Used                                                immediately
-  Version                                                      0.1.0 (0)
-  Call Alias                                                   (Not set)
-                                   Tags
-  None
+> wash inspect --wit ./build/http_hello_world_s.wasm
 ```
 
-Once you've got the component's public key, you can export a `HELLO_COMPONENT_ID` environment variable with that value and copy-and-paste the link command:
+```wit
+package root:component;
 
-<Tabs groupId="os" queryString>
-<TabItem value="unix" label="Unix" default>
+world root {
+  # ..imports
+
+  export wasi:http/incoming-handler@0.2.0; # [!code ++]
+}
+```
+
+With both the provider and the component running, the next step is to [link](/docs/concepts/runtime-linking.mdx) the two. Our component implements the function `wasi:http/incoming-handler.handle`, and the wasmCloud HTTP server provider is configured to call that function whenever it receives an HTTP request on the specified port.
+
+First, create a [named configuration](/docs/developer/components/configure) for the HTTP server capability provider:
 
 ```bash
-# Paste your component ID after the `=` below (with no space after the `=`)
-export HELLO_COMPONENT_ID=
+wash config put hello-listen-address address=0.0.0.0:8085
 ```
+
+Then, link the provider to the component and pass the configuration to the provider (the source of the link):
 
 ```bash
-wash link put ${HELLO_COMPONENT_ID} VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver address=0.0.0.0:8087
+# wash link put <source> <target> <namespace> <package> --source-config <config> --interface <interface>
+wash link put http-server hello wasi http --source-config hello-listen-address --interface incoming-handler
 ```
-
-  </TabItem>
-  <TabItem value="windows" label="Powershell" default>
-
-```powershell
-# Paste your component ID after the `=` below (with a space after the `=`)
-$env:HELLO_COMPONENT_ID =
-```
-
-```powershell
-wash link put $env:HELLO_COMPONENT_ID VAG3QITQQ2ODAOWB5TTQSDJ53XK3SHBEIFNK4AYJ5RKAX2UNSCAPHA5M wasmcloud:httpserver address=0.0.0.0:8087
-```
-
-  </TabItem>
-</Tabs>
 
 At this point your HTTP server capability provider has been notified that a link definition was created, and it started the corresponding web server listening on port `8087`. You can now hit that endpoint and exercise the code you just wrote:
 
 ```bash
-curl localhost:8087
+curl localhost:8085
 ```
 
 and you should get the response:
 
-```
-Hello World
-```
-
-The component accepts an optional parameter `name`, and uses it to change the greeting. (Notice the quotes around the url below).
-
-```bash
-curl "localhost:8087?name=Carol"
-```
-
-The response should be
-
-```
-Hello Carol
+```console
+Hello from Rust!
 ```
 
 This page took you through the process of imperatively starting a component and a capability provider, and then linking them together. You can use these commands as you develop to work with running resources, or just use [wash app](/docs/cli/app) to deploy the same resources declaratively.
