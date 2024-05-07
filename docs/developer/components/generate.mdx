@@ -22,15 +22,10 @@ wash new component hello --template-name hello-world-rust
 Let's change into the newly-created folder `hello` and take a look at the generated project. The file `src/lib.rs` includes a `wit-bindgen` generate macro, an imports section, a struct `HttpServer`, and an `impl` block that implements the `Guest` trait for the component struct. Let's walk through these sections in detail.
 
 ```rust
-wit_bindgen::generate!({
-    world: "hello",
-    exports: {
-        "wasi:http/incoming-handler": HttpServer,
-    },
-});
+wit_bindgen::generate!();
 ```
 
-This shows us that we're using a core wasmCloud package called `wit-bindgen` to generate the types and bindings for our component. The `world` term is the name of the wit world we're generating from under `./wit`, and the `exports` term declares the functions the component will export. In this case, we're declaring that the component will implement the `wasi:http/incoming-handler` capability interface, and that the implementation struct is named `HttpServer`.
+This shows us that we're using a core wasmCloud package called `wit-bindgen` to generate the types and bindings for our component. This is automatically done from the `wit/world.wit` file, any changes to imports or exports will update automatically on the next build.
 
 Note the two lines near the top of the source code file:
 
@@ -61,6 +56,12 @@ impl Guest for HttpServer {
 ```
 
 Within the `handle` method, the component receives the HTTP request, creates an `OutgoingResponse` and writes that response out back to the requesting http client (such as a `curl` command or a web browser).
+
+Finally, we use the `wit-bindgen` generated macro `export!` to export the `HttpServer` struct as the incoming handler for the HTTP server capability. If you don't implement the `Guest` trait for your struct, the `export!` macro will give you an error at compile time noting which functions you need to implement.
+
+```rust
+export!(HttpServer);
+```
 
   </TabItem>
   <TabItem value="tinygo" label="TinyGo">
@@ -106,10 +107,14 @@ func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWrite
 	headers := http.NewFields()
 	httpResponse := http.NewOutgoingResponse(headers)
 	httpResponse.SetStatusCode(200)
-	httpResponse.Body().Unwrap().Write().Unwrap().BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap()
+	body := httpResponse.Body().Unwrap()
+	bodyWrite := body.Write().Unwrap()
+	bodyWrite.BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap()
 
 	// Send HTTP response
 	okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+	bodyWrite.Drop()
+	http.StaticOutgoingBodyFinish(body, http.None[http.WasiHttp0_2_0_TypesTrailers]())
 	http.StaticResponseOutparamSet(responseWriter, okResponse)
 }
 ```
@@ -149,16 +154,21 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
 
   // Access the outgoing response body
   let outgoingBody = outgoingResponse.body();
-  // Create a stream for the response body
-  let outputStream = outgoingBody.write();
-  // // Write hello world to the response stream
-  outputStream.blockingWriteAndFlush(
-    new Uint8Array(new TextEncoder().encode('Hello from Typescript!\n')),
-  );
+  {
+    // Create a stream for the response body
+    let outputStream = outgoingBody.write();
+    // Write hello world to the response stream
+    outputStream.blockingWriteAndFlush(
+      new Uint8Array(new TextEncoder().encode('Hello from Typescript!\n')),
+    );
+    // @ts-ignore: This is required in order to dispose the stream before we return
+    outputStream[Symbol.dispose]();
+  }
 
   // Set the status code for the response
   outgoingResponse.setStatusCode(200);
-
+  // Finish the response body
+  OutgoingBody.finish(outgoingBody, undefined);
   // Set the created response
   ResponseOutparam.set(resp, { tag: 'ok', val: outgoingResponse });
 }
