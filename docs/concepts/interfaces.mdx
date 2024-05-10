@@ -2,20 +2,80 @@
 title: 'Interfaces'
 date: 2020-05-01T00:00:00+00:00
 icon: 'ti-anchor' # themify icon pack : https://themify.me/themify-icons
-description: 'A quick guide to interface-driven development'
+description: 'A quick guide to wasmCloud interfaces'
 sidebar_position: 2
 type: 'docs'
 ---
 
 ## Overview
 
-In wasmCloud, [components](/docs/concepts/components) and [providers](/docs/concepts/providers) communicate through **interfaces**, sometimes called capabilities.
+In wasmCloud, [components](/docs/concepts/components) and [providers](/docs/concepts/providers) communicate through **interfaces**: contracts that define the relationships between entities. These interfaces come in two kinds:
+
+* **Well-known interfaces** are common standards (such as [WASI interfaces](#wasi-interfaces)) or wasmCloud interfaces (core functionalities like `wasmcloud-messaging`) supported out-of-the-box by wasmCloud hosts.
+* **Custom interfaces** are user-created contracts that make it possible to extend and tailor how wasmCloud components and providers interact with one another.
+
+In all cases, wasmCloud interfaces are defined using the interface description language **WebAssembly Interface Type (WIT)**.
 
 ## WebAssembly Interface Type (WIT)
 
-wasmCloud supports interfaces belonging to [WebAssembly System Interface (WASI)](https://wasi.dev/) 0.2 and custom interfaces written by third parties. In all cases, wasmCloud interfaces are defined using [**WebAssembly Interface Type (WIT)**](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md) interface description language (IDL), an open standard maintained as part of the Component Model by the W3C WebAssembly Community Group.
+WebAssembly Interface Type (WIT) is an [open standard maintained as part of the Component Model](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md) by the W3C WebAssembly Community Group.  
 
-WIT is designed to allow WebAssembly components to define the interfaces they support ("exports") and the capabilities they need ("imports"). wasmCloud also uses WIT to define the interface/contract provided by capability providers.
+WIT enables WebAssembly components to define the functions they expose to external entities ("**exports**") and the functionalities they require ("**imports**") in `.wit` files.
+
+The highest-level contract in a WIT interface is called a **world**. A WIT world is where an interface defines imports and exports. Here is a simple example of a world:
+
+```wit
+package wasmcloud:demo;
+
+world demo {
+  import wasi:logging/logging; 
+
+  export wasi:http/incoming-handler@0.2.0;
+}
+
+```
+This is the top-level world for a hypothetical component that *imports* on the `logging` interface from [WASI Logging](https://github.com/WebAssembly/wasi-logging) and *exports* (or exposes a function on) the `incoming-handler` interface from [WASI HTTP](https://github.com/WebAssembly/wasi-http). This enables the component to be invoked (and respond) via HTTP and to use logging functionality. 
+
+A wasmCloud component typically includes a top-level WIT world at the root of a `wit` folder in the project directory, while a `wasmcloud.toml` configuration file tells the `wash build` tool which top-level WIT world to compile into a component.
+
+Worlds refer to **interfaces** comprised of *type* and *function* definitions&mdash;these represent the lower-level vocabulary of the contract between entities. Worlds may also refer to other worlds, which themselves may refer to interfaces or still "deeper" worlds. Here is the `incoming-handler` interface imported by the world above:
+
+```wit
+/// This interface defines a handler of incoming HTTP Requests. It should
+/// be exported by components which can respond to HTTP Requests.
+interface incoming-handler {
+  use types.{incoming-request, response-outparam};
+
+  /// This function is invoked with an incoming HTTP Request, and a resource
+  /// `response-outparam` which provides the capability to reply with an HTTP
+  /// Response. The response is sent by calling the `response-outparam.set`
+  /// method, which allows execution to continue after the response has been
+  /// sent. This enables both streaming to the response body, and performing other
+  /// work.
+  ///
+  /// The implementor of this function must write a response to the
+  /// `response-outparam` before returning, or else the caller will respond
+  /// with an error on its behalf.
+  handle: func(
+    request: incoming-request,
+    response-out: response-outparam
+  );
+}
+```
+
+When two entities import and export respectively on the same interface (such as `incoming-handler`), they can be **linked** so that once invoked, they interact according to the contract defined in the interface.  
+
+![Interface diagram](../images/interface.png)
+
+For more information on using WIT, see our Developer Guide page on [**Creating an interface**](/docs/developer/interfaces/creating-an-interface). 
+
+:::info[WIT without WebAssembly]
+In spite of the name, WIT isn't limited to WebAssembly: wasmCloud also uses WIT to define the interfaces used by providers and host functions written in Rust or Go. It is entirely possible, for example, to create a Rust or Go binary that uses WIT interfaces over the wRPC (WIT over RPC) protocol. 
+:::
+
+## Well-known interfaces
+
+wasmCloud supports interfaces belonging to [WebAssembly System Interface (WASI)](https://wasi.dev/) 0.2 in addition to a selection of interfaces proposed for inclusion in WASI, and interfaces belonging to the wasmCloud host.
 
 ### WASI interfaces
 
@@ -43,7 +103,19 @@ Additionally, wasmCloud supports proposed WASI APIs that are in the process of i
 | https://github.com/WebAssembly/wasi-keyvalue  | 0.2.0-draft |
 | https://github.com/WebAssembly/wasi-logging   | [proposal]  |
 
-### Custom interfaces
+### wasmCloud interfaces
+
+Well-known interfaces include two APIs built specifically for wasmCloud:
+
+| API                                                                              | Versions    |
+| -------------------------------------------------------------------------------- | ----------- |
+| [wasmcloud:bus](https://github.com/wasmCloud/wasmCloud/blob/main/wit/bus.wit)    | 1.0.0       |
+| [wasmcloud:messaging](https://github.com/wasmCloud/messaging)                    | 1.0.0       |
+
+* **`wasmcloud:bus`** provides advanced link configuration only available in wasmCloud.
+* **`wasmcloud:messaging`** facilitates communication through message brokers.
+
+## Custom interfaces
 
 WASI interfaces are ultimately common standards using WIT, but wasmCloud enables you to build custom WIT interfaces and communicate between components in the way best-suited to your requirements.
 
@@ -70,8 +142,6 @@ While similar frameworks and languages like [gRPC][grpc] and [Smithy][smithy] ar
 ## Interface-driven development
 
 Interface-driven development (IDD) is a development approach that focuses on defining what capabilities components require before the specifics of how you will meet those needs. Systems developed using IDD&mdash;especially distributed systems&mdash;are loosely coupled, robust, and maintainable.
-
-By default, [WebAssembly components](/docs/concepts/components) operate in a completely isolated sandbox, meaning that they can only perform logical operations with no access to system resources like I/O, networking, and syscalls. In functional programming terminology we might call these components "pure," as they can only map inputs to outputs without producing side-effects. But without any side-effects, how can we use WebAssembly components to do anything useful in our applications?
 
 ## Keep reading
 
