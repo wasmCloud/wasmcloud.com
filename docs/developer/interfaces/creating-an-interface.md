@@ -15,7 +15,7 @@ You can find full documentation for WIT in the [community documentation for the 
 
 Writing WIT does not enact application behavior itself&mdash;instead, it defines a _contract_ between components, a behavior that a component will either fulfill itself or expect another component to fulfill.
 
-When developing an interface, you can use WIT to define the interfaces through which components and providers will communicate. Specifically, your WIT will define the interfaces that a WebAssembly component supports **("exports")** and the capabilities that it requires **("imports")**.
+When developing an interface, you can use WIT to define the interfaces through which components and providers will communicate. Specifically, your WIT will define the interfaces through which your component exposes functions **("exports")** and the capabilities that it requires **("imports")**.
 
 When a component adds an import&mdash;for `blobstore` functionality, say&mdash;you can imagine that your component is putting out an open call for _someone_ to perform the very specific, tightly-defined job of providing blob storage. Your component isn't going to worry about who does the job or exactly _how_ they do it, so long as it conforms to the precise definition of work your component has set out.
 
@@ -30,7 +30,7 @@ WIT files define _interfaces_ and _worlds_:
 - **Interfaces** are exactly what you would expect&mdash;named groups of _types_ and _functions_ making up an API.
 - **Worlds** are sets of imports and exports.
 
-In the `wit` directory of your project, you will typically have a `world.wit` file that defines the overall imports and exports for your component. A `world.wit` file might look like this:
+In a wasmCloud component project, it is conventional to include a top-level WIT world at the root of a `wit` folder in the project directory. This file defines the overall imports and exports for your component. A `world.wit` file might look like this:
 
 ```wit
 package wasmcloud:hello;
