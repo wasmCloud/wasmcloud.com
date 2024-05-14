@@ -155,67 +155,70 @@ Linking components at runtime is a two-step process:
 <details>
 <summary>Example: Two Components</summary>
 
-Here is an example manifest for a hypothetical application comprised of two components and an http-server provider:
+Here is an example manifest for an example application comprised of two components and an http-server provider:
 
 ```yaml
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: foobar
+  name: http-hello-world
   annotations:
-    version: v0.0.1 
-    description: 'Multi-component demo'
-    experimental: true
+    version: v0.0.2
+    description: "HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)"
 spec:
   components:
-    # The first component
-    - name: foo-component
+    - name: http-component
       type: component
       properties:
-        image: fooimage
+        image: file://./build/http_hello_world_s.wasm
       traits:
+        # Govern the spread/scheduling of the component
         - type: spreadscaler
           properties:
             replicas: 1
-        # Link definition for foo-component -> bar-component
         - type: link
           properties:
-            target: bar-component
-            namespace: custom
-            package: bar
-            interfaces: [bar]
-    # The second component
-    - name: bar-component
+            target: pong-component
+            namespace: example
+            package: pong
+            interfaces: [pingpong]
+
+    - name: pong-component
       type: component
       properties:
-        image: barimage
+        image: file://../pong/virt.wasm
       traits:
+        # Govern the spread/scheduling of the component
         - type: spreadscaler
           properties:
             replicas: 1
-    # The httpserver provider
+
+    # Add a capability provider that enables HTTP access
     - name: httpserver
       type: capability
       properties:
-        image: ghcr.io/wasmcloud/http-server:0.20.0
+        image: ghcr.io/wasmcloud/http-server:0.20.1
       traits:
-        # Link definition for httpserver -> bar-component
+        # Link the httpserver to the component, and configure the HTTP server
+        # to listen on port 8080 for incoming requests
         - type: link
           properties:
-            target: foo-component
+            target: http-component
             namespace: wasi
             package: http
-            interfaces: [incoming-handler] 
-            source_config: 
+            interfaces: [incoming-handler]
+            source_config:
               - name: default-http
-                properties: 
+                properties:
                   address: 127.0.0.1:8080
 
 ```
 
-* The foo-component is **exporting on the wasi-http interface** and **importing on a custom "bar" interface**. It is the importer in relation to the bar-component, so it is the source for that link. 
-* The bar-component is **exporting on the custom "bar" interface**. This is its only link relationship, and it is the exporter, so no links are defined as a trait of bar-component. 
-* The httpserver provider is **importing on the wasi-http interface**. It is the importer in relation to foo-component, so it is the source for that link, and basic configuration is performed in the `source_config`.
+* The http-component is **exporting on the wasi-http interface** and **importing on a custom "pingpong" interface**. It is the importer in relation to the pong-component, so it is the source for that link. 
+* The pong-component is **exporting on the custom "pingpong" interface**. This is its only link relationship, and it is the exporter, so no links are defined as a trait of pong-component. 
+* The httpserver provider is **importing on the wasi-http interface**. It is the importer in relation to http-component, so it is the source for that link, and basic configuration is performed in the `source_config`.
+
+If you would like to build and run the example described by this manifest, follow Steps 1 and 2 in the [composition example readme](https://github.com/wasmCloud/wasmCloud/tree/main/examples/rust/composition). 
 
 Remember that the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool is available to help you automatically generate a Wadm deployment manifest for a given component. Because it extrapolates link definitions from a component's WIT interfaces, it can be very helpful for not only generating manifests but understanding linking relationships in your application. 
 </details>
