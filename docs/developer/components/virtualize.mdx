@@ -1,0 +1,145 @@
+---
+title: 'Virtualize'
+date: 2024-05-13T11:00:00+00:00
+sidebar_position: 6
+draft: false
+---
+
+In the course of developing some components, you may find that you need to be able to **virtualize** a component within another encapsulating component in order to abstract away certain requirements. For example, the component may use an import not available from either the host or another entity on the lattice. One common reason for this scenario is that a required import is not secure. Virtualization provides an additional layer of sandboxing.
+
+In conventional usage, components utilizing WASI APIs such as Sockets and Filesystem have access to core operating system interfaces. In order to run such APIs securely on wasmCloud, it is necessary to isolate the component with [**WASI Virt**](https://github.com/bytecodealliance/wasi-virt).
+
+WASI Virt is a [Bytecode Alliance](https://bytecodealliance.org/) project that enables encapsulation of a virtualized component within another component. WASI API usage is deny-by-default for virtualized components&mdash;interfaces must be explicitly enabled at the time of composition. WASI Virt supports the following WASI APIs:
+
+* Clocks
+* Environment
+* Exit
+* Filesystem
+* HTTP
+* Random
+* Sockets
+* Stdio
+
+WASI Virt's virtual adapters are implemented with Wasm, providing complete isolation between the application and virtualization layers. Because WASI Virt and wasmCloud use the common standards of the Component Model and WASI P2, components generated with WASI Virt may be deployed directly to wasmCloud.
+
+## Install WASI Virt
+
+WASI Virt requires the nightly release channel for [Rust](https://www.rust-lang.org/tools/install):
+
+```bash
+rustup toolchain install nightly
+```
+
+Install the `wasi-virt` command line tool with Rust's `cargo` package manager:
+
+```bash
+cargo +nightly install --git https://github.com/bytecodealliance/wasi-virt
+```
+
+## Example: Virtualized environment variables
+
+In this example, we'll use WASI Virt to virtualize a component that uses **environment variables** within an encapsulating component.
+
+In addition to WASI Virt, you will need [wasmCloud Shell (wash)](https://wasmcloud.com/docs/installation).
+
+The example files are included in the wasmCloud [monorepo](https://en.wikipedia.org/wiki/Monorepo) at [github.com/wasmcloud/wasmcloud](https://github.com/wasmcloud/wasmcloud). You can perform a "sparse" checkout to download only the relevant example directory (and associated documentation and metadata):
+
+```bash
+git clone --depth 1 --no-checkout https://github.com/wasmCloud/wasmCloud.git
+cd wasmcloud
+git sparse-checkout set ./examples/rust/composition
+git checkout
+cd examples/rust/composition
+```
+
+For this example, we will use only the `pong` directory.
+
+### Virtualizing a component
+
+Navigate to the `pong` directory. Here we have a Rust-based component with a custom interface called `pong` that will return a string "ping" on its exported `pingpong` interface. Build the component:
+
+```shell
+cd pong
+wash build
+```
+
+We can use `wash inspect` to take a look at the WIT for this component:
+
+```shell
+wash inspect --wit ./build/pong_s.wasm
+```
+```wit
+package root:component;
+
+world root {
+  import wasi:cli/environment@0.2.0;
+  import wasi:cli/exit@0.2.0;
+  import wasi:io/error@0.2.0;
+  import wasi:io/streams@0.2.0;
+  import wasi:cli/stdin@0.2.0;
+  import wasi:cli/stdout@0.2.0;
+  import wasi:cli/stderr@0.2.0;
+  import wasi:clocks/wall-clock@0.2.0;
+  import wasi:filesystem/types@0.2.0;
+  import wasi:filesystem/preopens@0.2.0;
+  import wasi:random/random@0.2.0;
+
+  export example:pong/pingpong;
+}
+```
+You can see the `pingpong` interface listed as an export and `wasi:cli/environment` as one of many imports. 
+
+Using WASI Virt, we can compose `pong_s.wasm` into an encapsulating component with an environment variable `PONG` set to `demo`. The resulting component will be named `virt.wasm`.
+
+```shell
+wasi-virt build/pong_s.wasm --allow-random -e PONG=demo -o virt.wasm
+```
+In this command...
+
+* We define the input component, `build/pong_s.wasm`
+* We use `--allow-random` to allow the virtualized component to import `wasi:random/random`, because we know the wasmCloud host can satisfy that requirement
+* We set an environment variable `PONG` to `demo` using the `-e` flag
+* We name the output component `virt.wasm`
+
+Now let's view the WIT for our virtualized component:
+
+```shell
+wash inspect --wit virt.wasm 
+```
+```wit
+package root:component;
+
+world root {
+  import wasi:random/random@0.2.0;
+
+  export example:pong/pingpong;
+}
+```
+The virtualized component still exports `pingpong` but no longer requires `wasi:cli/environment`&mdash;that import (and all of the others except `wasi:random/random`, which we added via a WASI Virt argument) is satisfied by the encapsulating component. If we run this component on wasmCloud, the host will be able to satisfy the `random` import&mdash;it will simply require another component to invoke it via the `pingpong` interface. 
+
+In the `http-hello2` directory, we have a modified `http-hello-world` component that imports the `pingpong` interface and calls for a string from `pong` to append to the hello world message. Let's navigate over to that directory and build the component.
+
+```shell
+cd ../http-hello2
+wash build
+```
+The `wadm.yaml` deployment manifest in this directory will launch both the virtualized `pong` component and the new `http-hello-world` we just built. When we deploy with this manifest, wasmCloud will automatically [**link the components at runtime**](/docs/concepts/linking-components/linking-at-runtime.mdx), so that `pong` can satisfy the import of `http-hello-world`. 
+
+```shell
+wash app deploy wadm.yaml
+```
+
+When we invoke `http-hello-world` via `curl`, it invokes `pong`:
+
+```shell
+curl localhost:8080
+Hello World! I got pong demo
+```
+
+The environment variable value `demo` from our virtualization is returned in the hello world message. 
+
+## Further reading
+
+For more information on using WASI Virt, see the [project repository on GitHub](https://github.com/bytecodealliance/wasi-virt).
+
+

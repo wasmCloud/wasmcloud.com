@@ -8,7 +8,7 @@ type: 'docs'
 
 ## Overview
 
-At build-time, WebAssembly components may be **composed**, meaning they will be packaged together as a single component and linked internally. The composability of components is a core tenet of components' design. Open source CLI tools like [`wac`](https://github.com/bytecodealliance/wac) and [`wasm-tools`](https://github.com/bytecodealliance/wasm-tools) (using the `compose` subcommand) enable you to compose components before deployment.
+At build-time, WebAssembly components may be **composed**, meaning they will be packaged together as a single component and linked internally. The composability of components is a core tenet of components' design. Open source CLI tools like [`wac`](https://github.com/bytecodealliance/wac) and [WASI Virt](https://github.com/bytecodealliance/wasi-virt) enable you to compose components before deployment.
 
 It's important to note that build-time composition is a matter of link *declaration*. These links will be resolved upon component instantiation by the WebAssembly runtime&mdash;in our case, [Wasmtime](https://github.com/bytecodealliance/wasmtime), the underlying runtime used by the wasmCloud host. 
 
@@ -23,48 +23,88 @@ Linking at build makes sense when...
 
 ## Example: Composition
 
-This example uses a Wasm component written in TypeScript that composes with the Rust component [wit2wadm](https://github.com/brooksmtownsend/wit2wadm). The wit2wadm tool is a small Rust library that is useful for generating deployment manifests, and can be compiled to a component. Here we are using its componentized form as an arbitrary example of a component that can be composed at build-time in order to reuse functionality from different languages. 
-
-The instructions below show how to build an arbitrary TypeScript component and compose it with the Rust-based wit2wadm component as if it was a native TypeScript library.
+In this example, we'll perform multiple compositions, using tools like **WAC** and **WASI Virt** to compose Wasm binaries that run in wasmCloud and Wasmtime, and ultimately arriving at a single composed component. 
 
 ### Prerequisites
 
-- [wasm-tools](https://github.com/bytecodealliance/wasm-tools/tree/main)
-- [jco](https://github.com/bytecodealliance/jco)
-- [wash](https://wasmcloud.com/docs/installation)
-- [node](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
-- [rust](https://www.rust-lang.org/tools/install)
+This demo is designed to demonstrate multiple ecosystem tools, including:
 
-Clone the example TypeScript component repository:
+- [wasmCloud Shell (wash)](https://wasmcloud.com/docs/installation)
+- [Wasmtime](https://github.com/bytecodealliance/wasmtime)
+- [WebAssembly Compositions (WAC)](https://github.com/bytecodealliance/wac)
+- [WASI Virt](https://github.com/bytecodealliance/wasi-virt)
+
+Note that multiple tools require Cargo, and WASI Virt requires the [nightly release channel for Rust](https://github.com/bytecodealliance/WASI-Virt/blob/main/rust-toolchain.toml), so you may wish to install that up front:
 
 ```bash
-git clone https://github.com/brooksmtownsend/wit2wadm-ts.git
+rustup toolchain install nightly
 ```
 
-Install Node dependencies and build the component:
+#### wasmCloud Shell (`wash`)
+
+Follow the instructions for your OS on the [Installation page](https://wasmcloud.com/docs/installation). Since several of the following tools use [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html), you may wish to use `wash` through Cargo as well. 
+
+```shell
+cargo install wash-cli
+```
+
+#### Wasmtime 
+
+On Linux or macOS, you can install Wasmtime locally with an install script:
+
+```shell
+curl https://wasmtime.dev/install.sh -sSf | bash
+```
+
+#### WebAssembly Compositions (WAC)
+
+WAC requires [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html). Once you've installed Cargo:
+
+```shell
+cargo install wac-cli
+```
+
+#### WASI Virt
+
+WASI Virt requires the nightly release channel for [Rust](https://www.rust-lang.org/tools/install):
 
 ```bash
-# Install NPM dependencies
-npm install
-# Build the TypeScript component
+rustup toolchain install nightly
+```
+
+Install the `wasi-virt` command line tool with Rust's `cargo` package manager:
+
+```bash
+cargo +nightly install --git https://github.com/bytecodealliance/wasi-virt
+```
+
+#### Example files
+
+The example files are included in the wasmCloud [monorepo](https://en.wikipedia.org/wiki/Monorepo) at [github.com/wasmcloud/wasmcloud](https://github.com/wasmcloud/wasmcloud). You can perform a "sparse" checkout to download only the relevant example directory (and associated documentation and metadata):
+
+```bash
+git clone --depth 1 --no-checkout https://github.com/wasmCloud/wasmCloud.git
+cd wasmcloud
+git sparse-checkout set ./examples/rust/composition
+git checkout
+cd examples/rust/composition
+```
+
+For this example, we will use the `pong` and `http-hello2` directories as well as the `compose.wac` file at the root of the `composition` project directory.
+
+### Virtualizing a component
+
+Navigate to the `pong` directory. Here we have a Rust-based component with a custom interface called `pong` that will return a string "ping" on its exported `pingpong` interface. Build the component:
+
+```shell
+cd pong
 wash build
 ```
-Inside the `wit2wadm-ts` project directory, we'll clone the `wit2wadm` Rust library as well:
 
-```bash
-git clone https://github.com/brooksmtownsend/wit2wadm.git
-```
+We can use `wash inspect` to take a look at the WIT for this component:
 
-Now (from the root of `wit2wadm-ts`) we can build the other component:
-
-```bash
-wash build -p ./wit2wadm
-```
-
-Let's take a look at the two component's WIT interfaces:
-
-```bash
-wash inspect --wit ./wit2wadm/build/wit2wadm_component_s.wasm
+```shell
+wash inspect --wit ./build/pong_s.wasm
 ```
 ```wit
 package root:component;
@@ -82,63 +122,110 @@ world root {
   import wasi:filesystem/preopens@0.2.0;
   import wasi:random/random@0.2.0;
 
-  export wasmcloud:tools/convert;
+  export example:pong/pingpong;
 }
 ```
+You can see the `pingpong` interface listed as an export and `wasi:cli/environment` as one of many imports. 
 
-```bash
-wash inspect --wit ./build/wit2wadm_ts_s.wasm
+Now it's time to perform our first composition in the form of a virtualization with WASI Virt. Using WASI Virt, we're going to compose `pong_s.wasm` into an encapsulating component with an environment variable `PONG` set to `demo`. The resulting component will be named `virt.wasm`.
+
+```shell
+wasi-virt build/pong_s.wasm --allow-random -e PONG=demo -o virt.wasm
+```
+Now let's view the WIT for our virtualized component:
+
+```shell
+wash inspect --wit virt.wasm 
 ```
 ```wit
 package root:component;
 
 world root {
-  import wasmcloud:tools/convert;
+  import wasi:random/random@0.2.0;
 
-  export wasmcloud:tools/convert;
+  export example:pong/pingpong;
 }
 ```
+The virtualized component still exports `pingpong` but no longer requires `wasi:cli/environment`&mdash;that import (and all of the others except the new `wasi:random/random`, which we added via a WASI Virt argument) is satisfied by the encapsulating component. If we run this component on wasmCloud or with Wasmtime, the host will be able to satisfy the `random` import. But we still need another component to invoke this one via the exposed `pingpong` interface. 
 
-What we're going to be doing by composing these components together is connecting the `export wasmcloud:tools/convert` in the Rust component to the `import wasmcloud:tools/component` in the TypeScript component, and the final product is a single WebAssembly component.
+### Composing a component
 
-![wit2wasm architecture](../../images/wit2wadm-ts.png)
+In the `http-hello2` directory, we have a modified `http-hello-world` component that imports the `pingpong` interface and calls for a string from `pong` to append to the hello world message. Navigate to that directory and build the component.
 
-### Compose
-
-Compose the component with the wit2wadm Rust component in the `wit2wadm` directory, satisfying the `wasmcloud:tools/convert` import in our WIT:
-
-```bash
-# Copy into current directory for simplicity
-cp ./wit2wadm/build/wit2wadm_component_s.wasm ./wit2wadm.wasm
-# Compose the components, the wit2wadm component export will satisfy the import of the TypeScript component
-wasm-tools compose ./build/wit2wadm_ts_s.wasm --definitions ./wit2wadm.wasm > composed.wasm
+```shell
+cd ../http-hello2
+wash build
 ```
+For context, let's try running `wasmtime serve` *without* composing `pong` and `http-hello-world` together. 
 
-Taking a look at our composed component, we can see that we've ended up with a combination of both components:
+```shell
+wasmtime serve -S cli=y build/http_hello_world.wasm
+Error: component imports instance `example:pong/pingpong`, but a matching implementation was not found in the linker
+
+Caused by:
+    0: instance export `ping` has the wrong type
+    1: function implementation is missing
+```
+As we might expect, it doesn't work&mdash;the hello world component doesn't have anything linked to fulfill the `pong` import. If we compose it with the `pong` component, however, we essentially wire those corresponding imports and exports together within the encapsulating component. Head back to the root of the project directory with `cd ..` and then we'll use WAC to perform the composition.
+
+WAC works by encoding a composed component based on the instructions defined in a .wac file. The .wac file uses a superset of WIT also called WAC. Here are the contents of `compose.wac`:
+
+```wit
+package demo:composition;
+
+let pong = new ping:pong { ... };
+let hello = new hello:there { "example:pong/pingpong": pong.pingpong, ... };
+
+export hello...;
+```
+This is a pretty simple composition, but the the design of WAC facilitates much more complex compositions of many components. You can learn more about WAC usage in the tool's [readme](https://github.com/bytecodealliance/wac/blob/main/README.md) and [language guide](https://github.com/bytecodealliance/wac/blob/main/LANGUAGE.md). 
+
+For this demo's purposes, we simply need to run `wac encode` while indicating the components we wish to compose with the `--dep` argument, naming our output file with `-o`, and specifying our `.wac` instructions:
+
+```shell
+wac encode --dep ping:pong=./pong/virt.wasm --dep hello:there=./http-hello2/build/http_hello_world_s.wasm -o output.wasm compose.wac
+```
+Now we have a new file: `output.wasm`. Taking a look at our composed component, we can see that we've ended up with a combination of both components:
 
 ```bash
-wash inspect --wit ./composed.wasm
+wash inspect --wit output.wasm
 ```
 ```wit
 package root:component;
 
 world root {
-  import wasi:cli/environment@0.2.0;
-  import wasi:cli/exit@0.2.0;
+  import wasi:random/random@0.2.0;
   import wasi:io/error@0.2.0;
   import wasi:io/streams@0.2.0;
+  import wasi:http/types@0.2.0;
+  import wasi:cli/environment@0.2.0;
+  import wasi:cli/exit@0.2.0;
   import wasi:cli/stdin@0.2.0;
   import wasi:cli/stdout@0.2.0;
   import wasi:cli/stderr@0.2.0;
   import wasi:clocks/wall-clock@0.2.0;
   import wasi:filesystem/types@0.2.0;
   import wasi:filesystem/preopens@0.2.0;
-  import wasi:random/random@0.2.0;
 
-  export wasmcloud:tools/convert;
+  export wasi:http/incoming-handler@0.2.0;
 }
 ```
-If we wish to explore the flexibility of components, we can take this example further by transpiling the now-composed component to run as a JavaScript module in the web&mdash;that is beyond the scope of this page, but you can find instructions in the [example's GitHub repository](https://github.com/brooksmtownsend/wit2wadm-ts/tree/main). 
+
+Let's try running it with Wasmtime:
+
+```shell
+wasmtime serve -S cli=y output.wasm
+```
+```shell
+curl localhost:8080
+Hello World! I got pong demo
+```
+We can run the composed component in wasmCloud as well:
+
+```shell
+wash app deploy wadm.yaml
+```
+Congratulations! You've composed a component that runs anywhere supporting WASI P2. 
 
 ## Keep reading
 

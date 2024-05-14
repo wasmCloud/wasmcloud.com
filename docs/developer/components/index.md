@@ -15,3 +15,4 @@ The following pages will take you through the process of developing application 
 - [Configure](./configure)
 - [Iterate](./update)
 - [Publish](./publish)
+- [Virtualize](./virtualize)
