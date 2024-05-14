@@ -7,7 +7,7 @@ type: 'docs'
 sidebar_position: 4
 ---
 
-The normal way to interact with a `wadm` installation (which could be a single server or a cluster)
+The most common way to interact with a Wadm installation (which could be a single server or a cluster)
 is through the [wash](./usage.md) command-line tool. However, if you are planning on
 creating your own integration or writing a non-Rust language binding, then this reference will help.
 
@@ -15,16 +15,16 @@ creating your own integration or writing a non-Rust language binding, then this 
 _wadm and its corresponding API are not currently 1.0_. This means the API is likely to
 undergo changes and there may be some pieces that aren't yet implemented. This document will be
 updated as we continue to work on the API. All API changes will also be communicated via the release
-notes for wadm
+notes for Wadm.
 :::
 
 Please note that in production deployments, you will likely be using separate NATS credentials for
-accessing wadm. Please see the [deployment guide](/docs/deployment/wadm/) for more information for running
-wadm in production.
+accessing Wadm. Please see the [operator guide](/docs/deployment/wadm/) for more information for running
+Wadm in production.
 
-## Topic Space
+## Topic space
 
-The wadm API is exposed entirely as a NATS service on a topic space. All of the API operations will
+The Wadm API is exposed entirely as a NATS service on a topic space. All of the API operations will
 occur as _requests_ (_not_ simple publishes) on a topic in the following format:
 
 ```
@@ -32,7 +32,7 @@ wadm.api.{lattice-id}.{category}.{operation}.{object}
 ```
 
 The `operation` is usually a verb, and `object` is an optional scope-limiter to the operation. In
-many cases, the `object` will be something like a model name.
+many cases, the `object` will be something like a model name. 
 
 All requests and responses on this topic are encoded as JSON, except for the creation of models.
 
@@ -42,13 +42,11 @@ governing NATS topic segments. For example, they cannot contain spaces, commas, 
 characters, or periods.
 :::
 
-## Model Persistence
+## Model persistence
 
-The following operations pertain to storing and retrieving models. Persistence of models is
-explicitly and deliberately separated from deployment management. Any model can have multiple
-versions stored, and any one of those versions can be deployed
+In wasmCloud, models are versioned representations of application workloads stored in NATS key-value buckets. The following operations pertain to storing and retrieving models. Persistence of models is explicitly and deliberately separated from deployment management. Any model can have multiple versions stored, and any one of those versions can be deployed. Model persistence is similarly decoupled from any particular host. 
 
-### Store Models
+### Store models
 
 `wadm.api.{lattice}.model.put`
 
@@ -91,7 +89,7 @@ If the model and version being submitted already exist, the request will be _rej
 this won't automatically deploy a model, it only affects storage. The response will tell the caller
 how many versions are on file and the current version number _after_ the operation completed.
 
-### Get Model List
+### Get model list
 
 `wadm.api.{lattice-id}.model.list`
 
@@ -123,7 +121,7 @@ required to be semver, only recommended). The `deployed_version` field will be s
 that is currently deployed. If no version is deployed, this field will be set to `null`. Please note
 that `description` can also be `null` if no description was set
 
-### Get a Model Spec
+### Get a model spec
 
 `wadm.api.{lattice}.model.get.{name}`
 
@@ -214,7 +212,7 @@ to fetch a specific version
 Note that the `manifest` field is the JSON serialization of the [OAM
 model](https://github.com/wasmCloud/wadm/tree/main/oam)
 
-### Version History
+### Version history
 
 `wadm.api.{lattice}.model.versions.{name}`
 
@@ -240,7 +238,7 @@ Each of the items in the response list describes a revision and indicates whethe
 the deployed one. Remember that the ordering of the list does not reflect the semantic versioning as
 we do not require that the version field be semver.
 
-### Delete Models
+### Delete models
 
 `wadm.api.{lattice}.model.del.{name}`
 
@@ -270,7 +268,7 @@ currently deployed, then the resources will be undeployed automatically as well.
 The response indicates success, failure, or noop (i.e. nothing was deleted because it didn't exist),
 and if an `undeploy` operation occurred as part of the delete.
 
-## Managing Deployments
+## Managing deployments
 
 Deployments are discrete instances of autonomous control agents that monitor an application model
 against the real-time, discovered state of a lattice. This agent monitors lattice events, compares
@@ -357,7 +355,7 @@ It's important to note that the success/fail of this call doesn't indicate compl
 only success or failure of the receipt of the deployment request. In other words, the response is an
 _ack_. `notfound` is a specific error condition that indicates the model or version was not found
 
-### Deployment Status
+### Deployment status
 
 :::warning
 This functionality is not yet implemented. The documentation below is what we plan on implementing
