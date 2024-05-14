@@ -20,7 +20,7 @@ wash link query
 ```
 
 ### `put`
-Adds a link definition in the lattice associated with a component and provider and having an associated contract. If you want to name the link, you may pass a value to the `--link-name` flag. Be default, the link name is "default".
+Adds a link definition in the lattice associated with a component and provider and having an associated contract. If you want to name the link, you may pass a value to the `--link-name` flag. By default, the link name is "default".
 
 #### Usage
 ```
@@ -32,7 +32,7 @@ Deletes a link definition in the lattice. If it is named other than "default" th
 
 #### Usage
 ```
-wash link del [OPTIONS] --namespace <WIT_NAMESPACE> --package <WIT_PACKAGE> <source-id>
+wash link del [OPTIONS] <source-id> <wit-namespace> <wit-package>
 ```
 
 #### Options

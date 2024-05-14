@@ -8,21 +8,15 @@ draft: false
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-:::info
-
-The primary wasmCloud host runtime is the [`wasmcloud-host`](https://github.com/wasmCloud/wasmCloud/tree/main/crates/host), which you'll be using if you're running the host from wash, a released binary, or with the [wasmcloud](https://hub.docker.com/r/wasmcloud/wasmcloud) docker image.
-
-The Javascript host has different log messages, and it's recommended to create an issue in the [wasmcloud-js repo](https://github.com/wasmCloud/wasmcloud-js/issues/new) if you are running into errors in the browser.
-
-:::
+## Using logs
 
 The first place to check when troubleshooting the host is logs. wasmCloud host logs include the following:
 
 1. Logs from the host runtime
 1. Logs from components
-1. Logs from capability providers
+1. Logs from providers
 
-### Finding the Logs
+### Finding the logs
 
 <Tabs queryString="installation">
   <TabItem value="binary" label="wash" default>
@@ -89,7 +83,7 @@ Note that all components and providers inherit the same log level settings as th
 
 :::
 
-### Log Format
+### Log format
 
 By default, the wasmCloud host emits logs as unstructured text. However, structured logs can be enabled via the `--enable-structured-logging` flag, or by setting the `WASMCLOUD_STRUCTURED_LOGGING_ENABLED` environment variable to `true`. Structured logs are convenient when forwarding logs to an aggregation tool.
 
@@ -102,3 +96,79 @@ Structured logs look like the following:
 {"timestamp":"2023-12-19T22:16:06.402034Z","level":"INFO","fields":{"message":"bucket already exists. Skipping creation.","bucket":"CONFIGDATA_default"},"target":"wasmcloud_host::wasmbus"}
 {"timestamp":"2023-12-19T22:16:06.406203Z","level":"INFO","fields":{"message":"wasmCloud host started","host_id":"NC3CUT4IP43REAEQDE33652YNK4Z7KFE7KI3XGUMHVNSP2TNY3CFAH4M"},"target":"wasmcloud_host::wasmbus"}
 ```
+
+## Cleaning the slate
+
+In the course of troubleshooting, you may wish to completely clear your existing wasmCloud environment and start with a fresh installation. You can follow these steps to do so, but **note that the process will remove all existing data associated with wasmCloud** including application models stored on the lattice.
+
+### Drain and uninstall `wash`
+
+Run `wash drain` to clear caches (including OCI artifacts and provider binaries) and then uninstall `wash` in the same way you installed it. (The example below assumes an install via Cargo.)
+
+```shell
+wash drain
+# Uninstall wash the same way you installed it
+cargo uninstall wash-cli
+# Ensure the wash directory is clear
+rm -r ~/.wash
+```
+
+### Clear NATS streams and buckets 
+
+Several **streams** and **key-value buckets** used by wasmCloud persist on NATS even if `wash` is uninstalled, since the model store is decoupled from any given host. 
+
+You can interact directly with NATS using the NATS CLI. Find instructions to install the CLI on the [NATS CLI GitHub repo](https://github.com/nats-io/natscli). 
+
+You can list all streams on your NATS instance with:
+
+```shell
+nats stream list -a
+```
+
+The `-a` flag includes system streams in the list. The listed streams will include:
+
+* `wadm_commands`
+* `wadm_events`
+* `wadm_mirror`
+* `wadm_notify`
+* `KV_CONFIGDATA_default`
+* `KV_wadm_manifests`
+* `KV_wadm_state`
+* `wadm_status`
+* `KV_LATTICEDATA_default`
+
+To delete a NATS stream:
+
+```shell
+nats stream del STREAM_NAME
+```
+For example: `nats stream del wadm_status`
+
+You can list all key-value buckets on your NATS instance with:
+
+```shell
+nats kv list
+```
+
+The listed key-value buckets will include:
+
+* `CONFIGDATA_default`
+* `wadm_manifests`
+* `wadm_state`
+* `LATTICEDATA_default`
+
+To delete a NATS key-value bucket:
+
+```shell
+nats kv del BUCKET_NAME CONTEXT_NAME
+```
+Unless you've added or edited a context, the CONTEXT_NAME value is `host_default`.
+
+For example: `nats kv del wadm_state host_default`
+
+For a total reset, delete all buckets and streams. These buckets and streams will be automatically regenerated when you run `wash up` from your new `wash` installation. 
+
+### Reinstall `wash`
+
+[Install `wash`](https://wasmcloud.com/docs/installation) again according to the instructions for your installation method.
+
