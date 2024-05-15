@@ -1,26 +1,21 @@
 ---
-title: 'Using the Wadm API'
+title: 'Using the wadm API'
 date: 2020-01-19T00:00:00+00:00
 icon: 'ti-map' # themify icon pack : https://themify.me/themify-icons
-description: "Interacting with Wadm's API"
+description: "Interacting with wadm's API"
 type: 'docs'
 sidebar_position: 4
 ---
 
-The most common way to interact with a Wadm installation (which could be a single server or a cluster)
-is through the [wash](./usage.md) command-line tool. However, if you are planning on
-creating your own integration or writing a non-Rust language binding, then this reference will help.
+The most common way to interact with a Wadm installation (which could be a single server or a cluster) is through the [wash](./usage.md) command-line tool. However, if you are planning on creating your own integration or writing a non-Rust language binding, then this reference will help.
 
 :::warning
-_wadm and its corresponding API are not currently 1.0_. This means the API is likely to
-undergo changes and there may be some pieces that aren't yet implemented. This document will be
-updated as we continue to work on the API. All API changes will also be communicated via the release
-notes for Wadm.
+**The wadm API is not currently 1.0**. This means the API is likely to undergo changes and there may be some pieces that aren't yet implemented. This document will be updated as we continue to work on the API. All API changes will also be communicated via the release notes for wadm.
 :::
 
 Please note that in production deployments, you will likely be using separate NATS credentials for
-accessing Wadm. Please see the [operator guide](/docs/deployment/wadm/) for more information for running
-Wadm in production.
+accessing wadm. Please see the [operator guide](/docs/deployment/wadm/) for more information for running
+wadm in production.
 
 ## Topic space
 
@@ -37,7 +32,7 @@ many cases, the `object` will be something like a model name.
 All requests and responses on this topic are encoded as JSON, except for the creation of models.
 
 :::info
-**NOTE** that all model _names_ are treated like unique identifiers and must conform to the rules
+All model names are treated like unique identifiers and must conform to the rules
 governing NATS topic segments. For example, they cannot contain spaces, commas, unprintable
 characters, or periods.
 :::
