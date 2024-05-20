@@ -69,7 +69,7 @@ wasmCloud host version to download, e.g. `v0.80.0`. See https://github.com/wasmC
 #### --lattice
 
 Alias: `-x`.
-A lattice name is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE_PREFIX=] [default: default]
+A lattice name is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE=] [default: default]
 
 #### --host-seed
 
