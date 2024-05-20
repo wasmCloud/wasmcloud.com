@@ -66,7 +66,7 @@ NATS Server Jetstream domain, defaults to `core` [env: NATS_JS_DOMAIN=]
 
 wasmCloud host version to download, e.g. `v0.80.0`. See https://github.com/wasmCloud/wasmCloud/releases for releases [env: WASMCLOUD_VERSION=] [default: v0.80.0]
 
-#### --lattice-prefix
+#### --lattice
 
 Alias: `-x`.
 A lattice name is a unique identifier for a lattice, and is frequently used within NATS topics to isolate messages from different lattices [env: WASMCLOUD_LATTICE_PREFIX=] [default: default]
