@@ -5,7 +5,7 @@ sidebar_position: 1
 draft: false
 ---
 
-The first step in creating our new provider is to generate a new project from a template. We provide an example template to generate a capability provider that has scaffolding to implement the `wasmcloud:messaging` interface. This page will walk you through generating this capability provider and then implementing the functionality using [NATS](https://nats.io).
+The first step in creating our new provider is to generate a new project from a template. We provide an example template to generate a capability provider that has scaffolding to implement the `wasmcloud:messaging` interface. This page will walk you through generating this capability provider and then implementing the functionality using [NATS](https://nats.io). If you're interested in building a new capability provider from scratch, or from a custom interface, see the [Extend with Custom Capabilities](./create_custom.mdx) page.
 
 :::info[Dependencies]
 To create this capability provider you'll need to install [wash](/docs/installation.mdx) and the [Rust toolchain](https://www.rust-lang.org/tools/install). After implementing, you'll also want the [nats CLI](https://github.com/nats-io/natscli) to send your provider messages.
