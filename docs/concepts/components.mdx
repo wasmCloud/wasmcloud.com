@@ -7,77 +7,65 @@ sidebar_position: 0
 type: 'docs'
 ---
 
-## WebAssembly components
+## Overview
 
-[WebAssembly components](https://github.com/WebAssembly/component-model) are the unit of compute for wasmCloud. The Component Model provides a standard for creating portable, interoperable, and composable code with WebAssembly. This aligns well with wasmCloud's approach to building distributed applications that are composable and [interface-driven](/docs/concepts/interfaces), and we are committed to supporting a componentized ecosystem.
+**Components** are portable, interoperable WebAssembly binaries (`.wasm` files) that implement stateless logic. In wasmCloud, components typically enact the core logic of an application (for example, the API for a web application), while leaving longer-lived, reusable processes such as key-value storage to [**providers**](/docs/concepts/providers/).
 
-The wasmCloud host remains up-to-date with the latest versions of [wasmtime](https://wasmtime.dev/) and [WASI Preview 2](https://github.com/WebAssembly/WASI/blob/main/preview2/README.md), a set of standard APIs designed to allow WebAssembly components to access external resources in a safe and portable way.
+In wasmCloud usage and documentation, the term **"component"** simply refers to a standard WebAssembly component. For example, the `wash new component` command creates a new component that could be executed with any WebAssembly runtime that supports components. The wasmCloud platform provides a way to run components distributedly.
 
-## Components in wasmCloud
+## Features of components
 
-In wasmCloud, applications are comprised of **components** and **providers** that communicate with one another via **interfaces**.
+Components may be compiled from a variety of languages including Rust, Go, Python, JavaScript, and more. Because components can be compiled from many different languages and then interact with one another, they enable developers to break down language silos and utilize libraries and tooling in new ways. 
 
-- **Components**: Core logic that runs statelessly (ex. API for a web app).
-- **Providers**: Longer-lived processes fulfilling non-functional requirements (ex. Key-value storage).
+![Compilation from a variety of languages](../../static/img/compile.png)
 
-In wasmCloud usage and documentation, the term **"component"** is conventionally used to refer to a component implementing stateless core logic&mdash;we will also use the term **application component** for this purpose. For example, the `wash new component` command creates a new application component.
+*Components can compile from a variety of languages and run across architectures. The `wash build` command can compile components from any language, leveraging language-specific toolchains.*
 
-Providers are implemented as executable host plugins. For clarity, we will always use the terms "provider" or "capability provider" in usage and documentation. You can read more about providers on the [provider](/docs/concepts/providers.mdx) page.
+Components are portable, interoperable, and composable:
 
-## Application components
+* **Portable**: Because WebAssembly binaries execute against a virtual instruction set architecture (essentially a tiny VM), they are agnostic to architecture and operating system kernel; they run anywhere there is a WebAssembly runtime. Component binaries are typically much smaller than analogous container images, as well&mdash;often measured in kilobytes&mdash;enabling them to run in resource-constrained environments where even containers aren't practical. 
+* **Interoperable**: Components can interact with one another over high-level APIs regardless of their respective languages of origin, so that a component written in Rust can utilize the functionality of a library from Go. 
+* **Composable**: Multiple components can be combined into a single binary (or dynamically linked at runtime in wasmCloud). This enables developers to build applications as if with construction bricks, satisfying dependencies with other components as needed.  
 
-An **application component** is the smallest unit of deployable, portable compute within the wasmCloud ecosystem. Application components can handle messages delivered to them by the host runtime and can invoke functions on [capability providers](/docs/concepts/providers).
+Additionally, components are...
 
-wasmCloud application components are:
+#### Stateless
 
-### Stateless
+When a component needs state, it uses a [provider](/docs/concepts/providers). Leaving state to providers enables wasmCloud to orchestrate invocations in complex applications without regard to specific instances of components or where they're running.
 
-When an application component needs state, it uses a [capability provider](/docs/concepts/providers). Leaving state to capability providers enables wasmCloud to orchestrate invocations in complex applications without regard to specific instances of application components or where they're running.
+#### Secure
 
-### Secure
+Components are secure by default. Because WebAssembly components that can't use WASI capabilities directly, they are incapable of interacting with any operating system functionality on their own. The only way components can affect their external environment is through the use of a provider. wasmCloud will only allow calls between [linked](/docs/concepts/linking-components/) components and providers.
 
-Application components are secure by default. Because WebAssembly components that can't use WASI capabilities directly, they are incapable of interacting with any operating system functionality on their own. The only way application components can affect their external environment is through the use of a capability provider. The host runtime will only allow calls between [linked](/docs/concepts/linking-components/) components and providers.
+#### Reactive
 
-### Flat in hierarchy
+Components follow the principles of **[reactive programming](https://en.wikipedia.org/wiki/Reactive_programming)**: they only run when invoked by another entity. An invocation might originate from another component or provider's function call, a message from the [wasmCloud host](/docs/concepts/hosts/), or a `wash call` command from the CLI. In turn, components can invoke exposed functions on components, providers, or the host.
 
-In a zero trust environment, allowing application components to spawn others is a security risk. wasmCloud hosts maintain the horizontal scale of application components with an entirely flat hierarchy.
+#### Connected by abstractions
 
-### Internally single-threaded
+wasmCloud components are _loosely coupled_ with the providers they use for non-functional requirements. A component doesn't communicate with **Redis** or **Cassandra** or **Consul**; instead it communicates with a generalized abstraction over the `keyvalue` interface.
 
-The surrounding environment of the host runtime may have varying levels of concurrency support. This support may differ depending on whether the host is running in a browser, on a constrained device, or in a VM somewhere. However, the code for application components should be independent of these conditions and _never have to change_, even if the surrounding environment adopts a different concurrency model.
+An [interface](/docs/concepts/interfaces) represents an abstracted functionality. As long as the provider implements the correct interface, it's considered compatible with your component. A component written using the `keyvalue` interface should be able to work with _any_ key-value store. This decoupling also enables swapping the store at runtime without requiring a rebuild or redeploy. Learn more about wasmCloud's interface support on the [Interface](/docs/concepts/interfaces) page.
+
+#### Internally single-threaded
+
+The surrounding environment of the [wasmCloud host](/docs/concepts/hosts/) may have varying levels of concurrency support. This support may differ depending on whether the host is running in a browser, on a constrained device, or in a VM somewhere. However, the code for components should be independent of these conditions and _never have to change_, even if the surrounding environment adopts a different concurrency model.
 
 :::info[Note]
 While it's nice not worrying about the underlying concurrency model, it's important to understand that single-threaded code has the potential to create bottlenecks. Therefore, when developing _message handlers_ for components, embrace the design of performing small amounts of work in a "get in and get out fast" approach. Divide the work into the smallest bits possible, and perform each bit as fast as possible. This approach maximizes the benefits of _external concurrency_ while still keeping the code simple and synchronous.
 :::
 
-### Reactive
+#### Flat in hierarchy
 
-**[Reactive](https://en.wikipedia.org/wiki/Reactive_programming)**: An application component can't start any flow on its own. Components can only _react_ to outside stimuli in the form of messages delivered by the host. Developers declare which messages their components handle as input and return messages as output. The following example implements a handler that receives a bank account query and responds with the bank account value:
+In a zero trust environment, allowing components to spawn others is a security risk. wasmCloud maintains the horizontal scale of components with an entirely flat hierarchy.
 
-```rust
-#[async_trait]
-impl BankServer for BankComponent {
-    async fn handle_inquiry(&self,
-        ctx: &Context,
-        query: &BalanceInquiry) -> RpcResult<Balance> {
+## Open standards
 
-        // queried using another capability provider
-        let balance = get_balance()?;
-        Ok(Balance{
-            account: query.account,
-            balance
-        })
-    }
-}
-```
+The wasmCloud project is committed to supporting a componentized ecosystem and remains up-to-date with the latest versions of the [Wasmtime](https://wasmtime.dev/) WebAssembly runtime and [WASI 0.2](https://github.com/WebAssembly/WASI/blob/main/preview2/README.md), a set of standard APIs designed to allow WebAssembly components to access external resources in a safe and portable way.
 
-The preceding component code could communicate with capability providers (for example, a _key-value store_ to retrieve the account balance), but only in response to a message from the host.
+Components are defined according to the [Component Model](https://github.com/WebAssembly/component-model), an open standard governed by the [W3C WebAssembly Community Group](https://www.w3.org/community/webassembly/) that describes a layer of specification in addition to that of a core WebAssembly module. 
 
-### Connected by abstractions
-
-wasmCloud components are _loosely coupled_ with the providers they use for non-functional requirements. A component doesn't communicate with **Redis** or **Cassandra** or **Consul**; instead it communicates with a generalized abstraction over the `keyvalue` interface.
-
-An [interface](/docs/concepts/interfaces) represents an abstracted functionality. As long as the provider implements the correct interface, it's considered compatible with your component. A component written using the `keyvalue` interface should be able to work with _any_ key-value store. This decoupling also enables swapping the store at runtime without requiring a rebuild or redeploy. Learn more about wasmCloud's interface support on the [Interface](/docs/concepts/interfaces) page.
+In principle, any language can compile code to a component; the maturity of compilers varies by language, and component tooling is developing rapidly since the release of WASI 0.2 in January 2024. You can find practical tooling for working with components in [Useful WebAssembly Tooling](/docs/ecosystem/useful-webassembly-tools/).
 
 ## Keep reading
 
