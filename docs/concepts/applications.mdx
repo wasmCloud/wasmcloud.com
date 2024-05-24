@@ -14,9 +14,9 @@ Applications are the primary abstraction for deployable workloads in a wasmCloud
 
 Once deployed, applications are represented as **models** in the **wasmCloud Application Deployment Manager (Wadm)**. An application model may include multiple deployable versions. Model persistence is decoupled from deployments themselves and from any particular host.
 
-:::info
+:::info[Compared to Kubernetes...]
 
-If you're familiar with Kubernetes or Nomad, you can think of a wasmCloud application as a Deployment or Job, respectively.
+A **wasmCloud application** is analogous to a **Kubernetes Deployment**.
 
 :::
 
@@ -34,49 +34,53 @@ wasmCloud application manifests are composed of two sections: metadata and `spec
 The following is an example of a simple wasmCloud application manifest:
 
 ```yaml
+# Metadata
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: echo
+  name: hello-world
   annotations:
-    version: v1.2.3
-    description: My echo app
+    description: 'HTTP hello world demo'
 spec:
   components:
-    - name: echo
+    - name: http-component
       type: component
       properties:
-        image: wasmcloud.azurecr.io/echo:0.3.8
+        # Run components from OCI registries as below or from a local .wasm component binary.
+        image: wasmcloud.azurecr.io/http-hello-world:0.1.0
       traits:
+        # One replica of this component will run
         - type: spreadscaler
           properties:
             replicas: 1
-        - type: linkdef
-          properties:
-            target: httpserver
-            values:
-              address: 0.0.0.0:8080
-
+    # The httpserver capability provider, started from the official wasmCloud OCI artifact
     - name: httpserver
       type: capability
       properties:
-        contract: wasmcloud:httpserver
-        image: wasmcloud.azurecr.io/httpserver:0.19.1
+        image: ghcr.io/wasmcloud/http-server:0.20.0
       traits:
-        - type: spreadscaler
+        # Link the HTTP server and set it to listen on the local machine's port 8080
+        - type: link
           properties:
-            replicas: 1
+            target: http-component
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler]
+            source_config:
+              - name: default-http
+                properties:
+                  ADDRESS: 127.0.0.1:8080
 ```
 
 :::[Write less YAML]
 The design of WebAssembly Interface Type (WIT) interfaces makes it possible to automate the generation of a manifest for a given component. Use the [`wit2wadm`](https://github.com/brooksmtownsend/wit2wadm) tool to quickly generate manifests from your components on the command line. 
 :::
 
-### wasmCloud Application Deployment Manager (Wadm)
+### wasmCloud Application Deployment Manager (wadm)
 
-To deploy and manage applications, wasmcloud uses Wadm. Wadm uses a control loop to react to events and reconcile requested state with desired state.
+Application deployment and management is handled by the **wasmCloud Application Deployment Manager (wadm)**, a part of the wasmCloud platform that uses a control loop to react to events and reconcile requested state with desired state.
 
-For an in-depth guide into how how wasmCloud manages applications, see the [Wadm documentation](/docs/ecosystem/wadm/).
+For an in-depth guide on how wasmCloud manages applications, see [wasmCloud Application Deployment Manager](/docs/ecosystem/wadm/).
 
 :::info[Imperative or declarative?]
 While wasmCloud supports the imperative management of [components](/docs/concepts/components), [providers](/docs/concepts/providers), and [links](/docs/concepts/linking-components/) (which can be useful for experimentation or debuggging), these are generally considered low-level operations. Declarative application management is generally better-suited to complex distributed applications that can be dynamically adjusted at runtime.
