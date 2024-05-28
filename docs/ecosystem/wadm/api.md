@@ -7,10 +7,15 @@ type: 'docs'
 sidebar_position: 4
 ---
 
-The most common way to interact with a Wadm installation (which could be a single server or a cluster) is through the [wash](./usage.md) command-line tool. However, if you are planning on creating your own integration or writing a non-Rust language binding, then this reference will help.
+The most common way to interact with a Wadm installation (which could be a single server or a
+cluster) is through the [wash](./usage.md) command-line tool or the [Rust client
+crate](https://docs.rs/wadm-client/latest/wadm_client/). However, if you are planning on creating
+your own integration or writing a non-Rust language binding, then this reference will help.
 
 :::warning
-**The wadm API is not currently 1.0**. This means the API is likely to undergo changes and there may be some pieces that aren't yet implemented. This document will be updated as we continue to work on the API. All API changes will also be communicated via the release notes for wadm.
+**The wadm API is not currently 1.0**. This means the API is likely to undergo changes and there may
+be some pieces that aren't yet implemented. This document will be updated as we continue to work on
+the API. All API changes will also be communicated via the release notes for wadm.
 :::
 
 Please note that in production deployments, you will likely be using separate NATS credentials for
@@ -39,7 +44,11 @@ characters, or periods.
 
 ## Model persistence
 
-In wasmCloud, models are versioned representations of application workloads stored in NATS key-value buckets. The following operations pertain to storing and retrieving models. Persistence of models is explicitly and deliberately separated from deployment management. Any model can have multiple versions stored, and any one of those versions can be deployed. Model persistence is similarly decoupled from any particular host. 
+In wasmCloud, models are versioned representations of application workloads stored in NATS key-value
+buckets. The following operations pertain to storing and retrieving models. Persistence of models is
+explicitly and deliberately separated from deployment management. Any model can have multiple
+versions stored, and any one of those versions can be deployed. Model persistence is similarly
+decoupled from any particular host. 
 
 ### Store models
 
@@ -48,7 +57,9 @@ In wasmCloud, models are versioned representations of application workloads stor
 Model storage is _append-only_. New versions are added to the model's version history according to
 retention policy and will not replace previously existing versions. This means that if you put a
 model with the same version, it will be rejected. The `name` of the model is a unique identifier and
-should be a valid NATS topic segment.
+should be a valid NATS topic segment. Please note that specifying a version in a model is not
+required. If a version is not specified, a [ULID](https://github.com/ulid/spec) will be generated
+and used as the version.
 
 #### Request
 
@@ -80,9 +91,9 @@ attempt to interpret the version field. We highly recommend using _semantic vers
 but that is up to the developers. The string `latest` is explicitly NOT allowed as a version as it
 used as a reserved word for indicating that the latest version should be deployed
 
-If the model and version being submitted already exist, the request will be _rejected_. Note that
-this won't automatically deploy a model, it only affects storage. The response will tell the caller
-how many versions are on file and the current version number _after_ the operation completed.
+Please note that versions are entirely optional. Wadm will by default generate a
+[ULID](https://github.com/ulid/spec) for the model when it is pushed if no version is set. However,
+versions must still be unique 
 
 ### Get model list
 
@@ -112,7 +123,7 @@ Empty body
 ```
 
 The `version` field will always be set to the latest version stored (by time, as version is _not_
-required to be semver, only recommended). The `deployed_version` field will be set to the version
+required to be semver). The `deployed_version` field will be set to the version
 that is currently deployed. If no version is deployed, this field will be set to `null`. Please note
 that `description` can also be `null` if no description was set
 
@@ -143,64 +154,65 @@ to fetch a specific version
 ```json
 {
   "result": "error|success|notfound",
-  "message": "Fetched model echo",
+  "message": "Successfully fetched model http-hello-world",
   "manifest": {
-    "apiVersion": "core.oam.dev/v1beta1",
-    "kind": "Application",
-    "metadata": {
-      "name": "echo",
-      "annotations": {
-        "description": "This is my app",
-        "version": "v0.0.1"
-      }
-    },
-    "spec": {
-      "components": [
-        {
-          "name": "echo",
-          "type": "component",
-          "properties": {
-            "image": "wasmcloud.azurecr.io/echo:0.3.7"
-          },
-          "traits": [
-            {
-              "type": "spreadscaler",
-              "properties": {
-                "replicas": 1,
-                "spread": []
-              }
-            },
-            {
-              "type": "linkdef",
-              "properties": {
-                "target": "httpserver",
-                "values": {
-                  "address": "0.0.0.0:8080"
-                }
-              }
-            }
-          ]
+      "apiVersion": "core.oam.dev/v1beta1",
+      "kind": "Application",
+      "metadata": {
+        "annotations": {
+          "description": "HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)",
+          "version": "v0.0.1"
         },
-        {
-          "name": "httpserver",
-          "type": "capability",
-          "properties": {
-            "image": "wasmcloud.azurecr.io/httpserver:0.19.1",
-            "contract": "wasmcloud:httpserver"
-          },
-          "traits": [
-            {
-              "type": "spreadscaler",
-              "properties": {
-                "replicas": 1,
-                "spread": []
+        "name": "http-hello-world"
+      },
+      "spec": {
+        "components": [
+          {
+            "name": "http-component",
+            "properties": {
+              "image": "wasmcloud.azurecr.io/echo:0.3.7"
+            },
+            "traits": [
+              {
+                "properties": {
+                  "instances": 1
+                },
+                "type": "spreadscaler"
               }
-            }
-          ]
-        }
-      ]
+            ],
+            "type": "component"
+          },
+          {
+            "name": "httpserver",
+            "properties": {
+              "image": "ghcr.io/wasmcloud/http-server:0.20.1"
+            },
+            "traits": [
+              {
+                "properties": {
+                  "interfaces": [
+                    "incoming-handler"
+                  ],
+                  "namespace": "wasi",
+                  "package": "http",
+                  "source_config": [
+                    {
+                      "name": "default-http",
+                      "properties": {
+                        "address": "127.0.0.1:8080"
+                      }
+                    }
+                  ],
+                  "target": "http-component"
+                },
+                "type": "link"
+              }
+            ],
+            "type": "capability"
+          }
+        ]
+      }
     }
-  }
 }
 ```
 
@@ -231,22 +243,25 @@ Empty body
 
 Each of the items in the response list describes a revision and indicates whether that revision is
 the deployed one. Remember that the ordering of the list does not reflect the semantic versioning as
-we do not require that the version field be semver.
+we do not require that the version field be semver. If no manual versions were set, all IDs will be
+also be lexicographically sortable to be the same as insertion order since they will be
+[ULIDs](https://github.com/ulid/spec) 
 
 ### Delete models
 
 `wadm.api.{lattice}.model.del.{name}`
 
-Deletes the named model with the supplied version number. If the `delete_all` flag is set, then all
-versions of this model will be deleted. If you delete a model version (or the whole model) that is
+Deletes all versions of the named model. If the `version` field is set, then only that specific
+version of this model will be deleted. If you delete a model version (or the whole model) that is
 currently deployed, then the resources will be undeployed automatically as well.
 
 #### Request
 
+Empty body or
+
 ```json
 {
   "version": "1.0",
-  "delete_all": false
 }
 ```
 
@@ -322,20 +337,6 @@ to complete an undeploy.
 #### Request
 
 Empty body
-
-or
-
-```json
-{
-  "non_destructive": true
-}
-```
-
-for a non-destructive undeploy. This will stop managing, but will not destroy resources.
-
-:::warning
-Non-destructive undeploy is currently not implemented, but will be added in a future version. Please comment on [this issue](https://github.com/wasmCloud/wadm/issues/113) if you would like to see this feature and how you'd like it to behave
-:::
 
 **Response**:
 
