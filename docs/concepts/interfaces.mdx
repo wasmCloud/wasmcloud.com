@@ -11,7 +11,7 @@ type: 'docs'
 
 In wasmCloud, [components](/docs/concepts/components) and [providers](/docs/concepts/providers) communicate through **interfaces**: contracts that define the relationships between entities. These interfaces come in two kinds:
 
-* **Well-known interfaces** are common standards (such as [WASI interfaces](#wasi-interfaces)) or wasmCloud interfaces (core functionalities like `wasmcloud-messaging`) supported out-of-the-box by wasmCloud hosts.
+* **Well-known interfaces** are common standards (such as [WebAssembly System Interface (WASI) APIs](#wasi-interfaces)) or wasmCloud interfaces (core functionalities like `wasmcloud-messaging`) supported out-of-the-box by wasmCloud hosts.
 * **Custom interfaces** are user-created contracts that make it possible to extend and tailor how wasmCloud components and providers interact with one another.
 
 In all cases, wasmCloud interfaces are defined using the interface description language **WebAssembly Interface Type (WIT)**.
@@ -22,7 +22,34 @@ WebAssembly Interface Type (WIT) is an [open standard maintained as part of the 
 
 WIT enables WebAssembly components to define the functions they expose to external entities ("**exports**") and the functionalities they require ("**imports**") in `.wit` files.
 
-The highest-level contract in a WIT interface is called a **world**. A WIT world is where an interface defines imports and exports. Here is a simple example of a world:
+### Packages, namespaces, and versions
+
+Interfaces defined in WIT are organized into **packages**. Packages must include a **namespace** and **identifier**.   
+
+![Namespace and package in a WIT file](../../static/img/wit-package.png)
+
+Optionally, WIT packages may include a version using [semantic versioning](https://semver.org/).
+
+:::info[Why `0.2.0-draft`?]
+The version for the example above is `0.2.0-draft`. WASI proposals move through three phases. Once a proposal reaches Phase 3, it may be included in the standard API group of WASI 0.2. The `wasi-keyvalue` interface above is at Phase 2.
+:::
+
+In wasmCloud, you will often see packages belonging to the `wasmcloud` and `wasi` namespaces. You may also create custom interfaces with arbitrary namespaces. Packages with different namespaces may be mixed and matched freely, and the contents of a given package may be spread across multiple files. 
+
+A common organizational pattern divides a package into: 
+
+* `types.wit`
+* `imports.wit` 
+* `world.wit` 
+* `my-interface-name.wit`
+
+An interface may also have a `deps` folder holding WIT files for other WIT files used as dependencies in your interface. 
+
+For more information on organizing an interface, see [Creating an interface](/docs/developer/interfaces/creating-an-interface).
+
+### Worlds
+
+The highest-level contract in a WIT interface is called a **world**. A WIT world is akin to a complete description of a component, defining the imports and exports that enable the component to interact other entities. Here is a simple example of a world:
 
 ```wit
 package wasmcloud:demo;
@@ -36,9 +63,15 @@ world demo {
 ```
 This is the top-level world for a hypothetical component that *imports* on the `logging` interface from [WASI Logging](https://github.com/WebAssembly/wasi-logging) and *exports* (or exposes a function on) the `incoming-handler` interface from [WASI HTTP](https://github.com/WebAssembly/wasi-http). This enables the component to be invoked (and respond) via HTTP and to use logging functionality. 
 
+There are often at least two worlds defined in a package. A common convention is to have an `imports` world and the world components typically target. 
+
 In a wasmCloud component project, it is conventional to include a top-level WIT world at the root of a `wit` folder in the project directory. At the project root, a `wasmcloud.toml` configuration file tells the `wash build` tool which top-level WIT world to compile into a component.
 
-Worlds refer to **interfaces** comprised of *type* and *function* definitions&mdash;these represent the lower-level vocabulary of the contract between entities. Worlds may also refer to other worlds, which themselves may refer to interfaces or still "deeper" worlds. Here is the `incoming-handler` interface imported by the world above:
+### Interfaces
+
+An interface is a collection of **types** and **functions** scoped to a package which can be used within a world. Interfaces are the only place that a type can be defined. Packages may contain multiple interfaces.
+
+Interfaces represent the lower-level vocabulary of the contract between entities. Worlds may also refer to other worlds, which themselves may refer to interfaces or still "deeper" worlds. Here is the `incoming-handler` interface imported by the world above:
 
 ```wit
 /// This interface defines a handler of incoming HTTP Requests. It should
@@ -135,7 +168,7 @@ world greeter {
 
 While reading the [spec][wit-spec] is the best way to learn about WIT, it is also designed to be easy to understand at a glance. WASI interfaces written in WIT contain their own documentation and are useful to consult as examples.
 
-:::warning[Comparing to gRPC and Smithy]
+:::warning[Compared to gRPC and Smithy...]
 While similar frameworks and languages like [gRPC][grpc] and [Smithy][smithy] are meant to perform over network boundaries, WIT is _in-process_, and performs at near-native speed.
 :::
 
