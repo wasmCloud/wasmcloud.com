@@ -197,11 +197,11 @@ metadata:
 spec:
   components:
     - name: kvcounter
-      type: actor
+      type: component
       properties:
         image: file://./build/http_hello_world_s.wasm
       traits:
-        # Govern the spread/scheduling of the actor
+        # Govern the spread/scheduling of the component
         - type: spreadscaler
           properties:
             replicas: 1
