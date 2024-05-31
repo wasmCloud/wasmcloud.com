@@ -1,5 +1,5 @@
 ---
-title: "Wash Plugin Developer Guide"
+title: "wash Plugin Developer Guide"
 date: 2024-04-26T11:02:05+06:00
 draft: false
 sidebar_position: 4
@@ -8,7 +8,7 @@ description: "How to create your own plugins"
 
 :::tip
 
-Wash plugins are available starting with version 0.28.
+wash plugins are available starting with version 0.28.
 
 :::
 
@@ -25,7 +25,7 @@ that demonstrates how to use all of the available functionality.
 
 The Plugin API is defined via WIT and is a small wrapper around the standard `wasi:cli/run`
 interface. The WIT is defined in the `wash-lib` crate and can be found
-[here](https://github.com/puppetlabs/wash/blob/main/crates/wash-lib/wit).
+[here](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-lib/wit).
 
 A plugin can be any component that exports `wasi:cli/run` and the wasmCloud-defined interface called
 `wasmcloud:wash/subcommand`. This is a very small interface that expects a single function called
