@@ -18,7 +18,7 @@ When deploying apps using [wadm](../ecosystem/wadm/index.md), the easiest way to
 ### `list`
 This will retrieve a list of all applications that wadm knows about. Application specifications (also referred to in our documentation and code as "models") are stored in a model store and are associated to your lattice.
 
-Usage: 
+Usage:
 
 ```
 wash app list
@@ -77,6 +77,12 @@ wash app deploy <name> [version]
 wash app deploy petclinic v0.0.1
 ```
 
+You can also *replace* a wadm application manifest with the `--replace` option:
+
+```
+wash app deploy --replace path/to/wadm.yaml
+```
+
 ### `undeploy`
 Undeploying an application spec tells wadm to stop monitoring that deployment. By default, all resources originally provisioned for an application will be removed after that application is undeployed.
 
@@ -87,44 +93,52 @@ wash app undeploy <name>
 wash app undeploy petclinic
 ```
 
+### `validate`
+Figure out if a wadm manifest has any issues that might prevent it from working properly.
+
+Usage:
+
+```
+wash app validate path/to/wadm.yaml
+```
 
 ### Options
 The following options can be specified with all of the above subcommands for a finer control of your environment.
 
-#### --output 
+#### --output
 Alias: `-o`.
         Specify output format (text or json). The default value is text.
-        
-#### --ctl-host 
+
+#### --ctl-host
 Alias: `-r`.
         CTL Host for connection. The default value is 127.0.0.1 for local nats [env: WASMCLOUD_CTL_HOST=]
 
 #### --experimental
 Whether or not to enable experimental features [env: WASH_EXPERIMENTAL=]
 
-#### --ctl-port 
+#### --ctl-port
 Alias: `-p`.
         CTL Port for connections, defaults to 4222 for local nats [env: WASMCLOUD_CTL_PORT=]
 
-#### --ctl-jwt 
+#### --ctl-jwt
 JWT file for CTL authentication. Must be supplied with ctl_seed [env: WASMCLOUD_CTL_JWT]
 
-#### --ctl-seed 
+#### --ctl-seed
 Seed file or literal for CTL authentication. Must be supplied with ctl_jwt [env: WASMCLOUD_CTL_SEED]
 
-#### --ctl-credsfile 
+#### --ctl-credsfile
 Credsfile for CTL authentication. Combines ctl_seed and ctl_jwt. See https://docs.nats.io/using-nats/developer/connecting/creds for details [env: WASH_CTL_CREDS]
 
-#### --js-domain 
+#### --js-domain
 JS domain for wasmCloud control interface. Defaults to None [env: WASMCLOUD_JS_DOMAIN]
 
-#### --lattice-prefix 
+#### --lattice-prefix
 Alias: `-x`.
         Lattice name for wasmCloud control interface. The default value is "default". [env: WASMCLOUD_LATTICE_PREFIX=]
 
-#### --timeout-ms 
+#### --timeout-ms
 Alias: `-t`.
         Timeout length to await a control interface response. The default value is 2000 milliseconds [env: WASMCLOUD_CTL_TIMEOUT_MS=] [default: 2000]
 
-#### --context 
+#### --context
 Path to a context with values to use for CTL connection and authentication
