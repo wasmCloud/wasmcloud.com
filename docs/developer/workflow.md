@@ -10,7 +10,7 @@ As a developer using wasmCloud, there are a number of common day-to-day workflow
 
 The following is a list of developer workflows _sorted_ from **_most to least common_**.
 
-### Building Components
+## Building Components
 
 The most common thing application developers will do is build [components](/docs/concepts/components). Components encompass pure business logic in wasmCloud, and only communicate with non-functional requirements through capability providers and abstract [interfaces](/docs/concepts/interfaces).
 
@@ -29,7 +29,7 @@ The developer's _iteration loop_ for building a component looks something like t
 
 As of wash 0.18.0, there is now a `wash dev` command that automates this process for you. See the [Customizing the component](/docs/developer/components/update) section for more details on how to use it.
 
-### Building Providers
+## Building Providers
 
 The workflow for building a capability provider is similar to that of building a component. Once you've located and declared a dependency on the _interface_ implemented by your capability provider, the _iteration loop_ looks something like this:
 
@@ -64,7 +64,7 @@ Previous guides used `wash reg push`, which is now deprecated and will be remove
 See [the wash command ref componenting RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
 :::
 
-### Allowing unauthenticated OCI registry access
+## Allowing unauthenticated OCI registry access
 
 The wasmCloud host runtime will, by default, require that all OCI references use authentication in order to resolve and download. This is a security measure that is enabled by default to keep the system as secure as possible.
 
@@ -72,8 +72,54 @@ However, if you're running the local docker-supplied registry with its default s
 
 This can be done by setting the environment variable `WASMCLOUD_OCI_ALLOWED_INSECURE` to include the URL of your local registry, e.g. `localhost:5000`. You can either supply this as an environment variable directly when you start a local wasmCloud host via `iex` or the release binary, or you can modify your shell profile to always set this variable on your development workstation.
 
-### Purging the OCI cache
+## Purging the OCI cache
 
 The wasmCloud host runtime caches the files that it receives from OCI registries beneath whatever `temp` directory your operating system prefers. Because images in an OCI registry are supposed to be _immutable_ (another reason we recommend against using `latest` when requesting an image version), the wasmCloud host has no reason to automatically purge or overwrite these files in the cache.
 
 During your local development iterations, you will likely find yourself pushing the same file with the same OCI reference over and over again. In order for the wasmCloud host to see these changes, you'll need to _drain_ the wasmCloud host cache. This can be done by executing one of the variants of `wash drain`, such as `wash drain all`.
+
+## Testing wadm manifests faster with `wash`
+
+As of `wash` v0.29.0, deploying applications and iterative development has become much easier with the help of a few new commands.
+
+### Validate wadm application manifests before deploying them
+
+Misspelled interfaces, missing links, and other issues can be hard to find in a wadm application manifest.
+
+To find potential issues *before* you `wash app deploy` your manifest, use `wash app validate`:
+
+```console
+wash app validate path/to/your/wadm.yaml
+```
+
+`wash app validate` will check for common issues and errors in your wadm manifest, and notify you of any issues.
+
+### Start a host and deploy a wadm application manifest in one command
+
+The easiest way to test a wadm application is to start a host, deploy the application, and start using it.
+
+To quickly run a host and deploy a *single* wadm manifest, run `wash up` with `--wadm-manifest`:
+
+```console
+wash up --wadm-manifest path/to/your/wadm.yaml
+```
+
+When run this way, `wash up` will start a single host lattice as normal, but *also* deploy your provided manifest to the running lattice, so you can interact with your application as soon as possible.
+
+### Easily deploy a wadm application manifest continuously
+
+If you have your host running in a seperate shell/terminal window and want to avoid having to constantly `wash app delete` in-between changes to your project and/or manifest, you can run `wash app deploy` with the `--replace` option:
+
+```console
+wash app deploy --replace path/to/your/wadm.yaml
+```
+
+Running `wash app deploy` with the `--replace` flag makes wash attempt to delete the application before attempting to deploy it.
+
+Combine this with a tool like [`cargo watch`][cargo-watch] (in the Rust ecosystem) and you can continously re-deploy your manifest any time your Rust project changes:
+
+```console
+cargo watch -- wash app deploy --replace path/to/your/wadm.yaml
+```
+
+[cargo-watch]: https://crates.io/crates/cargo-watch

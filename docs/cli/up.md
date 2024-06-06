@@ -180,3 +180,7 @@ If enabled, wasmCloud will not be downloaded if it's not installed
 wadm version to download, e.g. `v0.4.0`. See https://github.com/wasmCloud/wadm/releases for releases [env: WADM_VERSION=] [default: v0.6.0]
 
 #### --disable-wadm
+
+#### --wadm-manifest
+
+Specify a wadm application manifest to run right after starting the host.
