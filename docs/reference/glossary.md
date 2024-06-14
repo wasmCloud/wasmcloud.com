@@ -10,6 +10,12 @@ type: 'docs'
 
 The following is a glossary of important or frequently used terms. These terms may have meanings or assumed context outside wasmCloud, and so these definitions should help to clarify how wasmCloud defines them.
 
+### Built-in provider
+
+Built-in providers are functionalities exposed by the wasmCloud host, such that the host itself can fulfull a component's imports on certain interfaces. Built-in providers may be linked with components. This limited set of functions for capabilities such as **logging** represents wasmCloud's **trusted compute base**. 
+
+For more information, see [**Providers**](/docs/concepts/providers).
+
 ### Capability
 
 An abstraction for a given functionality (such as key-value storage or connection over HTTP), usually facilitated by a provider. For this reason, [providers](#provider) are sometimes called "capability providers."
@@ -25,12 +31,6 @@ For more information, see [**Components**](/docs/concepts/components).
 A wasmCloud host is a runtime environment node consisting of a WebAssembly runtime ([Wasmtime](#wasmtime)) and additional layers of security and functionality. Multiple hosts may run on a single machine and hosts are meant to be ephemeral. 
 
 For more information, see [**Hosts**](/docs/concepts/hosts/).
-
-### Host function
-
-Host functions are functionalities exposed by the wasmCloud host, such that the host itself can fulfull a component's imports on certain interfaces. In other words, host functions are entities (like providers and other components) that may be linked with components. This limited set of functions for capabilities such as **logging** represents wasmCloud's **trusted compute base**. 
-
-For more information, see [**Linking at Runtime**](http://localhost:3000/docs/concepts/linking-components/linking-at-runtime#host-functions).
 
 ### Interface
 
