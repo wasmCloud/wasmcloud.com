@@ -107,7 +107,7 @@ const config: Config = {
           rehypePlugins: [rehypeNameToId],
         },
         theme: {
-          customCss: require.resolve('./src/css/custom.css'),
+          customCss: [require.resolve('./src/styles/index.css')],
         },
       } satisfies PresetClassicOptions,
     ],
