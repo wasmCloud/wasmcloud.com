@@ -1,5 +1,5 @@
 ---
-title: "Control Interface"
+title: 'Control Interface'
 date: 2018-12-29T11:02:05+06:00
 sidebar_position: 3
 draft: false
@@ -43,16 +43,15 @@ requirements to respond whether or not they can run the provider
 
 ```json
 {
-    "constraints": {
-        "os": "macos"
-    },
-    "link_name": "default",
-    "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1"
+  "constraints": {
+    "os": "macos"
+  },
+  "link_name": "default",
+  "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1"
 }
 ```
 
-
-##### Response 
+##### Response
 
 An auction is a "scatter/gather" type operation. This means that you'll receive multiple json
 responses from all hosts until your configured timeout. If using a nats client (like the NATS CLI),
@@ -60,12 +59,12 @@ you'll need to set `--replies 0 --timeout <your timeout>`. An example response i
 
 ```json
 {
-    "host_id": "NOTAREALHOSTID",
-    "constraints": {
-        "os": "macos"
-    },
-    "link_name": "default",
-    "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1" 
+  "host_id": "NOTAREALHOSTID",
+  "constraints": {
+    "os": "macos"
+  },
+  "link_name": "default",
+  "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1"
 }
 ```
 
@@ -80,10 +79,10 @@ to respond whether or not they can run the component
 
 ```json
 {
-    "constraints": {
-        "os": "macos"
-    },
-    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7"
+  "constraints": {
+    "os": "macos"
+  },
+  "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7"
 }
 ```
 
@@ -95,11 +94,11 @@ you'll need to set `--replies 0 --timeout <your timeout>`. An example response i
 
 ```json
 {
-    "host_id": "NOTAREALHOSTID",
-    "constraints": {
-        "os": "macos"
-    },
-    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7"
+  "host_id": "NOTAREALHOSTID",
+  "constraints": {
+    "os": "macos"
+  },
+  "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7"
 }
 ```
 
@@ -116,12 +115,12 @@ wasmCloud host. It is documented here purely for completeness
 
 ```json
 {
-    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7",
-    "annotations": {
-        "key": "value"
-    },
-    "count": 5,
-    "host_id": "NOTAREALHOSTID"
+  "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7",
+  "annotations": {
+    "key": "value"
+  },
+  "count": 5,
+  "host_id": "NOTAREALHOSTID"
 }
 ```
 
@@ -132,8 +131,8 @@ omit the field entirely.
 
 ```json
 {
-    "accepted": true,
-    "error": ""
+  "accepted": true,
+  "error": ""
 }
 ```
 
@@ -151,11 +150,11 @@ Stops a component on a host, terminating any pre-instantiated instances.
 
 ```json
 {
-    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7",
-    "host_id": "NOTAREALHOSTID",
-    "annotations": {
-        "key": "value"
-    }
+  "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7",
+  "host_id": "NOTAREALHOSTID",
+  "annotations": {
+    "key": "value"
+  }
 }
 ```
 
@@ -167,8 +166,8 @@ critical for applications such as `wadm` that use annotations to indicate owners
 
 ```json
 {
-    "accepted": true,
-    "error": ""
+  "accepted": true,
+  "error": ""
 }
 ```
 
@@ -193,12 +192,12 @@ annotations) that is already at the desired scale, the host will respond with an
 
 ```json
 {
-    "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7",
-    "host_id": "NOTAREALHOSTID",
-    "annotations": {
-        "key": "value"
-    },
-    "max_concurrent": 5
+  "actor_ref": "wasmcloud.azurecr.io/echo:0.3.7",
+  "host_id": "NOTAREALHOSTID",
+  "annotations": {
+    "key": "value"
+  },
+  "max_concurrent": 5
 }
 ```
 
@@ -208,10 +207,11 @@ The `annotations` field is optional and can be omitted entirely.
 
 ```json
 {
-    "accepted": true,
-    "error": ""
+  "accepted": true,
+  "error": ""
 }
 ```
+
 If the response has an `accepted` value of `true`, this means the host has accepted the request and
 will attempt to start the component. This _does not_ guarantee the component has started. To determine if
 the component has started, you should monitor the lattice event stream for the `actors_started` event.
@@ -227,12 +227,12 @@ running on the host) with the newer version specified.
 
 ```json
 {
-    "actor_id": "MNOTAREALACTOR",
-    "host_id": "NOTAREALHOSTID",
-    "new_actor_ref": "wasmcloud.azurecr.io/echo:0.3.8",
-    "annotations": {
-        "key": "value"
-    }
+  "actor_id": "MNOTAREALACTOR",
+  "host_id": "NOTAREALHOSTID",
+  "new_actor_ref": "wasmcloud.azurecr.io/echo:0.3.8",
+  "annotations": {
+    "key": "value"
+  }
 }
 ```
 
@@ -243,8 +243,8 @@ running annotations of the component in order for the update command to actually
 
 ```json
 {
-    "accepted": true,
-    "error": ""
+  "accepted": true,
+  "error": ""
 }
 ```
 
@@ -263,13 +263,13 @@ can run on any given host.
 
 ```json
 {
-    "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1",
-    "link_name": "default",
-    "host_id": "NOTAREALHOSTID",
-    "annotations": {
-        "key": "value"
-    },
-    "config": "encoded config string"
+  "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1",
+  "link_name": "default",
+  "host_id": "NOTAREALHOSTID",
+  "annotations": {
+    "key": "value"
+  },
+  "config": "encoded config string"
 }
 ```
 
@@ -281,8 +281,8 @@ providers or guaranteed to be a specific format.
 
 ```json
 {
-    "accepted": true,
-    "error": ""
+  "accepted": true,
+  "error": ""
 }
 ```
 
@@ -301,13 +301,13 @@ Stops a matching capability provider + link name on a host.
 
 ```json
 {
-    "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1 | VPROVIDERID",
-    "link_name": "default",
-    "host_id": "NOTAREALHOSTID",
-    "contract_id": "wasmcloud:httpserver",
-    "annotations": {
-        "key": "value"
-    }
+  "provider_ref": "wasmcloud.azurecr.io/httpserver:0.19.1 | VPROVIDERID",
+  "link_name": "default",
+  "host_id": "NOTAREALHOSTID",
+  "contract_id": "wasmcloud:httpserver",
+  "annotations": {
+    "key": "value"
+  }
 }
 ```
 
@@ -315,8 +315,8 @@ Stops a matching capability provider + link name on a host.
 
 ```json
 {
-    "accepted": true,
-    "error": ""
+  "accepted": true,
+  "error": ""
 }
 ```
 
@@ -335,8 +335,8 @@ Stops the host indicated in the request.
 
 ```json
 {
-    "host_id": "NOTAREALHOSTID",
-    "timeout_ms": 10000
+  "host_id": "NOTAREALHOSTID",
+  "timeout_ms": 10000
 }
 ```
 
@@ -347,8 +347,8 @@ default timeout value for shutting down the host.
 
 ```json
 {
-    "accepted": true,
-    "error": ""
+  "accepted": true,
+  "error": ""
 }
 ```
 
@@ -373,7 +373,7 @@ Sets the value of a config key for a component. This will overwrite any value th
 
 ##### Request
 
-Arbitrary bytes. This could be a string or other encoded data. 
+Arbitrary bytes. This could be a string or other encoded data.
 
 ##### Response
 
@@ -447,17 +447,17 @@ Empty body
 
 ```json
 {
-    "links": [
-        {
-            "actor_id": "NOTAREALACTOR",
-            "provider_id": "NOTAREALPROVIDER",
-            "contract_id": "wasmcloud:httpserver",
-            "link_name": "default",
-            "values": {
-                "PORT": "8080"
-            }
-        }
-    ]
+  "links": [
+    {
+      "actor_id": "NOTAREALACTOR",
+      "provider_id": "NOTAREALPROVIDER",
+      "contract_id": "wasmcloud:httpserver",
+      "link_name": "default",
+      "values": {
+        "PORT": "8080"
+      }
+    }
+  ]
 }
 ```
 
@@ -603,16 +603,8 @@ Empty body
 
 ```json
 {
-  "foo": [
-    98,
-    97,
-    114
-  ],
-  "baz": [
-    113,
-    117,
-    120
-  ]
+  "foo": [98, 97, 114],
+  "baz": [113, 117, 120]
 }
 ```
 
@@ -634,11 +626,7 @@ If the key exists, the following body will be returned:
 
 ```json
 {
-  "data": [
-    113,
-    117,
-    120
-  ],
+  "data": [113, 117, 120],
   "found": true
 }
 ```
@@ -665,13 +653,13 @@ along with a unique set of configuration values.
 
 ```json
 {
-    "actor_id": "NOTAREALACTOR",
-    "provider_id": "NOTAREALPROVIDER",
-    "contract_id": "wasmcloud:httpserver",
-    "link_name": "default",
-    "values": {
-        "PORT": "8080"
-    }
+  "actor_id": "NOTAREALACTOR",
+  "provider_id": "NOTAREALPROVIDER",
+  "contract_id": "wasmcloud:httpserver",
+  "link_name": "default",
+  "values": {
+    "PORT": "8080"
+  }
 }
 ```
 
@@ -679,8 +667,8 @@ along with a unique set of configuration values.
 
 ```json
 {
-    "accepted": true,
-    "error": ""
+  "accepted": true,
+  "error": ""
 }
 ```
 
@@ -699,9 +687,9 @@ Deletes a link definition from the lattice.
 
 ```json
 {
-    "actor_id": "NOTAREALACTOR",
-    "contract_id": "wasmcloud:httpserver",
-    "link_name": "default"
+  "actor_id": "NOTAREALACTOR",
+  "contract_id": "wasmcloud:httpserver",
+  "link_name": "default"
 }
 ```
 
@@ -709,8 +697,8 @@ Deletes a link definition from the lattice.
 
 ```json
 {
-    "accepted": true,
-    "error": ""
+  "accepted": true,
+  "error": ""
 }
 ```
 
@@ -726,4 +714,4 @@ the lattice name (also referred to as the "lattice ID"). Lattice events are
 JSON-serialized [CloudEvents](https://github.com/cloudevents/spec/blob/v1.0.1/json-format.md) for
 easy, standardized consumption. This means that the `data` field in the cloud event envelope is just
 another JSON object and does not need to be decoded further. For documentation on all emitted
-events, check out the [reference guide](../../reference/cloud-event-list.md)
+events, check out the [reference guide](/docs/reference/cloud-event-list.mdx)
