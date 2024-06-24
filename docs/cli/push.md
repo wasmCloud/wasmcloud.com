@@ -29,3 +29,5 @@ wash push wasmcloud.azurecr.io/example:0.0.1 /path/to/artifact
 `--password` (Alias `-p`) OCI password, if omitted anonymous authentication will be used [env: `PASSWORD`]
 
 `--insecure` Allow insecure (HTTP) registry connections
+
+`--insecure-skip-tls-verify` Skip checking server's certificate for validity
