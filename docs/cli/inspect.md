@@ -64,4 +64,6 @@ description: "wash inspect command reference"
 
 `--insecure` Allow insecure (HTTP) registry connections
 
+`--insecure-skip-tls-verify` Skip checking server's certificate for validity
+
 `--no-cache` skip the local OCI cache

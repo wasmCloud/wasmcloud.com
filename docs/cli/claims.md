@@ -78,6 +78,8 @@ This subcommand will be deprecated in future versions. Please use `wash inspect`
 
 `--insecure` Allow insecure (HTTP) registry connections
 
+`--insecure-skip-tls-verify` Skip checking server's certificate for validity
+
 `--no-cache` skip the local OCI cache
 
 ## `sign`
