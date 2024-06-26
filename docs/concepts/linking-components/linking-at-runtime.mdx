@@ -6,6 +6,9 @@ sidebar_position: 1
 type: 'docs'
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Overview
 
 A **runtime link** is a declared connection between a component and another entity. Runtime links are typically defined in [Wadm deployment manifests](/docs/ecosystem/wadm/) and resolved on instantiation, regardless of where the linked entities are running. 
@@ -29,7 +32,7 @@ Linking at runtime makes sense when...
 
 Runtime links are typically defined in [Wadm deployment manifests](/docs/ecosystem/wadm/). Here is an example of a definition for a link from a component (importing on the `keyvalue` interface) to a provider (exporting on the same interface):
 
-```yaml {7-16}
+```yaml {7-17}
 components:
   - name: http-component
     type: component
@@ -38,6 +41,7 @@ components:
     traits:
       - type: link
         properties:
+          name: foo
           target: kvredis
           namespace: wasi
           package: keyvalue
@@ -50,6 +54,7 @@ components:
 
 **A link is always defined as a trait of the source**&mdash;that is, the importer. In addition to a target, the link definition has properties including...
 
+- `name`, an optional unique identifier for this link which can be used to distinguish between [different usages of the same interface](#defining-and-using-link-names). If not specified, this value is `default`.
 - `target`, which specifies the name of the exporting entity to be called
 - `namespace`, which in the example above refers to `wasi`
 - `package`, which specifies the particular interface group used
@@ -300,6 +305,125 @@ spec:
 
 Remember that the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool is available to help you automatically generate a Wadm deployment manifest for a given component. Because it extrapolates link definitions from a component's WIT interfaces, it can be very helpful for not only generating manifests but understanding linking relationships in your application. 
 </details>
+
+## Defining and using link names
+
+In some cases, you may wish to assign names to links. This can be useful when a source component needs to use the same interface with different configurations under different circumstances.
+
+* For example, a component may use the `wasi:keyvalue` interface to link to both a local key-value cache for ephemeral storage and a cloud-based store for more resilient storage.
+* In this example, you're using the same key-value interface and the same operations, but the interface needs to be configured differently. These different configurations of the interface can be differentiated with a link name. 
+
+Link names can be set [imperatively with the `wash link put` command](/docs/cli/link#put) or [declaratively via Wadm manifest](#exploring-a-link-definition), but are typically easiest to manage from a manifest. Link names are an optional field in a link definition and default to the value `default` if not specified. Below is an excerpt of a manifest defining names for two differently configured links:
+
+```yaml
+- type: link
+  properties:
+    name: foo
+    target: your_provider_or_component
+    namespace: wasi
+    package: keyvalue
+    interfaces: [store]
+    target_config:
+      # foo configuration
+- type: link
+  properties:
+    name: bar
+    target: your_provider_or_component
+    namespace: wasi
+    package: keyvalue
+    interfaces: [store]
+    target_config:
+      # bar configuration
+```
+
+Once a link name is defined, in your component or provider's code, you can use [wasmCloud's `wasmcloud:bus` interface](https://github.com/wasmCloud/wasmCloud/blob/main/wit/bus.wit) to make a call to a target by link name. You can include the `wasmcloud:bus` interface in your WIT world by copying it into your `/wit/deps` folder and importing the interface in your top-level world:
+
+```wit
+world world {
+  import wasmcloud:bus/lattice@1.0.0;
+}
+```
+
+Below are snippets of sample code that use different link names across languages supported by wasmCloud:
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust">
+
+```rust
+let interface = wasmcloud::bus::lattice::CallTargetInterface::new(
+    "wasi",
+    "keyvalue",
+    "store",
+);
+
+// Sets the operative link for interface to the named link foo
+wasmcloud::bus::lattice::set_link_name("foo", interface);
+// Calls over link foo to perform a keyvalue operation
+let x = wasi::keyvalue::store::function(args); 
+
+// Sets the operative link for interface to the named link bar
+wasmcloud::bus::lattice::set_link_name("bar", interface);
+// Calls over link bar to perform a keyvalue operation
+let y = wasi::keyvalue::store::function(args); 
+```
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo">
+
+```go
+// TODO: This is a bit off, need input
+yourInterface := world.WasmcloudBus1_0_0_LatticeCallTargetInterface().new(
+	"wasi",
+	"keyvalue",
+	"store",
+);
+
+// Sets the operative link for interface to the named link foo
+world.WasmcloudBus1_0_0_LatticeSetLinkName("foo", yourInterface);
+// Calls over link foo to perform a keyvalue operation
+let x = world.WasiKeyvalue0_2_0_draft_StoreFunction
+
+// Sets the operative link for interface to the named link bar
+world.WasmcloudBus1_0_0_LatticeSetLinkName("bar", yourInterface);
+// Calls over link bar to perform a keyvalue operation
+let y = world.WasiKeyvalue0_2_0_draft_StoreFunction
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+```js
+let interface = 
+
+// Sets the operative link for interface to the named link foo
+TK
+// Calls over link foo to perform a keyvalue operation
+TK
+
+// Sets the operative link for interface to the named link bar
+TK
+// Calls over link bar to perform a keyvalue operation
+TK
+```
+
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+let interface = 
+
+// Sets the operative link for interface to the named link foo
+TK
+// Calls over link foo to perform a keyvalue operation
+TK
+
+// Sets the operative link for interface to the named link bar
+TK
+// Calls over link bar to perform a keyvalue operation
+TK
+```
+
+  </TabItem>
+</Tabs>
 
 ## Designed for flexibility at runtime
 
