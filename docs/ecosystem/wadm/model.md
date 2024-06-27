@@ -193,7 +193,6 @@ metadata:
   annotations:
     version: v0.0.1
     description: 'Kvcounter demo'
-    experimental: true
 spec:
   components:
     - name: kvcounter
