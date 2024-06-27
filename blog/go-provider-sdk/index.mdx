@@ -2,14 +2,14 @@
 title: "Create custom providers in Go with the Go Provider SDK"
 author: "Eric Gregory"
 image: '/img/go-provider-sdk.png'
-date: 2024-06-14T9:00:00-05:00
+date: 2024-07-01T9:00:00-05:00
 categories: ['webassembly', 'wasmcloud', 'providers', 'go']
 draft: false
 ---
 
 ![Create custom providers in Go with the Go Provider SDK](/img/go-provider-sdk.png)
 
-Our recent update to the [**Go Provider SDK**](https://github.com/wasmCloud/provider-sdk-go/tree/main) brings the library up-to-date for wasmCloud 1.0, making it possible for Gophers to build custom wasmCloud providers that communicate with components over WebAssembly Interface Type (WIT) interfaces. In this post, we'll explore how you can get started writing wasmCloud 1.0 providers in Go. 
+Our recent update to the [**Go Provider SDK**](https://github.com/wasmCloud/provider-sdk-go/tree/main) brings the library up-to-date for wasmCloud 1.0, making it possible for Gophers to build custom wasmCloud capability providers that communicate with components over WebAssembly Interface Type (WIT) interfaces. In this post, we'll explore how you can get started writing wasmCloud 1.0 providers in Go. 
 
 {/* truncate */}
 
@@ -17,7 +17,7 @@ Our recent update to the [**Go Provider SDK**](https://github.com/wasmCloud/prov
 
 If you're new to wasmCloud, **providers** are executable plugins to the wasmCloud host. In practice, you can think of them as reusable standalone executables that provide common (and often stateful) functionality to **components**, which are stateless and typically dedicated to business logic. 
 
-Like components, you can run providers distributedly and update them independently of any given host. Providers use the same WIT interfaces as components and communicate via the WIT-over-RPC (wRPC) protocol. (For more information on [providers](/docs/concepts/providers), [WIT](/docs/concepts/interfaces#webassembly-interface-type-wit), [wRPC](/docs/concepts/lattice#runtime-composition), and how they all fit together, check out the [documentation](https://wasmcloud.com/docs/concepts/).) 
+Like components, you can run providers distributedly and update them independently of any given host. Providers use the same WIT interfaces as components and communicate via the WIT-over-RPC (wRPC) protocol. (For more information on [providers](/docs/concepts/providers), [WIT](/docs/concepts/interfaces#webassembly-interface-type-wit), [wRPC](/docs/concepts/lattice#runtime-composition), and how they all fit together, check out the [Platform Guide in our documentation](https://wasmcloud.com/docs/concepts/).) 
 
 A few examples of providers include:
 
@@ -33,15 +33,15 @@ Until recently, Rust has been the primary language for writing providers. Now th
 
 The updated SDK for Go-based providers is made possible by the Go implementation of **WIT-over-RPC (wRPC) Go**, which supplies component-native transport for any part of an application. 
 
-In the [Go examples directory of the wasmCloud monorepo](https://github.com/wasmCloud/wasmCloud/tree/main/examples/golang/), you can find a template for a custom provider that returns system info and stores ID and configuration data for any components that may be linked to it. This is not only a good example, but a great foundation for many custom provider projects. 
+In the [Go examples directory of the wasmCloud monorepo](https://github.com/wasmCloud/wasmCloud/tree/main/examples/golang/), you can find a template for a custom provider that returns system info when a component is linked and stores ID and configuration data for any components that may be linked to it. This is not only a good example, but a great foundation for many custom provider projects. 
 
 ### Prerequisites
 
-To build a Go provider, you'll need...
+To build a capability provider in Go, you'll need...
 
-* [Go toolchain](https://go.dev/doc/install)
+* [The Go toolchain](https://go.dev/doc/install)
 * [`wit-bindgen-wrpc`](https://github.com/wrpc/wit-bindgen-wrpc/tree/main) installed with `cargo install wit-bindgen-wrpc-cli` (meaning you'll need a [Rust toolchain](https://www.rust-lang.org/tools/install))
-* [`wash`](https://wasmcloud.com/docs/installation) v0.29 or later (released just a few days ago at the time of posting, so make sure you've updated!)
+* [`wash`](https://wasmcloud.com/docs/installation) v0.29 or later (make sure you've updated!)
 
 Additionally, for the purposes of the "testing" section of this example, you'll want:
 
@@ -63,6 +63,7 @@ In the new project directory `custom` we find the files for our Go provider. Let
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -80,7 +81,10 @@ func main() {
 
 func run() error {
 	// Initialize the provider with callbacks to track linked components
-	providerHandler := Handler{}
+	providerHandler := Handler{
+		linkedFrom: make(map[string]map[string]string),
+		linkedTo:   make(map[string]map[string]string),
+	}
 	p, err := provider.New(
 		provider.SourceLinkPut(func(link provider.InterfaceLinkDefinition) error {
 			return handleNewSourceLink(&providerHandler, link)
@@ -142,36 +146,36 @@ func run() error {
 }
 
 func handleNewSourceLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
-	handler.provider.Logger.Info("Handling new source link", "link", link)
-	handler.linkedTo[link.SourceID] = link.SourceConfig
+	fmt.Println("Handling new source link", "link", link)
+	handler.linkedTo[link.Target] = link.SourceConfig
 	return nil
 }
 
 func handleNewTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
-	handler.provider.Logger.Info("Handling new target link", "link", link)
-	handler.linkedFrom[link.Target] = link.TargetConfig
+	fmt.Println("Handling new target link", "link", link)
+	handler.linkedFrom[link.SourceID] = link.TargetConfig
 	return nil
 }
 
 func handleDelSourceLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
-	handler.provider.Logger.Info("Handling del source link", "link", link)
+	fmt.Println("Handling del source link", "link", link)
 	delete(handler.linkedTo, link.SourceID)
 	return nil
 }
 
 func handleDelTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
-	handler.provider.Logger.Info("Handling del target link", "link", link)
+	fmt.Println("Handling del target link", "link", link)
 	delete(handler.linkedFrom, link.Target)
 	return nil
 }
 
-func handleHealthCheck(handler *Handler) string {
-	handler.provider.Logger.Info("Handling health check")
+func handleHealthCheck(_ *Handler) string {
+	fmt.Println("Handling health check")
 	return "provider healthy"
 }
 
 func handleShutdown(handler *Handler) error {
-	handler.provider.Logger.Info("Handling shutdown")
+	fmt.Println("Handling shutdown")
 	clear(handler.linkedFrom)
 	clear(handler.linkedTo)
 	return nil
@@ -247,7 +251,8 @@ func (h *Handler) Call(ctx context.Context) (string, error) {
 		// Get the outgoing RPC client for the target
 		client := h.provider.OutgoingRpcClient(target)
 		// Send the data to the target for processing
-		res, err := process_data.Process(ctx, client, &data)
+		res, close, err := process_data.Process(ctx, client, &data)
+		defer close()
 		if err != nil {
 			return "", err
 		}
@@ -313,12 +318,18 @@ First we'll build the provider from the root of the project directory:
 wash build
 ```
 
+We'll also need to build the component in the `/component/` subdirectory. 
+
+```shell
+cd component && wash build
+```
+
 Now launch wasmCloud...
 
 ```shell
 wash up
 ```
-And in another terminal, deploy the manifest from the root of the project directory. This will launch the provider as well as the prebuilt component in the `/component/build` subdirectory.
+And in another terminal, deploy the manifest from the root of the project directory. This will launch the provider as well as the component in the `/component/build` subdirectory.
 
 ```shell
 wash app deploy ./wadm.yaml
@@ -329,7 +340,7 @@ Now we can run `wash call` again&mdash;but this time, the provider is running on
 wash call custom-template wasmcloud:example/system-info.call
 ```
 ```shell
-RESULT TK
+Provider is running on darwin-arm64
 ```
 
 ### Make it your own
