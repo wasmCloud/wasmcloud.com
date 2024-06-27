@@ -726,4 +726,4 @@ the lattice name (also referred to as the "lattice ID"). Lattice events are
 JSON-serialized [CloudEvents](https://github.com/cloudevents/spec/blob/v1.0.1/json-format.md) for
 easy, standardized consumption. This means that the `data` field in the cloud event envelope is just
 another JSON object and does not need to be decoded further. For documentation on all emitted
-events, check out the [reference guide](../../reference/cloud-event-list.md)
+events, check out the [reference guide](/docs/reference/cloud-event-list.mdx)
