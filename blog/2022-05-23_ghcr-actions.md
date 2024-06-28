@@ -77,16 +77,21 @@ Now, time to push! We'll use `wash` here along with some environment variables. 
 ```bash
 export WASH_REG_USER=<your_github_username>
 export WASH_REG_PASSWORD=<your_gitub_personal_access_token>
-wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
+wash push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
 ```
 
 You should see output like the following:
 
 ```
-wash reg push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
+wash push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
 
 🚿 Successfully validated and pushed to ghcr.io/brooksmtownsend/hello:0.1.0
 ```
+
+:::info
+Previous guides used `wash reg push`. It is not supported anymore, use `wash push`.
+See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
+:::
 
 Now, you can navigate to your GitHub profile and access the `Packages` tab to see your `hello` actor.
 

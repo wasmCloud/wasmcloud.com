@@ -11,7 +11,7 @@ To test a provider, we can run it in a local wasmCloud environment, interacting 
 
 2. Upload the newly-created _provider archive_ to the local OCI registry (You can use `wash push ...`, or if you have one of the provider project Makefiles, `make push`) `make start` to start it.
 
-3. Upload a component that utilizes the provider to the local OCI registry (`wash build` from the component source folder to compile it, sign it, and then use `wash reg push` to upload it to the registry). Then, use `wash start` to start the actor from the local registry.
+3. Upload a component that utilizes the provider to the local OCI registry (`wash build` from the component source folder to compile it, sign it, and then use `wash push` to upload it to the registry). Then, use `wash start` to start the actor from the local registry.
 
 4. Link the component in your Wadm manifest.
 
