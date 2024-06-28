@@ -99,6 +99,8 @@ wash par inspect wasmcloud.azurecr.io/httpserver:0.19.1
 
 `--insecure` Allow insecure (HTTP) registry connections
 
+`--insecure-skip-tls-verify` Skip checking OCI registry's certificate for validity
+
 `--no-cache` skip the local OCI cache
 
 ### `insert`

@@ -29,3 +29,5 @@ wash pull wasmcloud.azurecr.io/echo:0.3.7
 `--password` OCI password, if omitted anonymous authentication will be used
 
 `--insecure` Allow insecure (HTTP) registry connections
+
+`--insecure-skip-tls-verify` Skip checking server's certificate for validity
