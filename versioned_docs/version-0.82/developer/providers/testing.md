@@ -16,11 +16,11 @@ A second method for testing a provider is to run it in a realistic environment, 
 2. Upload the newly-created _provider archive_ to the local OCI registry (You can use `wash push ...`, or if you have one of the provider project Makefiles, `make push`) `make start` to start it.
 
 :::info
-Previous guides used `wash reg push`, which is now deprecated and will be removed in a future version.
+Previous guides used `wash reg push`. It is not supported anymore, use `wash push`.
 See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
 :::
 
-3. Upload an actor that utilizes the provider to the local OCI registry (`wash build` from the actor source folder to compile it, sign it, and then use `wash reg push` to upload it to the registry). Then, use `wash start` to start the actor from the local registry.
+3. Upload an actor that utilizes the provider to the local OCI registry (`wash build` from the actor source folder to compile it, sign it, and then use `wash push` to upload it to the registry). Then, use `wash start` to start the actor from the local registry.
 4. Link the actor with `wash link` [on the command line](/docs/0.82/developer/actors/run#add-a-link-definition). For the fakepay provider, no extra configuration parameters values are required for the link command. Note that even if you don't supply configuration values, an actor must be linked to a provider, and be signed with sufficient claims, before it can communicate with the provider.
 
 5. Invoke the actor by sending a JSON payload on the command line with `wash call actor -o json --data input.json`. The method name invoked, and the parameters in input.json must exactly match the interface implemented by your actor. In the previous section we used `CheckoutRequest` that might have a JSON body as follows:
