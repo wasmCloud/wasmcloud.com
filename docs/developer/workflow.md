@@ -60,7 +60,7 @@ wash push localhost:5000/myprovider:0.1.0 ./build/my_provider.par.gz
 ```
 
 :::info
-Previous guides used `wash reg push`. It is not supported anymore, use `wash push`.
+The `wash reg push` subcommand was renamed to `wash push`.
 See [the wash command ref componenting RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
 :::
 

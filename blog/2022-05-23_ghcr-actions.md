@@ -89,7 +89,7 @@ wash push ghcr.io/$WASH_REG_USER/hello:0.1.0 build/hello_s.wasm
 ```
 
 :::info
-Previous guides used `wash reg push`. It is not supported anymore, use `wash push`.
+The `wash reg push` subcommand was renamed to `wash push`.
 See [the wash command refactoring RFC](https://github.com/wasmCloud/wash/issues/538) for more information and to provide feedback
 :::
 
