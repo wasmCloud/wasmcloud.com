@@ -1,0 +1,211 @@
+---
+title: 'Extend with Custom Capabilities'
+date: 2024-04-10T11:02:05+06:00
+sidebar_position: 5
+draft: false
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+When your application needs functionality that's not captured in the set of [interfaces](/docs/reference/wasi/support.md) that wasmCloud provides, you can create a custom interface and capability provider to extend wasmCloud. Considering when you need to create a custom capability provider usually comes down to a few key reasons:
+
+1. You need to keep state alive between invocations (database connections, websockets)
+1. You need to provide access to external services or infrastructure (HTTP connections, messaging streams)
+1. A library you want to use does not yet support WebAssembly (TLS connections, OS-specific APIs)
+
+## Capability driven
+
+Adding a custom capability provider has a simple goal: provide a reusable building block for your application using a common abstraction. Our capabilities for HTTP, key-value, messaging, and blobstore all follow this principle of implementing a common abstraction with a specific purpose. This decouples your application's logic from the implementation of a service itself, allowing you to upgrade the implementation separately from your application. This is all good information to consider, and when creating a custom capability it's best to focus on your use case first and then see the benefits of this separation of concerns as you go.
+
+:::info[The Use Case]
+I want to build an application that performs some logic in response to an event trigger.
+:::
+
+Building a custom capability provider involves the following steps:
+
+1. [Creating WIT interface(s) that describe the custom capability](#creating-your-custom-interface)
+1. [Declaring `import` and `export` functionality in the provider's WIT world](#defining-the-event-trigger-interface)
+1. Generating interfaces and handlers via `wash build`
+1. Organizing the provider to call components based on `import`s
+1. Implementing `export`s in the provider
+1. Testing and running your provider using a declarative manifest
+
+Let's walk through those step-by-step to implement an event trigger capability. You can follow the same steps for your own custom capability as well.
+
+## Prerequisites
+
+<Tabs groupId="lang" queryString>
+
+    <TabItem value="rust" label="Rust" default>
+
+    1. [Rust toolchain to build the provider](https://www.rust-lang.org/tools/install)
+    1. [wash](https://wasmcloud.com/docs/installation)
+
+    </TabItem>
+    <TabItem value="tinygo" label="Go">
+
+    1. [Go toolchain to build the provider](https://go.dev/doc/install)
+    1. [Rust toolchain (to install `wit-bindgen-wrpc`)](https://www.rust-lang.org/tools/install)
+    1. [wit-bindgen-wrpc](https://github.com/wrpc/wit-bindgen-wrpc/tree/main) `cargo install wit-bindgen-wrpc-cli`
+    1. [wash](https://wasmcloud.com/docs/installation)
+
+    </TabItem>
+
+</Tabs>
+
+## Creating your custom interface
+
+The first step in adding additional capabilities to wasmCloud is creating your [WIT interface](/docs/concepts/interfaces.mdx), which is a specification of all of the types and functions in your capability. For the purpose of this documentation, we'll use a simple one-file interface with a function that can be `export`ed by a component and `import`ed by the custom provider. One such capability that wasmCloud doesn't provide out of the box is an event trigger capability, so let's build that here.
+
+:::info[WIT Specification]
+You can read the WIT specification in the WebAssembly component model repository: [https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md)
+:::
+
+We'll start from the custom capability provider templates that `wash` provides, and modify the interface to model our custom capability.
+
+<Tabs groupId="lang" queryString>
+
+    <TabItem value="rust" label="Rust" default>
+
+    ```bash
+    wash new provider --template-name custom-provider-rust event-trigger
+    ```
+
+    </TabItem>
+    <TabItem value="tinygo" label="Go">
+
+    ```bash
+    wash new provider --template-name custom-provider-go event-trigger
+    ```
+
+    </TabItem>
+
+</Tabs>
+
+Open up the project and the `wit/world.wit` file in your favorite text editor/IDE. We can modify this [WIT world](/docs/concepts/interfaces.mdx#worlds) to include the `event-trigger` interface. The `event-trigger` interface will include a `record` for the event type, and a function that can be called with an event. The capability provider template includes an example interface that we can replace with this one.
+
+The `package` can be named however you'd like, but it should be in the form of `<namespace>:<package>`. The `interface` **event-trigger** is where we'll place any structures and functions that our interface will include. For our **event-trigger** interface, we can define at a function for the trigger and a `record` (which is analogous to a class or a struct) for the event type. We can base this interface off of the [Cloudevents](https://cloudevents.io/) standard:
+
+### Defining the `event-trigger` interface
+
+```wit
+package wasmcloud:example;
+
+interface event-trigger {
+    record event {
+        specversion: string,
+        // Type is a reserved keyword in some languages, so we use %type
+        %type: string,
+        source: string,
+        id: string,
+        // For simplicity, use a unix timestamp since epoch
+        time: u64,
+        datacontenttype: string,
+        data: list<u8>,
+    }
+
+    trigger: func(event: event) -> result<string>;
+}
+
+world provider {
+    import event-trigger;
+}
+```
+
+Now the `event-trigger` interface includes one function that can be called with an event, and return a string result. We'll implement this in our custom provider first as a function that we'll call on a component, so we can first test with a mock interface and then handle events with Wasm component logic. Then, we can implement it in a way that components can publish their own events.
+
+## Generating interfaces and handlers
+
+After you've defined your interface, you can generate the necessary code for your custom capability provider using `wash build`. This command will generate the necessary code for your custom capability provider, including the interface definitions and handlers for the interface functions. Just keep in mind that this build _will_ fail because we're changing the interface from the template, we'll fix it in the next step.
+
+```bash
+wash build
+```
+
+<Tabs groupId="lang" queryString>
+
+    <TabItem value="rust" label="Rust" default>
+
+:::info
+You can also run `cargo build` to generate the necessary code for your custom capability provider. The generation is handled by the [`wit_bindgen_wrpc::generate!()`](https://docs.rs/crate/wit-bindgen-wrpc/latest) macro.
+:::
+
+    </TabItem>
+    <TabItem value="tinygo" label="Go">
+
+:::info
+You can also run `go generate ./...` to generate the necessary code for your custom capability provider. The generation is handled by the [`wit-bindgen-wrpc`](https://github.com/wrpc/wit-bindgen-wrpc) binary.
+:::
+
+    </TabItem>
+
+</Tabs>
+
+## Calling a component from a provider (provider import)
+
+Providers `import` functionality that components `export`, in this case the `event-trigger` interface will be implemented as a function on the component side, and the provider will call this function when it receives an event. On the capability provider side we can receive these events from HTTP, a message broker, or any other source, and we'll invoke the component for each event we receive. Since HTTP is a common way to receive events, we'll implement a simple HTTP server in the provider to receive events.
+
+We can start by removing the template specific code and implementing the `event-trigger` interface in the provider. We'll start by implementing a simple HTTP server that listens for requests with a JSON body that matches the `event` record in the `event-trigger` interface. For now, we'll call a function that will be our "component", and test that we implemented the provider's logic correctly.
+
+<Tabs groupId="lang" queryString>
+
+    <TabItem value="rust" label="Rust" default>
+
+    Let's use the `axum` crate to create an HTTP server that listens for POST requests on `/event` and calls a function with the request body. We'll use the `event` record from the `event-trigger` interface to parse the request body.
+
+    ```rust
+    ```
+
+
+    </TabItem>
+    <TabItem value="tinygo" label="Go">
+
+
+    </TabItem>
+
+</Tabs>
+
+### Calling multiple components
+
+We'll need to know what component to invoke when we receive an event, and at runtime providers will receive "source" links when a provider is linked to a component. We can use this information to determine which component to invoke when we receive an event.
+
+## Calling a provider from a component (provider export)
+
+Providers `export` functionality that components can `import`, in this case the `event-trigger` interface can also be functionality that a component imports to publish events externally.
+
+<Tabs groupId="lang" queryString>
+
+    <TabItem value="rust" label="Rust" default>
+
+    {/* TODO: rust empty example */}
+
+    </TabItem>
+
+    <TabItem value="tinygo" label="Go">
+
+    {/* TODO: go empty example */}
+
+    </TabItem>
+
+</Tabs>
+
+## Adding observability
+
+The custom provider templates don't come with OTEL observability configured out of the box, but you can add it to your provider using language specific SDKs.
+
+<Tabs groupId="lang" queryString>
+
+    <TabItem value="rust" label="Rust" default>
+
+    {/* TODO: rust example of instrumentation and propagating parent contexts */}
+
+    </TabItem>
+
+    <TabItem value="tinygo" label="Go">
+
+    A guided example of adding OTEL observability to a Go provider is coming soon.
+
+    </TabItem>
+
+</Tabs>
