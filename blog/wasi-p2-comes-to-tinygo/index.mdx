@@ -1,0 +1,92 @@
+---
+title: "WASI P2 comes to TinyGo: Write idiomatic Go and compile to a Wasm component"
+author: "Eric Gregory"
+image: '/img/tinygo-wasip2.png'
+date: 2024-07-02T10:00:00-06:00
+categories: ['webassembly', 'wasmcloud', 'go', 'golang', 'wasi', 'components']
+draft: false
+---
+
+![Write idiomatic Go and compile to a Wasm component](/img/tinygo-wasip2.png)
+
+It's a milestone day for Gophers and WebAssembly: the `wasi-preview-2` feature branch of TinyGo has landed in TinyGo's `dev` branch, bringing WASI P2 support to TinyGo! Now developers can write idiomatic Go code and compile to the `wasip2` target, creating Go-based WebAssembly components straight from the TinyGo CLI. From there, components can run anywhere that supports WASI P2, with all of the portability, interoperability, and composability that WebAssembly components bring to bear. 
+
+{/* truncate */}
+
+A *lot* of folks have worked tirelessly to bring this to fruition, including [Randy Reddig](https://github.com/ydnar) (Fastly), [Damian Gryski](https://github.com/dgryski) (Fastly), [Jiaxiao Zhou](https://github.com/Mossaka) (Microsoft), [Brendan Burns](https://github.com/brendandburns) (Microsoft), and [Jason Smith](https://github.com/omnide). Major props also go out to wasmCloud maintainer [Jordan Rash](https://github.com/jordan-rash) (Synadia) who has maintained our TinyGo support in wasmCloud for a long time. Now, whether you're building Go-based components for wasmCloud or other platforms, you can use common Go bindings&mdash;bindings that disappear into the background, where they belong.
+
+## What does this mean for Gophers?
+
+Let's look at a bit of code that compiles to WASI P2: 
+
+```go
+import (
+	"encoding/json"
+	"math"
+	"math/big"
+	"strings"
+)
+
+func normalizeNumber(v json.Number) any {
+	if i, err := v.Int64(); err == nil && math.MinInt <= i && i <= math.MaxInt {
+		return int(i)
+	}
+	if strings.ContainsAny(v.String(), ".eE") {
+		if f, err := v.Float64(); err == nil {
+			return f
+		}
+	}
+	if bi, ok := new(big.Int).SetString(v.String(), 10); ok {
+		return bi
+	}
+	if strings.HasPrefix(v.String(), "-") {
+		return math.Inf(-1)
+	}
+	return math.Inf(1)
+}
+```
+
+Do you see clunky calls to WASI interfaces? Do you see WASI at all? Nope, that's just [a bit](https://github.com/itchyny/gojq/blob/main/normalize.go) of [**`go-jq`**](https://github.com/itchyny/gojq), the widely-used Go implementation of the JSON processor `jq`. 
+
+WASI is there in *spirit*, but not in your Go code. This is development with WASI as it should be: clean and idiomatic, with WASI bindings happening quietly and out of sight. All you have to do is compile with `tinygo build -o app.wasm -target=wasip2`. (This smooth development experience leverages Randy Reddig's amazing work on idiomatic Go bindings in [wasm-tools-go](https://github.com/ydnar/wasm-tools-go).)
+
+In super-practical terms, now you can take a project like the go-jq CLI, clone the source from GitHub, and build it as a component, all in a couple of minutes. Go projects can now be fast-tracked to componentized flexibility, and common libraries can be made available to the entire component ecosystem.
+
+## Example with go-jq
+
+Let's see how easy it is to componentize go-jq. 
+
+First we need a build of TinyGo from the dev branch. Make sure that any older version of TinyGo is uninstalled and that you have [Go v1.19+](https://go.dev/doc/install) already installed on your machine. You can download a [binary for Linux](https://github.com/tinygo-org/tinygo/actions/workflows/linux.yml?query=branch%3Adev), [macOS](https://github.com/tinygo-org/tinygo/actions/workflows/build-macos.yml?query=branch%3Adev), or [Windows](https://github.com/tinygo-org/tinygo/actions/workflows/windows.yml?query=branch%3Adev). 
+
+Choose the latest build for your architecture, extract the zip file to your desired destination, and follow the install instructions for your platform. On a Mac, you can extract the zipped file and then export it to your PATH:
+
+```shell
+export PATH=<extract location>/tinygo/bin:$PATH
+```
+
+Now we can clone the go-jq repo:
+
+```shell
+git clone https://github.com/itchyny/gojq.git
+```
+
+From the root of the gojq directory, compile to the `wasip2` target:
+
+```shell
+tinygo build -o gojq.wasm -target=wasip2 ./cmd/gojq/main.go
+```
+Finally, we can run the component with our WASI P2 compatible WebAssembly runtime of choice. We'll use [Wasmtime](https://github.com/bytecodealliance/wasmtime), the runtime leveraged by wasmCloud:
+
+```shell
+echo '{"value":"foo"}' | wasmtime --wasm component-model ./gojq.wasm -r .value
+```
+
+And voila! 
+
+`foo`
+
+Welcome to the world of components, go-jq. From this point, we can take a Go-based component and compose it with other components (including, of course, those built in other languages), and run it in a distributed manner with wasmCloud. 
+
+## What comes next
+
+This is the pattern that we expect to see going forward for WASI P2 support across languages. Developers should be able to write code idiomatically in the language of their choice and then run it *everywhere* with the power of WASI. This is a milestone day for Go, and we can't wait to see what Gophers do with fully componentized superpowers. [Join us on the wasmCloud community Slack](https://slack.wasmcloud.com/) to share your next project, ask questions, or just chat Go and WebAssembly!
