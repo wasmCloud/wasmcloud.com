@@ -22,10 +22,10 @@ Please note that in production deployments, you will likely be using separate NA
 accessing wadm. Please see the [operator guide](/docs/deployment/wadm/) for more information for running
 wadm in production.
 
-## Topic space
+## Subject space
 
-The Wadm API is exposed entirely as a NATS service on a topic space. All of the API operations will
-occur as _requests_ (_not_ simple publishes) on a topic in the following format:
+The Wadm API is exposed entirely as a NATS service on a NATS subject space. All of the API operations will
+occur as _requests_ (_not_ simple publishes) on a subject in the following format:
 
 ```
 wadm.api.{lattice-id}.{category}.{operation}.{object}
@@ -38,7 +38,7 @@ All requests and responses on this topic are encoded as JSON, except for the cre
 
 :::info
 All model names are treated like unique identifiers and must conform to the rules
-governing NATS topic segments. For example, they cannot contain spaces, commas, unprintable
+governing NATS subject segments. For example, they cannot contain spaces, commas, unprintable
 characters, or periods.
 :::
 
@@ -57,7 +57,7 @@ decoupled from any particular host.
 Model storage is _append-only_. New versions are added to the model's version history according to
 retention policy and will not replace previously existing versions. This means that if you put a
 model with the same version, it will be rejected. The `name` of the model is a unique identifier and
-should be a valid NATS topic segment. Please note that specifying a version in a model is not
+should be a valid NATS subject segment. Please note that specifying a version in a model is not
 required. If a version is not specified, a [ULID](https://github.com/ulid/spec) will be generated
 and used as the version.
 
