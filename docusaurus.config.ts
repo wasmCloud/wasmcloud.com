@@ -46,238 +46,285 @@ const rehypeShikiPlugin = [
   } as RehypeShikiOptions,
 ];
 
-const config: Config = {
-  title: 'wasmCloud',
-  tagline: 'Build applications in any language. Deploy them anywhere.',
-  customFields: {
-    description: 'The secure, distributed, WebAssembly application platform',
-    tagline_1: 'Build applications in any language.',
-    tagline_2: 'Deploy them anywhere.',
-  },
-  url: 'https://wasmcloud.com',
-  baseUrl: '/',
-  onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
-  favicon: '/favicon.ico',
-  // Hubspot
-  scripts: [
-    {
-      src: `//js.hs-scripts.com/${process.env.HUBSPOT_ID}.js`,
-      defer: true,
-      async: true,
+const config = (async (): Promise<Config> => {
+  return {
+    title: 'wasmCloud',
+    tagline: 'Build applications in any language. Deploy them anywhere.',
+    customFields: {
+      description: 'The secure, distributed, WebAssembly application platform',
+      tagline_1: 'Build applications in any language.',
+      tagline_2: 'Deploy them anywhere.',
     },
-  ],
-
-  // Even if you don't use internalization, you can use this field to set useful
-  // metadata like html lang. For example, if your site is Chinese, you may want
-  // to replace "en" with "zh-Hans".
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
-  },
-
-  presets: [
-    [
-      'classic',
+    url: 'https://wasmcloud.com',
+    baseUrl: '/',
+    onBrokenLinks: 'throw',
+    onBrokenMarkdownLinks: 'warn',
+    favicon: '/favicon.ico',
+    // Hubspot
+    scripts: [
       {
-        blog: {
-          blogSidebarCount: 100,
-          beforeDefaultRehypePlugins: [rehypeShikiPlugin],
-          rehypePlugins: [rehypeNameToId],
-          authorsMapPath: '../authors.yml', // relative to blog directory
-        },
-        docs: {
-          editUrl: 'https://github.com/wasmCloud/wasmcloud.com/edit/main/',
-          beforeDefaultRehypePlugins: [rehypeShikiPlugin],
-          rehypePlugins: [rehypeNameToId],
-          lastVersion: 'current',
-          versions: {
-            current: {
-              label: '1.0',
-            },
-            0.82: {
-              label: '0.82',
-              path: '0.82',
-              banner: 'unmaintained',
+        src: `//js.hs-scripts.com/${process.env.HUBSPOT_ID}.js`,
+        defer: true,
+        async: true,
+      },
+    ],
+
+    // Even if you don't use internalization, you can use this field to set useful
+    // metadata like html lang. For example, if your site is Chinese, you may want
+    // to replace "en" with "zh-Hans".
+    i18n: {
+      defaultLocale: 'en',
+      locales: ['en'],
+    },
+
+    presets: [
+      [
+        'classic',
+        {
+          blog: {
+            blogSidebarCount: 100,
+            beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+            rehypePlugins: [rehypeNameToId],
+            authorsMapPath: '../authors.yml', // relative to blog directory
+          },
+          docs: {
+            editUrl: 'https://github.com/wasmCloud/wasmcloud.com/edit/main/',
+            beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+            rehypePlugins: [rehypeNameToId],
+            lastVersion: 'current',
+            versions: {
+              current: {
+                label: '1.0',
+              },
+              0.82: {
+                label: '0.82',
+                path: '0.82',
+                banner: 'unmaintained',
+              },
             },
           },
-        },
-        pages: {
+          pages: {
+            beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+            rehypePlugins: [rehypeNameToId],
+          },
+          theme: {
+            customCss: [require.resolve('./src/styles/index.css')],
+          },
+        } satisfies PresetClassicOptions,
+      ],
+    ],
+
+    plugins: [
+      [
+        '@wasmcloud/docusaurus-seo-checks',
+        {
+          underscores: { level: 'error' },
+        } satisfies SEOChecksPluginOptions,
+      ],
+      [
+        '@docusaurus/plugin-content-blog',
+        {
+          id: 'community',
+          routeBasePath: 'community',
+          path: './community',
+          showReadingTime: false,
+          editUrl: 'https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/',
+          blogSidebarCount: 100,
+          blogTitle: 'wasmCloud Community Content',
+          blogDescription: 'wasmCloud community meetings agendas, notes, and recordings',
+          blogSidebarTitle: 'Community Meetings',
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
           rehypePlugins: [rehypeNameToId],
-        },
-        theme: {
-          customCss: [require.resolve('./src/styles/index.css')],
-        },
-      } satisfies PresetClassicOptions,
+        } satisfies PluginContentBlogOptions,
+      ],
+      [
+        '@docusaurus/plugin-google-analytics',
+        {
+          trackingID: process.env.GOOGLE_ANALYTICS_ID || 'localdev',
+          anonymizeIP: true,
+        } as PluginGoogleAnalyticsOptions,
+      ],
+      customPostCssPlugin, // PostCSS plugin function registration
     ],
-  ],
 
-  plugins: [
-    [
-      '@wasmcloud/docusaurus-seo-checks',
-      {
-        underscores: { level: 'error' },
-      } satisfies SEOChecksPluginOptions,
-    ],
-    [
-      '@docusaurus/plugin-content-blog',
-      {
-        id: 'community',
-        routeBasePath: 'community',
-        path: './community',
-        showReadingTime: false,
-        editUrl: 'https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/',
-        blogSidebarCount: 100,
-        blogTitle: 'wasmCloud Community Content',
-        blogDescription: 'wasmCloud community meetings agendas, notes, and recordings',
-        blogSidebarTitle: 'Community Meetings',
-        beforeDefaultRehypePlugins: [rehypeShikiPlugin],
-        rehypePlugins: [rehypeNameToId],
-      } satisfies PluginContentBlogOptions,
-    ],
-    [
-      '@docusaurus/plugin-google-analytics',
-      {
-        trackingID: process.env.GOOGLE_ANALYTICS_ID || 'localdev',
-        anonymizeIP: true,
-      } as PluginGoogleAnalyticsOptions,
-    ],
-    customPostCssPlugin, // PostCSS plugin function registration
-  ],
-
-  themeConfig: {
-    image: '/logo/wasmcloud_large_social.png',
-    navbar: {
-      title: 'wasmCloud',
-      logo: {
-        alt: 'wasmCloud Logo',
-        src: '/logo/wasmcloud_green.svg',
+    themeConfig: {
+      image: '/logo/wasmcloud_large_social.png',
+      navbar: {
+        title: 'wasmCloud',
+        logo: {
+          alt: 'wasmCloud Logo',
+          src: '/logo/wasmcloud_green.svg',
+        },
+        items: [
+          { to: '/blog', label: 'Blog', position: 'left' },
+          { to: '/community', label: 'Community', position: 'left' },
+          { type: 'doc', docId: 'intro', position: 'left', label: 'Docs' },
+          {
+            type: 'docsVersionDropdown',
+            // used for styling, see src/styles/theme/_navbar.css
+            className: 'navbar__link--version-dropdown',
+          },
+          {
+            href: 'https://ostif.org/ostif-has-completed-a-security-audit-of-wasmcloud/',
+            label: 'Security Assessment',
+            position: 'right',
+          },
+          await svgIconNavItem({
+            svgIconPath: './static/img/icons/github.svg',
+            label: 'GitHub',
+            link: 'https://github.com/wasmcloud/wasmcloud',
+          }),
+        ],
       },
-      items: [
-        { to: '/blog', label: 'Blog', position: 'left' },
-        { to: '/community', label: 'Community', position: 'left' },
-        {
-          type: 'doc',
-          docId: 'intro',
-          position: 'left',
-          label: 'Docs',
-        },
-        {
-          type: 'docsVersionDropdown',
-        },
-        {
-          href: 'https://ostif.org/ostif-has-completed-a-security-audit-of-wasmcloud/',
-          label: 'Security Assessment',
-          position: 'right',
-        },
-        {
-          href: 'https://github.com/wasmcloud',
-          label: 'GitHub',
-          position: 'right',
-        },
-      ],
-    },
-    announcementBar: {
-      id: '1.0',
-      content: `🎉️ <b>wasmCloud v1.0</b> is available! Read the <a href="/docs/intro">1.0 documentation</a> and try it out now.`,
-      backgroundColor: '#20232a',
-      textColor: '#fff',
-    },
-    footer: {
-      style: 'dark',
-      links: [
-        {
-          title: 'Community',
-          items: [
-            {
-              label: 'GitHub',
-              href: 'https://github.com/wasmcloud/',
-            },
-            {
-              label: 'Contributing',
-              href: 'https://github.com/wasmCloud/wasmCloud/blob/main/CONTRIBUTING.md',
-            },
-            {
-              label: 'Slack',
-              href: 'https://slack.wasmcloud.com',
-            },
-            {
-              label: 'Calendar & wasmCloud Wednesdays',
-              href: 'https://calendar.google.com/calendar/u/0/embed?src=c_6cm5hud8evuns4pe5ggu3h9qrs@group.calendar.google.com',
-            },
-            {
-              label: 'Community Meeting Notes',
-              to: '/community',
-            },
-          ],
-        },
-        {
-          title: 'Social',
-          items: [
-            {
-              label: 'Twitter',
-              href: 'https://twitter.com/wasmcloud',
-            },
-            {
-              label: 'LinkedIn',
-              href: 'https://www.linkedin.com/company/wasmCloud/',
-            },
-            {
-              label: 'YouTube',
-              href: 'https://www.youtube.com/wasmcloud',
-            },
-          ],
-        },
-        {
-          title: 'Legal & Mail',
-          items: [
-            {
-              label: 'Privacy Policy',
-              to: '/privacy-policy',
-            },
-            {
-              label: 'Terms and Conditions',
-              to: '/terms-conditions',
-            },
-            {
-              label: 'Contact & Mailing List',
-              to: '/contact',
-            },
-          ],
-        },
-      ],
-      copyright: `Copyright © ${new Date().getFullYear()} wasmCloud LLC. All rights reserved. The Linux Foundation has registered trademarks and uses trademarks. For a list of trademarks of The Linux Foundation, please see our Trademark Usage page: https://www.linuxfoundation.org/trademark-usage. Built with Docusaurus.`,
-    },
-    algolia: {
-      apiKey: 'f0ef30f3d98ce5e9a7dd7579bb221dfc',
-      indexName: 'wasmcloud',
-      appId: '2IM4TMH501',
-    },
-  } satisfies PresetClassicThemeConfig,
+      announcementBar: {
+        id: '1.0',
+        content: `🎉️ <b>wasmCloud v1.0</b> is available! Read the <a href="/docs/intro">1.0 documentation</a> and try it out now.`,
+        backgroundColor: '#20232a',
+        textColor: '#fff',
+      },
+      footer: {
+        links: [
+          {
+            title: 'Community',
+            items: [
+              {
+                label: 'GitHub',
+                href: 'https://github.com/wasmcloud/',
+              },
+              {
+                label: 'Contributing',
+                href: 'https://github.com/wasmCloud/wasmCloud/blob/main/CONTRIBUTING.md',
+              },
+              {
+                label: 'Slack',
+                href: 'https://slack.wasmcloud.com',
+              },
+              {
+                label: 'Calendar & wasmCloud Wednesdays',
+                href: 'https://calendar.google.com/calendar/u/0/embed?src=c_6cm5hud8evuns4pe5ggu3h9qrs@group.calendar.google.com',
+              },
+              {
+                label: 'Community Meeting Notes',
+                to: '/community',
+              },
+            ],
+          },
+          {
+            title: 'Social',
+            items: [
+              {
+                label: 'Twitter',
+                href: 'https://twitter.com/wasmcloud',
+              },
+              {
+                label: 'LinkedIn',
+                href: 'https://www.linkedin.com/company/wasmCloud/',
+              },
+              {
+                label: 'YouTube',
+                href: 'https://www.youtube.com/wasmcloud',
+              },
+            ],
+          },
+          {
+            title: 'Legal & Mail',
+            items: [
+              {
+                label: 'Privacy Policy',
+                to: '/privacy-policy',
+              },
+              {
+                label: 'Terms and Conditions',
+                to: '/terms-conditions',
+              },
+              {
+                label: 'Contact & Mailing List',
+                to: '/contact',
+              },
+            ],
+          },
+        ],
+        copyright: `Copyright © ${new Date().getFullYear()} wasmCloud LLC. All rights reserved. The Linux Foundation has registered trademarks and uses trademarks. For a list of trademarks of The Linux Foundation, please see our Trademark Usage page: https://www.linuxfoundation.org/trademark-usage. Built with Docusaurus.`,
+      },
+      algolia: {
+        apiKey: 'f0ef30f3d98ce5e9a7dd7579bb221dfc',
+        indexName: 'wasmcloud',
+        appId: '2IM4TMH501',
+      },
+    } satisfies PresetClassicThemeConfig,
 
-  markdown: {
-    format: 'detect',
-    mdx1Compat: {
-      admonitions: false,
-      comments: false,
-      headingIds: false,
+    markdown: {
+      format: 'detect',
+      mdx1Compat: {
+        admonitions: false,
+        comments: false,
+        headingIds: false,
+      },
     },
-  },
 
-  onBrokenAnchors: 'throw',
-  onDuplicateRoutes: 'throw',
-};
+    headTags: [
+      {
+        tagName: 'link',
+        attributes: { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      },
+      {
+        tagName: 'link',
+        attributes: {
+          rel: 'preconnect',
+          href: 'https://fonts.gstatic.com',
+          crossorigin: 'crossorigin',
+        },
+      },
+      {
+        tagName: 'link',
+        attributes: {
+          href: 'https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=DM+Serif+Text:ital@0;1&family=Inter:wght@100..900&display=swap',
+          rel: 'stylesheet',
+        },
+      },
+    ],
+
+    onBrokenAnchors: 'throw',
+    onDuplicateRoutes: 'throw',
+  };
+})();
 
 /** @return {import('@docusaurus/types').Plugin} */
 function customPostCssPlugin() {
   return {
     name: 'custom-postcss',
     configurePostCss(options) {
-      // Append new PostCSS plugins here.
-      options.plugins.push(require('postcss-preset-env')); // allow newest CSS syntax
+      options.plugins.push(require('postcss-preset-env'));
       return options;
     },
+  };
+}
+
+/**
+ * build an icon nav item, works with styles in `src/styles/theme/_navbar.css`
+ */
+async function svgIconNavItem({
+  svgIconPath,
+  label,
+  link,
+}: {
+  label: string;
+  link: string;
+  svgIconPath: string;
+}): Promise<Required<Required<PresetClassicThemeConfig>['navbar']>['items'][number]> {
+  const icon = await fs.readFile(svgIconPath, 'utf-8');
+
+  return {
+    type: 'html',
+    value: `
+      <div class="navbar__icon">
+        <a href="${link}" target="_blank" rel="noopener noreferrer" class="navbar__icon-link" aria-description="${label}">
+          ${icon}
+          <span class="navbar__icon-label">${label}</span>
+        </a>
+      </div>
+    `,
+    position: 'right',
   };
 }
 
