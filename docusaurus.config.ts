@@ -88,6 +88,8 @@ const config = (async (): Promise<Config> => {
             beforeDefaultRehypePlugins: [rehypeShikiPlugin],
             rehypePlugins: [rehypeNameToId],
             authorsMapPath: '../authors.yml', // relative to blog directory
+            blogListComponent: '@theme/wasmcloud/blog/list-page',
+            blogPostComponent: '@theme/wasmcloud/blog/post-page',
           },
           docs: {
             editUrl: 'https://github.com/wasmCloud/wasmcloud.com/edit/main/',
@@ -133,10 +135,13 @@ const config = (async (): Promise<Config> => {
           editUrl: 'https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/',
           blogTitle: 'Community Calls',
           blogDescription: 'Weekly wasmCloud Wednesday agendas, notes, and recordings.',
-          blogSidebarCount: 100,
+          blogSidebarCount: 'ALL',
           blogSidebarTitle: 'Past Meetings',
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
           rehypePlugins: [rehypeNameToId],
+          authorsMapPath: '../authors.yml', // relative to community directory
+          blogListComponent: '@theme/wasmcloud/community/list-page',
+          blogPostComponent: '@theme/wasmcloud/community/post-page',
         } satisfies PluginContentBlogOptions,
       ],
       [
