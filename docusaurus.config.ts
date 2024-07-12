@@ -82,7 +82,7 @@ const config = (async (): Promise<Config> => {
         'classic',
         {
           blog: {
-            blogTitle: 'Community Calls',
+            blogTitle: 'Blog',
             blogDescription: 'The latest wasmCloud news, updates, and announcements.',
             blogSidebarCount: 0,
             beforeDefaultRehypePlugins: [rehypeShikiPlugin],
