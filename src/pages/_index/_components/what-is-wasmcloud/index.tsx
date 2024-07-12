@@ -34,6 +34,7 @@ function WhatIsWasmCloud({}: Props) {
           <SwitcherList className={styles.list}>
             <SwitcherButton className={styles.button} value="build">
               <img
+                alt=""
                 src="/img/pages/home/icon/build.svg"
                 className={`${styles.icon} ${styles.iconBuild}`}
               />
@@ -41,6 +42,7 @@ function WhatIsWasmCloud({}: Props) {
             </SwitcherButton>
             <SwitcherButton className={styles.button} value="compose">
               <img
+                alt=""
                 src="/img/pages/home/icon/compose.svg"
                 className={`${styles.icon} ${styles.iconCompose}`}
               />
@@ -48,6 +50,7 @@ function WhatIsWasmCloud({}: Props) {
             </SwitcherButton>
             <SwitcherButton className={styles.button} value="run">
               <img
+                alt=""
                 src="/img/pages/home/icon/run.svg"
                 className={`${styles.icon} ${styles.iconRun}`}
               />

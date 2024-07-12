@@ -4,7 +4,10 @@ import styles from './switcher.module.css';
 const SwitcherContext = createContext<{
   active: string;
   setActive: React.Dispatch<React.SetStateAction<string>>;
-} | null>(null);
+}>({
+  active: '',
+  setActive: () => {},
+});
 
 function Switcher({ defaultValue, children }: React.PropsWithChildren<{ defaultValue: string }>) {
   const [active, setActive] = useState(defaultValue);
@@ -26,6 +29,7 @@ function SwitcherList({ className, children }: React.PropsWithChildren<{ classNa
           src="/img/pages/home/icon/arrow.svg"
           className={styles.arrow}
           key={`arrow-${index}`}
+          alt=""
         />,
       );
     } else {
