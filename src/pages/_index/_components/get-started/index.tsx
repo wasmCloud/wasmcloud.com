@@ -28,7 +28,7 @@ function GetStarted({}: Props) {
         <div className={styles.grid}>
           <div className={styles.gridItem}>
             <img src="/img/pages/home/icon/build.svg" alt="" />
-            <h5>Download the wasmCloud CLI</h5>
+            <h4>Download the wasmCloud CLI</h4>
             <p>Get all the dev tooling you need by installing the wasmCloud "wash" CLI</p>
             <a href="/docs/installation" className="button">
               Download wash
@@ -36,7 +36,7 @@ function GetStarted({}: Props) {
           </div>
           <div className={styles.gridItem}>
             <img src="/img/pages/home/icon/compose.svg" alt="" />
-            <h5>Build your first component</h5>
+            <h4>Build your first component</h4>
             <p>Start building with interfaces using one of our examples</p>
             <a
               href="https://github.com/wasmCloud/wasmCloud/tree/main/examples"
@@ -49,7 +49,7 @@ function GetStarted({}: Props) {
           </div>
           <div className={styles.gridItem}>
             <img src="/img/pages/home/icon/run.svg" alt="" />
-            <h5>Deploy on wasmCloud</h5>
+            <h4>Deploy on wasmCloud</h4>
             <p>Deploy your application with the wasmCloud orchestrator</p>
             <a href="/docs/ecosystem/wadm/" className="button">
               Read Documentation
