@@ -1,10 +1,20 @@
 import React, { HTMLProps } from 'react';
 import styles from './logo-scroller.module.css';
 
-const LOGO_PATHS = Array.from(
-  { length: 10 },
-  (_, i) => `/img/pages/home/wasmcloud-ecosystem/logo-${i}.png`,
-);
+const LOGO_PATHS = [
+  '/img/pages/home/wasmcloud-ecosystem/brands/argocd.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/couchbase.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/docker.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/fluxcd.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/grafana.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/helm.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/kubernetes.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/minio.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/nats.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/opentelemetry.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/prometheus.svg',
+  '/img/pages/home/wasmcloud-ecosystem/brands/redis.svg',
+];
 
 function LogoScroller() {
   const split = Math.ceil(LOGO_PATHS.length / 2);
