@@ -66,7 +66,7 @@ function WhatIsWasmCloud({}: Props) {
                   Build and run applications from components written in C, C#, C++, Rust, Python,
                   Go, C#, TypeScript and more.
                 </p>
-                <a href="#">Developer Guide</a>
+                <a href="/docs/category/developer-guide">Developer Guide</a>
               </div>
               <div className={styles.feature}>
                 <h5>Integrate with your existing ecosystem</h5>
@@ -74,7 +74,7 @@ function WhatIsWasmCloud({}: Props) {
                   wasmCloud has first-tier support for Kubernetes, VS Code, ArgoCD, Backstage,
                   Chainguard, and more.
                 </p>
-                <a href="#">Integrations Guide</a>
+                <a href="/docs/concepts/capabilities/">Capabilities Guide</a>
               </div>
               <div className={styles.feature}>
                 <h5>Zero Trust security by default</h5>
@@ -82,7 +82,7 @@ function WhatIsWasmCloud({}: Props) {
                   Our security audited platform builds on the sandboxed security model of Wasm and
                   runs standalone or in distroless containers.
                 </p>
-                <a href="">Security Guide</a>
+                <a href="/docs/hosts/security">Security Guide</a>
               </div>
             </div>
             <div className={styles.contentImage}>{/* // TODO: Add image */}</div>
@@ -96,7 +96,7 @@ function WhatIsWasmCloud({}: Props) {
                   Create applications by connecting WebAssembly components, first-party platform
                   capabilities, or your own extensions.
                 </p>
-                <a href="#">Applications Guide</a>
+                <a href="/docs/ecosystem/wadm/">Applications Guide</a>
               </div>
               <div className={styles.feature}>
                 <h5>Elastically extensible</h5>
@@ -104,7 +104,7 @@ function WhatIsWasmCloud({}: Props) {
                   Easily extend the wasmCloud platform at runtime with secure, plugin-based custom
                   capabilities—including your own custom interfaces.
                 </p>
-                <a href="#">Component Provider Guide</a>
+                <a href="/docs/concepts/providers">Component Provider Guide</a>
               </div>
               <div className={styles.feature}>
                 <h5>Portable and pluggable</h5>
@@ -112,7 +112,7 @@ function WhatIsWasmCloud({}: Props) {
                   Universal interface abstractions built on WebAssembly Interface Types (WIT)
                   maximize application portability across dev, QA, test, and prod.
                 </p>
-                <a href="">Component Linking Guide</a>
+                <a href="/docs/concepts/linking-components/">Component Linking Guide</a>
               </div>
             </div>
             <div className={styles.contentImage}>{/* // TODO: add image */}</div>
