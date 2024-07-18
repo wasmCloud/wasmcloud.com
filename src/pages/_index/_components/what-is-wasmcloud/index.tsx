@@ -85,7 +85,9 @@ function WhatIsWasmCloud({}: Props) {
                 <a href="/docs/hosts/security">Security Guide</a>
               </div>
             </div>
-            <div className={styles.contentImage}>{/* // TODO: Add image */}</div>
+            <div className={styles.contentImage}>
+              <img src="/img/pages/home/what-is-wasmcloud/build.svg" alt="" />
+            </div>
           </SwitcherContent>
           <SwitcherContent value="compose" className={styles.content}>
             <div className={styles.contentCopy}>
@@ -115,7 +117,9 @@ function WhatIsWasmCloud({}: Props) {
                 <a href="/docs/concepts/linking-components/">Component Linking Guide</a>
               </div>
             </div>
-            <div className={styles.contentImage}>{/* // TODO: add image */}</div>
+            <div className={styles.contentImage}>
+              <img src="/img/pages/home/what-is-wasmcloud/compose.svg" alt="" />
+            </div>
           </SwitcherContent>
           <SwitcherContent value="run" className={styles.content}>
             <div className={styles.contentCopy}>
@@ -142,7 +146,9 @@ function WhatIsWasmCloud({}: Props) {
                 </p>
               </div>
             </div>
-            <div className={styles.contentImage}>{/* // TODO: add image */}</div>
+            <div className={styles.contentImage}>
+              <img src="/img/pages/home/what-is-wasmcloud/run.svg" alt="" />
+            </div>
           </SwitcherContent>
         </Switcher>
       </div>
