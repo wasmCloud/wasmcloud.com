@@ -23,8 +23,7 @@ function Kubernetes({}: Props) {
             </p>
           </div>
           <div>
-            {/* component image */}
-            {/* component image */}
+            <img className={styles.image} src="/img/pages/home/kubernetes/kubernetes.svg" alt="" />
           </div>
         </div>
       </div>

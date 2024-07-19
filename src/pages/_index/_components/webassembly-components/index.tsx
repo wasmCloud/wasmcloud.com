@@ -23,8 +23,11 @@ function WebAssemblyComponents({}: Props) {
             </p>
           </div>
           <div>
-            {/* component image */}
-            {/* component image */}
+            <img
+              className={styles.image}
+              src="/img/pages/home/webassembly-components/components.svg"
+              alt=""
+            />
           </div>
         </div>
       </div>
