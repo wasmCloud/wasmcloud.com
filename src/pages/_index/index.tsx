@@ -23,10 +23,12 @@ function ContactForm() {
         <Hero />
         <WhatIsWasmCloud />
         <WhyUseWasmCloud />
-        <WasmCloudTechnology />
+        {/* TODO: enable once video is produced */}
+        {/* <WasmCloudTechnology /> */}
         <WebAssemblyComponents />
         <GetInvolved />
-        <CaseStudies />
+        {/* TODO: enable once case studies are approved */}
+        {/* <CaseStudies /> */}
         <Kubernetes />
         <WasmCloudEcosystem />
         <GetStarted />
