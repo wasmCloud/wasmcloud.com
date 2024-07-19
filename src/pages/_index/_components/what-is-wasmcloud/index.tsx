@@ -13,143 +13,178 @@ import styles from './what-is-wasmcloud.module.css';
 
 type Props = {};
 
+const INTRO_CONTENT: {
+  tag: React.ReactNode;
+  heading: React.ReactNode;
+  description: React.ReactNode;
+} = {
+  tag: 'What is wasmCloud?',
+  heading: 'Fast-track the development, deployment, and management of distributed applications',
+  description: (
+    <p>
+      wasmCloud is an open source project from the Cloud Native Computing Foundation (CNCF) that
+      enables teams to build polyglot applications composed of reusable code and run
+      them—resiliently and efficiently—across any Kubernetes cluster, cloud, datacenter, or edge.
+    </p>
+  ),
+};
+
+const SWITCHER_CONTENT: Array<{
+  id: string;
+  title: React.ReactNode;
+  image: string;
+  features: Array<{
+    title: React.ReactNode;
+    description: React.ReactNode;
+    link?: string;
+    linkText?: React.ReactNode;
+  }>;
+}> = [
+  {
+    id: 'build',
+    image: '/img/pages/home/what-is-wasmcloud/build.svg',
+    title: 'Build',
+    features: [
+      {
+        title: 'Integrate with your existing ecosystem',
+        description: (
+          <>
+            wasmCloud has first-tier support for Kubernetes, VS Code, ArgoCD, Backstage, Chainguard,
+            and more.
+          </>
+        ),
+      },
+      {
+        title: 'Build Reusable Components',
+        description: (
+          <>
+            Using reusable components means that platform teams can build features that can be
+            leveraged across your entire organization.
+          </>
+        ),
+      },
+      {
+        title: 'Bring-your-own language(s) for polyglot apps',
+        description: (
+          <>
+            Build and run applications from components written in C, C#, C++, Rust, Python, Go, C#,
+            TypeScript and more.
+          </>
+        ),
+      },
+    ],
+  },
+  {
+    id: 'compose',
+    image: '/img/pages/home/what-is-wasmcloud/compose.svg',
+    title: 'Compose',
+    features: [
+      {
+        title: 'Combine components into applications',
+        description: (
+          <>
+            Create applications by connecting WebAssembly components, first-party platform
+            capabilities, or your own extensions.
+          </>
+        ),
+      },
+      {
+        title: 'Elastically extensible',
+        description: (
+          <>
+            Easily extend the wasmCloud platform at runtime with secure, plugin-based custom
+            capabilities—including your own custom interfaces.
+          </>
+        ),
+      },
+      {
+        title: 'Portable and pluggable',
+        description: (
+          <>
+            Universal interface abstractions built on WebAssembly Interface Types (WIT) maximize
+            application portability across dev, QA, test, and prod.
+          </>
+        ),
+      },
+    ],
+  },
+  {
+    id: 'run',
+    image: '/img/pages/home/what-is-wasmcloud/run.svg',
+    title: 'Run',
+    features: [
+      {
+        title: 'Seamless orchestration',
+        description: (
+          <>
+            wasmCloud enables distributed applications to seamlessly operate across any cloud,
+            Kubernetes cluster, datacenter, or edge.
+          </>
+        ),
+      },
+      {
+        title: 'Automatically elastic, reliably resilient',
+        description: (
+          <>
+            wasmCloud automatically scales your components vertically to meet real-time demand;
+            scaling horizontally is easy with our flexible, flat compute mesh.
+          </>
+        ),
+      },
+      {
+        title: 'Location Agnostic',
+        description: (
+          <>
+            With local-first routing and at-least-once delivery, wasmCloud delivers cross-region,
+            capability-level resiliency to every deployment
+          </>
+        ),
+      },
+    ],
+  },
+];
+
 function WhatIsWasmCloud({}: Props) {
   return (
     <Section color="light-gray" id="what-is-wasmcloud">
       <div className="container">
-        <SectionTag>What is wasmCloud?</SectionTag>
-        <SectionHeading>
-          Fast-track the development, deployment, and management of distributed applications
-        </SectionHeading>
-        <p>
-          wasmCloud is an open source project from the Cloud Native Computing Foundation (CNCF) that
-          enables teams to build polyglot applications composed of reusable code and run
-          them—resiliently and efficiently—across any Kubernetes cluster, cloud, datacenter, or
-          edge.
-        </p>
+        <SectionTag>{INTRO_CONTENT.tag}</SectionTag>
+        <SectionHeading>{INTRO_CONTENT.heading}</SectionHeading>
+        {INTRO_CONTENT.description}
       </div>
 
       <div className="container">
-        <Switcher defaultValue="build">
+        <Switcher defaultValue={SWITCHER_CONTENT[0].id}>
           <SwitcherList className={styles.list}>
-            <SwitcherButton className={styles.button} value="build">
-              <img
-                alt=""
-                src="/img/pages/home/icon/build.svg"
-                className={`${styles.icon} ${styles.iconBuild}`}
-              />
-              Build
-            </SwitcherButton>
-            <SwitcherButton className={styles.button} value="compose">
-              <img
-                alt=""
-                src="/img/pages/home/icon/compose.svg"
-                className={`${styles.icon} ${styles.iconCompose}`}
-              />
-              Compose
-            </SwitcherButton>
-            <SwitcherButton className={styles.button} value="run">
-              <img
-                alt=""
-                src="/img/pages/home/icon/run.svg"
-                className={`${styles.icon} ${styles.iconRun}`}
-              />
-              Run
-            </SwitcherButton>
+            {SWITCHER_CONTENT.map((content, i) => (
+              <SwitcherButton key={content.id} className={styles.button} value={content.id}>
+                <img
+                  src={`/img/pages/home/icon/${content.id}.svg`}
+                  className={`${styles.icon} ${styles[content.id]}`}
+                  alt=""
+                />
+                {content.title}
+              </SwitcherButton>
+            ))}
           </SwitcherList>
-          <SwitcherContent value="build" className={styles.content}>
-            <div className={styles.contentCopy}>
-              <SectionSubheading>Build</SectionSubheading>
-              <div className={styles.feature}>
-                <h5>Bring-your-own language(s) for polyglot apps</h5>
-                <p>
-                  Build and run applications from components written in C, C#, C++, Rust, Python,
-                  Go, C#, TypeScript and more.
-                </p>
-                <a href="/docs/category/developer-guide">Developer Guide</a>
+
+          {SWITCHER_CONTENT.map((content, i) => (
+            <SwitcherContent key={content.id} value={content.id} className={styles.content}>
+              <SectionSubheading className={styles.heading}>{content.title}</SectionSubheading>
+              <div className={styles.contentCopy}>
+                {content.features.map((feature, i) => (
+                  <div className={styles.feature} key={i}>
+                    <h5>{feature.title}</h5>
+                    <p>{feature.description}</p>
+                    {feature.link && <a href={feature.link}>{feature.linkText}</a>}
+                  </div>
+                ))}
               </div>
-              <div className={styles.feature}>
-                <h5>Integrate with your existing ecosystem</h5>
-                <p>
-                  wasmCloud has first-tier support for Kubernetes, VS Code, ArgoCD, Backstage,
-                  Chainguard, and more.
-                </p>
-                <a href="/docs/concepts/capabilities/">Capabilities Guide</a>
+              <div className={styles.contentImage}>
+                <img src={content.image} alt="" />
               </div>
-              <div className={styles.feature}>
-                <h5>Zero Trust security by default</h5>
-                <p>
-                  Our security audited platform builds on the sandboxed security model of Wasm and
-                  runs standalone or in distroless containers.
-                </p>
-                <a href="/docs/hosts/security">Security Guide</a>
-              </div>
-            </div>
-            <div className={styles.contentImage}>
-              <img src="/img/pages/home/what-is-wasmcloud/build.svg" alt="" />
-            </div>
-          </SwitcherContent>
-          <SwitcherContent value="compose" className={styles.content}>
-            <div className={styles.contentCopy}>
-              <SectionSubheading>Compose</SectionSubheading>
-              <div className={styles.feature}>
-                <h5>Combine components into applications</h5>
-                <p>
-                  Create applications by connecting WebAssembly components, first-party platform
-                  capabilities, or your own extensions.
-                </p>
-                <a href="/docs/ecosystem/wadm/">Applications Guide</a>
-              </div>
-              <div className={styles.feature}>
-                <h5>Elastically extensible</h5>
-                <p>
-                  Easily extend the wasmCloud platform at runtime with secure, plugin-based custom
-                  capabilities—including your own custom interfaces.
-                </p>
-                <a href="/docs/concepts/providers">Component Provider Guide</a>
-              </div>
-              <div className={styles.feature}>
-                <h5>Portable and pluggable</h5>
-                <p>
-                  Universal interface abstractions built on WebAssembly Interface Types (WIT)
-                  maximize application portability across dev, QA, test, and prod.
-                </p>
-                <a href="/docs/concepts/linking-components/">Component Linking Guide</a>
-              </div>
-            </div>
-            <div className={styles.contentImage}>
-              <img src="/img/pages/home/what-is-wasmcloud/compose.svg" alt="" />
-            </div>
-          </SwitcherContent>
-          <SwitcherContent value="run" className={styles.content}>
-            <div className={styles.contentCopy}>
-              <SectionSubheading>Run</SectionSubheading>
-              <div className={styles.feature}>
-                <h5>Seamless orchestration</h5>
-                <p>
-                  wasmCloud enables distributed applications to seamlessly operate across any cloud,
-                  Kubernetes cluster, datacenter, or edge.
-                </p>
-              </div>
-              <div className={styles.feature}>
-                <h5>Automatically elastic, reliably resilient</h5>
-                <p>
-                  wasmCloud automatically scales your components vertically to meet real-time
-                  demand; scaling horizontally is easy with our flexible, flat compute mesh.
-                </p>
-              </div>
-              <div className={styles.feature}>
-                <h5>Location Agnostic</h5>
-                <p>
-                  With local-first routing and at-least-once delivery, wasmCloud delivers
-                  cross-region, capability-level resiliency to every deployment
-                </p>
-              </div>
-            </div>
-            <div className={styles.contentImage}>
-              <img src="/img/pages/home/what-is-wasmcloud/run.svg" alt="" />
-            </div>
-          </SwitcherContent>
+            </SwitcherContent>
+          ))}
         </Switcher>
       </div>
     </Section>
