@@ -29,11 +29,15 @@ function Hero({}: Props) {
     <div className={styles.hero}>
       <div className={styles.content}>
         <h1>
-          {HEADING[0]}
+          <span>
+            {HEADING[0]}
+            <ImgSparkles className={[styles.img, styles.sparkles].join(' ')} title="" />
+          </span>
           <br />
-          {HEADING[1]}
-          <ImgSparkles className={[styles.img, styles.sparkles].join(' ')} title="" />
-          <ImgFlare className={[styles.img, styles.flare].join(' ')} title="" />
+          <span>
+            {HEADING[1]}
+            <ImgFlare className={[styles.img, styles.flare].join(' ')} title="" />
+          </span>
         </h1>
         <p>
           {CONTENT[0]}
