@@ -32,7 +32,7 @@ const FONTS: FontOption[] = [
   {
     category: 'Strong',
     fontName: 'Alegreya',
-    googleSource: 'Alegreya:ital,wght@0,700;1,700',
+    googleSource: 'Alegreya:wght@700',
   },
   {
     category: 'Playful',
@@ -43,14 +43,14 @@ const FONTS: FontOption[] = [
   {
     category: 'Playful',
     fontName: 'Chivo Mono',
-    googleSource: 'Chivo+Mono:ital,wght@0,500;1,500',
+    googleSource: 'Chivo+Mono:wght@500',
   },
   { category: 'Fresh', fontName: 'Fraunces', weight: '600' },
   { category: 'Fresh', fontName: 'Gabarito', weight: '600' },
   {
     category: 'Fresh',
     fontName: 'Kufam',
-    googleSource: 'Kufam:ital,wght@0,600;1,600',
+    googleSource: 'Kufam:wght@600',
     weight: '600',
   },
   { category: 'Strong', fontName: 'Lalezar', weight: '400' },
@@ -68,7 +68,7 @@ const FONTS: FontOption[] = [
   {
     category: 'Strong',
     fontName: 'Platypi',
-    googleSource: 'Platypi:ital,wght@0,500;1,500',
+    googleSource: 'Platypi:wght@500',
     weight: '500',
   },
   { category: 'Strong', fontName: 'Suez One', weight: '400' },
@@ -109,30 +109,20 @@ function FontPickerButton() {
   };
 
   React.useEffect(() => {
-    let existingScript = linkRef.current;
-    if (existingScript) existingScript.remove();
-    const link = document.createElement('link');
-    const googleFontName =
-      selectedFontObj.googleSource ?? selectedFontObj.fontName.replace(/ /g, '+');
-    link.href = `https://fonts.googleapis.com/css2?family=${googleFontName}&display=fallback`;
-    link.rel = 'stylesheet';
+    if (!selectedFontObj) return;
+    linkRef.current?.remove();
+
+    // Add the new font link
+    const link = addStylesheetLink(selectedFontObj);
     linkRef.current = link;
-    document.head.appendChild(link);
+
+    // Update the font properties
+    updateProperties(selectedFontObj);
 
     return () => {
+      updateProperties();
       link.remove();
     };
-  }, [selectedFontObj]);
-
-  React.useEffect(() => {
-    Object.entries(VARIABLES).forEach(([property, key]) => {
-      const value = key === 'fontName' ? `"${selectedFontObj[key]}"` : selectedFontObj[key];
-      if (!value) {
-        document.documentElement.style.removeProperty(property);
-        return;
-      }
-      document.documentElement.style.setProperty(property, value);
-    });
   }, [selectedFontObj]);
 
   return (
@@ -151,6 +141,26 @@ function FontPickerButton() {
       </select>
     </div>
   );
+}
+
+function addStylesheetLink(font: FontOption) {
+  const link = document.createElement('link');
+  const googleFontName = font.googleSource ?? font.fontName.replace(/ /g, '+');
+  link.href = `https://fonts.googleapis.com/css2?family=${googleFontName}&display=fallback`;
+  link.rel = 'stylesheet';
+  document.head.appendChild(link);
+  return link;
+}
+
+function updateProperties(font?: FontOption) {
+  Object.entries(VARIABLES).forEach(([property, key]) => {
+    const value = font ? font[key] : null;
+    if (!value) {
+      document.documentElement.style.removeProperty(property);
+      return;
+    }
+    document.documentElement.style.setProperty(property, key === 'fontName' ? `'${value}'` : value);
+  });
 }
 
 export { FontPickerButton };
