@@ -20,7 +20,7 @@ function HomepageHeader() {
           <div className={styles.heroGraphic}>
             <img
               id="cloudspic"
-              src="img/dancing-clouds.svg"
+              src="/pages/home/dancing-clouds.svg"
               class={colorMode === 'dark' ? styles.cloudsDark : styles.cloudsLight}
               alt="logo"
             />

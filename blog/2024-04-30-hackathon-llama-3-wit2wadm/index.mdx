@@ -1,0 +1,81 @@
+---
+title: "wasmCloud 1.0 Hackathon: Llama 3 on wasmCloud, wit2wadm, and (much) more"
+authors: [ericgregory]
+image: './images/hackathon-pt-1.jpg'
+date: "2024-04-30"
+categories: ['webassembly', 'wasmcloud', 'wash plugins', 'wit2wadm']
+slug: hackathon-llama-3-wit2wadm
+---
+
+![wasmCloud 1.0 Hackathon](./images/hackathon-pt-1.jpg)
+
+With [v1.0 in the wild](https://wasmcloud.com/blog/wasmcloud-1.0-webassembly-apps-production-any-cloud-any-edge), wasmCloud maintainers are hacking on some big ideas, putting the new release through its paces, and generally recharging their engineering mana with some wildly creative Wasm projects. In last week's community call, maintainers and WebAssembly community contributors shared some of what they've been working on, including...
+
+* An implementation of Llama 3 using Ollama on wasmCloud
+* Workspaces on Wasm&mdash;a workspace manager for components
+* A tool to automatically generate YAML manifests for Wadm from WIT
+* Go support for wRPC
+
+The participants' accomplishments are incredible&mdash;many of these projects were up and running in just a day or two. As Brooks mentioned later, "We got ridiculous mileage just by using WIT and components."
+
+{/* truncate */}
+
+We'll be exploring many of these projects individually (and showing off a bunch more) soon. In the meantime, here's a whistletop tour of wasmCloud and WebAssembly community hacks: you can [watch the full recording](https://youtu.be/Gh0zbbS9hOs) of the community meeting or read on. 
+
+## Llama 3 on wasmCloud with Ollama
+
+Since he was already experimenting with Llama 3 and the Ollama API, [Taylor Thomas](https://github.com/thomastaylor312/) decided to bring them to wasmCloud. Taylor represented the Ollama API in the WebAssembly Interface Type (WIT) interface description language (IDL) and created a provider to implement the interface, so any component can speak Llama. 
+
+With Taylor's demo, you can run Ollama locally and then launch the provider along with a component that acts as a client. Send the component a question like "What dwarf planets exist beyond Pluto?" or "Why is blue?" and get a response back from the provider. Like any component on wasmCloud, the client component could be running anywhere, including lower-powered machines or edge nodes.
+
+Taylor's [Ollama provider is on GitHub](https://github.com/thomastaylor312/ollama-provider) and available to try right now.
+
+## wasmCloud Discord chatbot: Janet gets componentized
+
+[Janet from *The Good Place*](https://thegoodplace.fandom.com/wiki/Janet) is not a robot, but she *is* now a Discord chatbot courtesy of [Brooks Townsend](https://github.com/brooksmtownsend) and the Component Model. 
+
+Brooks implemented his Janet Discord bot on wasmCloud as a component and provider using the `wasmcloud:messaging` interface. With the application running on a wasmCloud host, the chatbot works exactly as you'd expect, responding when pinged in a Discord server. 
+
+In addition to being an excellent companion for your time in the Bad Place and/or Discord, the chatbot makes an excellent model for backing Discord bots with wasmCloud applications, including how to use the messaging interface. [Check it out on GitHub](https://github.com/brooksmtownsend/wasmcloud-messaging-chatbot). 
+
+## Workspaces on Wasm (WOW): Sandboxed dev tools with components
+
+[Robin Brown](https://github.com/esoterra) joined the call to share her new workspace manager, [**Workspaces on Wasm (or WOW)**](https://github.com/esoterra/wow). This tool for development environments streamlines management of developer tooling and is particularly cool for the way it brings together different facets of the WebAssembly ecosystem. With WOW, you can pull a CLI utility from a registry, enabling a tooling workflow in which devs can easily set up and manage development environments from a community component registry like [wa.dev](https://wa.dev/). 
+
+Robin explained that this also creates a security model in which commands "can only see the directory from the config down"&mdash;the workspace. Developers can have an environment where their tools are limited to the sandbox where they're working without the hassle of worrying about permissions on a per-tool basis.
+
+Any tool that uses the `wasi:cli` world is compatible. You can [learn more about WOW and try it out at the GitHub repo](https://github.com/esoterra/wow). 
+
+Robin said, "I want to see all of [the ecosystem's] dev tools as components and dogfood all the way down," and added, "WebAssembly and the registry projects give a really strong foundation, and I was able to build this in a matter of two days." 
+
+## `wash` plugins: Build your own CLI!
+
+Speaking of modular Wasm tooling, Taylor also showed a new plugin system for wasmCloud Shell (wash), with plugins implemented as components. 
+
+The system works by composing an adapter component with the component for a given plugin. Once composed, a user can execute the plugin as a subcommand to `wash`. Plugins themselves can be sourced from local files, over HTTP, or from OCI registries. 
+
+What's particularly cool about the component-based approach is that very little of it is actually specific to wasmCloud or `wash`&mdash;so little, in fact, that it remains largely functional when run with Wasmtime. So in addition to a plugin system for `wash`, Taylor has created a more generalizable component-driven approach to modular CLIs.
+
+Plugins for `wash` release this week with wash 0.28, so you can expect to hear more about them very, very soon. 
+
+## Wasm component-native RPC&mdash;now with Go
+
+[Roman Volosatovs](https://github.com/rvolosatovs) is the driving force behind [wRPC](https://github.com/wrpc/wrpc), a framework for Wasm component-native RPC that helps remote components communicate via WIT interfaces. With v1.0, wasmCloud uses wRPC to link components at runtime over the lattice&mdash;in short, wRPC is the secret sauce that makes it possible to run distributed components seamlessly.
+
+For the Hackathon, Roman demonstrated Go working with wRPC, showing requests served by a Go program via wRPC. In the [wRPC repo](https://github.com/wrpc/wrpc), you can find examples for NATS transport over wRPC in [Go](https://github.com/wrpc/wrpc/tree/main/examples/go) as well as [Rust](https://github.com/wrpc/wrpc/tree/main/examples/rust).
+
+## wit2wadm: Generate YAML from WIT
+
+Everyone loves writing YAML manifests, so it's difficult to understand why Brooks would want to automate the process. Nevertheless, he followed his inscrutable whims to create [**wit2wadm**](https://github.com/brooksmtownsend/wit2wadm), a Rust binary and library that automatically generates Wadm manifests from provided WIT, enabling a smooth, speedy path from build to deploy with wasmCloud. 
+
+As Brooks explained, if you bring a little knowledge about available capability providers, a component's WIT provides all the information about import and export requirements that you need to populate a Wadm manifest. So that's exactly what wit2wadm does, fulfilling unsatisfied links with appropriate first-party providers and otherwise outputting placeholder YAML for custom interfaces. The CLI interface also provides options for defining fields like an app's name or description manually. 
+
+Taking things a step further, wit2wadm can be compiled as a component. Once it's componentized, you have a new set of possibilities&mdash;like transpiling it with [jco](https://github.com/bytecodealliance/jco) to [run in the browser](https://brooksmtownsend.github.io/wit2wadm/). From the same core code, Brooks now has a web app that generates Wadm manifests in an instant.
+
+![wit2wadm screenshot](./images/wit2wadm-2.png)
+
+This is one of those tools that will immediately become an essential part of your workflow. (Spoiler: it's also an excellent candidate for a `wash` plugin.) The Hackathon build is [available on GitHub now](https://github.com/brooksmtownsend/wit2wadm). 
+
+## What's next
+
+There are more Hackathon projects to come in the next community meeting, and we'll be doing deeper dives on many of these projects in the coming weeks. With the ridiculous velocity enabled by components and WIT, a ton of Hackathon work is either in the process of being integrated into wasmCloud or already there, and we're always eager to welcome new contributors. If you'd like to chat with the maintainers, get involved, talk Wasm, ask questions, or share your own projects, [join us on the wasmCloud community Slack](https://slack.wasmcloud.com/)!
