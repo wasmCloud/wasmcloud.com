@@ -58,7 +58,7 @@ const config: Config = {
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
-  favicon: 'img/favicon.ico',
+  favicon: '/favicon.ico',
   // Hubspot
   scripts: [
     {
@@ -147,12 +147,12 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/wasmcloud_large_social.png',
+    image: '/logo/wasmcloud_large_social.png',
     navbar: {
       title: 'wasmCloud',
       logo: {
         alt: 'wasmCloud Logo',
-        src: 'img/wasmcloud_green.svg',
+        src: '/logo/wasmcloud_green.svg',
       },
       items: [
         { to: '/blog', label: 'Blog', position: 'left' },

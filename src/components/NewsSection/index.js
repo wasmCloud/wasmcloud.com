@@ -5,7 +5,7 @@ import clsx from 'clsx';
 
 function NewsImageComponent() {
   const { colorMode } = useColorMode();
-  const root = '/img/';
+  const root = '/pages/home/';
   return (
     <img
       className={styles.newsSvg}
