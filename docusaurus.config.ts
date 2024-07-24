@@ -14,6 +14,7 @@ import {
   transformerNotationHighlight,
   transformerNotationFocus,
 } from '@shikijs/transformers';
+import rehypeNameToId from 'rehype-name-to-id';
 
 const rehypeShikiPlugin = [
   rehypeShiki,
@@ -81,10 +82,13 @@ const config: Config = {
         blog: {
           blogSidebarCount: 100,
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+          rehypePlugins: [rehypeNameToId],
+          authorsMapPath: 'authors.yml',
         },
         docs: {
           editUrl: 'https://github.com/wasmCloud/wasmcloud.com/edit/main/',
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+          rehypePlugins: [rehypeNameToId],
           lastVersion: 'current',
           versions: {
             current: {
@@ -99,6 +103,7 @@ const config: Config = {
         },
         pages: {
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+          rehypePlugins: [rehypeNameToId],
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
@@ -121,6 +126,7 @@ const config: Config = {
         blogDescription: 'wasmCloud community meetings agendas, notes, and recordings',
         blogSidebarTitle: 'Community Meetings',
         beforeDefaultRehypePlugins: [rehypeShikiPlugin],
+        rehypePlugins: [rehypeNameToId],
       } satisfies PluginContentBlogOptions,
     ],
     [
@@ -251,6 +257,9 @@ const config: Config = {
       headingIds: false,
     },
   },
+
+  onBrokenAnchors: 'throw',
+  onDuplicateRoutes: 'throw',
 };
 
 /** @return {import('@docusaurus/types').Plugin} */

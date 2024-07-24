@@ -1,4 +1,4 @@
-<h1><a name="logging">World logging</a></h1>
+<h1><a name="logging"></a>World logging</h1>
 <ul>
 <li>Exports:
 <ul>

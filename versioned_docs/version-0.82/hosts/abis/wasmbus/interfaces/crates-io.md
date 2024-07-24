@@ -1,5 +1,5 @@
 ---
-title: "Rust crates"
+title: 'Rust crates'
 draft: false
 ---
 
@@ -17,4 +17,4 @@ When building an interface project from source, `rust/build.rs`, `codegen.toml`,
 
 ### Smithy model dependencies
 
-If your smithy file depends on others that are not in your source tree, the `codegen.toml` file can refer to the dependencies using the [`url`](./codegen-toml/#from-urls) parameter. These files are downloaded and [cached](./codegen-toml/#caching) locally to support later offline builds.
+If your smithy file depends on others that are not in your source tree, the `codegen.toml` file can refer to the dependencies using the [`url`](./codegen-toml#from-urls) parameter. These files are downloaded and [cached](./codegen-toml#caching) locally to support later offline builds.
