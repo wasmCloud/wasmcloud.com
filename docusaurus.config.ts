@@ -6,6 +6,7 @@ import {
 } from '@docusaurus/preset-classic';
 import { Options as PluginContentBlogOptions } from '@docusaurus/plugin-content-blog';
 import { Options as PluginGoogleAnalyticsOptions } from '@docusaurus/plugin-google-analytics';
+import { Options as SEOChecksPluginOptions } from '@wasmcloud/docusaurus-seo-checks';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import { bundledLanguages } from 'shiki';
 import {
@@ -83,7 +84,7 @@ const config: Config = {
           blogSidebarCount: 100,
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],
           rehypePlugins: [rehypeNameToId],
-          authorsMapPath: 'authors.yml',
+          authorsMapPath: '../authors.yml', // relative to blog directory
         },
         docs: {
           editUrl: 'https://github.com/wasmCloud/wasmcloud.com/edit/main/',
@@ -113,6 +114,12 @@ const config: Config = {
   ],
 
   plugins: [
+    [
+      '@wasmcloud/docusaurus-seo-checks',
+      {
+        underscores: { level: 'error' },
+      } satisfies SEOChecksPluginOptions,
+    ],
     [
       '@docusaurus/plugin-content-blog',
       {
