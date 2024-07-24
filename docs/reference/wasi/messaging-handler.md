@@ -1,4 +1,4 @@
-<h1><a name="messaging_handler">World messaging-handler</a></h1>
+<h1><a name="messaging_handler"></a>World messaging-handler</h1>
 <ul>
 <li>Imports:
 <ul>
