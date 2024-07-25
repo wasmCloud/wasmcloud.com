@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import type BlogPostItemType from '@theme/BlogPostItem';
 import { useBlogPost, useDateTimeFormat } from '@docusaurus/theme-common/internal';
 import type { WrapperProps } from '@docusaurus/types';
+import MDXContent from '@theme/MDXContent';
 
 type Props = WrapperProps<typeof BlogPostItemType>;
 
@@ -28,7 +29,9 @@ function CommunityPostListItem({ children, className }: Props): JSX.Element {
   return (
     <div className={clsx(styles.postItem, className)}>
       <h1 className={styles.title}>{title}</h1>
-      <div className={styles.content}>{children}</div>
+      <div className={styles.content}>
+        <MDXContent>{children}</MDXContent>
+      </div>
     </div>
   );
 }

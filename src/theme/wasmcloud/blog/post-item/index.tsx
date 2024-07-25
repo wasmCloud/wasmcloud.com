@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import type BlogPostItemType from '@theme/BlogPostItem';
 import { useBlogPost } from '@docusaurus/theme-common/internal';
 import type { WrapperProps } from '@docusaurus/types';
+import MDXContent from '@theme/MDXContent';
 
 type Props = WrapperProps<typeof BlogPostItemType>;
 
@@ -26,7 +27,9 @@ function CommunityPostItem({ children, className }: Props): JSX.Element {
             <BlogPostItemHeaderInfo />
           </span>
         </div>
-        <div className={styles.content}>{children}</div>
+        <div className={styles.content}>
+          <MDXContent>{children}</MDXContent>
+        </div>
       </div>
     </div>
   );
