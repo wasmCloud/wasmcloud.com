@@ -285,7 +285,7 @@ const config = (async (): Promise<Config> => {
       {
         tagName: 'link',
         attributes: {
-          href: 'https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=DM+Serif+Text:ital@0;1&family=Inter:wght@100..900&display=swap',
+          href: 'https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Lexend:wght@100..900&family=Inter:wght@100..900&display=swap',
           rel: 'stylesheet',
         },
       },
