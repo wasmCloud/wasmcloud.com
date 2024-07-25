@@ -11,6 +11,7 @@ import { CaseStudies } from './_components/case-studies';
 import { Kubernetes } from './_components/kubernetes';
 import { WasmCloudEcosystem } from './_components/wasmcloud-ecosystem';
 import { GetStarted } from './_components/get-started';
+import { WasmCloudUseCases } from './_components/wasmcloud-use-cases';
 
 function ContactForm() {
   return (
@@ -23,6 +24,7 @@ function ContactForm() {
         <Hero />
         <WhatIsWasmCloud />
         <WhyUseWasmCloud />
+        <WasmCloudUseCases />
         {/* TODO: enable once video is produced */}
         {/* <WasmCloudTechnology /> */}
         <WebAssemblyComponents />

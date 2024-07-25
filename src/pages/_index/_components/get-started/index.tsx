@@ -4,7 +4,7 @@ import { SectionHeading } from '@site/src/pages/_components/section-heading';
 import { SectionTag } from '@site/src/pages/_components/section-tag';
 import styles from './get-started.module.css';
 import SvgSparkles from './img/sparkles.svg';
-import SvgUnderline from './img/underline.svg';
+import { SketchUnderline } from '@site/src/pages/_components/sketch-underline';
 
 type Props = {};
 
@@ -14,12 +14,7 @@ function GetStarted({}: Props) {
       <div className="container">
         <SectionTag>Get started</SectionTag>
         <SectionHeading className={styles.heading}>
-          Your{' '}
-          <span>
-            Universal
-            <SvgUnderline className={styles.underline} />
-          </span>{' '}
-          Golden Path starts{' '}
+          Your <SketchUnderline>Universal</SketchUnderline> Golden Path starts{' '}
           <span>
             here
             <SvgSparkles className={styles.sparkles} />

@@ -10,7 +10,7 @@ type Props = {};
 
 function WasmCloudTechnology({}: Props) {
   return (
-    <Section color="dark-gray" id="technology">
+    <Section color="space-blue" id="technology">
       <div className="container">
         <div className={styles.content}>
           <SectionTag>wasmCloud Technology</SectionTag>
