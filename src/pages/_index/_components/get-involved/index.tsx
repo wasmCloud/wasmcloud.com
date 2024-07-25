@@ -38,13 +38,13 @@ function GetInvolved({}: Props) {
                 </a>
               </li>
               <li>
-                <a href={PLAYLIST} target="_blank" rel="noreferrer">
+                <a href={PLAYLIST} target="_blank" rel="noopener">
                   <img src="/img/pages/home/icon/youtube.svg" alt="" />
                   <span>Watch past Community Calls</span>
                 </a>
               </li>
               <li>
-                <a href={CALENDAR} target="_blank" rel="noreferrer">
+                <a href={CALENDAR} target="_blank" rel="noopener">
                   <img src="/img/pages/home/icon/calendar.svg" alt="" />
                   <span>Add to your calendar</span>
                 </a>
@@ -57,23 +57,23 @@ function GetInvolved({}: Props) {
               <span>{countdown}</span>
             </h4>
             {isLive ? (
-              <div className={styles.wednesdayButtons}>
-                <a href={ZOOM} className={styles.wednesdayButton}>
+              <div className={styles.buttons}>
+                <a href={ZOOM} target="_blank" rel="noopener" className={styles.button}>
                   <img src="/img/pages/home/icon/zoom.svg" alt="" />
                   Join Live
                 </a>
-                <a href={YOUTUBE} className={styles.wednesdayButton}>
+                <a href={YOUTUBE} target="_blank" rel="noopener" className={styles.button}>
                   <img src="/img/pages/home/icon/youtube.svg" alt="" />
                   Stream Live
                 </a>
               </div>
             ) : (
-              <div className={styles.wednesdayButtons}>
-                <a href={CALENDAR} className={styles.wednesdayButton}>
+              <div className={styles.buttons}>
+                <a href={CALENDAR} target="_blank" rel="noopener" className={styles.button}>
                   <img src="/img/pages/home/icon/calendar.svg" alt="" />
                   Add to Cal
                 </a>
-                <a href={PLAYLIST} className={styles.wednesdayButton}>
+                <a href={PLAYLIST} target="_blank" rel="noopener" className={styles.button}>
                   <img src="/img/pages/home/icon/youtube.svg" alt="" />
                   Past Calls
                 </a>

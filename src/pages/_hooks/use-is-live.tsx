@@ -23,7 +23,7 @@ function useIsLive() {
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
         // update the countdown
-        setCountdown(`in ${days}d ${hours}h ${minutes}m`);
+        setCountdown(`${days ? `${days}d ` : ''}${hours ? `${hours}h ` : ''}${minutes}m`);
       }
 
       timeout = setTimeout(updateCountdown, 60 * 1000); // 60 seconds

@@ -10,5 +10,10 @@ git fetch
 git pull
 
 DST_FILE=community/$1-community-meeting.mdx
-cat community/template.txt | sed "s/YYYY-MM-DD/$1/" | sed "s,VIDEOURL,$2," > $DST_FILE
+cat community/template.txt | sed "s/YYYY-MM-DD/$1/" | sed "s,VIDEOURL,$2," > "$DST_FILE"
+
+CONSTANTS_FILE=src/constants.ts
+sed "s,YOUTUBE: '.*',YOUTUBE: '${2}'," $CONSTANTS_FILE > $CONSTANTS_FILE.tmp
+mv $CONSTANTS_FILE.tmp $CONSTANTS_FILE
+
 echo "Done! Add agenda items, demos, and awesome stuff to $DST_FILE"
