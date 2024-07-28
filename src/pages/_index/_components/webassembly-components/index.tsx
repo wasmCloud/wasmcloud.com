@@ -19,7 +19,9 @@ function WebAssemblyComponents({}: Props) {
               composition and need a Wasm-specific orchestrator to take best advantage of them.
             </p>
             <p>
-              <a href="">Read our components starter guide</a>
+              <a href="https://wasmcloud.com/docs/concepts/components" target="_blank">
+                Read our components starter guide
+              </a>
             </p>
           </div>
           <div>

@@ -14,6 +14,12 @@ function WasmCloudEcosystem({}: Props) {
         <SectionTag>wasmCloud Ecosystem</SectionTag>
         <SectionHeading>Wasm-native works with cloud-native</SectionHeading>
         <p>wasmCloud works with the tools you know and love today.</p>
+        <p>
+          Explore the{' '}
+          <a href="https://wasmcloud.com/docs/capabilities/" target="_blank">
+            Capability Catalog.
+          </a>
+        </p>
       </div>
       <div className={styles.graphic}>
         <div className={styles.callout} data-before>

@@ -24,7 +24,7 @@ const INTRO_CONTENT: {
     <p>
       wasmCloud is an open source project from the Cloud Native Computing Foundation (CNCF) that
       enables teams to build polyglot applications composed of reusable code and run
-      them—resiliently and efficiently—across any Kubernetes cluster, cloud, datacenter, or edge.
+      them—resiliently and efficiently—across any cloud, Kubernetes, datacenter, or edge.
     </p>
   ),
 };
@@ -46,20 +46,22 @@ const SWITCHER_CONTENT: Array<{
     title: 'Build',
     features: [
       {
-        title: 'Integrate with your existing ecosystem',
+        title: 'Build with Reusable Wasm Components',
         description: (
           <>
-            wasmCloud has first-tier support for Kubernetes, VS Code, ArgoCD, Backstage, Chainguard,
-            and more.
+            Stop copying boilerplate from app to app - wasmCloud provides the most common app
+            building blocks or add your own. Leveraging reusable components means that platform
+            teams can mantain 1,000's of apps centrally.
           </>
         ),
       },
       {
-        title: 'Build Reusable Components',
+        title: 'Integrate with your existing ecosystem',
         description: (
           <>
-            Using reusable components means that platform teams can build features that can be
-            leveraged across your entire organization.
+            wasmCloud has first-tier support for Kubernetes, AWS, Azure, GCP, Jenkins, Github
+            Actions, VS Code, ArgoCD, Backstage, Chainguard, KeyValue, Databases, Messaging, and
+            more.
           </>
         ),
       },
@@ -102,7 +104,8 @@ const SWITCHER_CONTENT: Array<{
         description: (
           <>
             Universal interface abstractions built on WebAssembly Interface Types (WIT) maximize
-            application portability across dev, QA, test, and prod.
+            application portability across dev, QA, test, and different production deployment
+            environments. Migrate your app without rewriting code.
           </>
         ),
       },
@@ -114,29 +117,29 @@ const SWITCHER_CONTENT: Array<{
     title: 'Run',
     features: [
       {
-        title: 'Seamless orchestration',
+        title: 'Zero Cold Starts, Scale to Zero',
         description: (
           <>
-            wasmCloud enables distributed applications to seamlessly operate across any cloud,
-            Kubernetes cluster, datacenter, or edge.
+            Lightning fast cold starts means that all workloads are run at the right scale at the
+            right time.
           </>
         ),
       },
       {
-        title: 'Automatically elastic, reliably resilient',
+        title: 'Horizontal & Vertical Autoscaling',
         description: (
           <>
-            wasmCloud automatically scales your components vertically to meet real-time demand;
-            scaling horizontally is easy with our flexible, flat compute mesh.
+            Veritical auto-scalers automatically meet real-time demand then scale to zero; scaling
+            horizontally is easy with our flexible, flat compute mesh.
           </>
         ),
       },
       {
-        title: 'Location Agnostic',
+        title: 'Seamless, Location Agnostic Orchestration, ',
         description: (
           <>
             With local-first routing and at-least-once delivery, wasmCloud delivers cross-region,
-            capability-level resiliency to every deployment
+            cross-cloud, and cross-edge capability-level resiliency to every deployment
           </>
         ),
       },

@@ -19,7 +19,9 @@ function Kubernetes({}: Props) {
               Kubernetes and distribute applications across clouds, regions, clusters, and edges.
             </p>
             <p>
-              <a href="">Deploy the wasmCloud Operator</a>
+              <a href="https://wasmcloud.com/docs/deployment/k8s/" target="_blank">
+                Deploy the wasmCloud k8s Operator
+              </a>
             </p>
           </div>
           <div>
