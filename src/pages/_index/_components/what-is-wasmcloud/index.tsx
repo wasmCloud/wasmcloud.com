@@ -69,8 +69,8 @@ const SWITCHER_CONTENT: Array<{
         title: 'Bring-your-own language(s) for polyglot apps',
         description: (
           <>
-            Build and run applications from components written in C, C#, C++, Rust, Python, Go, C#,
-            TypeScript and more.
+            Build and run applications from components written in C, C#, C++, Rust, Python, Go,
+            JavaScript, TypeScript and more.
           </>
         ),
       },
@@ -91,7 +91,7 @@ const SWITCHER_CONTENT: Array<{
         ),
       },
       {
-        title: 'Elastically extensible',
+        title: 'Endlessly extensible',
         description: (
           <>
             Easily extend the wasmCloud platform at runtime with secure, plugin-based custom
@@ -138,7 +138,7 @@ const SWITCHER_CONTENT: Array<{
         title: 'Seamless, Location Agnostic Orchestration, ',
         description: (
           <>
-            With local-first routing and at-least-once delivery, wasmCloud delivers cross-region,
+            With local-first routing and at-most-once delivery, wasmCloud delivers cross-region,
             cross-cloud, and cross-edge capability-level resiliency to every deployment
           </>
         ),

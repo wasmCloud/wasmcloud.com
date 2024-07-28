@@ -32,7 +32,7 @@ function GetStarted({}: Props) {
           <div className={styles.gridItem}>
             <img src="/img/pages/home/icon/compose.svg" alt="" />
             <h4>Build your first component</h4>
-            <p>Start building with interfaces using one of our examples</p>
+            <p>Start building with standard interfaces using one of our examples</p>
             <a
               href="https://github.com/wasmCloud/wasmCloud/tree/main/examples"
               className="button"
