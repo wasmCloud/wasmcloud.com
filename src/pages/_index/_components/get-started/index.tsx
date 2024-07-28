@@ -25,7 +25,7 @@ function GetStarted({}: Props) {
             <img src="/img/pages/home/icon/build.svg" alt="" />
             <h4>Download the wasmCloud CLI</h4>
             <p>Get all the dev tooling you need by installing the wasmCloud "wash" CLI</p>
-            <a href="/docs/installation" className="button">
+            <a href="/docs/installation" target="_blank" className="button">
               Download wash
             </a>
           </div>

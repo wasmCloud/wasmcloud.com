@@ -14,8 +14,8 @@ const HEADING = [
 ] as const;
 const CONTENT = [
   // p
-  'Deploy and manage Wasm applications',
-  'on any device, server or cloud',
+  'Deploy and manage Wasm apps',
+  'on any cloud, k8s, or edge',
   'even your own!',
 ] as const;
 const BUTTON = [
