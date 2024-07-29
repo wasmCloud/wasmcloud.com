@@ -46,27 +46,26 @@ const SWITCHER_CONTENT: Array<{
     title: 'Build',
     features: [
       {
-        title: 'Applications Faster',
+        title: 'Faster Development Cycles',
         description: (
-          <>
-            Leveraging reusable, polyglot, Wasm components on a reliable, distributed platform.
-          </>
+          <>Leverage reusable, polyglot, Wasm components on a reliable, distributed platform.</>
         ),
       },
       {
         title: 'Centrally Maintainable Apps',
         description: (
           <>
-            Reusable, version-controlled, components empower platform teams to maintain 1,000's of diverse apps centrally.
+            Reusable, version-controlled components empower platform teams to maintain thousands of
+            diverse apps centrally.
           </>
         ),
       },
       {
-        title: 'Compatible With Existing Platforms & Stacks',
+        title: 'Integrate with Existing Stacks',
         description: (
           <>
-            Common integrations make the wasmCloud ecosystem compatible with today's platforms - Argo, Jenkins, Actions, 
-            Chainguard, Backstage, K8s...
+            wasmCloud has first-tier support for Kubernetes, AWS, Azure, GCP, Jenkins, Github
+            Actions, ArgoCD, Backstage, Chainguard, Databases, Messaging, and more.
           </>
         ),
       },
@@ -78,27 +77,29 @@ const SWITCHER_CONTENT: Array<{
     title: 'Compose',
     features: [
       {
-        title: 'Without Lock-In',
+        title: 'Development Without Lock-In',
         description: (
           <>
-            Define application dependencies at runtime via contract-driven interfaces leveraging different
-             vendors across deployments, dev, QA, or prod.
+            Define application dependencies at runtime via contract driven interfaces leveraging
+            different vendors across deployments, dev, QA, or prod.
           </>
         ),
       },
       {
-        title: 'Portable Apps',
+        title: 'Truly Portable Apps',
         description: (
           <>
-            That easily run across Linux, MacOS X, Windows, ARM, x86, and more.
+            Run the same Wasm application across operating systems and architectures&mdash;no new
+            builds required. Linux, MacOS X, Windows, ARM, x86, and more.
           </>
         ),
       },
       {
-        title: 'Custom Capabilites',
+        title: 'Custom Capabilities',
         description: (
           <>
-            Easily extend the secure wasmCloud host at runtime to support custom dependencies, hardware, or business contracts. 
+            Easily extend the secure wasmCloud host at runtime to support custom dependencies,
+            hardware, or business contracts.
           </>
         ),
       },
@@ -110,27 +111,30 @@ const SWITCHER_CONTENT: Array<{
     title: 'Run',
     features: [
       {
-        title: 'Scale to Zero with Zero Cold Starts',
+        title: 'Scale-to-Zero with Zero Cold Starts',
         description: (
           <>
-            Sub-millisecond start times and vertical autoscaling means workloads scale to the demand. 
+            Sub-millisecond start times and vertical autoscaling means workloads scale to the
+            demand.
           </>
         ),
       },
       {
-        title: 'Reliable, Fault Tolerant Apps',
+        title: 'Reliable, Fault-Tolerant Apps',
         description: (
           <>
-            Horizontal scaling with automated fail-over gives apps capability level resiliency, reliability, and scalability. 
+            Horizontal scaling with automated fail-over gives apps capability-level resiliency,
+            reliability, and scalability.
           </>
         ),
       },
       {
-        title: 'Across Clouds',
+        title: 'Deploy Across Clouds',
         description: (
           <>
-            Close to your users, with local-first routing and at-least-once delivery, wasmCloud delivers cross-region, cross-cloud, 
-            and cross-edge capability-level resiliency to every deployment
+            Close to your users, with local-first routing and at-most-once delivery, wasmCloud
+            delivers cross-region, cross-cloud, and cross-edge capability-level resiliency to every
+            deployment
           </>
         ),
       },
