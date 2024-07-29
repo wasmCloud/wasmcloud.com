@@ -13,7 +13,7 @@ function Kubernetes({}: Props) {
         <div className={styles.content}>
           <div>
             <SectionTag>Kubernetes</SectionTag>
-            <SectionHeading>Extend the frontiers of Kubernetes</SectionHeading>
+            <SectionHeading>Extend Kubernetes with wasmCloud</SectionHeading>
             <p>
               Run wasmCloud standalone or on Kubernetes. Leverage WebAssembly components to extend
               Kubernetes and distribute applications across clouds, regions, clusters, and edges.

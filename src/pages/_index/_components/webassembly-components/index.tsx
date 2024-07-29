@@ -15,8 +15,8 @@ function WebAssemblyComponents({}: Props) {
             <SectionTag>WebAssembly Components</SectionTag>
             <SectionHeading>New to Components?</SectionHeading>
             <p>
-              WebAssembly components are a fundamentally finer-grained abstraction for application
-              composition and need a Wasm-specific orchestrator to take best advantage of them.
+            Leverage WebAssembly components' polyglot programming, 
+            security features, and modularity to build secure, maintainable applications.
             </p>
             <p>
               <a href="https://wasmcloud.com/docs/concepts/components" target="_blank">
