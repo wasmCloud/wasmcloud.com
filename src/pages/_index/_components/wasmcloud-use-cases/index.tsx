@@ -35,9 +35,9 @@ const VIDEO_CONTENT: [UseCasesContent, UseCasesContent] = [
     content: (
       <>
         <p>
-          Jochen Rau and Tyler Schoppe demonstrate how Machine Metrics is utilizing Wasm Components to move
-          platform capabilities across edges & clouds with redundancy and dynamic fault tolerance using
-          CNCF wasmCloud.
+          Jochen Rau and Tyler Schoppe demonstrate how Machine Metrics is utilizing Wasm components
+          to move platform capabilities across edges and clouds with redundancy and dynamic
+          fault-tolerance using CNCF wasmCloud.
         </p>
       </>
     ),
@@ -49,8 +49,8 @@ const VIDEO_CONTENT: [UseCasesContent, UseCasesContent] = [
       <>
         <p>
           Sean Isom and Colin Murphy explain how Adobe is using CNCF wasmCloud to run WebAssembly in
-          locations that containers can't go while maintaining connectivity with existing cloud
-          services and kubernetes clusters.
+          locations that containers can't go&mdash;while maintaining connectivity with existing
+          cloud services and Kubernetes clusters.
         </p>
       </>
     ),
