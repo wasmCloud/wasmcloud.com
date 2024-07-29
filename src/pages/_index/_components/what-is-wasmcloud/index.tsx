@@ -62,7 +62,7 @@ const SWITCHER_CONTENT: Array<{
         ),
       },
       {
-        title: 'With Existing Platforms & Stack',
+        title: 'Compatible With Existing Platforms & Stacks',
         description: (
           <>
             Common integrations make wasmCloud ecosystem compatible with today's platforms - Argo, Jenkins, Actions, 
@@ -118,7 +118,7 @@ const SWITCHER_CONTENT: Array<{
         ),
       },
       {
-        title: 'Reliable, fault tolerant apps',
+        title: 'Reliable, Fault Tolerant Apps',
         description: (
           <>
             Horizontal scaling with automated fail-over gives apps capability level resiliency, reliability, and scalability. 
