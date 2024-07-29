@@ -65,7 +65,7 @@ const SWITCHER_CONTENT: Array<{
         title: 'Compatible With Existing Platforms & Stacks',
         description: (
           <>
-            Common integrations make wasmCloud ecosystem compatible with today's platforms - Argo, Jenkins, Actions, 
+            Common integrations make the wasmCloud ecosystem compatible with today's platforms - Argo, Jenkins, Actions, 
             Chainguard, Backstage, K8s...
           </>
         ),
@@ -78,10 +78,10 @@ const SWITCHER_CONTENT: Array<{
     title: 'Compose',
     features: [
       {
-        title: 'With Out Lock In',
+        title: 'Without Lock-In',
         description: (
           <>
-            Define application dependencies at runtime via contract driven interfaces leveraging different
+            Define application dependencies at runtime via contract-driven interfaces leveraging different
              vendors across deployments, dev, QA, or prod.
           </>
         ),
@@ -90,7 +90,7 @@ const SWITCHER_CONTENT: Array<{
         title: 'Portable Apps',
         description: (
           <>
-            That easily run across Linux, MacOSX, Windows, ARM, x86, and more.
+            That easily run across Linux, MacOS X, Windows, ARM, x86, and more.
           </>
         ),
       },
