@@ -13,11 +13,11 @@ function WhyUseWasmCloud({}: Props) {
         <div className={styles.content}>
           <SectionTag>Why use wasmCloud?</SectionTag>
           <SectionHeading>
-            Productivity. Portability. Reusability. Connectivity. Resiliency.
+            Productivity. Maintainability. Portability. Reusability. Availability. Security.
           </SectionHeading>
           <p>
-            WebAssembly components are a fundamentally finer-grained abstraction for application
-            composition and need a Wasm-specific orchestrator to take best advantage of them.
+            WebAssembly components are a finer-grained abstraction for application
+            composition and a Wasm-specific orchestrator maximizes their full potential.
           </p>
         </div>
         <div className={styles.image}>
