@@ -23,7 +23,7 @@ const INTRO_CONTENT: {
   description: (
     <p>
       wasmCloud is an open source project from the Cloud Native Computing Foundation (CNCF) that
-      enables teams to build polyglot applications composed of reusable code and run
+      enables teams to build polyglot applications composed of reusable Wasm components and run
       them—resiliently and efficiently—across any cloud, Kubernetes, datacenter, or edge.
     </p>
   ),
