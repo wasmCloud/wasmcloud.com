@@ -40,12 +40,16 @@ function Hero({}: Props) {
           </span>
         </h1>
         <p>
-          {CONTENT[0]}
+          <span className={styles.line1}>{CONTENT[0]}</span>
           <br />
-          {CONTENT[1]}
-          <ImgArrow className={[styles.img, styles.arrow].join(' ')} title="" />
-          <span className={styles.callout}>{CONTENT[2]}</span>
-          <ImgUnderline className={[styles.img, styles.underline].join(' ')} title="" />
+          <span className={styles.line2}>
+            {CONTENT[1]}
+            <ImgUnderline className={[styles.img, styles.underline].join(' ')} title="" />
+            <span className={styles.callout}>
+              <ImgArrow className={[styles.img, styles.arrow].join(' ')} title="" />
+              {CONTENT[2]}
+            </span>
+          </span>
         </p>
         <a href={BUTTON[1]} className="button button--lg">
           {BUTTON[0]}
