@@ -152,41 +152,48 @@ function WhatIsWasmCloud({}: Props) {
       </div>
 
       <div className="container">
-        <Switcher defaultValue={SWITCHER_CONTENT[0].id}>
-          <SwitcherList className={styles.list}>
-            {SWITCHER_CONTENT.map((content, i) => (
-              <SwitcherButton key={content.id} className={styles.button} value={content.id}>
-                <img
-                  src={`/img/pages/home/icon/${content.id}.svg`}
-                  className={`${styles.icon} ${styles[content.id]}`}
-                  alt=""
-                />
-                {content.title}
-              </SwitcherButton>
-            ))}
-          </SwitcherList>
-
-          {SWITCHER_CONTENT.map((content, i) => (
-            <SwitcherContent key={content.id} value={content.id} className={styles.content}>
-              <SectionSubheading className={styles.heading}>{content.title}</SectionSubheading>
-              <div className={styles.contentCopy}>
-                {content.features.map((feature, i) => (
-                  <div className={styles.feature} key={i}>
-                    <h5>{feature.title}</h5>
-                    <p>{feature.description}</p>
-                    {feature.link && <a href={feature.link}>{feature.linkText}</a>}
-                  </div>
-                ))}
-              </div>
-              <div className={styles.contentImage}>
-                <img src={content.image} alt="" />
-              </div>
-            </SwitcherContent>
-          ))}
-        </Switcher>
+        <WhatIsWasmCloudSwitcher />
       </div>
     </Section>
   );
 }
 
-export { WhatIsWasmCloud };
+// Abstracted switcher component for reuse on introduction docs page
+function WhatIsWasmCloudSwitcher({}: Props) {
+  return (
+    <Switcher defaultValue={SWITCHER_CONTENT[0].id}>
+      <SwitcherList className={styles.list}>
+        {SWITCHER_CONTENT.map((content, i) => (
+          <SwitcherButton key={content.id} className={styles.button} value={content.id}>
+            <img
+              src={`/img/pages/home/icon/${content.id}.svg`}
+              className={`${styles.icon} ${styles[content.id]}`}
+              alt=""
+            />
+            {content.title}
+          </SwitcherButton>
+        ))}
+      </SwitcherList>
+
+      {SWITCHER_CONTENT.map((content, i) => (
+        <SwitcherContent key={content.id} value={content.id} className={styles.content}>
+          <SectionSubheading className={styles.heading}>{content.title}</SectionSubheading>
+          <div className={styles.contentCopy}>
+            {content.features.map((feature, i) => (
+              <div className={styles.feature} key={i}>
+                <h5>{feature.title}</h5>
+                <p>{feature.description}</p>
+                {feature.link && <a href={feature.link}>{feature.linkText}</a>}
+              </div>
+            ))}
+          </div>
+          <div className={styles.contentImage}>
+            <img src={content.image} alt="" />
+          </div>
+        </SwitcherContent>
+      ))}
+    </Switcher>
+  );
+}
+
+export { WhatIsWasmCloud, WhatIsWasmCloudSwitcher };
