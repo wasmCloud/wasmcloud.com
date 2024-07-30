@@ -55,7 +55,10 @@ const config = (async (): Promise<Config> => {
       tagline_1: 'Build applications in any language.',
       tagline_2: 'Deploy them anywhere.',
     },
-    url: 'https://wasmcloud.com',
+    url:
+      process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview'
+        ? process.env.DEPLOY_PRIME_URL
+        : 'https://wasmcloud.com',
     baseUrl: '/',
     onBrokenLinks: 'throw',
     onBrokenMarkdownLinks: 'warn',
