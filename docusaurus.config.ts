@@ -165,7 +165,7 @@ const config = (async (): Promise<Config> => {
     ],
 
     themeConfig: {
-      image: '/logo/wasmcloud_large_social.png',
+      image: '/logo/wasmcloud-social.png',
       navbar: {
         title: 'wasmCloud',
         logo: {
