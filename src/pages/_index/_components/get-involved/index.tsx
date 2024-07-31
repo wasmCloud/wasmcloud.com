@@ -10,7 +10,7 @@ type Props = {};
 
 function GetInvolved({}: Props) {
   const { YOUTUBE, PLAYLIST, CALENDAR, ZOOM, GITHUB, SLACK } = Links;
-  const { countdown, isLive } = useIsLive();
+  const { countdown, showLinks } = useIsLive();
 
   return (
     <Section color="green" id="community">
@@ -56,7 +56,7 @@ function GetInvolved({}: Props) {
               wasmCloud Wednesday
               <span>{countdown}</span>
             </h4>
-            {isLive ? (
+            {showLinks ? (
               <div className={styles.buttons}>
                 <a href={ZOOM} target="_blank" rel="noopener" className={styles.button}>
                   <img src="/img/pages/home/icon/zoom.svg" alt="" />

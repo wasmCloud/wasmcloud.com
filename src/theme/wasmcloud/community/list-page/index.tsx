@@ -38,7 +38,7 @@ function BlogListPageMetadata(props: Props): JSX.Element {
 
 function BlogListPageContent(props: Props): JSX.Element {
   const { metadata, items, sidebar } = props;
-  const { countdown, isLive } = useIsLive();
+  const { countdown, showLinks } = useIsLive();
   const isFirstPage = metadata.page === 1;
   return (
     <Layout>
@@ -66,7 +66,7 @@ function BlogListPageContent(props: Props): JSX.Element {
                   </div>
                 )}
                 <aside className={styles.countdown}>
-                  {isLive ? (
+                  {showLinks ? (
                     <>
                       <span>Live now!</span>
                       <a href={Links.YOUTUBE} target="_blank">
