@@ -46,6 +46,16 @@ const rehypeShikiPlugin = [
   } as RehypeShikiOptions,
 ];
 
+function siteBaseUrl() {
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3000';
+  }
+  if (process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview') {
+    return process.env.DEPLOY_PRIME_URL;
+  }
+  return 'https://wasmcloud.com';
+}
+
 const config = (async (): Promise<Config> => {
   return {
     title: 'wasmCloud',
@@ -55,10 +65,7 @@ const config = (async (): Promise<Config> => {
       tagline_1: 'Build applications in any language.',
       tagline_2: 'Deploy them anywhere.',
     },
-    url:
-      process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview'
-        ? process.env.DEPLOY_PRIME_URL
-        : 'https://wasmcloud.com',
+    url: siteBaseUrl(),
     baseUrl: '/',
     onBrokenLinks: 'throw',
     onBrokenMarkdownLinks: 'warn',
