@@ -16,7 +16,7 @@ wasmCloud supports many WASI APIs out of the box. Any WebAssembly component that
 Inspecting the component from the [Hello World](/docs/tour/hello-world/) example shows the following imports and exports:
 
 ```bash
-wash inspect --wit wasmcloud.azurecr.io/http-hello-world:0.1.0
+wash inspect --wit ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
 ```
 
 ```wit
