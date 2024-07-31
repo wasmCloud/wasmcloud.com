@@ -39,14 +39,17 @@ function useIsLive() {
   const isLive = countdown === LIVE_NOW;
   const wednesday = getWednesday();
   const [start, end] = getStartEnd(wednesday);
+  const tenMinutesBefore = new Date(start.getTime() - 10 * 60 * 1000);
+  const now = new Date();
+  const showLinks = isLive || now >= tenMinutesBefore;
 
-  return { countdown, isLive, wednesday, start, end };
+  return { countdown, isLive, showLinks, wednesday, start, end };
 }
 
 function getWednesday() {
   const now = new Date();
   const wednesday = new Date();
-  wednesday.setUTCHours(17, 0, 0, 0); // 5pm UTC
+  wednesday.setUTCHours(16, 50, 0, 0); // 4:50pm UTC
   if (now.getUTCDay() <= 3) {
     wednesday.setDate(wednesday.getDate() + (3 - now.getUTCDay()));
   } else {
