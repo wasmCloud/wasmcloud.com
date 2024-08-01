@@ -195,7 +195,7 @@ const config = (async (): Promise<Config> => {
       },
       announcementBar: {
         id: '1.0',
-        content: `🎉️ <b>wasmCloud v1.0</b> is available! Read the <a href="/docs/intro">1.0 documentation</a> and try it out now.`,
+        content: `🚀 <b>wasmCloud v1.1</b> is available! Read the <a href="https://github.com/wasmCloud/wasmCloud/releases/tag/v1.1.0">release notes</a> and check it out now.`,
         backgroundColor: '#20232a',
         textColor: '#fff',
       },
