@@ -1,17 +1,17 @@
 import React from 'react';
 import Layout from '@theme/Layout';
 import styles from './styles.module.css';
+import { CaseStudies } from './_components/case-studies';
+import { GetInvolved } from './_components/get-involved';
+import { GetStarted } from './_components/get-started';
 import { Hero } from './_components/hero';
-import { WhatIsWasmCloud } from './_components/what-is-wasmcloud';
-import { WhyUseWasmCloud } from './_components/why-use-wasmcloud';
+import { Kubernetes } from './_components/kubernetes';
+import { PlatformEngineering } from './_components/platform-engineering';
+import { WasmCloudEcosystem } from './_components/wasmcloud-ecosystem';
 import { WasmCloudTechnology } from './_components/wasmcloud-technology';
 import { WebAssemblyComponents } from './_components/webassembly-components';
-import { GetInvolved } from './_components/get-involved';
-import { CaseStudies } from './_components/case-studies';
-import { Kubernetes } from './_components/kubernetes';
-import { WasmCloudEcosystem } from './_components/wasmcloud-ecosystem';
-import { GetStarted } from './_components/get-started';
-import { WasmCloudUseCases } from './_components/wasmcloud-use-cases';
+import { WhatIsWasmCloud } from './_components/what-is-wasmcloud';
+import { WhyUseWasmCloud } from './_components/why-use-wasmcloud';
 
 function ContactForm() {
   return (
@@ -24,7 +24,7 @@ function ContactForm() {
         <Hero />
         <WhatIsWasmCloud />
         <WhyUseWasmCloud />
-        <WasmCloudUseCases />
+        <PlatformEngineering />
         {/* TODO: enable once video is produced */}
         {/* <WasmCloudTechnology /> */}
         <WebAssemblyComponents />

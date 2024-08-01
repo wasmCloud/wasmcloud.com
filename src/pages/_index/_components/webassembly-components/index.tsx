@@ -1,38 +1,55 @@
+import Link from '@docusaurus/Link';
 import { Section } from '@site/src/pages/_components/section';
+import { SectionContent } from '@site/src/pages/_components/section-content';
 import { SectionHeading } from '@site/src/pages/_components/section-heading';
+import { SectionLayout } from '@site/src/pages/_components/section-layout';
 import { SectionTag } from '@site/src/pages/_components/section-tag';
-import React from 'react';
-import styles from './webassembly-components.module.css';
+import React, { ComponentProps } from 'react';
 
-type Props = {};
+type Props = Partial<ComponentProps<typeof SectionLayout>>;
 
-function WebAssemblyComponents({}: Props) {
+const DEFAULT_CONTENT = {
+  color: 'light-gray' as const,
+  id: 'webassembly-components',
+  tag: 'WebAssembly Components',
+  heading: 'New to Components?',
+  intro: (
+    <p>
+      Leverage WebAssembly components' polyglot programming, security features, and modularity to
+      build secure, maintainable applications.
+    </p>
+  ),
+  link: {
+    href: 'https://wasmcloud.com/docs/concepts/components',
+    text: 'Read our components starter guide',
+  },
+  img: {
+    src: '/img/pages/home/webassembly-components/components.svg',
+    alt: '',
+  },
+};
+
+function WebAssemblyComponents({
+  color = DEFAULT_CONTENT.color,
+  id = DEFAULT_CONTENT.id,
+  tag = DEFAULT_CONTENT.tag,
+  heading = DEFAULT_CONTENT.heading,
+  intro = DEFAULT_CONTENT.intro,
+  link = DEFAULT_CONTENT.link,
+  img = DEFAULT_CONTENT.img,
+}: Props) {
   return (
-    <Section color="light-gray" id="webassembly-components">
-      <div className="container">
-        <div className={styles.content}>
-          <div>
-            <SectionTag>WebAssembly Components</SectionTag>
-            <SectionHeading>New to Components?</SectionHeading>
-            <p>
-            Leverage WebAssembly components' polyglot programming, 
-            security features, and modularity to build secure, maintainable applications.
-            </p>
-            <p>
-              <a href="https://wasmcloud.com/docs/concepts/components" target="_blank">
-                Read our components starter guide
-              </a>
-            </p>
-          </div>
-          <div>
-            <img
-              className={styles.image}
-              src="/img/pages/home/webassembly-components/components.svg"
-              alt=""
-            />
-          </div>
-        </div>
-      </div>
+    <Section id={id} color={color}>
+      <SectionContent aside={<img src={img.src} alt={img.alt} />}>
+        <SectionTag>{tag}</SectionTag>
+        <SectionHeading>{heading}</SectionHeading>
+        {intro}
+        {link && (
+          <p>
+            <Link href={link.href}>{link.text}</Link>
+          </p>
+        )}
+      </SectionContent>
     </Section>
   );
 }
