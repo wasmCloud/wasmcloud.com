@@ -5,6 +5,7 @@ import React from 'react';
 import styles from './use-cases.module.css';
 import { SketchUnderline } from '@site/src/pages/_components/sketch-underline';
 import { VideoButton } from '@site/src/pages/_components/video-button';
+import { Grid, GridItem } from '@site/src/pages/_components/grid';
 
 type Props = {};
 
@@ -19,8 +20,8 @@ const SECTION_CONTENT: {
   tag: string;
   heading: React.ReactNode;
 } = {
-  id: 'use-cases',
-  tag: 'wasmCloud Use Cases',
+  id: 'platform-engineering',
+  tag: 'wasmCloud as a Platform',
   heading: (
     <>
       The <SketchUnderline>Platform</SketchUnderline> for Platform-Engineering
@@ -57,24 +58,24 @@ const VIDEO_CONTENT: [UseCasesContent, UseCasesContent] = [
   },
 ];
 
-function WasmCloudUseCases({}: Props) {
+function PlatformEngineering({}: Props) {
   return (
     <Section color="dark-gray" id={SECTION_CONTENT.id}>
       <div className="container">
         <SectionTag>{SECTION_CONTENT.tag}</SectionTag>
         <SectionHeading>{SECTION_CONTENT.heading}</SectionHeading>
-        <div className={styles.content}>
+        <Grid className={styles.content} alignLast>
           {VIDEO_CONTENT.map((video, i) => (
-            <div className={styles.item} key={i}>
+            <GridItem key={i} className={styles.item}>
               <h4>{video.name}</h4>
               {video.content}
               <VideoButton title={video.name} url={video.url} />
-            </div>
+            </GridItem>
           ))}
-        </div>
+        </Grid>
       </div>
     </Section>
   );
 }
 
-export { WasmCloudUseCases };
+export { PlatformEngineering };

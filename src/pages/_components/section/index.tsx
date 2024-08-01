@@ -1,8 +1,10 @@
 import React, { PropsWithChildren } from 'react';
 import styles from './styles.module.css';
 
+export type SectionColor = 'dark-gray' | 'light-gray' | 'green' | 'space-blue' | 'yellow';
+
 type Props = {
-  color?: 'dark-gray' | 'light-gray' | 'green' | 'space-blue' | 'yellow';
+  color?: SectionColor;
   className?: string;
 } & React.HTMLAttributes<HTMLDivElement>;
 

@@ -1,10 +1,17 @@
-import { Section } from '@site/src/pages/_components/section';
+import { Section, SectionColor } from '@site/src/pages/_components/section';
 import { SectionHeading } from '@site/src/pages/_components/section-heading';
 import { SectionTag } from '@site/src/pages/_components/section-tag';
 import React from 'react';
 import styles from './case-studies.module.css';
+import { SectionContent } from '@site/src/pages/_components/section-content';
+import { Grid, GridItem } from '@site/src/pages/_components/grid';
 
-type Props = {};
+type Props = {
+  color?: SectionColor;
+  tag?: React.ReactNode;
+  heading?: React.ReactNode;
+  content?: typeof CONTENT;
+};
 
 type CaseStudyContent = {
   name: string;
@@ -47,15 +54,25 @@ const CONTENT: [CaseStudyContent, CaseStudyContent] = [
   },
 ];
 
-function CaseStudies({}: Props) {
+const HEADING = 'Solving real problems for your business';
+const TAG = 'Case Studies';
+
+function CaseStudies({
+  color = 'light-gray',
+  tag = TAG,
+  heading = HEADING,
+  content = CONTENT,
+}: Props) {
   return (
-    <Section color="light-gray" id="case-studies">
-      <div className="container">
-        <SectionTag>Case Studies</SectionTag>
-        <SectionHeading>Solving real problems for your business</SectionHeading>
-        <div className={styles.studies}>
-          {CONTENT.map((study, i) => (
-            <div className={styles.study} key={i}>
+    <Section color={color} id="case-studies">
+      <SectionContent>
+        <SectionTag>{tag}</SectionTag>
+        <SectionHeading>{heading}</SectionHeading>
+      </SectionContent>
+      <SectionContent>
+        <Grid>
+          {content.map((study, i) => (
+            <GridItem className={styles.study} key={i}>
               <h4>
                 <img src={study.logo} alt={study.name} />
               </h4>
@@ -65,10 +82,10 @@ function CaseStudies({}: Props) {
                   View Case Study
                 </a>
               </p>
-            </div>
+            </GridItem>
           ))}
-        </div>
-      </div>
+        </Grid>
+      </SectionContent>
     </Section>
   );
 }

@@ -10,6 +10,7 @@ import {
 } from '../what-is-wasmcloud/switcher';
 import { SectionSubheading } from '@site/src/pages/_components/section-subheading';
 import styles from './what-is-wasmcloud.module.css';
+import { Grid, GridItem } from '@site/src/pages/_components/grid';
 
 type Props = {};
 
@@ -144,7 +145,7 @@ const SWITCHER_CONTENT: Array<{
 
 function WhatIsWasmCloud({}: Props) {
   return (
-    <Section color="light-gray" id="what-is-wasmcloud">
+    <Section color="dark-gray" id="what-is-wasmcloud">
       <div className="container">
         <SectionTag>{INTRO_CONTENT.tag}</SectionTag>
         <SectionHeading>{INTRO_CONTENT.heading}</SectionHeading>
@@ -178,18 +179,20 @@ function WhatIsWasmCloudSwitcher({}: Props) {
       {SWITCHER_CONTENT.map((content, i) => (
         <SwitcherContent key={content.id} value={content.id} className={styles.content}>
           <SectionSubheading className={styles.heading}>{content.title}</SectionSubheading>
-          <div className={styles.contentCopy}>
-            {content.features.map((feature, i) => (
-              <div className={styles.feature} key={i}>
-                <h5>{feature.title}</h5>
-                <p>{feature.description}</p>
-                {feature.link && <a href={feature.link}>{feature.linkText}</a>}
-              </div>
-            ))}
-          </div>
-          <div className={styles.contentImage}>
-            <img src={content.image} alt="" />
-          </div>
+          <Grid>
+            <GridItem>
+              {content.features.map((feature, i) => (
+                <div className={styles.feature} key={i}>
+                  <h5>{feature.title}</h5>
+                  <p>{feature.description}</p>
+                  {feature.link && <a href={feature.link}>{feature.linkText}</a>}
+                </div>
+              ))}
+            </GridItem>
+            <GridItem>
+              <img src={content.image} alt="" />
+            </GridItem>
+          </Grid>
         </SwitcherContent>
       ))}
     </Switcher>
