@@ -21,19 +21,24 @@ function WasmCloudSolutions({ color = 'light-gray' }: Props) {
       <SectionContent>
         <Grid className={styles.content} center>
           <GridItem>
-            <Placeholder size="200px" />
-            <h4>Costly Clouds?</h4>
-            <p>Idle infrastructure, wasted overhead</p>
+            <Placeholder size="50px" />
+            <h4>Idle Infrastructure?</h4>
+            <p>Does scalability planning & long cold starts leave you with 
+              inefficient Infrastructure?
+            </p>
           </GridItem>
           <GridItem>
-            <Placeholder size="200px" />
+            <Placeholder size="50px" />
             <h4>Maintaining Apps?</h4>
-            <p>Constantly patching the same vulnerabilities across 100's of apps.</p>
+            <p>Are developers patching the same 
+              vulnerabilities across 100's or 1,000's of apps?
+            </p>
           </GridItem>
           <GridItem>
-            <Placeholder size="200px" />
+            <Placeholder size="50px" />
             <h4>Distributed Apps?</h4>
-            <p>Need to run your app close to your users? On Prem? Disconnected?</p>
+            <p>Do you need to run your apps close to your users? On the Edge? On Prem? 
+              Disconnected?</p>
           </GridItem>
         </Grid>
       </SectionContent>

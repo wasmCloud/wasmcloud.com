@@ -20,7 +20,7 @@ const INTRO_CONTENT: {
   description: React.ReactNode;
 } = {
   tag: 'What is wasmCloud?',
-  heading: 'Fast-track the development, deployment, and management of distributed applications',
+  heading: 'Fast-track the development, deployment, and orchestration of WebAssembly components',
   description: (
     <p>
       wasmCloud is an open source project from the Cloud Native Computing Foundation (CNCF) that
