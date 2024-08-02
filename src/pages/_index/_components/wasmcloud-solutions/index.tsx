@@ -36,8 +36,8 @@ function WasmCloudSolutions({ color = 'light-gray' }: Props) {
           </GridItem>
           <GridItem>
             <Placeholder size="50px" />
-            <h4>Distributed Apps?</h4>
-            <p>Do you need to run your apps close to your users? On the Edge? On Prem? 
+            <h4>Cross Clouds?</h4>
+            <p>Do you need to run your apps close to your users? Multi-Region? On the Edge? On Prem? 
               Disconnected?</p>
           </GridItem>
         </Grid>
