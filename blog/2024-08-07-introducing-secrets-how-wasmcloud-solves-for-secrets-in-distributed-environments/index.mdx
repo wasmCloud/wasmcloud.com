@@ -1,13 +1,13 @@
 ---
-title: "Introducing secrets: How wasmCloud solves for secrets in distributed environments"
+title: "wasmCloud 1.1: Secure, pluggable WebAssembly secrets with Vault, K8s secrets, and more"
 authors: [brooksmtownsend]
-slug: introducing-secrets-how-wasmcloud-solves-for-secrets-in-distributed-environments
-image: './images/how-wasmcloud-solves-for-secrets.png'
+slug: secure-pluggable-webassembly-secrets-with-vault-k8s-secrets
+image: './images/secure-pluggable-wasm-secrets.png'
 date: "2024-08-07"
 description: ""
 ---
 
-![Introducing secrets](./images/how-wasmcloud-solves-for-secrets.png)
+![Introducing secrets](./images/secure-pluggable-wasm-secrets.png)
 
 In wasmCloud 1.1, we're excited to introduce what is far and away our most requested feature: **secrets**. Now applications on wasmCloud can request secrets at runtime, leveraging a secrets API that can be used with the secret store of your choice. With a system that encrypts secrets in transit and never stores them on disk, we've doubled down on our Zero Trust security posture so teams can deploy to production with confidence. 
 
@@ -15,26 +15,30 @@ In wasmCloud 1.1, we're excited to introduce what is far and away our most reque
 
 Secrets are a challenging problem in cloud native environments, so we spent a lot of time thinking about how to approach them in wasmCloud.  
 
-We wanted a better approach&mdash;one that leverages the NATS-powered lattice to deliver true encryption and avoid storing secrets on the [wasmCloud host](/docs/concepts/hosts) in any form that would be accessible to anything other than the component or provider requesting them. We accomplished this with an architecture that organizes secret requests and responses into a few key steps:
+We wanted a better approach&mdash;one that leverages the NATS-powered lattice to deliver true encryption and avoid storing secrets on the [wasmCloud host](/docs/concepts/hosts) in any form that would be accessible to anything other than the component or provider requesting them. 
+
+We also wanted our secret system to be **pluggable**, so teams could use the secret store of their choice, whether that was HashiCorp Vault, cloud provider systems like AWS Secrets Manager, an in-house solution, or an open source store.
+
+To achieve all of this, we came up with an architecture that organizes secret requests and responses into a few key steps:
 
 * A component or capability provider **requests a secret** by reference to secret's location, without needing to present credential material. 
 * The request goes to a **secrets handler** which in turn requests the specified secret from the appropriate **secrets backend**.
 * Communication with a **secrets store** is mediated by a **secrets backend**.
 
-You can see the path of a secret request for a component in the diagram below. In this example, we can see how the system integrates with both an external secret store like Vault and the key-value store already available in the wasmCloud stack as part of NATS.
+You can see how a component requests a secret in the diagram below:
 
-![diagram of secret flow when starting component with secret](../../static/img/start-component-with-secret.png)
+![diagram of secret flow when starting component with secret](../../static/img/secrets-diagram.png)
+
+If we zoom into an individual component level, the standard flow for a secret looks like this:
+
+![diagram](./images/component-secret.png)
 
 Let's walk through this process step-by-step:
 
-* The `wash` CLI asks the wasmCloud host to start a component with `SECRET_foo`
-* The host fetches a secret reference from the NATS key-value bucket
-* The NATS key-value bucket returns the secret reference to the host
-* The host fetches a secret named `foo` from the secrets backend
-* The secrets backend authorizes a secret fetch by the component JWT
-* The secrets backend returns the encrypted value of secret `foo` to the host
-* The host starts the component, storing the secret in the host handler using the `secrecy` crate
-* The host publishes a `component_scaled` event
+1. Component sends `wasmcloud:secrets/get` call to host
+2. Host returns secret reference
+3. Component sends `wasmcloud:secrets/reveal` call to host
+4. Host exposes secret from `secrecy` crate's in-memory store, returning value to component
 
 The secret itself is never logged or accessible in memory&mdash;it is encrypted with an [**xkey**](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_callout#encryption), a x25519 keypair, and held in-memory with Rust's [`secrecy` crate](https://crates.io/crates/secrecy). When you drop a secret, it is wiped in-memory. 
 
@@ -42,7 +46,15 @@ The secret itself is never logged or accessible in memory&mdash;it is encrypted 
 
 As you can see in the diagram, **secret backends** are an important piece of the puzzle, acting as a mediator between your applications and the secret store(s) of your choice. You can learn more about the design of backends in the documentation, but the most important thing to know up-front is that backends and wasmCloud workloads alike use the common `wasmcloud:secrets` API defined in [WebAssembly Interface Type (WIT)](/docs/concepts/interfaces#webassembly-interface-type-wit). You can [check out the interface on GitHub](https://github.com/wasmCloud/wasmCloud/blob/main/crates/secrets-types/wit/secrets.wit). 
 
-Using a common API enables the same vendor-agnostic approach that we take throughout the rest of the wasmCloud ecosystem&mdash;if you need to swap out your secrets vendor, that's not a problem as your components and providers remain unchanged while leveraging exactly the same API. All you need to do is change one or two lines of configuration.  
+Using a common API enables the same vendor-agnostic approach that we take throughout the rest of the wasmCloud ecosystem&mdash;if you need to swap out your secrets vendor, that's not a problem, as your components and providers remain unchanged while leveraging exactly the same API. All you need to do is change one or two lines of configuration. 
+
+At the launch of secrets support, backends are available for:
+
+* [HashiCorp Vault](https://github.com/wasmCloud/wasmCloud-contrib/tree/main/secrets/secrets-vault)
+* [NATS KV store](https://github.com/wasmCloud/wasmCloud/tree/main/crates/secrets-nats-kv)
+* [Kubernetes Secrets](https://github.com/wasmCloud/wasmCloud-contrib/tree/main/secrets/secrets-kubernetes)
+
+Providing support for Kubernetes Secrets is particularly powerful, since it means that teams [running wasmCloud on Kubernetes](/blog/how-to-run-webassembly-components-on-kubernetes-with-wasmcloud) can immediately use their existing secrets systems with wasmCloud applications. 
 
 Once you've built a component or provider that uses the `wasmcloud:secrets` interface to consume a secret, using the secret is simply a matter of defining it in your application's [**wasmCloud Application Deployment Manager (wadm)**](/docs/ecosystem/wadm) deployment manifest. At minimum, this means defining a secret `name` and `properties` (with the `properties` specifying a `backend` and `key`). A basic example looks like this:
 
