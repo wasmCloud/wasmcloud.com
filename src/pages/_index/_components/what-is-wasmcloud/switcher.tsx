@@ -26,7 +26,7 @@ function SwitcherList({ className, children }: React.PropsWithChildren<{ classNa
       acc.push(
         child,
         <img
-          src="/img/pages/home/icon/arrow.svg"
+          src="/pages/home/icon/arrow.svg"
           className={styles.arrow}
           key={`arrow-${index}`}
           alt=""

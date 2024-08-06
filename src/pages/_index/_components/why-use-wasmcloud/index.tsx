@@ -21,7 +21,7 @@ function WhyUseWasmCloud({}: Props) {
         </p>
       </SectionContent>
       <SectionContent className={styles.image}>
-        <img src="/img/pages/home/why-use-wasmcloud/wasm-everywhere.svg" alt="" />
+        <img src="/pages/home/why-use-wasmcloud/wasm-everywhere.svg" alt="" />
       </SectionContent>
     </Section>
   );

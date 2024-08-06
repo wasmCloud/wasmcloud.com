@@ -16,22 +16,22 @@ function Wednesday(): React.ReactElement {
       {showLinks ? (
         <div className={styles.buttons}>
           <Link href={ZOOM} className={styles.button}>
-            <img src="/img/pages/home/icon/zoom.svg" alt="" />
+            <img src="/pages/home/icon/zoom.svg" alt="" />
             Join Live
           </Link>
           <Link href={YOUTUBE} className={styles.button}>
-            <img src="/img/pages/home/icon/youtube.svg" alt="" />
+            <img src="/pages/home/icon/youtube.svg" alt="" />
             Stream Live
           </Link>
         </div>
       ) : (
         <div className={styles.buttons}>
           <Link href={CALENDAR} className={styles.button}>
-            <img src="/img/pages/home/icon/calendar.svg" alt="" />
+            <img src="/pages/home/icon/calendar.svg" alt="" />
             Add to Cal
           </Link>
           <Link href={PLAYLIST} className={styles.button}>
-            <img src="/img/pages/home/icon/youtube.svg" alt="" />
+            <img src="/pages/home/icon/youtube.svg" alt="" />
             Past Calls
           </Link>
         </div>

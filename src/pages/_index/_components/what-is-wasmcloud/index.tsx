@@ -43,7 +43,7 @@ const SWITCHER_CONTENT: Array<{
 }> = [
   {
     id: 'build',
-    image: '/img/pages/home/what-is-wasmcloud/build.svg',
+    image: '/pages/home/what-is-wasmcloud/build.svg',
     title: 'Build',
     features: [
       {
@@ -74,7 +74,7 @@ const SWITCHER_CONTENT: Array<{
   },
   {
     id: 'compose',
-    image: '/img/pages/home/what-is-wasmcloud/compose.svg',
+    image: '/pages/home/what-is-wasmcloud/compose.svg',
     title: 'Compose',
     features: [
       {
@@ -108,7 +108,7 @@ const SWITCHER_CONTENT: Array<{
   },
   {
     id: 'run',
-    image: '/img/pages/home/what-is-wasmcloud/run.svg',
+    image: '/pages/home/what-is-wasmcloud/run.svg',
     title: 'Run',
     features: [
       {
@@ -167,7 +167,7 @@ function WhatIsWasmCloudSwitcher({}: Props) {
         {SWITCHER_CONTENT.map((content, i) => (
           <SwitcherButton key={content.id} className={styles.button} value={content.id}>
             <img
-              src={`/img/pages/home/icon/${content.id}.svg`}
+              src={`/pages/home/icon/${content.id}.svg`}
               className={`${styles.icon} ${styles[content.id]}`}
               alt=""
             />

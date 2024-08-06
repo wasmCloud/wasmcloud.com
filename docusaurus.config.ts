@@ -187,7 +187,7 @@ const config = (async (): Promise<Config> => {
             position: 'right',
           },
           await svgIconNavItem({
-            svgIconPath: './static/img/icons/github.svg',
+            svgIconPath: './static/icons/github.svg',
             label: 'GitHub',
             link: 'https://github.com/wasmcloud/wasmcloud',
           }),
