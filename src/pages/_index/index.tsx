@@ -8,7 +8,7 @@ import { Hero } from './_components/hero';
 import { Kubernetes } from './_components/kubernetes';
 import { PlatformEngineering } from './_components/platform-engineering';
 import { WasmCloudEcosystem } from './_components/wasmcloud-ecosystem';
-import { WasmCloudSolutions } from './_components/wasmcloud-solutions';
+import { WasmCloudSolves } from './_components/wasmcloud-solves';
 import { WasmCloudTechnology } from './_components/wasmcloud-technology';
 import { WebAssemblyComponents } from './_components/webassembly-components';
 import { WhatIsWasmCloud } from './_components/what-is-wasmcloud';
@@ -23,7 +23,7 @@ function ContactForm() {
     >
       <main className={styles.main}>
         <Hero />
-        <WasmCloudSolutions />
+        <WasmCloudSolves />
         <WhatIsWasmCloud />
         <WhyUseWasmCloud />
         <PlatformEngineering />

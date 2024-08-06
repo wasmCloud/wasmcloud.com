@@ -13,11 +13,11 @@ type Props = {
   color?: SectionColor;
 };
 
-function WasmCloudSolutions({ color = 'light-gray' }: Props) {
+function WasmCloudSolves({ color = 'light-gray' }: Props) {
   return (
     <Section color={color} id="wasmcloud-solutions">
       <SectionContent align="center">
-        <SectionTag>wasmCloud Solutions</SectionTag>
+        <SectionTag>wasmCloud Solves</SectionTag>
         <SectionHeading>Are you a team struggling with...</SectionHeading>
       </SectionContent>
       <SectionContent>
@@ -66,4 +66,4 @@ function Placeholder({ size }: { size: string }) {
   );
 }
 
-export { WasmCloudSolutions };
+export { WasmCloudSolves };
