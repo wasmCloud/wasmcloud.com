@@ -2,11 +2,10 @@ import Link from '@docusaurus/Link';
 import { Section } from '@site/src/pages/_components/section';
 import { SectionContent } from '@site/src/pages/_components/section-content';
 import { SectionHeading } from '@site/src/pages/_components/section-heading';
-import { SectionLayout } from '@site/src/pages/_components/section-layout';
 import { SectionTag } from '@site/src/pages/_components/section-tag';
 import React, { ComponentProps } from 'react';
 
-type Props = Partial<ComponentProps<typeof SectionLayout>>;
+type Props = Partial<ComponentProps<typeof Section> & typeof DEFAULT_CONTENT>;
 
 const DEFAULT_CONTENT = {
   color: 'light-gray' as const,
@@ -24,7 +23,7 @@ const DEFAULT_CONTENT = {
     text: 'Read our components starter guide',
   },
   img: {
-    src: '/img/pages/home/webassembly-components/components.svg',
+    src: '/pages/home/webassembly-components/components.svg',
     alt: '',
   },
 };

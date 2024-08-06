@@ -16,9 +16,9 @@ import Layout from '@theme/Layout';
 import useIsLive from '@site/src/pages/_hooks/use-is-live';
 import { Links } from '@site/src/constants';
 
-import SvgZoom from '@site/static/img/pages/home/icon/zoom.svg';
-import SvgYoutube from '@site/static/img/pages/home/icon/youtube.svg';
-import SvgCalendar from '@site/static/img/pages/home/icon/calendar.svg';
+import SvgZoom from '@site/static/pages/home/icon/zoom.svg';
+import SvgYoutube from '@site/static/pages/home/icon/youtube.svg';
+import SvgCalendar from '@site/static/pages/home/icon/calendar.svg';
 
 function BlogListPageMetadata(props: Props): JSX.Element {
   const { metadata } = props;
