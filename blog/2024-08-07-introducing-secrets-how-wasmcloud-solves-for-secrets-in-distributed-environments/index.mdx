@@ -15,7 +15,7 @@ In wasmCloud 1.1, we're excited to introduce what is far and away our most reque
 
 Secrets are a challenging problem in cloud native environments, so we spent a lot of time thinking about how to approach them in wasmCloud.  
 
-We wanted a better approach&mdash;one that leverages the NATS-powered lattice to deliver true encryption and avoid storing secrets on the [wasmCloud host](/docs/concepts/hosts) in any form. We accomplished this with an architecture that organizes secret requests and responses into a few key steps:
+We wanted a better approach&mdash;one that leverages the NATS-powered lattice to deliver true encryption and avoid storing secrets on the [wasmCloud host](/docs/concepts/hosts) in any form that would be accessible to anything other than the component or provider requesting them. We accomplished this with an architecture that organizes secret requests and responses into a few key steps:
 
 * A component or capability provider **requests a secret** by reference to secret's location, without needing to present credential material. 
 * The request goes to a **secrets handler** which in turn requests the specified secret from the appropriate **secrets backend**.
@@ -36,7 +36,7 @@ Let's walk through this process step-by-step:
 * The host starts the component, storing the secret inthe host handler using the `secrecy` crate
 * The host publishes a `component_scaled` event
 
-The secret itself is never logged or accessible in memory&mdash;it is encrypted with an [**xkey**](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_callout#encryption), a x25519 keypair compatible with [NaCl](https://nacl.cr.yp.to/) Seal and Open operations, and held in-memory with Rust's [`secrecy` crate](https://crates.io/crates/secrecy). When you drop a secret, it is wiped in-memory. 
+The secret itself is never logged or accessible in memory&mdash;it is encrypted with an [**xkey**](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_callout#encryption), a x25519 keypair, and held in-memory with Rust's [`secrecy` crate](https://crates.io/crates/secrecy). When you drop a secret, it is wiped in-memory. 
 
 ## Putting the pieces together
 
@@ -46,26 +46,31 @@ Using a common API enables the same vendor-agnostic approach that we take throug
 
 Once you've built a component or provider that uses the `wasmcloud:secrets` interface to consume a secret, using the secret is simply a matter of defining it in your application's [**wasmCloud Application Deployment Manager (wadm)**](/docs/ecosystem/wadm) deployment manifest. At minimum, this means defining a secret `name` and `properties` (with the `properties` specifying a `backend` and `key`). A basic example looks like this:
 
-```yaml {14-18}
-apiVersion: core.oam.dev/v1beta1
-kind: Application
-metadata:
-  name: App with secrets
-  annotations:
-    version: v0.0.1
-    description: 'HTTP hello world demo in Rust'
+```yaml {16-20}
+...
 spec:
+  # The policy block allows reuse of secrets backend configurations across components and providers
+  policies:
+    - name: nats-kv
+      type: policy.secret.wasmcloud.dev/v1alpha1
+      properties:
+        backend: nats-kv
   components:
-    - name: http-component
+    - name: counter
       type: component
       properties:
-        image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+        image: file://./component-keyvalue-counter-auth/build/component_keyvalue_counter_auth_s.wasm
+        id: auth-counter
+        # Provide the api_password secret to this component, fetching from nats-kv
         secrets:
-          - name: test
+          - name: api_password
             properties:
-              backend: vault
-              key: 'path/to/key'
+              policy: nats-kv
+              key: api_password
+...
 ```
+
+The excerpt above is drawn from a manifest for an example application using the NATS key-value backend. ([You can check out the complete manifest here](https://github.com/wasmCloud/wasmCloud/blob/main/examples/security/secrets/wadm.yaml).) Let's take a look at that example.
 
 ## Example: Using a NATS KV backend
 
