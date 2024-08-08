@@ -7,6 +7,7 @@ import {
 import { Options as PluginContentBlogOptions } from '@docusaurus/plugin-content-blog';
 import { Options as PluginGoogleAnalyticsOptions } from '@docusaurus/plugin-google-analytics';
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
+import { Options as PluginGithubStarsOptions } from '@wasmcloud/docusaurus-github-stars';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import { bundledLanguages } from 'shiki';
 import {
@@ -130,6 +131,12 @@ const config = (async (): Promise<Config> => {
 
     plugins: [
       [
+        '@wasmcloud/docusaurus-github-stars',
+        {
+          preloadRepo: 'wasmCloud/wasmCloud',
+        } satisfies PluginGithubStarsOptions,
+      ],
+      [
         '@wasmcloud/docusaurus-seo-checks',
         {
           underscores: { level: 'error' },
@@ -180,6 +187,13 @@ const config = (async (): Promise<Config> => {
             type: 'docsVersionDropdown',
             // used for styling, see src/styles/theme/_navbar.css
             className: 'navbar__link--version-dropdown',
+          },
+          {
+            href: 'https://github.com/wasmcloud/wasmcloud',
+            ariaLabel: 'Star wasmCloud on GitHub',
+            position: 'right',
+            html: `<span class="badge badge--outline">Star us! ★ <github-count repo="wasmcloud/wasmcloud">1300</github-count></span>`,
+            className: 'sidebar-hidden',
           },
           await svgIconNavItem({
             svgIconPath: './static/icons/github.svg',
