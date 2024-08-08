@@ -6,7 +6,7 @@ import {
 } from '@docusaurus/preset-classic';
 import { Options as PluginContentBlogOptions } from '@docusaurus/plugin-content-blog';
 import { Options as PluginGoogleAnalyticsOptions } from '@docusaurus/plugin-google-analytics';
-import { Options as SEOChecksPluginOptions } from '@wasmcloud/docusaurus-seo-checks';
+import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import { bundledLanguages } from 'shiki';
 import {
@@ -133,7 +133,7 @@ const config = (async (): Promise<Config> => {
         '@wasmcloud/docusaurus-seo-checks',
         {
           underscores: { level: 'error' },
-        } satisfies SEOChecksPluginOptions,
+        } satisfies PluginSEOChecksOptions,
       ],
       [
         '@docusaurus/plugin-content-blog',
@@ -159,7 +159,7 @@ const config = (async (): Promise<Config> => {
         {
           trackingID: process.env.GOOGLE_ANALYTICS_ID || 'localdev',
           anonymizeIP: true,
-        } as PluginGoogleAnalyticsOptions,
+        } satisfies PluginGoogleAnalyticsOptions,
       ],
       customPostCssPlugin, // PostCSS plugin function registration
     ],
@@ -181,15 +181,15 @@ const config = (async (): Promise<Config> => {
             // used for styling, see src/styles/theme/_navbar.css
             className: 'navbar__link--version-dropdown',
           },
-          {
-            href: 'https://ostif.org/ostif-has-completed-a-security-audit-of-wasmcloud/',
-            label: 'Security Assessment',
-            position: 'right',
-          },
           await svgIconNavItem({
             svgIconPath: './static/icons/github.svg',
             label: 'GitHub',
-            link: 'https://github.com/wasmcloud/wasmcloud',
+            href: 'https://github.com/wasmcloud/wasmcloud',
+          }),
+          await svgIconNavItem({
+            svgIconPath: './static/icons/slack.svg',
+            label: 'Slack',
+            href: 'https://twitter.com/wasmCloud',
           }),
         ],
       },
@@ -242,8 +242,12 @@ const config = (async (): Promise<Config> => {
             ],
           },
           {
-            title: 'Legal & Mail',
+            title: 'Organization',
             items: [
+              {
+                href: 'https://ostif.org/ostif-has-completed-a-security-audit-of-wasmcloud/',
+                label: 'Security Assessment',
+              },
               {
                 label: 'Privacy Policy',
                 to: '/privacy-policy',
@@ -315,31 +319,37 @@ function customPostCssPlugin() {
   };
 }
 
+type NavbarItem = Required<Required<PresetClassicThemeConfig>['navbar']>['items'][number];
+type SvgNavItemOptions = NavbarItem & {
+  svgIconPath: string;
+  label: string;
+  href: string;
+  className?: string;
+  position?: 'left' | 'right';
+};
 /**
  * build an icon nav item, works with styles in `src/styles/theme/_navbar.css`
  */
 async function svgIconNavItem({
   svgIconPath,
   label,
-  link,
-}: {
-  label: string;
-  link: string;
-  svgIconPath: string;
-}): Promise<Required<Required<PresetClassicThemeConfig>['navbar']>['items'][number]> {
+  href,
+  className,
+  position = 'right',
+  ...extras
+}: SvgNavItemOptions): Promise<NavbarItem> {
   const icon = await fs.readFile(svgIconPath, 'utf-8');
+  const linkClass = 'navbar__icon';
 
   return {
-    type: 'html',
-    value: `
-      <div class="navbar__icon">
-        <a href="${link}" target="_blank" rel="noopener noreferrer" class="navbar__icon-link" aria-description="${label}">
-          ${icon}
-          <span class="navbar__icon-label">${label}</span>
-        </a>
-      </div>
+    href: href,
+    position,
+    html: `
+      ${icon}
+      <span class="navbar__icon-label">${label}</span>
     `,
-    position: 'right',
+    className: `${className ? `${className} ` : ''}${linkClass}`,
+    ...extras,
   };
 }
 
