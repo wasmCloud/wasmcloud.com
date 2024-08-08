@@ -1,8 +1,12 @@
 import * as React from 'react';
 
 const LIVE_NOW = 'Live now!';
-const START: [number, number, number, number] = [17, 0, 0, 0];
-const END: [number, number, number, number] = [18, 0, 0, 0];
+
+/** This one is specifically used to set the time using Date.setUTCHours()
+ */
+type TimeHourMinuteSecondMilli = [number, number, number, number];
+const START: TimeHourMinuteSecondMilli = [17, 0, 0, 0];
+const END: TimeHourMinuteSecondMilli = [18, 0, 0, 0];
 
 function useIsLive() {
   const [countdown, setCountdown] = React.useState('Join us!');
