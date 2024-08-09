@@ -1,11 +1,13 @@
 ---
 title: 'Components (wit)'
-date: 2018-12-29T11:02:05+06:00
+date: 2024-08-09T11:02:05+06:00
 sidebar_position: 4
 draft: false
 description: 'Support for wit-defined WebAssembly components'
 ---
 
-The [WebAssembly component model](https://github.com/WebAssembly/component-model) holds the promise of ushering in an even more powerful programming paradigm than WebAssembly modules. With components, we can bolt together incredible new forms of compute from small building blocks. For more information on our thoughts on the component model's future, check out the blog post [For the wit!](https://cosmonic.com/blog/engineering/for-the-wit-my-first-day-with-components)
+The wasmCloud host communicates with WebAssembly guests using the [WebAssembly component model](https://github.com/WebAssembly/component-model). You can read more about components in our [Platform Overview](https://wasmcloud.com/docs/concepts/components).
 
-The wasmCloud host has added **_experimental_** support for WebAssembly components. As the specification and tooling around components and the component model stabilize, we will gradually improve our support for components. Until then, we recommend that you utilize our [Stable ABI](/docs/0.82/hosts/abis/wasmbus), which will still be supported even after components are the default.
+### Reference
+
+Previously wasmCloud had a purpose-built ABI called [wasmbus](https://wasmcloud.com/docs/0.82/hosts/abis/wasmbus/) for communicating with Wasm guests, but it did not provide portability between runtimes or a standard way to communicate between host and guest.

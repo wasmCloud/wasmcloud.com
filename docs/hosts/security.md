@@ -1,12 +1,12 @@
 ---
-title: "Security"
+title: 'Security'
 date: 2018-12-29T11:02:05+06:00
 sidebar_position: 0
 draft: false
-description: "wasmCloud Ecosystem Security"
+description: 'wasmCloud Ecosystem Security'
 ---
 
-wasmCloud embraces a [zero trust](https://en.wikipedia.org/wiki/Zero_trust_networks) security model. This means that the runtime, by default, does not trust any component with the ability to do anything. Without adding security claims to a component, the component cannot send or receive messages in a wasmCloud runtime environment.
+wasmCloud embraces a [zero trust](https://en.wikipedia.org/wiki/Zero_trust_networks) security model. With the WebAssembly component model, every function call must be declared and embedded in a component's WIT, giving wasmCloud full ability to deny the component from invoking anything or accessing any resources at runtime. See the [policy service](/docs/deployment/security/policy-service) documentation for information on how to evaluate policies to increase the default security of wasmCloud.
 
 ### Embedding JSON web tokens
 
