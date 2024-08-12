@@ -183,7 +183,6 @@ const config = (async (): Promise<Config> => {
           { to: '/blog', label: 'Blog', position: 'left' },
           { to: '/community', label: 'Community', position: 'left' },
           { type: 'doc', docId: 'intro', position: 'left', label: 'Docs' },
-/*          { type: 'doc', docId: 'swag', position: 'left', label: 'Get Swag' },*/
           {
             type: 'docsVersionDropdown',
             // used for styling, see src/styles/theme/_navbar.css
@@ -274,6 +273,10 @@ const config = (async (): Promise<Config> => {
               {
                 label: 'Contact & Mailing List',
                 to: '/contact',
+              },
+              {
+                label: 'wasmCloud Swag',
+                to: '/swag',
               },
             ],
           },
