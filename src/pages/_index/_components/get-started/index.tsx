@@ -27,7 +27,7 @@ function GetStarted({
       <SectionContent>
         <Grid className={styles.content} alignLast>
           <GridItem>
-            <img src="/img/pages/home/icon/build.svg" alt="" />
+            <img src="/pages/home/icon/build.svg" alt="" />
             <h4>Download the wasmCloud CLI</h4>
             <p>Get all the dev tooling you need by installing the wasmCloud "wash" CLI</p>
             <a href="/docs/installation" target="_blank" className="button">
@@ -35,7 +35,7 @@ function GetStarted({
             </a>
           </GridItem>
           <GridItem>
-            <img src="/img/pages/home/icon/compose.svg" alt="" />
+            <img src="/pages/home/icon/compose.svg" alt="" />
             <h4>Build your first component</h4>
             <p>Start building with standard interfaces using one of our examples</p>
             <a
@@ -48,7 +48,7 @@ function GetStarted({
             </a>
           </GridItem>
           <GridItem>
-            <img src="/img/pages/home/icon/run.svg" alt="" />
+            <img src="/pages/home/icon/run.svg" alt="" />
             <h4>Deploy on wasmCloud</h4>
             <p>Deploy your application with the wasmCloud orchestrator</p>
             <a href="/docs/ecosystem/wadm/" className="button">

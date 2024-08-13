@@ -51,25 +51,25 @@ function GetInvolved({
             <ul className={styles.list}>
               <li>
                 <Link href={GITHUB}>
-                  <img src="/img/pages/home/icon/github.svg" alt="" />
+                  <img src="/pages/home/icon/github.svg" alt="" />
                   <span>Star wasmCloud on GitHub</span>
                 </Link>
               </li>
               <li>
                 <Link href={SLACK}>
-                  <img src="/img/pages/home/icon/slack.svg" alt="" />
+                  <img src="/pages/home/icon/slack.svg" alt="" />
                   <span>Join our Slack community</span>
                 </Link>
               </li>
               <li>
                 <Link href={PLAYLIST}>
-                  <img src="/img/pages/home/icon/youtube.svg" alt="" />
+                  <img src="/pages/home/icon/youtube.svg" alt="" />
                   <span>Watch past Community Calls</span>
                 </Link>
               </li>
               <li>
                 <Link href={CALENDAR}>
-                  <img src="/img/pages/home/icon/calendar.svg" alt="" />
+                  <img src="/pages/home/icon/calendar.svg" alt="" />
                   <span>Add to your calendar</span>
                 </Link>
               </li>

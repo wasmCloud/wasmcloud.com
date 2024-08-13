@@ -23,7 +23,7 @@ const DEFAULT_CONTENT = {
     text: 'Deploy the wasmCloud k8s Operator',
   },
   img: {
-    src: '/img/pages/home/kubernetes/kubernetes.svg',
+    src: '/pages/home/kubernetes/kubernetes.svg',
     alt: '',
   },
 };

@@ -23,7 +23,7 @@ type CaseStudyContent = {
 const CONTENT: [CaseStudyContent, CaseStudyContent] = [
   {
     name: 'Machine Metrics',
-    logo: '/img/pages/home/machine-metrics.svg',
+    logo: '/pages/home/machine-metrics.svg',
     link: '#',
     content: (
       <>
@@ -40,7 +40,7 @@ const CONTENT: [CaseStudyContent, CaseStudyContent] = [
   },
   {
     name: 'TM Forum',
-    logo: '/img/pages/home/tm-forum.svg',
+    logo: '/pages/home/tm-forum.svg',
     link: '#',
     content: (
       <>
