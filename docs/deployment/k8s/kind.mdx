@@ -9,9 +9,19 @@ type: 'docs'
 
 ## Overview
 
-[**kind**](https://kind.sigs.k8s.io/) is a Kubernetes distribution designed to run local clusters for local development or CI, using nodes that run as containers.
+[**kind**](https://kind.sigs.k8s.io/) is a Kubernetes distribution designed to run local clusters for local development or CI, using nodes that run as containers. 
 
-## Install kind
+This deployment guide will demonstrate how to deploy wasmCloud to a kind cluster and run wasmCloud applications built from WebAssembly components. 
+
+## Install tools
+
+In addition to kind and the **container tooling** a kind cluster requires to run, this guide uses **Helm** and the **wasmCloud Shell (`wash`)** CLI. (For an alternative, script-driven kind quickstart using Kustomize, see the [community contributions](https://github.com/wasmCloud/wasmCloud-contrib) repository.)
+
+### Install container tooling
+
+kind requires container tooling and supports [Docker](https://www.docker.com/), [podman](https://podman.io/), and [nerdctl](https://github.com/containerd/nerdctl). Install the container toolchain of your choice before installing kind.
+
+### Install kind
 
 If you do not already have kind, you can install it with the [Go toolchain](https://go.dev/doc/install). 
 
@@ -24,7 +34,7 @@ You may need to add your Go binary folder to your PATH as well:
 export PATH=${PATH}:`go env GOPATH`/bin
 ```
 
-kind requires container tooling and supports [Docker](https://www.docker.com/), [podman](https://podman.io/), and [nerdctl](https://github.com/containerd/nerdctl). Once you have the tooling of your choice installed, start a local Kubernetes cluster:
+Start a local Kubernetes cluster:
 
 ```shell
 cat <<EOF | kind create cluster --config=-
@@ -48,9 +58,9 @@ nodes:
 EOF
 ```
 
-## Install Helm
+### Install Helm
 
-This walkthrough requires [Helm](https://helm.sh/), which serves as a package manager for Kubernetes. You can follow the instructions on the [Helm install page](https://helm.sh/docs/intro/install/) or use the project's install script:
+[Helm](https://helm.sh/) serves as a package manager for Kubernetes. Follow the instructions on the [Helm install page](https://helm.sh/docs/intro/install/) or use the project's install script:
 
 ```shell
 curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
@@ -58,17 +68,17 @@ chmod 700 get_helm.sh
 ./get_helm.sh
 ```
 
-## Install wash
+### Install wash
 
-Once wasmCloud is deployed to your kind cluster, you can use the **wasmCloud Shell (`wash`)** CLI to manage wasmCloud applications. If you do not have `wash` installed locally already, follow the instructions on the [install page](https://wasmcloud.com/docs/installation).
+Once wasmCloud is deployed to your kind cluster, you can use the **wasmCloud Shell (`wash`)** CLI to manage wasmCloud applications. If you do not have `wash` installed locally, follow the instructions on the [install page](https://wasmcloud.com/docs/installation).
 
 ## Deploying wasmCloud
 
-Once a `kind` cluster is running locally, you can run wasmCloud on Kubernetes with the [wasmCloud Kubernetes operator](https://github.com/wasmCloud/wasmcloud-operator). (An operator is TK&mdash;you can [learn more about the Kubernetes operator pattern in the Kubernetes documentation](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).)
+Once a `kind` cluster is running locally, you can run wasmCloud on Kubernetes with the [wasmCloud Kubernetes operator](https://github.com/wasmCloud/wasmcloud-operator). (An operator is an extension that uses custom Kubernetes resources to manage an application&mdash;you can [learn more about the Kubernetes operator pattern in the Kubernetes documentation](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).)
 
-Before installing the operator, it is necessary to install two prerequisites:
+Before deploying the operator, it is necessary to deploy two prerequisites to the cluster:
 
-- A **[NATS](/docs/ecosystem/nats/) cluster** (with Jetstream enabled)
+- **[NATS](/docs/ecosystem/nats/)** (with Jetstream enabled)
 - **[wasmCloud Application Deployment Manager (wadm)](/docs/ecosystem/wadm/)** 
 
 The following steps will help you deploy the prerequisites to your Kubernetes cluster, then deploy the operator.
@@ -115,12 +125,14 @@ To deploy the operator:
 kubectl apply -k https://github.com/wasmCloud/wasmcloud-operator/deploy/base
 ```
 
-Validate the installation with:
+Validate that the pods are ready:
 
 ```shell
-# make sure pods are ready
 kubectl rollout status deploy -l app=wasmcloud-operator -n wasmcloud-operator
-# apiservice should be available
+```
+Validate that the apiservice is available:
+
+```shell
 kubectl get apiservices.apiregistration.k8s.io v1beta1.core.oam.dev
 ```
 
@@ -140,7 +152,7 @@ kubectl describe wasmcloudhostconfig wasmcloud-host
 
 ### Run a WebAssembly component on Kubernetes
 
-When you `kubectl apply` a [wasmCloud application manifest](../../docs/ecosystem/wadm/model), the cluster automatically provisions the component workload with wasmCloud. 
+When you `kubectl apply` a [wasmCloud application manifest](/docs/ecosystem/wadm/model), the cluster automatically provisions the component workload with wasmCloud. 
 
 This example uses the [`hello-world-application.yaml` manifest](https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/hello-world-application.yaml) included in the operator's quickstart. (The [source code for the application](https://github.com/wasmCloud/wasmCloud/tree/main/examples/rust/components/http-hello-world) is available in the wasmCloud repository.)
 
@@ -174,6 +186,56 @@ APPLICATION   DEPLOYED VERSION   LATEST VERSION   STATUS
 hello-world   v0.0.1             v0.0.1           Deployed
 ```
 
+When you run a wasmCloud application that uses the `httpserver` provider with a daemonscaler, as this one does, the operator automatically creates a Kubernetes service for the application. 
+
+View services:
+
+```shell
+kubectl get services
+```
+```text
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                                        AGE
+hello-world      ClusterIP   10.96.199.43    <none>        8080/TCP                                       11s
+kubernetes       ClusterIP   10.96.0.1       <none>        443/TCP                                        6m29s
+nats             ClusterIP   10.96.104.180   <none>        4222/TCP,7422/TCP,4223/TCP                     5m36s
+nats-headless    ClusterIP   None            <none>        4222/TCP,7422/TCP,4223/TCP,6222/TCP,8222/TCP   5m36s
+wasmcloud-host   ClusterIP   10.96.67.225    <none>        4222/TCP                                       84s
+
+```
+
+### Test the application
+
+On a cluster without ingress (such as this one), you can still test the component from within the wasmCloud host container where the application is running. 
+
+Assign the wasmCloud host pod name to an environment variable:
+
+```shell
+WASMCLOUD_HOST_POD=$(kubectl get pods -o jsonpath="{.items[*].metadata.name}" -l app.kubernetes.io/instance=wasmcloud-host)
+```
+Use `kubectl exec` to shell into the host container:
+
+```shell
+kubectl exec -it pod/$WASMCLOUD_HOST_POD -c wasmcloud-host -- bash
+```
+Install `curl` in the host container:
+
+```shell
+apt-get update && apt-get install -y curl lsof procps
+```
+`curl` the application:
+
+```shell
+curl http://localhost:8080
+```
+
+### Debugging
+
+You can use `kubectl` to get logs from the wasmCloud host running on your kind cluster:
+
+```shell
+kubectl logs -l app.kubernetes.io/instance=wasmcloud-host -c wasmcloud-host
+```
+
 ### Manage applications with wash
 
 To connect `wash` to the cluster, port-forward into the NATS service running in your Kubernetes cluster. (Note: `4222` is the port for the NATS service, `4223` is the port for NATS websockets.)
@@ -181,18 +243,23 @@ To connect `wash` to the cluster, port-forward into the NATS service running in 
 ```shell
 kubectl port-forward svc/nats 4222:4222 4223:4223
 ```
-Now you can connect to wasmCloud on Kubernetes with your local wash toolchain:
+Now you can connect to wasmCloud on Kubernetes with your local `wash` toolchain:
 
 ```shell
 wash app list
 ```
 
-View the hello world component running on the Kubernetes cluster, manageable via our local `wash` CLI:
+View the `hello-world` application running on the Kubernetes cluster, manageable via our local `wash` CLI:
 
 ```text
 Name          Latest Version   Deployed Version   Deploy Status  Description                                                                                                  
 hello-world   v0.0.1           v0.0.1                  Deployed  HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)
 ```
+
+#### Common mistakes
+
+* If you're having trouble deploying an application, make sure your wadm application manifest references an OCI image and not a local file.
+* If a service is not automatically generated for an application using the httpserver provider, check to ensure that the provider uses `daemonscaler` in the application manifest. (You can see an example of this in the [`hello-world-application` manifest](https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/hello-world-application.yaml).)
 
 ### Clean up
 
