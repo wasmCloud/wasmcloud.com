@@ -274,6 +274,10 @@ const config = (async (): Promise<Config> => {
                 label: 'Contact & Mailing List',
                 to: '/contact',
               },
+              {
+                label: 'wasmCloud Swag',
+                to: '/swag',
+              },
             ],
           },
         ],
