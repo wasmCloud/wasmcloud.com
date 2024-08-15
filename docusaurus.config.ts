@@ -203,7 +203,7 @@ const config = (async (): Promise<Config> => {
           await svgIconNavItem({
             svgIconPath: './static/icons/slack.svg',
             label: 'Slack',
-            href: 'https://twitter.com/wasmCloud',
+            href: 'https://slack.wasmcloud.com/',
           }),
         ],
       },
