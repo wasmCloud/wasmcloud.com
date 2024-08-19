@@ -44,14 +44,13 @@ const VIDEO_CONTENT: [UseCasesContent, UseCasesContent] = [
     ),
   },
   {
-    name: 'Moving Beyond Containers',
-    url: 'https://www.youtube.com/watch?v=1_iCimJrLzM',
+    name: 'Wasm across Any Cloud, K8s, or Edge',
+    url: 'https://www.youtube.com/watch?v=B1Q_Xx5i6Ek',
     content: (
       <>
         <p>
-          Sean Isom and Colin Murphy explain how Adobe is using CNCF wasmCloud to run WebAssembly in
-          locations that containers can't go&mdash;while maintaining connectivity with existing
-          cloud services and Kubernetes clusters.
+          Colin Murphy from Adobe and Douglas Rodrigues from Akamai discuss how they use CNCF wasmCloud to run WebAssembly across
+          cloud services, Kubernetes clusters, and edges.
         </p>
       </>
     ),
