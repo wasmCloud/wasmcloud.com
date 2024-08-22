@@ -190,7 +190,7 @@ const config = (async (): Promise<Config> => {
           },
           {
             href: 'https://github.com/wasmcloud/wasmcloud',
-            ariaLabel: 'Star wasmCloud on GitHub',
+            'aria-label': 'Star wasmCloud on GitHub',
             position: 'right',
             html: `<span class="badge badge--outline">Star us! ★ <github-count repo="wasmcloud/wasmcloud">1300</github-count></span>`,
             className: 'sidebar-hidden',

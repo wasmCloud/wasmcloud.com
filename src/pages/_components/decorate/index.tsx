@@ -1,6 +1,4 @@
-import SvgSparkles from './img/sparkles.svg';
 import { SketchUnderline } from '@site/src/pages/_components/sketch-underline';
-import styles from './styles.module.css';
 import { SketchSparkles } from '../sketch-sparkles';
 
 type Props = {
@@ -18,7 +16,7 @@ function DecorateText({ children }: Props): React.ReactNode {
       return <SketchUnderline key={i}>{part.slice(1, -1)}</SketchUnderline>;
     }
     if (part.startsWith('*')) {
-      return <SketchSparkles>{part.slice(1, -1)}</SketchSparkles>;
+      return <SketchSparkles key={i}>{part.slice(1, -1)}</SketchSparkles>;
     }
     return part;
   });
