@@ -1,1 +1,3 @@
-export const PLUGIN_NAME = '@wasmcloud/docusaurus-seo-checks';
+import { getPluginName } from '@wasmcloud/docusaurus-helpers';
+
+export const PLUGIN_NAME = getPluginName(__dirname);

@@ -1,8 +1,10 @@
-import { PluginOptions } from './options';
-import { Plugin, LoadContext } from '@docusaurus/types';
-import { PLUGIN_NAME } from './utils/constants';
-import { Octokit } from '@octokit/rest';
 import logger from '@docusaurus/logger';
+import { LoadContext, Plugin } from '@docusaurus/types';
+import { Octokit } from '@octokit/rest';
+import { getPluginName } from '@wasmcloud/docusaurus-helpers';
+import { PluginOptions } from './options';
+
+export const PLUGIN_NAME = getPluginName(__dirname);
 
 type RepoData = Awaited<ReturnType<Octokit['repos']['get']>>['data'];
 
