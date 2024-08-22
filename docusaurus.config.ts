@@ -8,6 +8,7 @@ import { Options as PluginContentBlogOptions } from '@docusaurus/plugin-content-
 import { Options as PluginGoogleAnalyticsOptions } from '@docusaurus/plugin-google-analytics';
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
 import { Options as PluginGithubStarsOptions } from '@wasmcloud/docusaurus-github-stars';
+import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-hubspot-analytics';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import { bundledLanguages } from 'shiki';
 import {
@@ -71,14 +72,6 @@ const config = (async (): Promise<Config> => {
     onBrokenLinks: 'throw',
     onBrokenMarkdownLinks: 'warn',
     favicon: '/favicon.ico',
-    // Hubspot
-    scripts: [
-      {
-        src: `//js.hs-scripts.com/${process.env.HUBSPOT_ID}.js`,
-        defer: true,
-        async: true,
-      },
-    ],
 
     // Even if you don't use internalization, you can use this field to set useful
     // metadata like html lang. For example, if your site is Chinese, you may want
@@ -167,6 +160,12 @@ const config = (async (): Promise<Config> => {
           trackingID: process.env.GOOGLE_ANALYTICS_ID || 'localdev',
           anonymizeIP: true,
         } satisfies PluginGoogleAnalyticsOptions,
+      ],
+      [
+        '@wasmcloud/docusaurus-hubspot-analytics',
+        {
+          hubspotId: process.env.HUBSPOT_ID || 'localdev',
+        } satisfies PluginHubspotAnalyticsOptions,
       ],
       customPostCssPlugin, // PostCSS plugin function registration
     ],
