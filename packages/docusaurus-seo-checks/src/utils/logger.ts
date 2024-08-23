@@ -2,7 +2,7 @@ import { PLUGIN_NAME } from './constants';
 import { logger as loggerHelper } from '@wasmcloud/docusaurus-helpers';
 
 function logger(name?: string) {
-  const loggerName = name ? `[${PLUGIN_NAME}:${name}]` : `[${PLUGIN_NAME}]`;
+  const loggerName = name ? `${PLUGIN_NAME}:${name}` : PLUGIN_NAME;
 
   return {
     /**
