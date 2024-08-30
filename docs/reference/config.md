@@ -46,7 +46,7 @@ See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/w
 | Setting             | Type    | Default        | Description                                                   |
 | ------------------- | ------- | -------------- | ------------------------------------------------------------- |
 | tinygo_path         | string  | `which tinygo` | The path to the tinygo binary                                 |
-| disable_go_generate | boolean | false          | Wheter to disable the 'go generate' step in the build process |
+| disable_go_generate | boolean | false          | Whether to disable the 'go generate' step in the build process |
 
 ### Language Config - [rust]
 
