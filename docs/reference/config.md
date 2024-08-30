@@ -32,20 +32,21 @@ See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/w
 
 ### Common Config
 
-| Setting       | Type   | Default                       | Description                                                                            |
-| ------------- | ------ | ----------------------------- | -------------------------------------------------------------------------------------- |
-| name          | string |                               | Name of the project                                                                    |
-| version       | string |                               | Semantic version of the project                                                        |
-| path          | string | `{pwd}`                       | Path to the project directory to determine where built and signed artifacts are output |
-| language      | enum   | [rust, tinygo]                | Language that component or provider is written in                                          |
+| Setting       | Type   | Default                           | Description                                                                            |
+| ------------- | ------ | --------------------------------- | -------------------------------------------------------------------------------------- |
+| name          | string |                                   | Name of the project                                                                    |
+| version       | string |                                   | Semantic version of the project                                                        |
+| path          | string | `{pwd}`                           | Path to the project directory to determine where built and signed artifacts are output |
+| language      | enum   | [rust, tinygo]                    | Language that component or provider is written in                                      |
 | type          | enum   | [component, provider, interface ] | Type of wasmcloud artifact that is being generated                                     |
-| wasm_bin_name | string | "name" setting                | Expected name of the wasm module binary that will be generated                         |
+| wasm_bin_name | string | "name" setting                    | Expected name of the wasm module binary that will be generated                         |
 
 ### Language Config - [tinygo]
 
-| Setting     | Type   | Default        | Description                   |
-| ----------- | ------ | -------------- | ----------------------------- |
-| tinygo_path | string | `which tinygo` | The path to the tinygo binary |
+| Setting             | Type    | Default        | Description                                                   |
+| ------------------- | ------- | -------------- | ------------------------------------------------------------- |
+| tinygo_path         | string  | `which tinygo` | The path to the tinygo binary                                 |
+| disable_go_generate | boolean | false          | Wheter to disable the 'go generate' step in the build process |
 
 ### Language Config - [rust]
 
@@ -57,14 +58,14 @@ See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/w
 ### Registry Config - [registry]
 
 | Setting     | Type   | Default | Description                                                                                     |
-|-------------|--------|---------|-------------------------------------------------------------------------------------------------|
+| ----------- | ------ | ------- | ----------------------------------------------------------------------------------------------- |
 | url         | string | N/A     | URL for the container registry to use when pushing images (i.e. `wash push`)                    |
 | credentials | string |         | Path to a credentials file to use when pushing to container registries (ex. specified by `url`) |
 
 ### Type Config - [component]
 
 | Setting        | Type    | Default                                   | Description                                                                                                                                                                                                                                                                                                                   |
-|----------------|---------|-------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| -------------- | ------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | claims         | list    | `[]`                                      | The list of provider claims that this component requires. eg. ["wasmcloud:httpserver", "wasmcloud:blobstore"]                                                                                                                                                                                                                 |
 | registry       | string  | `localhost:8080`                          | The registry to push to. eg. "localhost:8080"                                                                                                                                                                                                                                                                                 |
 | push_insecure  | boolean | `false`                                   | Whether to push to the registry insecurely                                                                                                                                                                                                                                                                                    |
@@ -74,6 +75,7 @@ See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/w
 | build_artifact | string  | /path/to/project/build/{filename}.wasm    | Optional override path where `wash` can expect to find the built and unsigned WebAssembly artifact                                                                                                                                                                                                                            |
 | build_command  | string  | Language specific command                 | Optional command to run instead of inferring the default language toolchain build command. Supports commands in the format of `command ...arg`. `wash` expects that the build command will result in an artifact under the project `build` folder named either `{wasm_bin_name}.wasm` if supplied or `{name}.wasm` otherwise. |
 | destination    | string  | /path/to/project/build/{filename}\_s.wasm | File path to output the destination WebAssembly artifact after building and signing.                                                                                                                                                                                                                                          |
+
 ### Type Config - [provider]
 
 | Setting       | Type   | Default | Description                       |
