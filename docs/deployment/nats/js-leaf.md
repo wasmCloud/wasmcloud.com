@@ -19,10 +19,10 @@ This is done by modifying the _server configuration_ for the NATS servers that w
 
 The following diagram illustrates a sample architecture with leaf nodes all communicating with a central 3-node NATS cluster:
 
-![NATS Leaf Nodes](/img/nats_js_leafs.png)
+![NATS Leaf Nodes](/docs/images/nats_js_leafs.png)
 
 Anywhere leaf nodes bridge between each other, you can insert [NGS](https://synadia.com/ngs) and seamlessly span two different infrastructures and security domains with NGS providing a "global connective tissue" in between, as shown in the following diagram:
 
-![NATS Leaf Nodes with NGS](/img/nats_js_leafs_ngs.png)
+![NATS Leaf Nodes with NGS](/docs/images/nats_js_leafs_ngs.png)
 
 In summary, building on the power of NATS, NATS leaf nodes, and NGS, the wasmCloud lattice can be used to provide seamless, no-discovery-required, automatic-failover connectivity between hosts anywhere in the world on any infrastructure through any number of intervening firewalls without opening any listening ports.

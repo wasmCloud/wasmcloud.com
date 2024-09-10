@@ -1,9 +1,9 @@
 ---
-title: "wash Plugins"
+title: 'wash Plugins'
 date: 2024-04-26T11:02:05+06:00
 draft: false
 sidebar_position: 3
-description: "Using wash plugins"
+description: 'Using wash plugins'
 ---
 
 :::tip
@@ -37,7 +37,7 @@ wash plugin install https://github.com/myuser/plugins/releases/download/v0.1.0/w
 Plugin Hello (version 0.1.0) installed
 ```
 
-The command will download the plugin, validate it, and then install it – erroring if there are any
+The command will download the plugin, validate it, and then install it—erroring if there are any
 issues with the process
 
 There are also additional options for authenticating with an OCI registry and validating the

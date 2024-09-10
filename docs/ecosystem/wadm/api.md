@@ -22,23 +22,23 @@ Please note that in production deployments, you will likely be using separate NA
 accessing wadm. Please see the [operator guide](/docs/deployment/wadm/) for more information for running
 wadm in production.
 
-## Topic space
+## Subject space
 
-The Wadm API is exposed entirely as a NATS service on a topic space. All of the API operations will
-occur as _requests_ (_not_ simple publishes) on a topic in the following format:
+The Wadm API is exposed entirely as a NATS service on a NATS subject space. All of the API operations will
+occur as _requests_ (_not_ simple publishes) on a subject in the following format:
 
 ```
 wadm.api.{lattice-id}.{category}.{operation}.{object}
 ```
 
 The `operation` is usually a verb, and `object` is an optional scope-limiter to the operation. In
-many cases, the `object` will be something like a model name. 
+many cases, the `object` will be something like a model name.
 
 All requests and responses on this topic are encoded as JSON, except for the creation of models.
 
 :::info
 All model names are treated like unique identifiers and must conform to the rules
-governing NATS topic segments. For example, they cannot contain spaces, commas, unprintable
+governing NATS subject segments. For example, they cannot contain spaces, commas, unprintable
 characters, or periods.
 :::
 
@@ -48,7 +48,7 @@ In wasmCloud, models are versioned representations of application workloads stor
 buckets. The following operations pertain to storing and retrieving models. Persistence of models is
 explicitly and deliberately separated from deployment management. Any model can have multiple
 versions stored, and any one of those versions can be deployed. Model persistence is similarly
-decoupled from any particular host. 
+decoupled from any particular host.
 
 ### Store models
 
@@ -57,7 +57,7 @@ decoupled from any particular host.
 Model storage is _append-only_. New versions are added to the model's version history according to
 retention policy and will not replace previously existing versions. This means that if you put a
 model with the same version, it will be rejected. The `name` of the model is a unique identifier and
-should be a valid NATS topic segment. Please note that specifying a version in a model is not
+should be a valid NATS subject segment. Please note that specifying a version in a model is not
 required. If a version is not specified, a [ULID](https://github.com/ulid/spec) will be generated
 and used as the version.
 
@@ -93,7 +93,7 @@ used as a reserved word for indicating that the latest version should be deploye
 
 Please note that versions are entirely optional. Wadm will by default generate a
 [ULID](https://github.com/ulid/spec) for the model when it is pushed if no version is set. However,
-versions must still be unique 
+versions must still be unique
 
 ### Get model list
 
@@ -156,63 +156,61 @@ to fetch a specific version
   "result": "error|success|notfound",
   "message": "Successfully fetched model http-hello-world",
   "manifest": {
-      "apiVersion": "core.oam.dev/v1beta1",
-      "kind": "Application",
-      "metadata": {
-        "annotations": {
-          "description": "HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)",
-          "version": "v0.0.1"
-        },
-        "name": "http-hello-world"
+    "apiVersion": "core.oam.dev/v1beta1",
+    "kind": "Application",
+    "metadata": {
+      "annotations": {
+        "description": "HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)",
+        "version": "v0.0.1"
       },
-      "spec": {
-        "components": [
-          {
-            "name": "http-component",
-            "properties": {
-              "image": "wasmcloud.azurecr.io/echo:0.3.7"
-            },
-            "traits": [
-              {
-                "properties": {
-                  "instances": 1
-                },
-                "type": "spreadscaler"
-              }
-            ],
-            "type": "component"
+      "name": "http-hello-world"
+    },
+    "spec": {
+      "components": [
+        {
+          "name": "http-component",
+          "properties": {
+            "image": "wasmcloud.azurecr.io/echo:0.3.7"
           },
-          {
-            "name": "httpserver",
-            "properties": {
-              "image": "ghcr.io/wasmcloud/http-server:0.20.1"
-            },
-            "traits": [
-              {
-                "properties": {
-                  "interfaces": [
-                    "incoming-handler"
-                  ],
-                  "namespace": "wasi",
-                  "package": "http",
-                  "source_config": [
-                    {
-                      "name": "default-http",
-                      "properties": {
-                        "address": "127.0.0.1:8080"
-                      }
+          "traits": [
+            {
+              "properties": {
+                "instances": 1
+              },
+              "type": "spreadscaler"
+            }
+          ],
+          "type": "component"
+        },
+        {
+          "name": "httpserver",
+          "properties": {
+            "image": "ghcr.io/wasmcloud/http-server:0.22.0"
+          },
+          "traits": [
+            {
+              "properties": {
+                "interfaces": ["incoming-handler"],
+                "namespace": "wasi",
+                "package": "http",
+                "source_config": [
+                  {
+                    "name": "default-http",
+                    "properties": {
+                      "address": "127.0.0.1:8080"
                     }
-                  ],
-                  "target": "http-component"
-                },
-                "type": "link"
-              }
-            ],
-            "type": "capability"
-          }
-        ]
-      }
+                  }
+                ],
+                "target": "http-component"
+              },
+              "type": "link"
+            }
+          ],
+          "type": "capability"
+        }
+      ]
     }
+  }
 }
 ```
 
@@ -245,7 +243,7 @@ Each of the items in the response list describes a revision and indicates whethe
 the deployed one. Remember that the ordering of the list does not reflect the semantic versioning as
 we do not require that the version field be semver. If no manual versions were set, all IDs will be
 also be lexicographically sortable to be the same as insertion order since they will be
-[ULIDs](https://github.com/ulid/spec) 
+[ULIDs](https://github.com/ulid/spec)
 
 ### Delete models
 
@@ -261,7 +259,7 @@ Empty body or
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.0"
 }
 ```
 

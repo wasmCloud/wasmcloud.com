@@ -1,12 +1,12 @@
 ---
-title: "Security"
+title: 'Security'
 date: 2018-12-29T11:02:05+06:00
 sidebar_position: 0
 draft: false
-description: "wasmCloud Ecosystem Security"
+description: 'wasmCloud Ecosystem Security'
 ---
 
-wasmCloud embraces a [zero trust](https://en.wikipedia.org/wiki/Zero_trust_networks) security model. This means that the runtime, by default, does not trust any component with the ability to do anything. Without adding security claims to a component, the component cannot send or receive messages in a wasmCloud runtime environment.
+wasmCloud embraces a [zero trust](https://en.wikipedia.org/wiki/Zero_trust_networks) security model. With the WebAssembly component model, every function call must be declared and embedded in a component's WIT, giving wasmCloud full ability to deny the component from invoking anything or accessing any resources at runtime. See the [policy service](/docs/deployment/security/policy-service) documentation for information on how to evaluate policies to increase the default security of wasmCloud.
 
 ### Embedding JSON web tokens
 
@@ -19,7 +19,7 @@ Every component in the ecosystem is a WebAssembly component that contains an emb
 
 In our ecosystem, the issuer of a component is the unique public key of an **account** (see the _Key Types_ section below), and the subject of a component is the component's public key.
 
-The [wash](/docs/ecosystem/wash) tool is responsible for creating keys and extracting and embeddeding signed JWTs within components.
+The [wash](/docs/ecosystem/wash) tool is responsible for creating keys and extracting and embedding signed JWTs within components.
 
 Each JWT embedded within a component is cryptographically signed using the [ed25519](https://ed25519.cr.yp.to/) signature algorithm. For information on why we chose this method of security over others, please check out our [Archictural Decision Record](https://wasmcloud.github.io/adr/).
 

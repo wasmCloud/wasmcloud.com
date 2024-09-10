@@ -10,26 +10,38 @@ For high-level discussion of our approach to Kubernetes and compatibility with c
 
 On **this** page, you can find documentation for operators wishing to deploy wasmCloud with Kubernetes, including details on prerequisites such as NATS and how to deploy the operator.
 
+:::info[kubectl support]
+When running wasmCloud on Kubernetes, you can use `kubectl` to deploy [wasmCloud manifests](/docs/ecosystem/wadm/model), check wasmCloud logs, and more. The example below demonstrates standard usage of `kubectl` with wasmCloud.
+:::
+
 ## Getting started with the wasmCloud operator
 
-The wasmCloud operator can be found on GitHub at [https://github.com/wasmCloud/wasmcloud-operator](https://github.com/wasmCloud/wasmcloud-operator). It uses custom resource definitions (CRDs) to define wasmCloud hosts as Kubernetes resources.
+The wasmCloud operator can be found on GitHub at [https://github.com/wasmCloud/wasmcloud-operator](https://github.com/wasmCloud/wasmcloud-operator) and enables...
 
-In order to follow the instructions on this page, you will need a Kubernetes cluster and appropriate access credentials as well as a [Helm](https://helm.sh/) installation.
+1. Deployment of wasmCloud Hosts onto a Kubernetes cluster via Custom Resource Definition (`WasmCloudHostConfig`)
+2. Interoperability with the [wasmCloud Application Deployment Manager (wadm)](/docs/ecosystem/wadm/) for deploying wasmcloud applications defined in the [OAM spec](https://oam.dev/) format.
+3. Automated creation of Kubernetes Services pointing to wasmCloud applications deployed with a HTTP Server capability (in the future this will become configurable&mdash;today it's automatic).
+
+In order to follow the instructions on this page, you will need a Kubernetes cluster and appropriate access credentials as well as a [Helm](https://helm.sh/) installation. It will also be useful to have [wasmCloud Shell (`wash`)](/docs/installation) installed locally.
+
+You can watch a [video of the setup on YouTube](https://www.youtube.com/embed/239Q_hAKqPw?si=y0nHeFHfCPOdItNU&start=235&end=780):
+
+<YouTube url="https://www.youtube.com/watch?v=239Q_hAKqPw&start=235&amp;end=780" />
 
 ### Deploying the operator
 
 A wasmCloud cluster requires a few things to run:
 
-- A NATS cluster with Jetstream enabled
-- WADM connected to the NATS cluster in order to support applications
+- A **[NATS](/docs/ecosystem/nats/) cluster** (with Jetstream enabled)
+- **[wasmCloud Application Deployment Manager (wadm)](/docs/ecosystem/wadm/)** connected to the NATS cluster in order to support deploying wasmCloud applications
 
-If you are running locally, the following steps will help you start a NATS cluster and wadm in your Kubernetes cluster, then deploy the operator.
+If you are running Kubernetes locally, the following steps will help you start a NATS cluster and wadm in your Kubernetes cluster, then deploy the operator.
 
 :::info[Testing]
-Make sure you have a Kubernetes cluster running locally. Some good options include [kind](https://kind.sigs.k8s.io/), [minikube](https://minikube.sigs.k8s.io/docs/), or Docker Desktop.
+Make sure you have a Kubernetes cluster running locally. Some good options include [minikube](https://minikube.sigs.k8s.io/docs/), [kind](https://kind.sigs.k8s.io/), [k3s](https://k3s.io/), or [k0s](https://k0sproject.io/).
 :::
 
-#### Running NATS
+#### Deploy NATS
 
 Add the NATS Helm repo:
 
@@ -37,107 +49,190 @@ Add the NATS Helm repo:
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
 ```
 
-Install the upstream NATS Helm chart to start a cluster with the following
-`values.yaml` file:
-
-```yaml
-config:
-  cluster:
-    enabled: true
-    replicas: 3
-  leafnodes:
-    enabled: true
-  jetstream:
-    enabled: true
-    fileStore:
-      pvc:
-        size: 10Gi
-    merge:
-      domain: default
-```
+Install the upstream NATS Helm chart to start a cluster with the `values.yaml` file from the quickstart:
 
 ```shell
-helm upgrade --install -f values.yaml nats-cluster nats/nats
+helm upgrade --install -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/nats-values.yaml nats nats/nats
 ```
 
-#### Running wadm
-
-You can deploy wadm to your Kubernetes cluster with the wadm Helm chart. First, clone the wadm repo from GitHub:
+Validate the installation with:
 
 ```shell
-git clone https://github.com/wasmCloud/wadm.git
+kubectl rollout status deploy,sts -l app.kubernetes.io/instance=nats
 ```
 
-In the cloned repo, find the chart at `wadm/charts/wadm`. In your `values.yaml` file, the `server` field for NATS should be set to:
+#### Deploy wadm
 
-```yaml
-server: 'nats-cluster.default.svc.cluster.local:4222'
-```
-
-Run `helm install` from `wadm/charts/wadm` in the cloned repo:
+You can deploy wadm to your Kubernetes cluster with a Helm chart hosted by wasmCloud.
 
 ```shell
-helm install wadm -f values.yaml ./
+helm install wadm -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/wadm-values.yaml oci://ghcr.io/wasmcloud/charts/wadm
 ```
 
-#### Setting up Secrets
+Validate the installation with:
 
-The `WasmCloudHostConfig` CRD describes the desired state of a set of wasmCloud hosts connected to the same lattice:
+```shell
+kubectl rollout status deploy -l app.kubernetes.io/instance=wadm
+```
+
+#### Deploy the operator
+
+To deploy the operator:
+
+```shell
+kubectl apply -k https://github.com/wasmCloud/wasmcloud-operator/deploy/base
+```
+
+Validate the installation with:
+
+```shell
+# make sure pods are ready
+kubectl rollout status deploy -l app=wasmcloud-operator -n wasmcloud-operator
+# apiservice should be available
+kubectl get apiservices.apiregistration.k8s.io v1beta1.core.oam.dev
+```
+
+### Create wasmCloud hosts
+
+Apply the `wasmcloud-host` manifest:
+
+```shell
+kubectl apply -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/wasmcloud-host.yaml
+```
+
+Check wasmCloud host status:
+
+```shell
+kubectl describe wasmcloudhostconfig wasmcloud-host
+```
+
+You can also check logs for a given host with:
+
+```shell
+kubectl logs -f -l app.kubernetes.io/instance=my-wasmcloud-cluster -c wasmcloud-host
+```
+
+### Deploying a workload
+
+When you `kubectl apply` a [wasmCloud application manifest](../../ecosystem/wadm/model.md), the cluster will automatically provision the component workload with wasmCloud. Below is the `hello-world-application.yaml` manifest included in the quickstart:
 
 ```yaml
-apiVersion: k8s.wasmcloud.dev/v1alpha1
-kind: WasmCloudHostConfig
+apiVersion: core.oam.dev/v1beta1
+kind: Application
 metadata:
-  name: my-wasmcloud-cluster
+  name: hello-world
+  annotations:
+    version: v0.0.1
+    description: 'HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)'
+    wasmcloud.dev/authors: wasmCloud team
+    wasmcloud.dev/source-url: https://github.com/wasmCloud/wasmCloud/blob/main/examples/rusg/components/http-hello-world/wadm.yaml
+    wasmcloud.dev/readme-md-url: https://github.com/wasmCloud/wasmCloud/blob/main/examples/rusg/components/http-hello-world/README.md
+    wasmcloud.dev/homepage: https://github.com/wasmCloud/wasmCloud/tree/main/examples/rusg/components/http-hello-world
+    wasmcloud.dev/categories: |
+      http,http-server,rust,hello-world,example
 spec:
-  # The number of wasmCloud host pods to run
-  hostReplicas: 2
-  # The cluster issuers to use for each host
-  issuers:
-    # This needs to be the public key of a cluster seed generated by
-    # `wash keys gen cluster`
-    - CDK...
-  # The lattice to connect the hosts to
-  lattice: 83a5b52e-17cf-4080-bac8-f844099f142e
-  # Additional labels to apply to the host other than the defaults set in the operator
-  hostLabels:
-    some-label: value
-  # Which wasmCloud version to use
-  version: 0.82.0
-  # The name of a secret in the same namespace that provides the required secrets.
-  secretName: cluster-secrets
-  # Enable the following to run the wasmCloud hosts as a DaemonSet
-  #daemonset: true
-  # The name of the image pull secret to use with wasmCloud hosts so that they
-  # can authenticate to a private registry to pull components.
-  # registryCredentialsSecret: my-registry-secret
+  components:
+    - name: http-component
+      type: component
+      properties:
+        image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+      traits:
+        # Govern the spread/scheduling of the component
+        - type: spreadscaler
+          properties:
+            replicas: 1
+
+    # Add a capability provider that enables HTTP access
+    - name: httpserver
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.22.0
+      traits:
+        # Establish a unidirectional link from this http server provider (the "source")
+        # to the `http-component` component (the "target") so the component can handle incoming HTTP requests,
+        #
+        # The source (this provider) is configured such that the HTTP server listens on 127.0.0.1:8080
+        - type: link
+          properties:
+            target: http-component
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler]
+            source_config:
+              - name: default-http
+                properties:
+                  address: 0.0.0.0:8080
 ```
 
-The CRD requires a Kubernetes Secret with the following keys:
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: my-wasmcloud-cluster
-data:
-  # You can generate this with wash:
-  # `wash keys gen cluster`
-  # For more on wash see https://wasmcloud.com/docs/installation
-  WASMCLOUD_CLUSTER_SEED: <seed>
-  # Only required if using a NATS creds file
-  # nats.creds: <base64 encoded creds file>
-```
-
-You can apply Secrets with `kubectl`:
+Run `kubectl apply`:
 
 ```shell
-kubectl apply -f your-secret-manifest.yaml
+kubectl apply -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/hello-world-application.yaml
 ```
 
-:::info[Secrets required]
-The operator will fail to provision the wasmCloud Deployment if any of these secrets are missing.
-:::
+Check the deployment status:
+
+```shell
+kubectl get application
+```
+
+```shell
+APPLICATION   DEPLOYED VERSION   LATEST VERSION   STATUS
+hello-world   v0.0.1             v0.0.1           Deployed
+```
+
+When you run a wasmCloud application that uses the `httpserver` provider with a daemonscaler, as this one does, the operator automatically creates a Kubernetes service for the application. 
+
+View services:
+
+```shell
+kubectl get services
+```
+```text
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                                        AGE
+hello-world      ClusterIP   10.96.199.43    <none>        8080/TCP                                       11s
+kubernetes       ClusterIP   10.96.0.1       <none>        443/TCP                                        6m29s
+nats             ClusterIP   10.96.104.180   <none>        4222/TCP,7422/TCP,4223/TCP                     5m36s
+nats-headless    ClusterIP   None            <none>        4222/TCP,7422/TCP,4223/TCP,6222/TCP,8222/TCP   5m36s
+wasmcloud-host   ClusterIP   10.96.67.225    <none>        4222/TCP                                       84s
+
+```
+
+### Test the application
+
+On a cluster without ingress (such as this one), you can still test the component from within the wasmCloud host container where the application is running. 
+
+Assign the wasmCloud host pod name to an environment variable:
+
+```shell
+WASMCLOUD_HOST_POD=$(kubectl get pods -o jsonpath="{.items[*].metadata.name}" -l app.kubernetes.io/instance=wasmcloud-host)
+```
+Port-forward the wasmCloud host's port 8080:
+
+```shell
+kubectl port-forward pods/$WASMCLOUD_HOST_POD 8080
+```
+`curl` the application:
+
+```shell
+curl http://localhost:8080
+```
+
+### Manage applications with wash
+
+Port-forward into the NATS service running in your Kubernetes cluster. `4222` is the port for the NATS service, `4223` is the port for NATS websockets.
+
+```shell
+kubectl port-forward svc/nats 4222:4222 4223:4223
+```
+
+Now you can connect to wasmCloud on Kubernetes with your local wash toolchain:
+
+```shell
+wash app list
+```
+
+### Optional configuration
 
 #### Image pull secrets (Optional)
 
@@ -146,12 +241,6 @@ You can also specify an image pull secret to use use with the wasmCloud hosts so
 
 Once it is created, you can reference an image pull secret in the `WasmCloudHostConfig` CRD by
 setting the `registryCredentialsSecret` field to the name of the secret.
-
-#### Start the operator
-
-```shell
-kubectl kustomize build deploy/local | kubectl apply -f -
-```
 
 #### Argo CD Health Check (Optional)
 

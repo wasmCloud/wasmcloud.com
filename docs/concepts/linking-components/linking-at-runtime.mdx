@@ -6,14 +6,17 @@ sidebar_position: 1
 type: 'docs'
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Overview
 
-A **runtime link** is a declared connection between a component and another entity. Runtime links are typically defined in [Wadm deployment manifests](/docs/ecosystem/wadm/) and resolved on instantiation, regardless of where the linked entities are running. 
+A **runtime link** is a declared connection between a component and another entity. Runtime links are typically defined in [Wadm deployment manifests](/docs/ecosystem/wadm/) and resolved on instantiation, regardless of where the linked entities are running.
 
 Link definitions have both a **source** and a **target**, corresponding to the [component imports and exports](/docs/concepts/linking-components/), and specify the relevant WASI interfaces.
 
-* In a link declaration, the **source** is the **importer**. You can think of it as the source of the requirement that needs to be fulfilled. 
-* The **target** is the **exporter**. Specifically, it is the function exposed in an export that the source will call.
+- In a link declaration, the **source** is the **importer**. You can think of it as the source of the requirement that needs to be fulfilled.
+- The **target** is the **exporter**. Specifically, it is the function exposed in an export that the source will call.
 
 Link definitions are **unidirectional**: the source (importer) can call the target (exporter), but not the other way around.From a [component's](/docs/concepts/components) point of view, code _only_ refers to an interface, e.g. `wasi-keyvalue`. Components do not know which specific entity is on the other side of a link.
 
@@ -21,15 +24,15 @@ Link definitions are **unidirectional**: the source (importer) can call the targ
 
 Linking at runtime makes sense when...
 
-* You want components to be able to scale and failover independently
-* You want to be able to update components independently
-* Data sources for each component are distributed, and you want each component to run as close to its data source as possible to reduce data transmitted over the wire
+- You want components to be able to scale and failover independently
+- You want to be able to update components independently
+- Data sources for each component are distributed, and you want each component to run as close to its data source as possible to reduce data transmitted over the wire
 
 ## Exploring a link definition
 
 Runtime links are typically defined in [Wadm deployment manifests](/docs/ecosystem/wadm/). Here is an example of a definition for a link from a component (importing on the `keyvalue` interface) to a provider (exporting on the same interface):
 
-```yaml {7-16}
+```yaml {7-17}
 components:
   - name: http-component
     type: component
@@ -38,18 +41,20 @@ components:
     traits:
       - type: link
         properties:
+          name: foo
           target: kvredis
           namespace: wasi
           package: keyvalue
           interfaces: [store]
           target_config:
-          - name: redis-url
-            properties:
-              url: redis://127.0.0.1:6379
+            - name: redis-url
+              properties:
+                url: redis://127.0.0.1:6379
 ```
 
 **A link is always defined as a trait of the source**&mdash;that is, the importer. In addition to a target, the link definition has properties including...
 
+- `name`, an optional unique identifier for this link which can be used to distinguish between [different usages of the same interface](#defining-and-using-link-names). If not specified, this value is `default`.
 - `target`, which specifies the name of the exporting entity to be called
 - `namespace`, which in the example above refers to `wasi`
 - `package`, which specifies the particular interface group used
@@ -64,17 +69,17 @@ You can use the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool to 
 
 In wasmCloud, components may be linked to...
 
-### Host functions
+### Built-in providers
 
-The wasmCloud host provides several functions available for import by components:
+The wasmCloud host provides several functions available for import by components through built-in providers:
 
-* Logging (using the [`wasi-logging`](https://github.com/WebAssembly/wasi-logging) interface)
-* Random (using the [`wasi-random`](https://github.com/WebAssembly/wasi-random) interface)
-* Clocks (using the [`wasi-clocks`](https://github.com/WebAssembly/wasi-clocks) interface)
+- Logging (using the [`wasi-logging`](https://github.com/WebAssembly/wasi-logging) interface)
+- Random (using the [`wasi-random`](https://github.com/WebAssembly/wasi-random) interface)
+- Clocks (using the [`wasi-clocks`](https://github.com/WebAssembly/wasi-clocks) interface)
 
-For example, the wasmCloud host's built-in logging function could satisfy a component's logging import. Host functions form wasmCloud's **trusted compute base**&mdash;they represent highly-vetted code that provides basic, commonly-used functionalities. 
+For example, the wasmCloud host's built-in logging function could satisfy a component's logging import. Built-in providers form wasmCloud's **trusted compute base**&mdash;they represent highly-vetted code that provides basic, commonly-used functionalities.
 
-To use a host function, you need *only* include the import in a component's `world.wit` and call it using the WASI interface in question. It is not necessary to include host functions in a deployment manifest&mdash;since they are already present on any wasmCloud host, the host will fulfill the imports automatically.
+To use a built-in provider, you need _only_ include the import in a component's `world.wit` and call it using the WASI interface in question. It is not necessary to include built-in providers in a deployment manifest&mdash;since they are already present on any wasmCloud host, the host will fulfill the imports automatically.
 
 <details>
 <summary>Example: Logging</summary>
@@ -84,6 +89,7 @@ Generate a new Rust project:
 ```shell
 wash new component hello --template-name hello-world-rust
 ```
+
 Add logging to the project's `world.wit` file in the `wit` directory:
 
 ```wit
@@ -95,6 +101,7 @@ world hello {
   export wasi:http/incoming-handler@0.2.0;
 }
 ```
+
 Update the Rust code to add a logging message:
 
 ```rust
@@ -108,7 +115,7 @@ struct HttpServer;
 impl Guest for HttpServer {
     fn handle(_request: IncomingRequest, response_out: ResponseOutparam) {
         // Add logging // [!code ++:6]
-        wasi::logging::logging::log( 
+        wasi::logging::logging::log(
             wasi::logging::logging::Level::Info,
             "",
             &format!("Hello to your logs from Rust"),
@@ -128,7 +135,8 @@ impl Guest for HttpServer {
 
 export!(HttpServer);
 ```
-Remember: it is not necessary to include host functions in a deployment manifest.
+
+Remember: it is not necessary to include built-in providers in a deployment manifest.
 
 Launch a local wasmCloud host with `wash up` and deploy:
 
@@ -141,11 +149,12 @@ When you invoke the component with `curl localhost:8080`, in addition to an HTTP
 ```shell
 INFO handle_invocation{params=IncomingHttpHandle component_id="http_hello_world-http_component" component_ref="file:///Users/user/wasmcloud/wip/linking/logtest/build/http_hello_world_s.wasm"}:log: wasmcloud_host::wasmbus::handler: Hello to your logs from Rust component_id="http_hello_world-http_component" level=Level::Info context=""
 ```
+
 </details>
 
 ### Other components
 
-A component may be linked to another component at runtime (over the [lattice](/docs/concepts/lattice)) or [build (via composition)](/docs/concepts/linking-components/linking-at-build). 
+A component may be linked to another component at runtime (over the [lattice](/docs/concepts/lattice)) or [build (via composition)](/docs/concepts/linking-components/linking-at-build).
 
 Linking components at runtime is a two-step process:
 
@@ -164,7 +173,7 @@ metadata:
   name: http-hello-world
   annotations:
     version: v0.0.2
-    description: "HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)"
+    description: 'HTTP hello world demo in Rust, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)'
 spec:
   components:
     - name: http-component
@@ -197,7 +206,7 @@ spec:
     - name: httpserver
       type: capability
       properties:
-        image: ghcr.io/wasmcloud/http-server:0.20.1
+        image: ghcr.io/wasmcloud/http-server:0.22.0
       traits:
         # Link the httpserver to the component, and configure the HTTP server
         # to listen on port 8080 for incoming requests
@@ -211,21 +220,21 @@ spec:
               - name: default-http
                 properties:
                   address: 127.0.0.1:8080
-
 ```
 
-* The http-component is **exporting on the wasi-http interface** and **importing on a custom "pingpong" interface**. It is the importer in relation to the pong-component, so it is the source for that link. 
-* The pong-component is **exporting on the custom "pingpong" interface**. This is its only link relationship, and it is the exporter, so no links are defined as a trait of pong-component. 
-* The httpserver provider is **importing on the wasi-http interface**. It is the importer in relation to http-component, so it is the source for that link, and basic configuration is performed in the `source_config`.
+- The http-component is **exporting on the wasi-http interface** and **importing on a custom "pingpong" interface**. It is the importer in relation to the pong-component, so it is the source for that link.
+- The pong-component is **exporting on the custom "pingpong" interface**. This is its only link relationship, and it is the exporter, so no links are defined as a trait of pong-component.
+- The httpserver provider is **importing on the wasi-http interface**. It is the importer in relation to http-component, so it is the source for that link, and basic configuration is performed in the `source_config`.
 
-If you would like to build and run the example described by this manifest, follow Steps 1 and 2 in the [composition example readme](https://github.com/wasmCloud/wasmCloud/tree/main/examples/rust/composition). 
+If you would like to build and run the example described by this manifest, follow Steps 1 and 2 in the [composition example readme](https://github.com/wasmCloud/wasmCloud/tree/main/examples/rust/composition).
 
-Remember that the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool is available to help you automatically generate a Wadm deployment manifest for a given component. Because it extrapolates link definitions from a component's WIT interfaces, it can be very helpful for not only generating manifests but understanding linking relationships in your application. 
+Remember that the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool is available to help you automatically generate a Wadm deployment manifest for a given component. Because it extrapolates link definitions from a component's WIT interfaces, it can be very helpful for not only generating manifests but understanding linking relationships in your application.
+
 </details>
 
 ### Providers
 
-[Providers](/docs/concepts/providers) are longer-lived host plugins which may facilitate connections to external resources. A component may be linked at runtime to a provider, which may be running either on the same wasmCloud host or another host on the lattice. 
+[Providers](/docs/concepts/providers) are longer-lived host plugins which may facilitate connections to external resources. A component may be linked at runtime to a provider, which may be running either on the same wasmCloud host or another host on the lattice.
 
 A provider only ever dispatches messages to&mdash;or receives messages from&mdash;components. When a link is established for a particular component, the provider can remember that component's identity and use it for subsequent dispatches. As a result, the only information a linked provider needs is the component's identity. This identity is typically used for managing specific resources on behalf of the component, such as database connections, open TCP sockets, etc.
 
@@ -242,16 +251,15 @@ kind: Application
 metadata:
   name: hello-world
   annotations:
-    version: v0.0.1 
+    version: v0.0.1
     description: 'HTTP hello world demo'
-    experimental: true
 spec:
   components:
     # The component with our business logic
     - name: http-component
       type: component
       properties:
-        image: wasmcloud.azurecr.io/http-hello-world:0.1.0
+        image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
       traits:
         - type: spreadscaler
           properties:
@@ -271,12 +279,12 @@ spec:
     - name: kvredis
       type: capability
       properties:
-        image: ghcr.io/wasmcloud/keyvalue-redis:0.24.0
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.27.0
     # The httpserver provider
     - name: httpserver
       type: capability
       properties:
-        image: ghcr.io/wasmcloud/http-server:0.20.0
+        image: ghcr.io/wasmcloud/http-server:0.22.0
       traits:
         # Link definition for httpserver -> http-component
         - type: link
@@ -284,22 +292,145 @@ spec:
             target: http-component
             namespace: wasi
             package: http
-            interfaces: [incoming-handler] 
-            source_config: 
+            interfaces: [incoming-handler]
+            source_config:
               - name: default-http
-                properties: 
+                properties:
                   address: 127.0.0.1:8080
-
 ```
 
-* The http-component is **importing functions on the keyvalue interface**. It is the **importer** in relation to **kvredis**, meaning that it is the source for the link definition: the link is defined as a trait of http-component. 
+- The http-component is **importing functions on the keyvalue interface**. It is the **importer** in relation to **kvredis**, meaning that it is the source for the link definition: the link is defined as a trait of http-component.
 
-* The http-component is **exposing a function on the http interface**. It is the **exporter** in relation to the **http-server** provider&mdash;in this case, the http-server provider is the source and the http-component is the target.
+- The http-component is **exposing a function on the http interface**. It is the **exporter** in relation to the **http-server** provider&mdash;in this case, the http-server provider is the source and the http-component is the target.
 
-* Both the kvredis and httpserver providers are configured in the link definition, using a `target_config` field (if the provider is the target) or a `source_config` field (if the provider is the source).
+- Both the kvredis and httpserver providers are configured in the link definition, using a `target_config` field (if the provider is the target) or a `source_config` field (if the provider is the source).
 
-Remember that the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool is available to help you automatically generate a Wadm deployment manifest for a given component. Because it extrapolates link definitions from a component's WIT interfaces, it can be very helpful for not only generating manifests but understanding linking relationships in your application. 
+Remember that the [wit2wadm](https://github.com/brooksmtownsend/wit2wadm) tool is available to help you automatically generate a Wadm deployment manifest for a given component. Because it extrapolates link definitions from a component's WIT interfaces, it can be very helpful for not only generating manifests but understanding linking relationships in your application.
+
 </details>
+
+## Defining and using link names
+
+In some cases, you may wish to assign names to links. This can be useful when a source component needs to use the same interface with different configurations under different circumstances.
+
+- For example, a component may use the `wasi:keyvalue` interface to link to both a local key-value cache for ephemeral storage and a cloud-based store for more resilient storage.
+- In this example, you're using the same key-value interface and the same operations, but the interface needs to be configured differently. These different configurations of the interface can be differentiated with a link name.
+
+Link names can be set [imperatively with the `wash link put` command](/docs/cli/#wash-link) or [declaratively via Wadm manifest](#exploring-a-link-definition), but are typically easiest to manage from a manifest. Link names are an optional field in a link definition and default to the value `default` if not specified. Below is an excerpt of a manifest defining names for two differently configured links:
+
+```yaml
+- type: link
+  properties:
+    name: foo
+    target: your_provider_or_component
+    namespace: wasi
+    package: keyvalue
+    interfaces: [store]
+    target_config:
+      # foo configuration
+- type: link
+  properties:
+    name: bar
+    target: your_provider_or_component
+    namespace: wasi
+    package: keyvalue
+    interfaces: [store]
+    target_config:
+      # bar configuration
+```
+
+Once a link name is defined, in your component or provider's code, you can use [wasmCloud's `wasmcloud:bus` interface](https://github.com/wasmCloud/wasmCloud/blob/main/wit/bus.wit) to make a call to a target by link name. You can include the `wasmcloud:bus` interface in your WIT world by copying it into your `/wit/deps` folder and importing the interface in your top-level world:
+
+```wit
+world world {
+  import wasmcloud:bus/lattice@1.0.0;
+}
+```
+
+Below are snippets of sample code that use different link names across languages supported by wasmCloud:
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust">
+
+```rust
+let yourinterface = wasmcloud::bus::lattice::CallTargetInterface::new(
+    "wasi",
+    "keyvalue",
+    "store",
+);
+
+// Sets the operative link for interface to the named link foo
+wasmcloud::bus::lattice::set_link_name("foo", yourinterface);
+// Calls over link foo to perform a keyvalue operation
+let x = wasi::keyvalue::store::function(args);
+
+// Sets the operative link for interface to the named link bar
+wasmcloud::bus::lattice::set_link_name("bar", yourinterface);
+// Calls over link bar to perform a keyvalue operation
+let y = wasi::keyvalue::store::function(args);
+```
+
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo">
+
+```go
+yourInterface := world.WasmcloudBus1_0_0_LatticeCallTargetInterface().new(
+	"wasi",
+	"keyvalue",
+	"store",
+);
+
+// Sets the operative link for interface to the named link foo
+world.WasmcloudBus1_0_0_LatticeSetLinkName("foo", yourInterface);
+// Calls over link foo to perform a keyvalue operation
+let x = world.WasiKeyvalue0_2_0_draft_StoreFunction
+
+// Sets the operative link for interface to the named link bar
+world.WasmcloudBus1_0_0_LatticeSetLinkName("bar", yourInterface);
+// Calls over link bar to perform a keyvalue operation
+let y = world.WasiKeyvalue0_2_0_draft_StoreFunction
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+```js
+let yourInterface = callTargetInterface.new('wasi', 'keyvalue', 'store');
+
+// Sets the operative link for interface to the named link foo
+setLinkName('foo', yourInterface);
+// Calls over link foo to perform a keyvalue operation
+keyvalueFunction(args);
+
+// Sets the operative link for interface to the named link bar
+setLinkName('bar', yourInterface);
+// Calls over link bar to perform a keyvalue operation
+keyvalueFunction(args);
+```
+
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+yourinterface = call_target_interface.new(
+    "wasi",
+    "keyvalue",
+    "store",
+)
+
+# Sets the operative link for interface to the named link foo
+set_link_name("foo", yourinterface)
+# Calls over link foo to perform a keyvalue operation
+keyvalue_function(args)
+
+# Sets the operative link for interface to the named link bar
+set_link_name("bar", yourinterface)
+# Calls over link bar to perform a keyvalue operation
+keyvalue_function(args)
+```
+
+  </TabItem>
+</Tabs>
 
 ## Designed for flexibility at runtime
 
@@ -311,7 +442,7 @@ The ability to update links at runtime is a powerful feature of wasmCloud. There
 - Upgrading a provider, or failing over to a backup provider.
 - Routing requests to a provider running with specific characteristics, such as locality or configuration.
 
-Runtime links can be created **imperatively** using the `wash` CLI, which can be helpful for development workflows and use-cases such as those above. See the [`wash link` subcommand documentation](/docs/cli/link) for more information.
+Runtime links can be created **imperatively** using the `wash` CLI, which can be helpful for development workflows and use-cases such as those above. See the [`wash link` subcommand documentation](/docs/cli/#wash-link) for more information.
 
 :::note
 "Order of operations" doesn't matter in runtime linking: while configuring an [application](/docs/concepts/applications), low-level commands to set links and start resources can arrive in any order. Additionally, all providers must treat messages to set/remove links as idempotent.
@@ -321,5 +452,3 @@ Runtime links can be created **imperatively** using the `wash` CLI, which can be
 
 - For more on Wadm deployment manifests, see the Toolchain section for [Declarative Application Deployment (Wadm)](/docs/ecosystem/wadm/).
 - For more information about linking at build, including a step-by-step example of composing components, check out [Linking at build](/docs/concepts/linking-components/linking-at-build).
-
-

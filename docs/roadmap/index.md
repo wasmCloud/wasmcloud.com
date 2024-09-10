@@ -1,9 +1,9 @@
 ---
 id: 'index'
-title: '2024 Q2 Roadmap'
-date: 2024-05-02T00:00:00+00:00
-description: 'wasmCloud Development Roadmap post 1.0, scoped to Q2 2024'
-sidebar_position: 997
+title: '2024 Q3 Roadmap'
+date: 2024-07-17T00:00:00+00:00
+description: 'wasmCloud Development Roadmap post 1.1, scoped to Q3 2024'
+sidebar_position: 996
 type: 'docs'
 ---
 
@@ -11,16 +11,27 @@ type: 'docs'
 This roadmap page is a snapshot of the current state of the project. It is not a guarantee of future direction or features. It is a living document and will change as the project evolves. You can view the most current version of this roadmap on [GitHub Projects](https://github.com/orgs/wasmCloud/projects/7/views/3).
 :::
 
-The 2024 Q2 Roadmap was brainstormed and planned in the [01 May 2024 community meeting](/community/2024/05/01/community-meeting). Thank you to all who attended, commented, and contributed to making this roadmap community-driven.
+The 2024 Q3 Roadmap was brainstormed and planned in the [02 Jul 2024 community meeting](/community/2024/07/02/community-meeting). Thank you to all who attended, commented, and contributed to making this roadmap community-driven.
+
+## Retrospective
+
+The [2024 Q2 roadmap](./2024-q2.md) centered on improvements, fixes, and documentation as we observe the impact of wasmCloud 1.0. We completed approximately half of the issues on the Q2 roadmap (17/29), leaving a few issues that weren't prioritized or specified enough to complete. In no way does this reflect a slow moving project, in fact the opposite is true. Solely in May and June of 2024, the primary wasmCloud repository had:
+
+- 332 Commits
+- 67 Issues Closed
+- 260 Merged PRs
+- 24 contributors
+
+As we look forward to Q3 2024, we'll attempt to capture more of the work that's necessary on the roadmap and target a higher percentage of issues completed, though like any planning session priorities change as more details come from the actual implementation.
 
 ## Goals
 
-Looking back at our [2024 Q1 roadmap](./2024-q1.md), we accomplished our goals to leverage WebAssembly and cloud-native standards to their fullest for the wasmCloud project. Now that we're completely OTEL observable and our WebAssembly components and providers can communicate completely using wRPC, with WIT as the interface language, we can build our goals as a standards-based application platform. For this roadmap, we're emphasizing testing and debugging for building Wasm components, adding new features to expand the use cases wasmCloud supports, and improving our experience as an application platform.
+Building on the work of the maintainers and contributors of Q2, this quarter will focus on the core goals of the project and expanding the surface area of contribution. Now that wasmCloud components can be written in Rust, Golang, JavaScript/TypeScript, and Python, and wasmCloud capability providers can be written in Rust or Golang using our respective provider SDKs, we have a wide variety of languages to accept contributions in.
 
-1. **Provide a seamless developer experience for building, testing, and deploying WebAssembly components.**
-1. Support additional use cases in wasmCloud like pluggable secrets, long-running workloads and PostgreSQL connections.
-1. Enable platform engineers to administer wasmCloud with extensible applications, scheduled or orchestrated with platforms like Nomad or Kubernetes in existing environments.
+1. **Utilize the transparency of components to provide a seamless developer experience for building, testing, and deploying applications with wasmCloud.**
 1. Enable developers to build features without vendor lock-in, platform specific dependencies, or language constraints.
+1. Facilitate 50% of issues on our Q3 roadmap to be completed by community contributors (non-wasmCloud maintainers)
+1. Surface more information from internal APIs in wasmCloud, wadm, and the operator to improve debuggability
 
 ## Features
 
@@ -32,24 +43,16 @@ wasmCloud as a project offers the following top features:
 1. Completely OTEL Observable
 1. Defense-In-Depth Security By Default
 
-## Roadmap
-
-The [wasmCloud 1.0 roadmap](./2024-q1.md) heavily focused on stabilization of APIs, adoption of core WebAssembly and cloud-native standards, and reworking our RPC layer to natively transmit WebAssembly Interface Types with wRPC. With a platform based on common standards and designed for extensibility, we can now support additional use cases and build on top of 1.0. As brainstormed in the [May 01 community call](/community/2024/05/01/community-meeting), we created a diagram of grouped tasks for this quarter's roadmap.
-
-Notable issues and RFCs to watch out for, which garnered the most attention during planning:
-
-1. [Long-running wasmCloud workloads](https://github.com/wasmCloud/wasmCloud/issues/2037)
-1. [Pluggable secrets management](https://github.com/wasmCloud/wasmCloud/issues/360)
-1. Golang provider SDK
-1. Zero-to-Twelve factor wasmCloud applications documentation
-1. [wasmcloud:postgres](https://github.com/wasmCloud/wasmCloud/issues/1914#issue-2246914162)
-
 ## Diagram
 
-The diagram below shows a loose organization of critical tasks into 3 sections: Documentation, New Features and Improvements. This roadmap is unordered as each individual task can be completed indepedently, so no rigid order is necessary. The diagram is also not exhaustive, as there a few smaller tasks that are not included. You can view the full-size version [here](/img/2024q2roadmap.png). This roadmap is also available as a [GitHub Project](https://github.com/orgs/wasmCloud/projects/7/views/10) for consistent updating.
+This roadmap is unordered as each individual task can be completed indepedently, so no rigid order is necessary. The diagram is also not exhaustive, as there a few smaller tasks that are not included. You can view the full-size and links included version [here](https://excalidraw.com/#json=tAg5TkgH6bvrrq76YGEDb,MERSFwVkfKrrnEk6IXRh4g). This roadmap is also available as a [GitHub Project](https://github.com/orgs/wasmCloud/projects/7/views/11) for consistent updating.
 
-![Q2 2024 Roadmap](/img/2024q2roadmap.png)
+![Q3 2024 Roadmap](/docs/images/2024q3roadmap.png)
 
 ## Contributing
 
-We welcome all contributors to the wasmCloud project, and we'd love to have help to accomplish our goals. If you're interested in contributing, please see our [Contributing Guide](https://github.com/wasmCloud/wasmCloud/blob/main/CONTRIBUTING.md) for more information, and come join us on [Slack](https://slack.wasmcloud.com) to chat with the team and other community members. We try to mark issues that are good for new contributors with the **good first issue** label, so look out for those for well scoped issues that are a good place to start. We also host [weekly community meetings](https://calendar.google.com/calendar/u/0/embed?src=c_6cm5hud8evuns4pe5ggu3h9qrs@group.calendar.google.com) that are open to all, where we can discuss aspects of the roadmap.
+We welcome all contributors to the wasmCloud project, and we'd love to have help to accomplish our goals. If you're interested in contributing, please see our [Contributing Guide](https://github.com/wasmCloud/wasmCloud/blob/main/CONTRIBUTING.md) for more information, and come join us on [Slack](https://slack.wasmcloud.com) to chat with the team and other community members.
+
+We try to mark issues that are good for new contributors with the [**good first issue**](https://github.com/wasmCloud/wasmCloud/contribute) label, so look out for those for well scoped issues that are a good place to start.
+
+We also host [weekly community meetings](https://calendar.google.com/calendar/u/0/embed?src=c_6cm5hud8evuns4pe5ggu3h9qrs@group.calendar.google.com) that are open to all, where we can discuss aspects of the roadmap.

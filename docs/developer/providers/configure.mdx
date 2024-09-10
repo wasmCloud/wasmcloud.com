@@ -1,0 +1,239 @@
+---
+title: 'Configure'
+date: 2024-04-19T11:00:00+00:00
+sidebar_position: 3
+draft: false
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Capability providers can be passed a map of configuration at runtime to use when executing. This configuration should first be defined using [wash](/docs/ecosystem/wash/) or as a part of your [wadm](/docs/ecosystem/wadm/) manifest, and then given to the capability provider at runtime.
+
+## Define Configuration
+
+<Tabs groupId="tool" queryString>
+    <TabItem value="wadm" label="wadm" default>
+
+If you're using [wadm](/docs/ecosystem/wadm/) to declaratively define applications, you can use the `config` field to define configuration for your provider. Wadm will automatically manage creating the configuration for you and supplying it to the provider at runtime.
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello-world
+  annotations:
+    version: v0.0.1
+    description: 'Capability provider that uses wasi:http and runtime configuration'
+spec:
+  components:
+    - name: http-server
+      type: capability
+      properties:
+        image: file://./build/http-server.par.gz
+        config: # [!code ++]
+          - name: custom-config # [!code ++]
+            properties: # [!code ++]
+              foo: bar # [!code ++]
+              log-level: debug # [!code ++]
+      traits:
+        # Govern the spread/scheduling of the component
+        - type: spreadscaler
+          properties:
+            replicas: 1
+```
+
+    </TabItem>
+    <TabItem value="wash" label="wash">
+
+If you're using [wash](/docs/ecosystem/wash/) to imperatively start your component, you can first define configuration using the `wash config` subcommand, and then supply it alongside your component.
+
+```bash
+# wash config put <config-name> <values...>
+wash config put custom-config foo=bar log-level=debug
+```
+
+Then, when starting your capability provider with `wash`, you can supply the configuration using the `--config` flag:
+
+```bash
+# wash start provider <component_ref> <component_id> --config <config-name>
+wash start provider ghcr.io/wasmcloud/components/http-server:0.1.0 http-server --config custom-config
+```
+
+    </TabItem>
+
+</Tabs>
+
+## Using Configuration
+
+Capability providers are given configuration at startup and as a part of each link. You can use the
+
+<Tabs groupId="lang" queryString>
+    <TabItem value="rust" label="Rust" default>
+
+The [HostData](https://docs.rs/wasmcloud-provider-sdk/0.8.0/wasmcloud_provider_sdk/struct.HostData.html) contains configuration for the provider at startup:
+
+```rust
+pub async fn run() -> anyhow::Result<()> {
+    initialize_observability!(
+        "my-provider",
+        std::env::var_os("FLAMEGRAPH_PATH")
+    );
+
+    let host_data = load_host_data().context("failed to load host data")?;
+    let config = host_data.config;
+    let my_provider = MyProvider::new(config)
+        .context("failed to create provider from hostdata configuration")?;
+    let shutdown = run_provider(my_provider, "my-provider")
+        .await
+        .context("failed to run provider")?;
+    shutdown.await;
+    Ok(())
+}
+```
+
+The functions on the [Provider](https://docs.rs/wasmcloud-provider-sdk/0.8.0/wasmcloud_provider_sdk/trait.Provider.html) trait in the SDK allow for handling links and fetching the configuration when it's established:
+
+```rust
+impl Provider for MyProvider {
+  async fn receive_link_config_as_source(
+    &self,
+    link: LinkConfig<'_>,
+  ) -> anyhow::Result<()> {
+    let config = link.config;
+    Ok(())
+  }
+
+  async fn receive_link_config_as_target(
+    &self,
+    link: LinkConfig<'_>,
+  ) -> anyhow::Result<()> {
+    let config = link.config;
+    Ok(())
+  }
+}
+
+```
+
+    </TabItem>
+    <TabItem value="tinygo" label="Go">
+
+The [HostData](https://github.com/wasmCloud/provider-sdk-go/blob/main/host.go#L21) struct contains the configuration passed to the provider at startup, and the [InterfaceLinkDefinition](https://github.com/wasmCloud/provider-sdk-go/blob/main/link.go#L20) struct contains the configuration passed to the provider when a link is established.
+
+```go
+package main
+
+import (
+	"github.com/wasmCloud/provider-sdk-go"
+)
+
+func main() {
+  p := &Provider{}
+
+	wasmcloudProvider, err := provider.New(
+		provider.SourceLinkPut(p.handleNewSourceLink),
+		provider.TargetLinkPut(p.handleNewTargetLink),
+	)
+
+  config := wasmcloudProvider.HostData().Config
+}
+
+func (p *Provider) handleNewSourceLink(link provider.InterfaceLinkDefinition) error {
+  config := link.SourceConfig
+	return nil
+}
+
+func (p *Provider) handleNewTargetLink(link provider.InterfaceLinkDefinition) error {
+  config := link.TargetConfig
+	return nil
+}
+```
+
+    </TabItem>
+
+</Tabs>
+
+## Supplying multiple configurations
+
+In both the above `wadm` and `wash` methods of defining configuration, you can actually supply multiple named configurations to components, providers, and links. This is useful both to reuse common pieces of configuration and provide overrides for specific instances.
+
+Let's a case where we have a set of reasonable defaults for connections to a database that we want multiple components to use, but we also want to be able to override the connection string for specific instances. This can be accomplished by defining the default configuration and then overriding it for specific instances.
+
+We'll use the [wasmCloud HTTP Server settings](https://github.com/wasmCloud/wasmCloud/blob/main/crates/provider-http-server/settings.md) as an example. We'll [link](/docs/concepts/linking-components/) the HTTP server to a component, supplying a default configuration with reasonable values and an additional configuration to change the address for that specific component. To create the default configuration, we can use the `wash config put` command:
+
+```bash
+wash config put default-http max_content_len=5M readonly_mode=true address=0.0.0.0:80
+```
+
+By default, we'll limit the max content length to 5MB and ensure that components are only accepting **GET** and **HEAD** requests using the `readonly_mode` configuration. We'll also supply a default listen address of `0.0.0.0:80`.
+
+For our component, we can use the default configuration by supplying the `default-http` configuration name, and then override the `address` configuration for this specific instance:
+
+<Tabs groupId="tool" queryString>
+    <TabItem value="wadm" label="wadm" default>
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello-world
+  annotations:
+    version: v0.0.1
+    description: 'Component that uses wasi:http'
+spec:
+  components:
+    - name: http-component
+      type: component
+      properties:
+        image: file://./build/http_hello_world_s.wasm
+      traits:
+        # Govern the spread/scheduling of the component
+        - type: spreadscaler
+          properties:
+            replicas: 1
+    # Add a capability provider that enables HTTP access
+    - name: httpserver
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.22.0
+      traits:
+        - type: link
+          properties:
+          target: http-component
+          namespace: wasi
+          package: http
+          interfaces: [incoming-handler]
+          source_config:
+            - name: default-http # [!code ++]
+            - name: custom-config # [!code ++]
+              properties: # [!code ++]
+                address: 0.0.0.0:4000 # [!code ++]
+```
+
+    </TabItem>
+    <TabItem value="wash" label="wash">
+
+```bash
+wash config put custom-config address=0.0.0.0:4000
+```
+
+Then, when linking the HTTP server with your component with `wash`, you can supply the configuration using the `--source-config` flag:
+
+```bash
+# wash link put <source_id> <target> <namespace> <package> ...
+wash link put http-server http-component wasi http --interface incoming-handler --source-config default-http --source-config custom-config
+```
+
+    </TabItem>
+
+</Tabs>
+
+Configuration is merged together in a left-folding manner, meaning that the last configuration supplied will override any previous configurations. In the above example, the `address` configuration will be overridden to `0.0.0.0:4000`, but the `max_content_len` and `readonly_mode` configurations will remain the same as the default configuration. Put another way, the configuration this provider will receive with the link is:
+
+```json
+{
+  "max_content_len": "5M",
+  "readonly_mode": true,
+  "address": "0.0.0:4000"
+}
+```

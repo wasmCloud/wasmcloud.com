@@ -1,4 +1,4 @@
-<h1><a name="interfaces">World interfaces</a></h1>
+<h1><a name="interfaces"></a>World interfaces</h1>
 <ul>
 <li>Imports:
 <ul>
