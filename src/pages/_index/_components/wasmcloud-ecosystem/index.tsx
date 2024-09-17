@@ -5,6 +5,7 @@ import { SectionTag } from '@site/src/pages/_components/section-tag';
 import { Section } from '@site/src/pages/_components/section';
 import { SectionContent } from '@site/src/pages/_components/section-content';
 import { SectionHeading } from '@site/src/pages/_components/section-heading';
+import Link from '@docusaurus/Link';
 
 type Props = {};
 
@@ -16,9 +17,9 @@ function WasmCloudEcosystem({}: Props) {
         <SectionHeading>Wasm-native works with cloud-native</SectionHeading>
         <p>wasmCloud works with the tools you know and love today.</p>
         <p>
-          <a className="button" href="https://wasmcloud.com/docs/capabilities/" target="_blank">
-            Capability Catalog
-          </a>
+          <Link className="button" href="/docs/integrations">
+            Integrations Catalog
+          </Link>
         </p>
       </SectionContent>
       <SectionContent align="center" hasContainer={false}>
