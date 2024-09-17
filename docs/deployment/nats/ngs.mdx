@@ -1,0 +1,116 @@
+---
+title: 'Synadia Cloud'
+description: 'Deploying wasmCloud on the Synadia Cloud network'
+sidebar_position: 3
+---
+
+[Synadia](https://www.synadia.com/) is the company behind the NATS messaging system that powers the wasmCloud [lattice](/docs/concepts/lattice.mdx). They offer a cloud-based service called Synadia Cloud (previously NGS) that provides a managed NATS service. NGS is a great way to get started with wasmCloud, as it provides a secure, scalable, and reliable messaging infrastructure.
+
+Deploying wasmCloud on Synadia Cloud is similar to deploying on any NATS infrastructure. The primary difference is that you will need to configure your wasmCloud hosts and [wadm](/docs/ecosystem/wadm/) to connect to the Synadia Cloud network. You can follow the steps in this guide replacing the Synadia Cloud-specific details with your own NATS infrastructure details as well.
+
+## Creating Credentials
+
+You can use any existing user credentials that have permissions to create streams and KV buckets. If you don't have any credentials, you can create a new user and generate a credentials file according to the [Synadia Cloud documentation](https://docs.synadia.com/cloud/walkthrough#user-management).
+
+A valid credentials file should look like this:
+
+```plaintext
+-----BEGIN NATS USER JWT-----
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJyZWFsX2p3dCI6ZmFsc2UsInRoYW5rX3lvdSI6IkZvciByZWFkaW5nIHRoZSB3YXNtQ2xvdWQgZG9jcyEiLCJtb3JlX2luZm9ybWF0aW9uIjoiaHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g_dj1kUXc0dzlXZ1hjUSJ9.5XgtYkFtqgIxcYOaalhGYPGxa5mieFLmkoGpbLqdxYg
+------END NATS USER JWT------
+
+************************* IMPORTANT *************************
+NKEY Seed printed below can be used to sign and prove identity.
+NKEYs are sensitive and should be treated as secrets.
+
+-----BEGIN USER NKEY SEED-----
+SUACQ6P5MS37FAL4TSHALHPUVWB62VRJQ5KB324VXSUSX7ILPXIBS6EGAI
+------END USER NKEY SEED------
+
+*************************************************************
+```
+
+## Creating JetStream resources
+
+:::caution
+A very important aspect of JetStream is the configuration of the [JetStream domain](https://docs.nats.io/running-a-nats-service/configuration/leafnodes/jetstream_leafnodes). NATS setups can be customized in many ways that are not covered here. If you are using a particular domain for your JetStream resources, you will need to provide that domain to wasmCloud and wadm using their applicable flags or environment variables (try supplying `--help` to any of the command line tools to find the domain argument).
+
+If you do not customize your JetStream domain, wasmCloud and wadm will not use one by default. This will work out-of-the-box unless a domain is required by your NATS setup.
+:::
+
+wasmCloud and wadm both use JetStream for persistent messaging and KV state storage. They will attempt to create these resources if they aren't found when they start up. For Synadia Cloud, there is a restriction that these streams _must_ provide a `max_bytes` limit per-stream, which wasmCloud doesn't do by default. You can create these streams manually using the `nats` CLI tool.
+
+:::note
+You can install the `nats` CLI tool by following the instructions at [https://github.com/nats-io/natscli#installation](https://github.com/nats-io/natscli#installation).
+:::
+
+All streams here are configured with a maximum size of 100MB. You can adjust this value based on your requirements. You may want to consider increasing the size of the `CONFIGDATA_<lattice>` bucket if you have lots of configuration, or the `LATTICEDATA_<lattice>` and `wadm_state` buckets if you have very large deployments.
+
+```shell
+# wasmCloud KV Buckets
+# "default" here is the name of your lattice. You can change this to match your lattice name.
+nats kv new LATTICEDATA_default --max-bucket-size=100000000 --server connect.ngs.global --creds /path/to/nats.creds
+nats kv new CONFIGDATA_default --max-bucket-size=100000000 --server connect.ngs.global --creds /path/to/nats.creds
+```
+
+The first time you launch `wadm`, whether it's via `wash up` or by running the binary or container directly, you must set all of the max bytes arguments for the streams and KV buckets wadm will use. Here is an example of the environment variables to set for your first run:
+
+```shell
+# Again, you may want to make the max-bucket-size larger than the suggested 100MB
+export WADM_STATE_BUCKET_MAX_BYTES=100000000
+export WADM_MANIFEST_BUCKET_MAX_BYTES=100000000
+export WADM_COMMAND_STREAM_MAX_BYTES=100000000
+export WADM_EVENT_STREAM_MAX_BYTES=100000000
+export WADM_EVENT_CONSUMER_STREAM_MAX_BYTES=100000000
+export WADM_STATUS_STREAM_MAX_BYTES=100000000
+export WADM_NOTIFY_STREAM_MAX_BYTES=100000000
+export WADM_WASMBUS_EVENT_STREAM_MAX_BYTES=100000000
+```
+
+## Connecting to Synadia Cloud
+
+Once your JetStream resources are created, you can configure wasmCloud and wadm to connect to Synadia Cloud. You will need to provide the `connect.ngs.global` server address and a credentials file.
+
+### wash up (Leaf Node)
+
+To optimize NATS traffic, wash launches a [Leaf Node](https://docs.nats.io/running-a-nats-service/configuration/leafnodes) that extends your remote NATS cluster. This will keep all traffic local to your machine when possible, and only send messages to the Synadia Cloud network when necessary. This is useful for development environments where you want to keep your network traffic local. Note that this local leaf node will count towards your leaf node limit on Synadia Cloud. To create a local leaf node, you can provide the `--nats-remote-url` and `--nats-credsfile` flags to `wash up`, or use their respective environment variables `NATS_REMOTE_URL` and `NATS_CREDSFILE`.
+
+```shell
+wash up --nats-remote-url connect.ngs.global --nats-credsfile ~/demo/ngs/nats.creds
+```
+
+```shell
+export NATS_REMOTE_URL=connect.ngs.global
+export NATS_CREDSFILE=~/demo/ngs/nats.creds
+wash up
+```
+
+After launching a local leaf node, wasmCloud and wadm will be accessible locally on `127.0.0.1:4222`.
+
+### wadm
+
+To connect wadm to Synadia Cloud, you can provide the `--nats-server` and `--nats-creds-file` flags to `wadm`, or use their respective environment variables `WADM_NATS_SERVER` and `WADM_NATS_CREDS_FILE`. If you're running wadm in a container or in Kubernetes, you can set these environment variables in your deployment configuration.
+
+```shell
+wadm --nats-server connect.ngs.global --nats-creds-file /path/to/nats.creds
+```
+
+```shell
+export WADM_NATS_SERVER=connect.ngs.global
+export WADM_NATS_CREDS_FILE=/path/to/nats.creds
+wadm
+```
+
+### wasmCloud
+
+To connect wasmCloud to Synadia Cloud, you can provide the `--nats-host` and `--nats-creds` flags to `wasmcloud`, or use their respective environment variables `WASMCLOUD_NATS_HOST` and `WASMCLOUD_NATS_CREDS`. If you're running wasmCloud in a container or in Kubernetes, you can set these environment variables in your deployment configuration.
+
+```shell
+wasmcloud --nats-host connect.ngs.global --nats-creds /path/to/nats.creds
+```
+
+```shell
+export WASMCLOUD_NATS_HOST=connect.ngs.global
+export WASMCLOUD_NATS_CREDS=/path/to/nats.creds
+wasmcloud
+```
