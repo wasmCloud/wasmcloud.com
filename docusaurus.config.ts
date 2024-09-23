@@ -207,8 +207,8 @@ const config = (async (): Promise<Config> => {
         ],
       },
 //      announcementBar: {
-//        id: 'innovation-day',
-//        content: `📢 Join us virtually for <b>wasmCloud Innovation Day</b> on September 18! <a href="/innovation-day">Register now</a> for a day of immersive learning, demos, user talks, and more.`,
+//        id: 'announcement',
+//        content: `📢 Announcement content goes here.`,
 //      },
       footer: {
         links: [
