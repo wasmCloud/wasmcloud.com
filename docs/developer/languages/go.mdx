@@ -1,0 +1,482 @@
+---
+title: 'Go'
+date: 2024-09-26T11:02:05+06:00
+sidebar_position: 1
+draft: false
+description: 'How to develop WebAssembly components with Go'
+---
+
+# Building components with Go
+
+The Go ecosystem provides developers with powerful options for building WebAssembly components. Go and the TinyGo fork provide a strong foundation for development:
+
+* **TinyGo**: The fast-moving implementation of Go for embedded environments includes native compilation to components with WASI 0.2 support as of TinyGo 0.33. 
+* **Go** has supported compilation to WebAssembly for years; we expect native WASI 0.2 support like that in TinyGo to land in the near future.
+
+There are a number of useful tools available as Go packages that streamline and simplify the Go development experience:
+
+### `wasm-tools-go`
+
+[`wasm-tools-go`](https://github.com/bytecodealliance/wasm-tools-go) is a project hosted by the Bytecode Alliance that collects utilities such as `wit-bindgen-go`, which generates Go bindings for WebAssembly Interface Type (WIT) interfaces. 
+
+### `component-sdk-go`
+
+[The Go Component SDK](https://github.com/wasmCloud/component-sdk-go) is an optional, open source framework that simplifies the development of WebAssembly components targeting the wasmCloud host runtime. The SDK aims to provide a more idiomatic Go development experience for developers using WASI interfaces such as `wasi:http` or `wasi:logging`.
+
+### `wadge`
+
+[`wadge`](https://github.com/wasmCloud/wadge) is a "bridging" framework that enables your native code to interact with WebAssembly component interfaces for purposes such as testing. `wadge` acts as a bridge between your Go toolchain and a WebAssembly runtime that makes interfaces “just work” when it's time to test your code. 
+
+## Get started
+
+In this walkthrough, we will create an HTTP server from scratch using the [Go component SDK](https://github.com/wasmCloud/component-sdk-go/), write a test for the application, and use `wadge` to run the test. This walkthrough requires:
+
+* [Go](https://go.dev/doc/install) 1.23.0+
+* [TinyGo](https://tinygo.org/getting-started/install/) 0.33.0+
+* [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation) CLI 0.32.1+ for building and deploying components
+* [`wit-deps`](https://github.com/bytecodealliance/wit-deps) 0.3.4+ for WIT dependency management
+
+### Step 1: Set up with `wash`
+
+The wasmCloud Shell (`wash`) CLI helps developers build component-based applications that can be deployed with wasmCloud, and consolidates many open source component development tools. 
+
+Create a new project called `http-test` and navigate into the project directory:
+
+```shell
+wash new component http-test --template-name hello-world-tinygo
+```
+```shell
+cd http-test
+```
+
+Replace the contents of `deps.toml` with the WIT dependency targets below:
+
+```toml
+http = "https://github.com/WebAssembly/wasi-http/archive/v0.2.0.tar.gz"
+component = "https://github.com/wasmCloud/component-sdk-go/archive/main.tar.gz"
+```
+Run `wit-deps` from the root of your project directory:
+
+```shell
+wit-deps
+```
+
+Replace the contents of `world.wit` with the WIT definition below:
+
+```wit
+package example:http-server;
+
+world hello {
+  include wasmcloud:component/imports;
+  export wasi:http/incoming-handler@0.2.0;
+}
+```
+
+Finally, we'll delete the contents of `hello.go` and write our HTTP server, which will echo POST requests back to us.
+
+Using the Component SDK, this looks like a fairly standard server using the HTTP standard library, with only a handful of exceptions where we use methods of `wasihttp` or `wasilog`.
+
+```go
+//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world example --out gen ./wit
+
+package main
+
+import (
+	"io"
+	"net/http"
+	"sort"
+	"strings"
+
+	"go.wasmcloud.dev/component/log/wasilog"
+	"go.wasmcloud.dev/component/net/wasihttp"
+)
+
+const Index = `
+  /post - echo the body of a POST request`
+
+func init() {
+	wasihttp.HandleFunc(entryHandler)
+}
+
+func entryHandler(w http.ResponseWriter, r *http.Request) {
+	logger := wasilog.ContextLogger("entryHandler")
+	handlers := map[string]http.HandlerFunc{
+		"/post": postHandler,
+	}
+
+	logger.Info("Request received", "host", r.Host, "path", r.URL.Path, "agent", r.Header.Get("User-Agent"))
+
+	if handler, ok := handlers[r.URL.Path]; ok {
+		handler(w, r)
+		return
+	}
+
+	var keys []string
+	for k := range handlers {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	w.Header().Add("content-type", "text/plain")
+	w.Header().Add("X-Requested-Path", r.URL.Path)
+	w.Header().Add("X-Existing-Paths", strings.Join(keys, ","))
+	_, _ = w.Write([]byte(Index))
+}
+
+func postHandler(w http.ResponseWriter, r *http.Request) {
+	logger := wasilog.ContextLogger("postHandler")
+
+	w.WriteHeader(http.StatusOK)
+
+	n, err := io.Copy(w, r.Body)
+	if err != nil {
+		logger.Error("Error copying body", "error", err)
+		return
+	}
+
+	logger.Info("Copied body", "bytes", n)
+}
+
+func main() {}
+```
+
+Download missing packages:
+
+```shell
+go mod tidy
+```
+Run `wash build` to generate bindings:
+
+```shell
+wash build
+```
+
+We can compile to a component with TinyGo:
+
+```shell
+tinygo build --target=wasip2 --wit-package ./wit --wit-world hello
+```
+
+The `wash inspect` subcommand enables us to examine the new component's imports and exports:
+
+```shell
+wash inspect --wit http-test.wasm
+```
+```wit
+package root:component;
+
+world root {
+  import wasi:io/poll@0.2.0;
+  import wasi:clocks/monotonic-clock@0.2.0;
+  import wasi:io/error@0.2.0;
+  import wasi:io/streams@0.2.0;
+  import wasi:http/types@0.2.0;
+  import wasi:logging/logging;
+  import wasi:cli/environment@0.2.0;
+  import wasi:cli/stdin@0.2.0;
+  import wasi:cli/stdout@0.2.0;
+  import wasi:cli/stderr@0.2.0;
+  import wasi:clocks/wall-clock@0.2.0;
+  import wasi:filesystem/types@0.2.0;
+  import wasi:filesystem/preopens@0.2.0;
+  import wasi:random/random@0.2.0;
+
+  export wasi:http/incoming-handler@0.2.0;
+}
+```
+
+Now we can deploy on wasmCloud and try the component manually.
+
+* Change the value of the image field on line 18 of `wadm.yaml` to `file://./http-test.wasm`
+* Start wasmCloud locally (and in detached mode) with `wash up -d`
+* Deploy with `wash app deploy wadm.yaml`. 
+
+The `wadm.yaml` deployment manifest configures the application to run on localhost:8080.
+
+Now we can `curl` a "Hello world" to the application:
+
+```shell
+curl -X POST "localhost:8080/post" -d "Hello world"
+```
+We should get the response:
+
+```text
+Hello world
+```
+
+### Step 2: Testing with a WASI interface
+
+[`wadge`](https://github.com/wasmCloud/wadge) is a "bridging" framework that will enable us to test our code using `go test` and standard test syntax.
+
+Use `go get` to add `wadge` to the project:
+
+```shell
+go get go.wasmcloud.dev/wadge
+```
+
+Aadd a `tools.go` file to include the `wadge` bindgen:
+
+```shell
+touch tools.go
+```
+```go
+//go:build tools
+
+package main
+
+import (
+	_ "github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go"
+	_ "go.wasmcloud.dev/wadge/cmd/wadge-bindgen-go"
+)
+```
+
+Now we will write a test for the application in a new file called `hello_test.go`:
+
+```shell
+touch hello_test.go
+```
+```go
+package main
+
+import (
+	"io"
+	"log"
+	"log/slog"
+	"net/http"
+	"os"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	incominghandler "go.wasmcloud.dev/component/gen/wasi/http/incoming-handler"
+	"go.wasmcloud.dev/wadge"
+	_ "go.wasmcloud.dev/wadge/bindings"
+	"go.wasmcloud.dev/wadge/wadgehttp"
+)
+
+func init() {
+	log.SetFlags(0)
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug, ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	})))
+}
+
+func TestIncomingHandler(t *testing.T) {
+	wadge.RunTest(t, func() {
+		req, err := http.NewRequest("", "/test", nil)
+		if err != nil {
+			t.Fatalf("failed to create new HTTP request: %s", err)
+		}
+		req.Header.Add("foo", "bar")
+		req.Header.Add("foo", "baz")
+		req.Header.Add("key", "value")
+		resp, err := wadgehttp.HandleIncomingRequest(incominghandler.Exports.Handle, req)
+		if err != nil {
+			t.Fatalf("failed to handle incoming HTTP request: %s", err)
+		}
+		assert.Equal(t, 200, resp.StatusCode)
+		assert.Equal(t, http.Header{
+			"content-type": {
+				"text/plain",
+			},
+			"x-requested-path": {
+				"/test",
+			},
+			"x-existing-paths": {
+				"/post",
+			},
+		}, resp.Header)
+		buf, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("failed to read HTTP response body: %s", err)
+		}
+		assert.Equal(t, []byte(Index), buf)
+	})
+}
+```
+```shell
+go mod download && go mod tidy
+```
+Generate `wadge` bindings for your test:
+
+```shell
+go run go.wasmcloud.dev/wadge/cmd/wadge-bindgen-go
+```
+
+This generates `bindings.wadge.go`.
+
+Now run `go test`:
+
+```shell
+go test
+```
+```text
+level=DEBUG msg="reading response body buffer"
+level=DEBUG msg="read body stream chunk" buf="\n  /post - echo the body of a POST request"
+level=DEBUG msg="reading response body buffer"
+level=DEBUG msg="response body closed"
+PASS
+ok  	github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world	0.301s
+```
+
+### Reference: Set up without `wash`
+
+`wash` simplifies set up for a Go project, but it is not required to build a Go-based component. For users who wish to use or understand the underlying tooling, the steps below replicate the initial set up above without `wash`.
+
+Create a new Go project:
+
+```shell
+mkdir http-test && cd http-test
+```
+```shell
+go mod init example/http/test
+```
+Now we'll add the Component SDK and `wasilog` packages to our project:
+
+```shell
+go get go.wasmcloud.dev/component go.wasmcloud.dev/component/log/wasilog 
+```
+
+Create a `/wit/` directory and a `deps.toml` file:
+
+```shell
+mkdir wit && touch ./wit/deps.toml
+```
+In your `deps.toml` file, add `wasi:http` and `component`:
+
+```toml
+http = "https://github.com/WebAssembly/wasi-http/archive/v0.2.0.tar.gz"
+component = "https://github.com/wasmCloud/component-sdk-go/archive/main.tar.gz"
+```
+Run `wit-deps` from the root of your project directory:
+
+```shell
+wit-deps
+```
+Create a file called `world.wit` in the `/wit/` folder:
+
+```shell
+touch ./wit/world.wit
+```
+```wit
+package example:http-server;
+
+world hello {
+  include wasmcloud:component/imports;
+  export wasi:http/incoming-handler@0.2.0;
+}
+```
+
+Finally, we'll write our HTTP server in a new `hello.go` file. Using the Component SDK, this looks like a standard server using the HTTP standard library.
+
+```shell
+touch main.go
+```
+```go
+//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world example --out gen ./wit
+
+package main
+
+import (
+	"io"
+	"net/http"
+	"sort"
+	"strings"
+
+	"go.wasmcloud.dev/component/log/wasilog"
+	"go.wasmcloud.dev/component/net/wasihttp"
+)
+
+const Index = `
+  /post - echo the body of a POST request`
+
+func init() {
+	wasihttp.HandleFunc(entryHandler)
+}
+
+func entryHandler(w http.ResponseWriter, r *http.Request) {
+	logger := wasilog.ContextLogger("entryHandler")
+	handlers := map[string]http.HandlerFunc{
+		"/post": postHandler,
+	}
+
+	logger.Info("Request received", "host", r.Host, "path", r.URL.Path, "agent", r.Header.Get("User-Agent"))
+
+	if handler, ok := handlers[r.URL.Path]; ok {
+		handler(w, r)
+		return
+	}
+
+	var keys []string
+	for k := range handlers {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	w.Header().Add("content-type", "text/plain")
+	w.Header().Add("X-Requested-Path", r.URL.Path)
+	w.Header().Add("X-Existing-Paths", strings.Join(keys, ","))
+	_, _ = w.Write([]byte(Index))
+}
+
+func postHandler(w http.ResponseWriter, r *http.Request) {
+	logger := wasilog.ContextLogger("postHandler")
+
+	w.WriteHeader(http.StatusOK)
+
+	n, err := io.Copy(w, r.Body)
+	if err != nil {
+		logger.Error("Error copying body", "error", err)
+		return
+	}
+
+	logger.Info("Copied body", "bytes", n)
+}
+
+func main() {}
+```
+Now we'll generate Go bindings for the application's WIT interfaces.
+
+```shell
+mkdir gen
+```
+```shell
+go generate
+```
+At this point, you can compile your Wasm component using `tinygo build`:
+
+```shell
+tinygo build --target=wasip2 --wit-package ./wit --wit-world hello
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
