@@ -1,5 +1,5 @@
 ---
-title: 'Go'
+title: 'Components'
 date: 2024-09-26T11:02:05+06:00
 sidebar_position: 1
 draft: false
@@ -49,7 +49,7 @@ wash new component http-test --template-name hello-world-tinygo
 cd http-test
 ```
 
-Replace the contents of `deps.toml` with the WIT dependency targets below:
+Replace the contents of `wit/deps.toml` with the WIT dependency targets below:
 
 ```toml
 http = "https://github.com/WebAssembly/wasi-http/archive/v0.2.0.tar.gz"
@@ -72,7 +72,7 @@ world hello {
 }
 ```
 
-Finally, we'll delete the contents of `hello.go` and write our HTTP server, which will echo POST requests back to us.
+Finally, we'll delete the contents of `hello.go` and write our HTTP server, which will return a simple "hello world."
 
 Using the Component SDK, this looks like a fairly standard server using the HTTP standard library, with only a handful of exceptions where we use methods of `wasihttp` or `wasilog`.
 
@@ -82,17 +82,14 @@ Using the Component SDK, this looks like a fairly standard server using the HTTP
 package main
 
 import (
-	"io"
 	"net/http"
-	"sort"
-	"strings"
 
 	"go.wasmcloud.dev/component/log/wasilog"
 	"go.wasmcloud.dev/component/net/wasihttp"
 )
 
 func init() {
-	wasihttp.HandleFunc(entryHandler)
+	wasihttp.HandleFunc(handler)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +97,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info("request received", "host", r.Host, "path", r.URL.Path, "agent", r.Header.Get("User-Agent"))
 
-	_, err := io.Write(w, []byte("hello world!"))
+	_, err := w.Write([]byte("hello world!"))
 	if err != nil {
 		logger.Error("failed to write body", "error", err)
 	}
@@ -135,7 +132,6 @@ wash inspect --wit http-test.wasm
 package root:component;
 
 world root {
-  import wasi:io/poll@0.2.0;
   import wasi:clocks/monotonic-clock@0.2.0;
   import wasi:io/error@0.2.0;
   import wasi:io/streams@0.2.0;
@@ -162,15 +158,15 @@ Now we can deploy on wasmCloud and try the component manually.
 
 The `wadm.yaml` deployment manifest configures the application to run on localhost:8080.
 
-Now we can `curl` a "Hello world" to the application:
+Now we can `curl` the application:
 
 ```shell
-curl -X POST "localhost:8080/post" -d "Hello world"
+curl localhost:8080
 ```
 We should get the response:
 
 ```text
-Hello world
+hello world!
 ```
 
 ### Step 2: Testing with a WASI interface
@@ -271,11 +267,20 @@ go test
 ```
 ```text
 level=DEBUG msg="reading response body buffer"
-level=DEBUG msg="read body stream chunk" buf="\n  /post - echo the body of a POST request"
+level=DEBUG msg="read body stream chunk" buf="hello world!"
 level=DEBUG msg="reading response body buffer"
 level=DEBUG msg="response body closed"
 PASS
-ok  	github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world	0.301s
+ok  	github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world	0.299s
+```
+
+To clean up, delete the application from your local wasmCloud and stop the host:
+
+```shell
+wash app delete http-test
+```
+```shell
+wash down
 ```
 
 ### Reference: Set up without `wash`
@@ -329,7 +334,7 @@ world hello {
 Finally, we'll write our HTTP server in a new `hello.go` file. Using the Component SDK, this looks like a standard server using the HTTP standard library.
 
 ```shell
-touch main.go
+touch hello.go
 ```
 ```go
 //go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world example --out gen ./wit
@@ -337,58 +342,25 @@ touch main.go
 package main
 
 import (
-	"io"
 	"net/http"
-	"sort"
-	"strings"
 
 	"go.wasmcloud.dev/component/log/wasilog"
 	"go.wasmcloud.dev/component/net/wasihttp"
 )
 
-const Index = `
-  /post - echo the body of a POST request`
-
 func init() {
-	wasihttp.HandleFunc(entryHandler)
+	wasihttp.HandleFunc(handler)
 }
 
-func entryHandler(w http.ResponseWriter, r *http.Request) {
-	logger := wasilog.ContextLogger("entryHandler")
-	handlers := map[string]http.HandlerFunc{
-		"/post": postHandler,
-	}
+func handler(w http.ResponseWriter, r *http.Request) {
+	logger := wasilog.ContextLogger("handler")
 
-	logger.Info("Request received", "host", r.Host, "path", r.URL.Path, "agent", r.Header.Get("User-Agent"))
+	logger.Info("request received", "host", r.Host, "path", r.URL.Path, "agent", r.Header.Get("User-Agent"))
 
-	if handler, ok := handlers[r.URL.Path]; ok {
-		handler(w, r)
-		return
-	}
-
-	var keys []string
-	for k := range handlers {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	w.Header().Add("content-type", "text/plain")
-	w.Header().Add("X-Requested-Path", r.URL.Path)
-	w.Header().Add("X-Existing-Paths", strings.Join(keys, ","))
-	_, _ = w.Write([]byte(Index))
-}
-
-func postHandler(w http.ResponseWriter, r *http.Request) {
-	logger := wasilog.ContextLogger("postHandler")
-
-	w.WriteHeader(http.StatusOK)
-
-	n, err := io.Copy(w, r.Body)
+	_, err := w.Write([]byte("hello world!"))
 	if err != nil {
-		logger.Error("Error copying body", "error", err)
-		return
+		logger.Error("failed to write body", "error", err)
 	}
-
-	logger.Info("Copied body", "bytes", n)
 }
 
 func main() {}
@@ -407,7 +379,10 @@ At this point, you can compile your Wasm component using `tinygo build`:
 tinygo build --target=wasip2 --wit-package ./wit --wit-world hello
 ```
 
+## Next steps
 
+* Explore [capabilities](/docs/capabilities/index.mdx) you can use in your wasmCloud application.
+* Learn [how to build a capability provider in Go](/docs/developer/languages/go/providers.mdx).
 
 
 
