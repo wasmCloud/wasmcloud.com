@@ -1,0 +1,366 @@
+---
+title: 'Providers'
+date: 2024-09-26T11:02:05+06:00
+sidebar_position: 1
+draft: false
+description: 'How to develop WebAssembly providers with Go'
+---
+
+# Building providers with Go
+
+wasmCloud provides a complete [SDK for building capability providers in Go](https://github.com/wasmCloud/provider-sdk-go), meaning that Go developers can write every part of a wasmCloud application. 
+
+For a listing of WebAssembly+Go tooling, see [**Building components with Go**](/docs/developer/languages/go/components.mdx). 
+
+## Get started
+
+In the [Go examples directory of the wasmCloud monorepo](https://github.com/wasmCloud/wasmCloud/tree/main/examples/golang/), you can find a template for a custom provider that returns system info when a component is linked and stores ID and configuration data for any components that may be linked to it. This is not only a good example, but a great foundation for many custom provider projects.
+
+### Prerequisites
+
+To build a capability provider in Go, you'll need...
+
+* [Go](https://go.dev/doc/install) 1.23.0+
+* [The Rust toolchain](https://www.rust-lang.org/tools/install)
+* [`wit-bindgen`](https://github.com/bytecodealliance/wit-bindgen) installed with `cargo install wit-bindgen-cli`
+* [`wit-bindgen-wrpc`](https://github.com/wrpc/wit-bindgen-wrpc/tree/main) installed with `cargo install wit-bindgen-wrpc-cli`
+* [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation) CLI 0.32.1+ for building and deploying components
+
+Additionally, for the purposes of the "testing" section of this example, you'll want:
+
+* [`nats-cli`](https://github.com/nats-io/natscli)
+* [`nats-server`](https://github.com/nats-io/nats-server)
+
+### Create a new provider
+
+Use `wash` to start a new provider project:
+
+```shell
+wash new provider custom --template-name custom-template-go
+```
+In the new project directory `custom` you will find the files for the Go provider. Open `main.go`:
+
+```go
+//go:generate wit-bindgen-wrpc go --out-dir bindings --package github.com/wasmCloud/wasmCloud/examples/go/providers/custom-template/bindings wit
+
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/wasmCloud/provider-sdk-go"
+	server "github.com/wasmCloud/wasmCloud/examples/go/providers/custom-template/bindings"
+)
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	// Initialize the provider with callbacks to track linked components
+	providerHandler := Handler{
+		linkedFrom: make(map[string]map[string]string),
+		linkedTo:   make(map[string]map[string]string),
+	}
+	p, err := provider.New(
+		provider.SourceLinkPut(func(link provider.InterfaceLinkDefinition) error {
+			return handleNewSourceLink(&providerHandler, link)
+		}),
+		provider.TargetLinkPut(func(link provider.InterfaceLinkDefinition) error {
+			return handleNewTargetLink(&providerHandler, link)
+		}),
+		provider.SourceLinkDel(func(link provider.InterfaceLinkDefinition) error {
+			return handleDelSourceLink(&providerHandler, link)
+		}),
+		provider.TargetLinkDel(func(link provider.InterfaceLinkDefinition) error {
+			return handleDelTargetLink(&providerHandler, link)
+		}),
+		provider.HealthCheck(func() string {
+			return handleHealthCheck(&providerHandler)
+		}),
+		provider.Shutdown(func() error {
+			return handleShutdown(&providerHandler)
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Store the provider for use in the handlers
+	providerHandler.provider = p
+
+	// Setup two channels to await RPC and control interface operations
+	providerCh := make(chan error, 1)
+	signalCh := make(chan os.Signal, 1)
+
+	// Handle RPC operations
+	stopFunc, err := server.Serve(p.RPCClient, &providerHandler)
+	if err != nil {
+		p.Shutdown()
+		return err
+	}
+
+	// Handle control interface operations
+	go func() {
+		err := p.Start()
+		providerCh <- err
+	}()
+
+	// Shutdown on SIGINT
+	signal.Notify(signalCh, syscall.SIGINT)
+
+	// Run provider until either a shutdown is requested or a SIGINT is received
+	select {
+	case err = <-providerCh:
+		stopFunc()
+		return err
+	case <-signalCh:
+		p.Shutdown()
+		stopFunc()
+	}
+
+	return nil
+}
+
+func handleNewSourceLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
+	fmt.Println("Handling new source link", "link", link)
+	handler.linkedTo[link.Target] = link.SourceConfig
+	return nil
+}
+
+func handleNewTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
+	fmt.Println("Handling new target link", "link", link)
+	handler.linkedFrom[link.SourceID] = link.TargetConfig
+	return nil
+}
+
+func handleDelSourceLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
+	fmt.Println("Handling del source link", "link", link)
+	delete(handler.linkedTo, link.SourceID)
+	return nil
+}
+
+func handleDelTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
+	fmt.Println("Handling del target link", "link", link)
+	delete(handler.linkedFrom, link.Target)
+	return nil
+}
+
+func handleHealthCheck(_ *Handler) string {
+	fmt.Println("Handling health check")
+	return "provider healthy"
+}
+
+func handleShutdown(handler *Handler) error {
+	fmt.Println("Handling shutdown")
+	clear(handler.linkedFrom)
+	clear(handler.linkedTo)
+	return nil
+}
+```
+
+The imports include the Go Provider SDK library, which helps to handle logic for wasmCloud links, health check responses, and other interactions with the wider wasmCloud system. This is the role of `main.go`&mdash;to handle the trappings of being a provider.
+
+In `provider.go`, we can examine the custom logic for this provider:
+
+```go
+package main
+
+import (
+	"context"
+	"errors"
+	"runtime"
+
+	// Go provider SDK
+	sdk "github.com/wasmCloud/provider-sdk-go"
+	wrpcnats "github.com/wrpc/wrpc/go/nats"
+
+	// Generated bindings from the wit world
+	system_info "github.com/wasmCloud/wasmCloud/examples/go/providers/custom-template/bindings/exports/wasmcloud/example/system_info"
+	"github.com/wasmCloud/wasmCloud/examples/go/providers/custom-template/bindings/wasmcloud/example/process_data"
+)
+
+// / Your Handler struct is where you can store any state or configuration that your provider needs to keep track of.
+type Handler struct {
+	// The provider instance
+	provider *sdk.WasmcloudProvider
+	// All components linked to this provider and their config.
+	linkedFrom map[string]map[string]string
+	// All components this provider is linked to and their config
+	linkedTo map[string]map[string]string
+}
+
+// Request information about the system the provider is running on
+func (h *Handler) RequestInfo(ctx context.Context, kind system_info.Kind) (string, error) {
+	// Only allow requests from a lattice source
+	header, ok := wrpcnats.HeaderFromContext(ctx)
+	if !ok {
+		h.provider.Logger.Warn("Received request from unknown origin")
+		return "", nil
+	}
+	// Only allow requests from a linked component
+	sourceId := header.Get("source-id")
+	if h.linkedFrom[sourceId] == nil {
+		h.provider.Logger.Warn("Received request from unlinked source", "sourceId", sourceId)
+		return "", nil
+	}
+
+	h.provider.Logger.Debug("Received request for system information", "sourceId", sourceId)
+
+	switch kind {
+	case system_info.Kind_Os:
+		return runtime.GOOS, nil
+	case system_info.Kind_Arch:
+		return runtime.GOARCH, nil
+	default:
+		return "", errors.New("invalid system info request")
+	}
+}
+
+// Example export to call from the provider for testing
+func (h *Handler) Call(ctx context.Context) (string, error) {
+	var lastResponse string
+	for target := range h.linkedTo {
+		data := process_data.Data{
+			Count: 3,
+			Name:  "sup",
+		}
+		// Get the outgoing RPC client for the target
+		client := h.provider.OutgoingRpcClient(target)
+		// Send the data to the target for processing
+		res, close, err := process_data.Process(ctx, client, &data)
+		defer close()
+		if err != nil {
+			return "", err
+		}
+		lastResponse = res
+	}
+
+	if lastResponse == "" {
+		lastResponse = "Provider received call but was not linked to any components"
+	}
+
+	return lastResponse, nil
+}
+```
+
+This code implements two functions defined in our WIT world: `process-data` and `system-info`. (The Go bindings translate them to the more idiomatic `process_data` and `system_info` respectively.) This provides the basic structure of the provider:
+
+* Custom logic in `provider.go`
+* Scaffolding for acting as a provider in `main.go`
+* Interface definitions in a WIT world
+
+This structure means that adapting a Go application to a provider isn't too challenging&mdash;*especially* if you're already using WIT definitions for interfaces.
+
+### Test your provider
+
+You can run the provider on a local NATS server for testing with the provided [script](https://github.com/wasmCloud/wasmCloud/blob/main/examples/golang/providers/custom-template/run.sh).
+
+First, start your NATS server:
+
+```shell
+nats-server -js
+```
+Then from your project directory, run:
+
+```shell
+sh run.sh
+```
+In another terminal, test provider health with the NATS CLI...
+
+```shell
+nats req "wasmbus.rpc.default.custom-template.health" '{}'
+```
+```shell
+18:06:30 Sending request on "wasmbus.rpc.default.custom-template.health"
+18:06:30 Received with rtt 438µs
+{"healthy":true,"message":"provider healthy"}
+```
+You can also invoke the provider with `wash call`, which in this case will report that we have no linked components:
+
+```shell
+wash call custom-template wasmcloud:example/system-info.call
+```
+```shell
+Provider received call but was not linked to any components
+```
+
+### Build and run on wasmCloud
+
+If you want to test the provider on wasmCloud, you can deploy it alongside an [included component](https://github.com/wasmCloud/wasmCloud/tree/main/examples/golang/providers/custom-template/component/) with the [wadm.yaml](https://github.com/wasmCloud/wasmCloud/tree/main/examples/golang/providers/custom-template/wadm.yaml) manifest included as part of the template.
+
+Download necessary packages:
+
+```shell
+go mod tidy
+```
+
+Build the provider from the root of the project directory:
+
+```shell
+wash build
+```
+
+We'll also need to build the component in the `/component/` subdirectory.
+
+```shell
+cd component && wash build
+```
+
+Now launch wasmCloud...
+
+```shell
+wash up
+```
+And in another terminal, deploy the manifest from the root of the project directory. This will launch the provider as well as the component in the `/component/build` subdirectory.
+
+```shell
+wash app deploy ./wadm.yaml
+```
+Now we can run `wash call` again&mdash;but this time, the provider is running on wasmCloud and is connected to a component:
+
+```shell
+wash call custom-template wasmcloud:example/system-info.call
+```
+```shell
+Provider is running on darwin-arm64
+```
+
+## Next steps
+
+* Explore [capabilities](/docs/capabilities/index.mdx) you can use in your wasmCloud application.
+* Learn [how to build a component in Go](/docs/developer/languages/go/components.mdx).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
