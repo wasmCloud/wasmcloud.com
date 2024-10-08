@@ -33,8 +33,7 @@ In this walkthrough, we will create an HTTP server from scratch using the [Go co
 
 * [Go](https://go.dev/doc/install) 1.23.0+
 * [TinyGo](https://tinygo.org/getting-started/install/) 0.33.0+
-* [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation) CLI 0.32.1+ for building and deploying components
-* [`wit-deps`](https://github.com/bytecodealliance/wit-deps) 0.3.4+ for WIT dependency management
+* [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation) CLI 0.34.0+ for building and deploying components
 
 ### Step 1: Set up with `wash`
 
@@ -49,25 +48,13 @@ wash new component http-test --template-name hello-world-tinygo
 cd http-test
 ```
 
-Replace the contents of `wit/deps.toml` with the WIT dependency targets below:
-
-```toml
-http = "https://github.com/WebAssembly/wasi-http/archive/v0.2.0.tar.gz"
-component = "https://github.com/wasmCloud/component-sdk-go/archive/main.tar.gz"
-```
-Run `wit-deps` from the root of your project directory:
-
-```shell
-wit-deps
-```
-
 Replace the contents of `world.wit` with the WIT definition below:
 
 ```wit
 package example:http-server;
 
 world hello {
-  include wasmcloud:component/imports;
+  include wasmcloud:component-go/imports@0.1.0;
   export wasi:http/incoming-handler@0.2.0;
 }
 ```
@@ -297,6 +284,22 @@ wash down
 
 `wash` simplifies set up for a Go project, but it is not required to build a Go-based component. For users who wish to use or understand the underlying tooling, the steps below replicate the initial set up above without `wash`.
 
+You'll also need to install the `wkg` cli to fetch your component's interface dependencies. Installation instructions can be found [here](https://github.com/bytecodealliance/wasm-pkg-tools#installation).
+
+Once that is installed, run the following command to edit your wasm package tools configuration `wkg` to know the location of `wasmcloud` namespaced interface dependencies:
+
+```shell
+wkg config edit
+```
+
+Replace all content in that file with the following:
+
+```toml
+[namespace_registries]
+wasmcloud = "wasmcloud.com"
+wasi = "wasi.dev"
+```
+
 Create a new Go project:
 
 ```shell
@@ -310,35 +313,24 @@ Now we'll add the Component SDK and `wasilog` packages to our project:
 ```shell
 go get go.wasmcloud.dev/component go.wasmcloud.dev/component/log/wasilog 
 ```
-
-Create a `/wit/` directory and a `deps.toml` file:
-
-```shell
-mkdir wit && touch ./wit/deps.toml
-```
-In your `deps.toml` file, add `wasi:http` and `component`:
-
-```toml
-http = "https://github.com/WebAssembly/wasi-http/archive/v0.2.0.tar.gz"
-component = "https://github.com/wasmCloud/component-sdk-go/archive/main.tar.gz"
-```
-Run `wit-deps` from the root of your project directory:
+Create a `wit/` directory and a file in that directory called `world.wit`:
 
 ```shell
-wit-deps
-```
-Create a file called `world.wit` in the `/wit/` folder:
-
-```shell
-touch ./wit/world.wit
+mkdir wit && touch ./wit/world.wit
 ```
 ```wit
 package example:http-server;
 
 world hello {
-  include wasmcloud:component/imports;
+  include wasmcloud:component/imports@0.1.0;
   export wasi:http/incoming-handler@0.2.0;
 }
+```
+
+Then fetch your dependencies:
+
+```shell
+wkg wit fetch
 ```
 
 Finally, we'll write our HTTP server in a new `hello.go` file. Using the Component SDK, this looks like a standard server using the HTTP standard library.
