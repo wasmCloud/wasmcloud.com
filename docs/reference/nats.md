@@ -5,23 +5,23 @@ sidebar_position: 12
 draft: false 
 ---
 
-This reference article attempts to give a quick overview of NATS subjects used by wasmCoud.
+This page provides an overview of NATS subjects used by wasmCloud.
 
 ## wRPC
 
-NATS Subjects used for wRPC communication uses the following subject pattern:
+NATS Subjects used for wRPC communication adopt the following subject pattern:
 
-```
+```plaintext
 {lattice}.{component_id}.wrpc.{protocol_version}.{namespace}:{package}/{interface}@{version}.{function}
 ```
 
-[See RPC article for more details](/docs/hosts/lattice-protocols/rpc)
+[See RPC page for more details](/docs/hosts/lattice-protocols/rpc).
 
 ## Control Interface
 
-The complete Control Interface documentation can be [found here](/docs/hosts/lattice-protocols/control-interface), and follows the following pattern: e
+The complete Control Interface documentation can be [found here](/docs/hosts/lattice-protocols/control-interface), and follows the following pattern:
 
-```
+```plaintext
 wasmbus.ctl.{version}.{lattice}.{noun}.{verb}.{optional_name}
 ```
 
@@ -45,14 +45,13 @@ wasmbus.ctl.{version}.{lattice}.{noun}.{verb}.{optional_name}
 | wasmbus.ctl.v1.{lattice}.host.ping| Queries | [Ping hosts](/docs/hosts/lattice-protocols/control-interface#ping-hosts) |
 | wasmbus.ctl.v1.{lattice}.link.put| Link operations | [Put link](/docs/hosts/lattice-protocols/control-interface#put-link) |
 | wasmbus.ctl.v1.{lattice}.link.del| Link operations | [Delete link](/docs/hosts/lattice-protocols/control-interface#delete-link) |
-| wasmbus.ctl.v1.{lattice}.link.del| Link operations | [Delete link](/docs/hosts/lattice-protocols/control-interface#delete-link) |
 
 ## wadm API
 
-The complete wadm API documentation can be [found here](/docs/ecosystem/wadm/api) takes requests in the following format:
+The wadm API uses the "model" term for brevity; each model is an individual application manifest. The complete wadm API documentation can be [found here](/docs/ecosystem/wadm/api) takes requests in the following format:
 
-```
-wadm.api.{lattice-id}.{category}.{operation}.{object}
+```plaintext
+wadm.api.{lattice}.{category}.{operation}.{object}
 ```
 
 | Subject      | Group      | Details |
