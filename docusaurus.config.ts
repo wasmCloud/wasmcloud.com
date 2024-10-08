@@ -9,6 +9,7 @@ import { Options as PluginGoogleAnalyticsOptions } from '@docusaurus/plugin-goog
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
 import { Options as PluginGithubStarsOptions } from '@wasmcloud/docusaurus-github-stars';
 import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-hubspot-analytics';
+import { Options as DecapCMSPluginOptions } from '@wasmcloud/docusaurus-cms-decap';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import { bundledLanguages } from 'shiki';
 import {
@@ -168,6 +169,13 @@ const config = (async (): Promise<Config> => {
         } satisfies PluginHubspotAnalyticsOptions,
       ],
       customPostCssPlugin, // PostCSS plugin function registration
+      [
+        '@wasmcloud/docusaurus-cms-decap',
+        {
+          config: './decap.config.yaml',
+          path: '/admin',
+        } satisfies DecapCMSPluginOptions,
+      ],
     ],
 
     themeConfig: {
