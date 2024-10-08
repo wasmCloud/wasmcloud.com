@@ -44,23 +44,20 @@ world hello {
 
 This component's WIT world _imports_ logging functionality from another component using the `logging` interface and _exports_ handler behavior to an HTTP server using the `incoming-handler` interface.
 
-The top-level WIT world refers to **WIT dependencies** that are included in the `wit/deps` subdirectory. (You can see an example in the [GitHub repo for the `http-hello-world` template](https://github.com/wasmCloud/wasmCloud/tree/main/examples/rust/components/http-hello-world/wit).) While the world above only explicitly uses `logging` and `http`, those interfaces can themselves depend on other interfaces. In `deps` we find directories for a variety of interfaces; the `http-hello-world` example includes the following:
+The top-level WIT world refers to **WIT dependencies** that are included in the `wit/deps` subdirectory. The dependencies are fetched on demand when running `wash build` or using `wash wit deps`. While the world above only explicitly uses `logging` and `http`, those interfaces can themselves depend on other interfaces. In `deps` for the example component above we find directories for a variety of interfaces:
 
 ```shell
-├── cli
-├── clocks
-├── filesystem
-├── http
-├── io
-├── keyvalue
-├── logging
-├── random
-└── sockets
+├── wasi-cli-0.2.0
+├── wasi-clocks-0.2.0
+├── wasi-http-0.2.0
+├── wasi-io-0.2.0
+├── wasi-random-0.2.0
+├── wasi-logging-0.1.0-draft
 ```
 
-If we look inside the `http` directory, we'll find three `.wit` files: `types.wit`, `handler.wit`, and `proxy.wit`. If you look inside, you'll find that `proxy` is a world while `types` is an interface describing types and `handler` is a pair of interfaces.
+If we look inside the `wasi-http-0.2.0` directory, we'll find a single `package.wit` file If you look inside, you'll find a world called `proxy` while `types` is an interface describing types and `handler` is a pair of interfaces.
 
-The `proxy` file describes the imports and exports for `http`. Imports include dependencies from other interfaces such as random number generation; the export is `incoming-handler`.
+The `proxy` world describes the imports and exports for `http`. Imports include dependencies from other interfaces such as random number generation; the export is `incoming-handler`.
 
 The `incoming-handler` interface in the `handler` WIT looks like this:
 
@@ -91,7 +88,7 @@ Note the following features:
 
 - Documentation is denoted by three forward-slashes.
 - The interface is named and then defined within braces.
-- The interface uses types defined in `types.wit`.
+- The interface uses types defined in `interface types` in the `package.wit` file.
 - `handle` is described as a function that takes two arguments, a `request` and a `response-out` of the types used above.
 
 ## Data types
@@ -112,7 +109,7 @@ WIT uses the following built-in data types:
 wasmCloud supports **all standard data types** in custom WIT interfaces. For more information on using these types, as well as user-defined types, see the [WIT documentation](https://component-model.bytecodealliance.org/design/wit.html).
 
 :::warning[Warning]
-**Streams**, **futures**, and **resources** will not work in a distributed way in custom interfaces, so exercise caution when using these types. You may notice that several WASI 0.2 interfaces use resources&mdash;note that the wasmCloud host adapts well-known resources from `wasi-http`, `wasi-keyvalue`, `wasi-messaging`, and `wasi-blobstore` into concrete types that we can send over the lattice, meaning those standard interfaces are fully supported for distributed applications.
+**Streams** and **futures** will not work in a distributed way in custom interfaces, so exercise caution when using these types. However, for better efficiency, some common WASI interfaces have a wRPC equivalent that adapts well-known resources from `wasi-http`, `wasi-keyvalue`, `wasi-messaging`, and `wasi-blobstore` into concrete types that we can send efficiently over the lattice.
 :::
 
 ## Functions
@@ -162,7 +159,14 @@ world greeter {
 
 This interface will take one string parameter called `message` and return a string value.
 
-To add this interface to a component, simply copy the `greeter` directory over to the component's `wit/deps` directory and add it to the project's `wit/world.wit` file:
+To add this interface to a component, add the following section to your `wasmcloud.toml` file:
+
+```toml
+[overrides]
+"local:greeter-demo" = { path = "<path to the greeter directory>" }
+```
+
+Then, inside of your component's `world.wit` file, add the following:
 
 ```wit
 package wasmcloud:hello;
@@ -172,7 +176,27 @@ world hello {
 }
 ```
 
+You can then fetch dependencies with `wash wit deps` (or automatically with `wash build`). If you `ls wit/deps` you'll see a directory containing your custom interface.
+
 Congratulations&mdash;you've written a simple custom interface and added it to a component. For more details on implementing custom interfaces with components and providers, see the [Provider section of the Developer Guide](/docs/developer/providers/).
+
+## Sharing your interface
+
+Sometimes you may want to share your interface for others to consume. `wash` integrates with the [common Wasm registry tooling](https://github.com/bytecodealliance/wasm-pkg-tools) to make this easy.
+
+When writing your interface, it is recommended to store your interface in a subdirectory of your project called `wit`. This is the expected default location for WIT files. It is not required to use this subdirectory, but you'll have to manually specify the directory for some of the commands below. You can break apart your interfaces into multiple `.wit` files in the `wit` directory depending on your preferences, but at least one file has to have a `package` declaration. If you are sharing an interface with others you _MUST_ have a [semver](https://semver.org/) compatible version in the `package` declaration (e.g. `package mynamespace:package-name@0.0.1`).
+
+### Building and publishing
+
+WIT interfaces are shared via a binary format called a "wit package." This is just WIT encoded as a Wasm binary. For convenience, we have a `wash wit` subcommand that is useful for building WIT packages. If you have followed the conventional `wit` directory structure, you can build a WIT package with the following command:
+
+```shell
+wash wit build
+```
+
+By default this will output a file with the same name as your package with a `.wasm` extension. See the help documentation for `wash wit build` for other options for selecting a different directory or file name. By default, `wash wit build` will not output any dependencies to the `wit/deps` directory. If you need the dependencies available locally (for debugging or generating documentation), run `wash wit deps` to fetch the dependencies and output them to the `wit/deps` directory.
+
+Once you have built your WIT package, you can publish it to a registry. The `wash` CLI has a `wash wit publish` command that will publish your package to a registry. For this to work properly, you will need to have a valid config file for the Wasm package tooling. Please see the [Dependencies documentation](../components/build.mdx#interface-dependencies-and-wash-build) for more information.
 
 ## Further reading
 

@@ -25,7 +25,8 @@ that demonstrates how to use all of the available functionality.
 
 The Plugin API is defined via WIT and is a small wrapper around the standard `wasi:cli/run`
 interface. The WIT is defined in the `wash-lib` crate and can be found
-[here](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-lib/wit).
+[here](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-lib/wit). To use this wit, just
+add `wasmcloud:wash/subcommand@0.1.0;` to your component's `world.wit` file.
 
 A plugin can be any component that exports `wasi:cli/run` and the wasmCloud-defined interface called
 `wasmcloud:wash/subcommand`. This is a very small interface that expects a single function called
