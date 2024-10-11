@@ -2,7 +2,6 @@
 title: 'Components'
 date: 2024-09-26T11:02:05+06:00
 sidebar_position: 1
-draft: false
 description: 'How to develop WebAssembly components with Go'
 ---
 
@@ -12,6 +11,8 @@ The Go ecosystem provides developers with powerful options for building WebAssem
 
 * **TinyGo**: The fast-moving implementation of Go for embedded environments includes native compilation to components with WASI 0.2 support as of TinyGo 0.33. 
 * **Go** has supported compilation to WebAssembly for years; we expect native WASI 0.2 support like that in TinyGo to land in the near future.
+
+## Go-native tooling
 
 There are a number of useful tools available as Go packages that streamline and simplify the Go development experience:
 
@@ -34,7 +35,8 @@ In this walkthrough, we will create an HTTP server from scratch using the [Go co
 * [Go](https://go.dev/doc/install) 1.23.0+
 * [TinyGo](https://tinygo.org/getting-started/install/) 0.33.0+
 * [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation) CLI 0.32.1+ for building and deploying components
-* [`wit-deps`](https://github.com/bytecodealliance/wit-deps) 0.3.4+ for WIT dependency management
+  {/* TODO: Remove after https://github.com/wasmCloud/wasmCloud/pull/3270 is released (est. wash-cli@v0.36.0) */}
+* [`wasm-pkg-tools`](https://github.com/bytecodealliance/wasm-pkg-tools) 0.7.4+ for WIT dependency management
 
 ### Step 1: Set up with `wash`
 
@@ -49,27 +51,22 @@ wash new component http-test --template-name hello-world-tinygo
 cd http-test
 ```
 
-Replace the contents of `wit/deps.toml` with the WIT dependency targets below:
-
-```toml
-http = "https://github.com/WebAssembly/wasi-http/archive/v0.2.0.tar.gz"
-component = "https://github.com/wasmCloud/component-sdk-go/archive/main.tar.gz"
-```
-Run `wit-deps` from the root of your project directory:
-
-```shell
-wit-deps
-```
-
 Replace the contents of `world.wit` with the WIT definition below:
 
 ```wit
 package example:http-server;
 
 world hello {
-  include wasmcloud:component/imports;
+  include wasmcloud:component-go/imports@0.1.0;
+
   export wasi:http/incoming-handler@0.2.0;
 }
+```
+
+Use the `wkg` cli tool to download the wit dependencies:
+
+```shell
+wkg wit fetch
 ```
 
 Finally, we'll delete the contents of `hello.go` and write our HTTP server, which will return a simple "hello world."
@@ -106,6 +103,20 @@ func handler(w http.ResponseWriter, r *http.Request) {
 func main() {}
 ```
 
+Add a `tools.go` file in your project so that the `wit-bindgen-go` tooling is able to generate the necessary bindings:
+```shell
+touch tools.go
+```
+```go
+//go:build tools
+
+package main
+
+import (
+	_ "github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go"
+)
+```
+
 Download missing packages:
 
 ```shell
@@ -120,13 +131,14 @@ type = "component"
 version = "0.1.0"
 
 [component]
-wasm_target = "wasm32-wasi"
-destination = "build/http_hello_world_s.wasm"
-build_command = "tinygo build --target=wasip2 --wit-package ./wit --wit-world hello"
-build_artifact = "http-test.wasm"
+wasm_target = "wasm32-wasi-preview2"
+wit_world = "hello"
 ```
 
-This takes advantage of `wash`'s custom build command feature to integrate TinyGo compilation into the `wash build` process. 
+We also need a folder where the generated bindings will be stored:
+```shell
+mkdir gen
+```
 
 When we run `wash build`, we will generate bindings and compile a component:
 
@@ -168,14 +180,10 @@ Now we can deploy on wasmCloud and try the component manually.
 
 The `wadm.yaml` deployment manifest configures the application to run on localhost:8080.
 
-Now we can `curl` the application:
+Now we can `curl` the application and you should see the "hello world" response:
 
-```shell
-curl localhost:8080
-```
-We should get the response:
-
-```text
+```console
+$ curl localhost:8080
 hello world!
 ```
 
@@ -189,19 +197,20 @@ Use `go get` to add `wadge` to the project:
 go get go.wasmcloud.dev/wadge
 ```
 
-Aadd a `tools.go` file to include the `wadge` bindgen:
+Add a `tools.go` file to include the `wadge` bindgen:
 
 ```shell
 touch tools.go
 ```
-```go
+
+```go {diff} meta=tools.go
 //go:build tools
 
 package main
 
 import (
 	_ "github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go"
-	_ "go.wasmcloud.dev/wadge/cmd/wadge-bindgen-go"
+	_ "go.wasmcloud.dev/wadge/cmd/wadge-bindgen-go" // [!code ++]
 )
 ```
 
@@ -311,34 +320,39 @@ Now we'll add the Component SDK and `wasilog` packages to our project:
 go get go.wasmcloud.dev/component go.wasmcloud.dev/component/log/wasilog 
 ```
 
-Create a `/wit/` directory and a `deps.toml` file:
+Create a `/wit/` directory and a `world.wit` file:
 
 ```shell
-mkdir wit && touch ./wit/deps.toml
-```
-In your `deps.toml` file, add `wasi:http` and `component`:
-
-```toml
-http = "https://github.com/WebAssembly/wasi-http/archive/v0.2.0.tar.gz"
-component = "https://github.com/wasmCloud/component-sdk-go/archive/main.tar.gz"
-```
-Run `wit-deps` from the root of your project directory:
-
-```shell
-wit-deps
-```
-Create a file called `world.wit` in the `/wit/` folder:
-
-```shell
-touch ./wit/world.wit
+mkdir wit && touch ./wit/world.wit
 ```
 ```wit
 package example:http-server;
 
 world hello {
-  include wasmcloud:component/imports;
+  include wasmcloud:component/imports@0.2.0-draft;
+
   export wasi:http/incoming-handler@0.2.0;
 }
+```
+
+Add the `wasm-tools-go` package to a `tools.go` file in your project:
+
+```shell
+touch tools.go
+```
+```go
+//go:build tools
+
+package main
+
+import (
+	_ "github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go"
+)
+```
+
+Then update your Go module:
+```shell
+go mod tidy
 ```
 
 Finally, we'll write our HTTP server in a new `hello.go` file. Using the Component SDK, this looks like a standard server using the HTTP standard library.
@@ -347,7 +361,7 @@ Finally, we'll write our HTTP server in a new `hello.go` file. Using the Compone
 touch hello.go
 ```
 ```go
-//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world example --out gen ./wit
+//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
 
 package main
 
@@ -393,31 +407,4 @@ tinygo build --target=wasip2 --wit-package ./wit --wit-world hello
 
 * Explore [capabilities](/docs/capabilities/index.mdx) you can use in your wasmCloud application.
 * Learn [how to build a capability provider in Go](/docs/developer/languages/go/providers.mdx).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
