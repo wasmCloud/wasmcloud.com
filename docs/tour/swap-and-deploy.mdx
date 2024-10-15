@@ -1,0 +1,251 @@
+---
+title: "Swap and Deploy"
+sidebar_position: 2.5
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+In our previous tutorials, we started a developer loop with `wash dev` and added two [**interfaces**](/docs/concepts/interfaces.mdx) (`wasi:logging` and `wasi:keyvalue`) to our application.
+
+Now we'll learn how to: 
+
+* Explore capabilities available for wasmCloud applications
+* Swap out the building blocks that provide key functionality 
+* Deploy an application in a local wasmCloud environment
+
+In the process, we'll look under the hood and see how [**capabilities**](/docs/concepts/capabilities.mdx) work.
+
+:::info[Prerequisites]
+This tutorial assumes you're following directly from the previous steps. Make sure to complete [**Quickstart**](/docs/tour/hello-world.mdx) and [**Plug in Capabilities**](/docs/tour/adding-capabilities.mdx) first.
+:::
+
+## Choose a capability
+
+As we learned in the previous tutorial, components can make use of pluggable **capabilities** for common requirements like key-value storage or logging. 
+
+If we want to learn about a capability, we can browse the [**Capability Catalog**](/docs/capabilities/index.mdx). 
+
+Each capability in the catalog consists of an *interface* and one or more *capability providers*.  
+
+* **Interfaces** are the language-agnostic APIs we use to represent a capability in our code. They are defined using the WebAssembly Interface Type (WIT) interface description language in simple `.wit` files. 
+* **Capability providers** are reusable executable plugins that deliver functionality described by an interface. Where interfaces are typically very general (i.e. key-value storage), providers are tool- or vendor-specific implementations (i.e. Redis, Vault). 
+
+Here's the Capability Catalog listing for **Key-Value Storage**:
+
+| NAME                  | INTERFACE                                                                                        | PROVIDERS                                                                                                                                                                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Key-Value Storage     | [`wasi:keyvalue`](https://github.com/WebAssembly/wasi-keyvalue)                                  | [Redis](https://github.com/orgs/wasmCloud/packages/container/package/keyvalue-redis), [NATS](https://github.com/orgs/wasmCloud/packages/container/package/keyvalue-nats), [Vault](https://github.com/orgs/wasmCloud/packages/container/package/keyvalue-vault)                        |
+
+Here we find the interface, `wasi:keyvalue`, and several capability providers including Redis. 
+
+Interface packages are named according to the following pattern:
+
+> `namespace:identifier`
+
+The `wasi` namespace tells us that this interface belongs to the [**WebAssembly System Interface (WASI)**](https://wasi.dev/), a group of APIs governed by the WASI Subgroup in the W3C WebAssembly Community Group. 
+
+Interface packages are self-documenting&mdash;for instructions on using the `wasi:keyvalue` interface, we can read through the `.wit` files in the `/wit/deps/keyvalue` folder of our project directory or on GitHub (linked in the Capability Catalog). 
+
+The wasmCloud component template includes common WASI interfaces like `wasi:keyvalue` and `wasi:logging` in the `/wit/deps/` folder. (Note that these interfaces must be explicitly imported in `world.wit` to be available to the component.) 
+
+For more on using interfaces with your native language toolchain and adding new interfaces to an application, see the [Interfaces](/docs/developer/interfaces/creating-an-interface) page in our [Developer Guide](/docs/developer/).
+
+### Select a capability provider
+
+Interfaces are backed by capability providers, which are both reusable and swappable. 
+
+When we ran `wash dev`,  we added capabilities&mdash;but we never specified tools or libraries for key-value storage and logging. `wash dev` provisioned appropriate **capability providers** automatically. How? Because components encode their dependencies in the binaries themselves, `wash dev` was able to detect the requirement at runtime and start an appropriate providers to satisfy the requirements for an HTTP server, key-value store, and logger. 
+
+In this case, `wash dev` used:
+
+* [The wasmCloud `httpserver` provider](https://github.com/orgs/wasmCloud/packages/container/package/http-server)
+* [The wasmCloud built-in logger](/docs/concepts/providers#built-in-providers)
+* [The NATS `keyvalue` provider](https://github.com/wasmCloud/wasmCloud/pkgs/container/keyvalue-nats) (Convenient since NATS is already part of the wasmCloud stack)
+
+If `wash dev` is still running from the previous tutorial, make sure to stop it with CTRL+C. 
+
+For our manual deployment, let's **swap out a different key-value storage provider**. We'll use the [Redis provider](https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-keyvalue-redis), which will only require us to have `redis-server` or Docker installed. The Redis provider will mediate a connection to the Redis server, which is running external to wasmCloud. 
+
+<Tabs groupId="env" queryString>
+  <TabItem value="local" label="Local Redis Server" default>
+
+[Install](https://redis.io/docs/getting-started/) and launch the local redis server in the background
+
+```bash
+redis-server &
+```
+
+  </TabItem>
+  <TabItem value="docker" label="Docker">
+
+Launch a Redis container in the background.
+
+```bash
+docker run -d --name redis -p 6379:6379 redis
+```
+
+  </TabItem>
+</Tabs>
+
+On the [wasmCloud GitHub Packages page](https://github.com/orgs/wasmCloud/packages?repo_name=wasmCloud), we can find a [`keyvalue-redis` image](https://github.com/wasmCloud/wasmCloud/pkgs/container/keyvalue-redis) (also linked in the Capability Catalog) that enables us to deploy the provider:
+
+```text
+ghcr.io/wasmcloud/keyvalue-redis:0.28.1
+```
+
+:::note[What are those images?]
+The wasmCloud ecosystem uses the [OCI image specification](https://github.com/opencontainers/image-spec) to package components and providers&mdash;these component and provider images are not container images, but conform to OCI standards and may be stored on any OCI-compatible registry.
+:::
+
+### Deploying the application with a key-value provider
+
+First, let's start a local wasmCloud environment in "detached" mode so we can keep working in our terminal:
+
+```shell
+wash up -d
+```
+
+When we deploy a wasmCloud application manually, we use an **application manifest** written in YAML, much like a Kubernetes manifest. 
+
+This `.yaml` file defines the relationships between the components and providers that make up our application, along with other important configuration details. It is conventionally named `wadm.yaml` after the [**wasmCloud Application Deployment Manager**](/docs/ecosystem/wadm/index.md) that handles scheduling.
+
+We can modify our `wadm.yaml` to include the Redis provider. We'll also need to **configure a link from the component to the provider**.
+
+Open `wadm.yaml` in your code editor and make the changes below.
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello-world
+  annotations:
+    description: 'HTTP hello world demo, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)'
+spec:
+  components:
+    - name: http-component
+      type: component
+      properties:
+        # Your manifest will point to the path of the built component, you can also
+        # start published components from OCI registries
+        image: file://./build/http_hello_world_s.wasm
+      traits:
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        # The new key-value link configuration # [!code ++:11]
+        - type: link
+          properties:
+            target: kvredis
+            namespace: wasi
+            package: keyvalue
+            interfaces: [atomics, store]
+            target_config:
+              - name: redis-url
+                properties:
+                  url: redis://127.0.0.1:6379
+    # The new capability provider # [!code ++:5]
+    - name: kvredis
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.28.1
+    - name: httpserver
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.22.0
+      traits:
+        - type: link
+          properties:
+            target: http-component
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler]
+            source_config:
+              - name: default-http
+                properties:
+                  address: 127.0.0.1:8080
+```
+
+Let's break down what we're doing here:
+
+* In the application spec, we define the three major pieces of our app: the `http-component` component, the `kvredis` provider, and the `httpserver` provider. 
+* The `kvredis` provider uses the OCI image address we copied previously.
+* Since the logging provider is built into wasmCloud as part of its trusted compute base, we don't have to define it at all!
+* The `http-component` "imports" the key-value capability, so we define the `kvredis` provider as its target on the `wasi:keyvalue` interface with a [**link**](/docs/concepts/linking-components/).
+* The `http-component` "exports" on the `wasi:http` interface, meaning that it exposes a function for calls by another entity. In this case, we define a link from the `httpserver` provider to `http-component`.
+
+Once you save `wadm.yaml`, we can deploy from the project directory:
+
+```shell
+wash app deploy wadm.yaml
+```
+
+Check the status of the app:
+
+```shell
+wash app list
+```
+
+Once the application status is `Deployed`, we can `curl` the application like before:
+
+```shell
+curl 'localhost:8080?name=Bob'
+```
+```text
+Hello x1, Bob!
+```
+```shell
+curl 'localhost:8080?name=Bob'
+```
+```text
+Hello x2, Bob!
+```
+```shell
+curl 'localhost:8080?name=Alice'
+```
+```text
+Hello x1, Alice!
+```
+Note that our increments are starting over again&mdash;after all, we swapped out the dev key-value store for a totally different one!
+
+When you're done with the application, delete it from the wasmCloud environment:
+
+```shell
+wash app delete hello-world
+```
+
+Shut down the environment:
+
+```shell
+wash down
+```
+
+## Log files
+
+If you encounter any problems, wasmCloud log files may contain useful error messages, and it's good to know how to find them. The tabs below, organized by how you started the wasmCloud environment, show you where to find logs:
+
+<Tabs groupId="env" queryString >
+  <TabItem value="local" label="Local" default>
+
+By default, logs from `wash up` are automatically output to your terminal. If you ran the command
+with the `--detached` flag, logs can be found in `~/.wash/downloads/wasmcloud.log`
+
+  </TabItem>
+  <TabItem value="docker" label="Docker">
+
+Logs from hosts running in Docker, if started with our docker compose, can be found by running
+`docker logs wasmcloud`.
+
+  </TabItem>
+</Tabs>
+
+## Next steps
+
+In this tutorial, we learned how to explore capabilities, swap out a provider, and deploy an application to a wasmCloud environment.
+
+* For more information on defining application manifests, see our documentation on the [wasmCloud application deployment manager](/docs/ecosystem/wadm/). 
+* For more information on capabilities, such as how to create new interfaces and providers, see the Developer Guide pages for [providers](docs/developer/providers/) and [interfaces](/docs/developer/interfaces/creating-an-interface).
+
+You can continue to build on this application by adding more features, or you can explore additional first-party providers in the [**Capability Catalog**](/docs/capabilities/index.mdx) to get an idea of what is possible with wasmCloud.
+
+The next page demonstrates scaling via application manifest and gives a high-level overview of why this application that you've built already eliminates complexity and pain that developers often face when building applications for the cloud.
