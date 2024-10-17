@@ -6,7 +6,7 @@ sidebar_position: 2
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Plug in Capabilities
+# Add Features
 
 Going from "Hello World" to a more complex application starts with two steps:
 
@@ -24,54 +24,6 @@ This tutorial assumes you're following directly from the previous tutorial. If y
 ## Add functionality
 
 <Tabs groupId="lang" queryString>
-  <TabItem value="rust" label="Rust">
-
-Let's extend this application to do more than just say "Hello!" 
-
-Using the `path_with_query` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
-
-```rust
-wit_bindgen::generate!({
-  generate_all
-});
-
-use exports::wasi::http::incoming_handler::Guest;
-use wasi::http::types::*;
-
-struct HttpServer;
-
-impl Guest for HttpServer {
-  fn handle(_request: IncomingRequest, response_out: ResponseOutparam) { // [!code --]
-  fn handle(request: IncomingRequest, response_out: ResponseOutparam) { // [!code ++]
-      let response = OutgoingResponse::new(Fields::new());
-      response.set_status_code(200).unwrap();
-      let response_body = response.body().unwrap();
-      let name = match request // [!code ++:11]
-          .path_with_query()
-          .unwrap()
-          .split("=")
-          .collect::<Vec<&str>>()[..]
-      {
-          // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
-          ["/?name", name] => name.to_string(),
-          // query string is anything else or empty e.g. localhost:8080
-          _ => "World".to_string(),
-      };
-      response_body
-          .write()
-          .unwrap()
-          .blocking_write_and_flush(b"Hello from Rust!\n") // [!code --]
-          .blocking_write_and_flush(format!("Hello, {}!\n", name).as_bytes()) // [!code ++]
-          .unwrap();
-      OutgoingBody::finish(response_body, None).expect("failed to finish response body");
-      ResponseOutparam::set(response_out, Ok(response));
-  }
-}
-
-export!(HttpServer);
-```
-
-  </TabItem>
   <TabItem value="tinygo" label="Go">
 
 Let's extend this application to do more than just say "Hello!" 
@@ -132,6 +84,54 @@ func getNameFromPath(path string) string { // [!code ++:8]
 
 //go:generate wit-bindgen tiny-go wit --out-dir=gen --gofmt
 func main() {}
+```
+
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+Let's extend this application to do more than just say "Hello!" 
+
+Using the `path_with_query` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
+
+```rust
+wit_bindgen::generate!({
+  generate_all
+});
+
+use exports::wasi::http::incoming_handler::Guest;
+use wasi::http::types::*;
+
+struct HttpServer;
+
+impl Guest for HttpServer {
+  fn handle(_request: IncomingRequest, response_out: ResponseOutparam) { // [!code --]
+  fn handle(request: IncomingRequest, response_out: ResponseOutparam) { // [!code ++]
+      let response = OutgoingResponse::new(Fields::new());
+      response.set_status_code(200).unwrap();
+      let response_body = response.body().unwrap();
+      let name = match request // [!code ++:11]
+          .path_with_query()
+          .unwrap()
+          .split("=")
+          .collect::<Vec<&str>>()[..]
+      {
+          // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
+          ["/?name", name] => name.to_string(),
+          // query string is anything else or empty e.g. localhost:8080
+          _ => "World".to_string(),
+      };
+      response_body
+          .write()
+          .unwrap()
+          .blocking_write_and_flush(b"Hello from Rust!\n") // [!code --]
+          .blocking_write_and_flush(format!("Hello, {}!\n", name).as_bytes()) // [!code ++]
+          .unwrap();
+      OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+      ResponseOutparam::set(response_out, Ok(response));
+  }
+}
+
+export!(HttpServer);
 ```
 
   </TabItem>
@@ -276,7 +276,38 @@ world hello {
 We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface and general logging operations via `wasi:logging`.
 
 <Tabs groupId="lang" queryString>
-  <TabItem value="rust" label="Rust">
+  <TabItem value="tinygo" label="Go">
+
+Now let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+```go
+func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
+  // Construct HttpResponse to send back
+  headers := http.NewFields()
+  httpResponse := http.NewOutgoingResponse(headers)
+  httpResponse.SetStatusCode(200)
+
+  body := httpResponse.Body().Unwrap()
+  bodyWrite := body.Write().Unwrap()
+  name := getNameFromPath(request.PathWithQuery().Unwrap()) // [!code ++:7]
+
+  http.WasiLoggingLoggingLog(http.WasiLoggingLoggingLevelInfo(), "", fmt.Sprintf("Greeting %s", name))
+  bucket := http.WasiKeyvalue0_2_0_draft_StoreOpen("").Unwrap()
+  count := http.WasiKeyvalue0_2_0_draft_AtomicsIncrement(bucket, name, 1).Unwrap()
+
+  bodyWrite.BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello x%d, %s!\n", count, name))).Unwrap()
+  bodyWrite.BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap() // [!code --]
+
+  // Send HTTP response
+  okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+  bodyWrite.Drop()
+  http.StaticOutgoingBodyFinish(body, http.None[http.WasiHttp0_2_0_TypesTrailers]())
+  http.StaticResponseOutparamSet(responseWriter, okResponse)
+}
+```
+
+  </TabItem>
+    <TabItem value="rust" label="Rust">
 
 Now let's use the atomic increment function to keep track of how many times we've greeted each person.
 
@@ -309,37 +340,6 @@ Now let's use the atomic increment function to keep track of how many times we'v
         .unwrap()
         .blocking_write_and_flush(format!("Hello x{count}, {name}!\n").as_bytes())
         .unwrap();
-```
-
-  </TabItem>
-  <TabItem value="tinygo" label="Go">
-
-Now let's use the atomic increment function to keep track of how many times we've greeted each person.
-
-```go
-func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
-  // Construct HttpResponse to send back
-  headers := http.NewFields()
-  httpResponse := http.NewOutgoingResponse(headers)
-  httpResponse.SetStatusCode(200)
-
-  body := httpResponse.Body().Unwrap()
-  bodyWrite := body.Write().Unwrap()
-  name := getNameFromPath(request.PathWithQuery().Unwrap()) // [!code ++:7]
-
-  http.WasiLoggingLoggingLog(http.WasiLoggingLoggingLevelInfo(), "", fmt.Sprintf("Greeting %s", name))
-  bucket := http.WasiKeyvalue0_2_0_draft_StoreOpen("").Unwrap()
-  count := http.WasiKeyvalue0_2_0_draft_AtomicsIncrement(bucket, name, 1).Unwrap()
-
-  bodyWrite.BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello x%d, %s!\n", count, name))).Unwrap()
-  bodyWrite.BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap() // [!code --]
-
-  // Send HTTP response
-  okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-  bodyWrite.Drop()
-  http.StaticOutgoingBodyFinish(body, http.None[http.WasiHttp0_2_0_TypesTrailers]())
-  http.StaticResponseOutparamSet(responseWriter, okResponse)
-}
 ```
 
   </TabItem>
