@@ -6,27 +6,25 @@ sidebar_position: 2.5
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-In our previous tutorials, we started a developer loop with `wash dev` and added two [**interfaces**](/docs/concepts/interfaces.mdx) (`wasi:logging` and `wasi:keyvalue`) to our application.
+In our previous tutorials, we started a developer loop and added two [**interfaces**](/docs/concepts/interfaces.mdx) (`wasi:logging` and `wasi:keyvalue`) to our application. The `wash dev` process satisfied our application's capability requirements automatically, so we could move quickly and focus on code.
 
 Now we'll learn how to: 
 
 * Explore capabilities available for wasmCloud applications
-* Swap out the building blocks that provide key functionality 
+* Extend our application by plugging in capability requirements
 * Deploy an application in a local wasmCloud environment
 
-In the process, we'll look under the hood and see how [**capabilities**](/docs/concepts/capabilities.mdx) work.
-
 :::info[Prerequisites]
-This tutorial assumes you're following directly from the previous steps. Make sure to complete [**Quickstart**](/docs/tour/hello-world.mdx) and [**Plug in Capabilities**](/docs/tour/adding-capabilities.mdx) first.
+This tutorial assumes you're following directly from the previous steps. Make sure to complete [**Quickstart**](/docs/tour/hello-world.mdx) and [**Add Features**](/docs/tour/add-features.mdx) first.
 :::
 
 ## Choose a capability
 
-As we learned in the previous tutorial, components can make use of pluggable **capabilities** for common requirements like key-value storage or logging. 
+As we learned in the previous tutorial, components can make use of **capabilities** for common requirements like key-value storage or logging. 
 
 If we want to learn about a capability, we can browse the [**Capability Catalog**](/docs/capabilities/index.mdx). 
 
-Each capability in the catalog consists of an *interface* and one or more *capability providers*.  
+Each capability in the catalog consists of an [interface](/docs/concepts/interfaces.mdx) and one or more [capability providers](/docs/concepts/providers.mdx).  
 
 * **Interfaces** are the language-agnostic APIs we use to represent a capability in our code. They are defined using the WebAssembly Interface Type (WIT) interface description language in simple `.wit` files. 
 * **Capability providers** are reusable executable plugins that deliver functionality described by an interface. Where interfaces are typically very general (i.e. key-value storage), providers are tool- or vendor-specific implementations (i.e. Redis, Vault). 
@@ -39,17 +37,9 @@ Here's the Capability Catalog listing for **Key-Value Storage**:
 
 Here we find the interface, `wasi:keyvalue`, and several capability providers including Redis. 
 
-Interface packages are named according to the following pattern:
-
-> `namespace:identifier`
-
-The `wasi` namespace tells us that this interface belongs to the [**WebAssembly System Interface (WASI)**](https://wasi.dev/), a group of APIs governed by the WASI Subgroup in the W3C WebAssembly Community Group. 
-
-Interface packages are self-documenting&mdash;for instructions on using the `wasi:keyvalue` interface, we can read through the `.wit` files in the `/wit/deps/keyvalue` folder of our project directory or on GitHub (linked in the Capability Catalog). 
-
-The wasmCloud component template includes common WASI interfaces like `wasi:keyvalue` and `wasi:logging` in the `/wit/deps/` folder. (Note that these interfaces must be explicitly imported in `world.wit` to be available to the component.) 
-
-For more on using interfaces with your native language toolchain and adding new interfaces to an application, see the [Interfaces](/docs/developer/interfaces/creating-an-interface) page in our [Developer Guide](/docs/category/developer-guide).
+:::info[What's WASI?]
+WASI stands for [**WebAssembly System Interface (WASI)**](https://wasi.dev/), a group of standards-track APIs governed by the WASI Subgroup in the W3C WebAssembly Community Group. wasmCloud uses WASI interfaces to define capabilities in a standards-based way that avoids vendor lock-in.For more on interfaces and WASI, see the [Interfaces](/docs/developer/interfaces/creating-an-interface) page in our [Developer Guide](/docs/category/developer-guide).
+:::
 
 ### Select a capability provider
 
@@ -57,11 +47,15 @@ Interfaces are backed by capability providers, which are both reusable and swapp
 
 When we ran `wash dev`,  we added capabilities&mdash;but we never specified tools or libraries for key-value storage and logging. `wash dev` provisioned appropriate **capability providers** automatically. How? Because components encode their dependencies in the binaries themselves, `wash dev` was able to detect the requirement at runtime and start an appropriate providers to satisfy the requirements for an HTTP server, key-value store, and logger. 
 
-In this case, `wash dev` used:
+So what was actually running? In this case, `wash dev` used:
 
 * [The wasmCloud `httpserver` provider](https://github.com/orgs/wasmCloud/packages/container/package/http-server)
 * [The wasmCloud built-in logger](/docs/concepts/providers#built-in-providers)
 * [The NATS `keyvalue` provider](https://github.com/wasmCloud/wasmCloud/pkgs/container/keyvalue-nats) (Convenient since NATS is already part of the wasmCloud stack)
+
+As far as the key-value capability is concerned, the application looks like this:
+
+![wash dev diagram](../images/quickstart-diagram-1.png)
 
 If `wash dev` is still running from the previous tutorial, make sure to stop it with CTRL+C. 
 
@@ -106,11 +100,15 @@ First, let's start a local wasmCloud environment in "detached" mode so we can ke
 wash up -d
 ```
 
-When we deploy a wasmCloud application manually, we use an **application manifest** written in YAML, much like a Kubernetes manifest. 
+Instead of the default NATS `keyvalue` provider used by `wash dev`, we want to use the Redis provider:
+
+![manual deploy diagram](../images/quickstart-diagram-2.png)
+
+To deploy a wasmCloud application manually, we use an [**application manifest**](/docs/ecosystem/wadm/model) written in YAML, much like a Kubernetes manifest. 
 
 This `.yaml` file defines the relationships between the components and providers that make up our application, along with other important configuration details. It is conventionally named `wadm.yaml` after the [**wasmCloud Application Deployment Manager**](/docs/ecosystem/wadm/index.md) that handles scheduling.
 
-We can modify our `wadm.yaml` to include the Redis provider. We'll also need to **configure a link from the component to the provider**.
+We can modify our `wadm.yaml` to include the Redis provider and match the diagram above.
 
 Open `wadm.yaml` in your code editor and make the changes below.
 
@@ -120,7 +118,7 @@ kind: Application
 metadata:
   name: hello-world
   annotations:
-    description: 'HTTP hello world demo, using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)'
+    description: 'HTTP hello world demo'
 spec:
   components:
     - name: http-component
@@ -165,14 +163,6 @@ spec:
                 properties:
                   address: 127.0.0.1:8080
 ```
-
-Let's break down what we're doing here:
-
-* In the application spec, we define the three major pieces of our app: the `http-component` component, the `kvredis` provider, and the `httpserver` provider. 
-* The `kvredis` provider uses the OCI image address we copied previously.
-* Since the logging provider is built into wasmCloud as part of its trusted compute base, we don't have to define it at all!
-* The `http-component` "imports" the key-value capability, so we define the `kvredis` provider as its target on the `wasi:keyvalue` interface with a [**link**](/docs/concepts/linking-components/).
-* The `http-component` "exports" on the `wasi:http` interface, meaning that it exposes a function for calls by another entity. In this case, we define a link from the `httpserver` provider to `http-component`.
 
 Once you save `wadm.yaml`, we can deploy from the project directory:
 
