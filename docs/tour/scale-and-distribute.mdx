@@ -7,19 +7,121 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import washboard_hello from '../images/washboard_hello.png';
 
-# Scale and Distribute
-
-In the previous tutorial, we chose a capability provider and deployed a simple application. Now we'll learn how to scale and distribute a wasmCloud application. 
-
-:::info[Prerequisites]
-This tutorial assumes you're following directly from the previous steps. Make sure to complete [**Quickstart**](/docs/tour/hello-world.mdx), [**Add Features**](/docs/tour/add-features.mdx), and [**Extend and Deploy**](/docs/tour/extend-and-deploy.mdx) first.
-:::
-
 ## Scaling up 📈
 
-WebAssembly can be easily scaled due to its small size, portability, and [wasmtime](https://wasmtime.dev/)'s ability to efficiently instantiate multiple instances of a single WebAssembly component. We leverage these aspects to make it simple to scale your applications with wasmCloud. Components only use resources when they're actively processing requests, so you can specify the number of replicas you want to run and wasmCloud will automatically scale up and down to meet demand. 
+So far, our hello world application can only handle a single request at a time. This is because a dedicated instance of our hello component is instantiated for each request received, but currently only a single replica is defined for it in `wadm.yaml`. Accordingly, wasmCloud instructs [wasmtime](https://wasmtime.dev/) to instantiate only a single instance for our component at any time to process incoming requests. As a result, requests received at the same time are processed sequentially, one after the other. Let's check this quickly.
 
-Let's scale up our hello world application to 100 replicas by editing `wadm.yaml`:
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust">
+
+For test and demonstration purposes, we add a simple `sleep` to the handler to simulate a longer processing time:
+
+```rust
+...
+use exports::wasi::http::incoming_handler::Guest;
+use wasi::http::types::*;
+use std::{thread, time}; // [!code ++]
+
+struct HttpServer;
+...
+        {
+            // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
+            ["/?name", name] => name.to_string(),
+            // query string is anything else or empty e.g. localhost:8080
+            _ => "World".to_string(),
+        };
+
+        let sleep = time::Duration::from_secs(2); // [!code ++:7]
+        wasi::logging::logging::log(
+          wasi::logging::logging::Level::Info,
+          "",
+          &format!("Sleep for {} to simulate longer processing time", sleep.as_secs()),
+        );
+        thread::sleep(sleep);
+
+        let bucket =
+            wasi::keyvalue::store::open("").expect("failed to open empty bucket");
+        let count = wasi::keyvalue::atomics::increment(&bucket, &name, 1)
+            .expect("failed to increment count");
+
+        wasi::logging::logging::log( // [!code ++:5]
+            wasi::logging::logging::Level::Info,
+            "",
+            &format!("Replying greeting 'Hello x{count}, {name}!'"),
+        );
+
+        response_body
+            .write()
+            .unwrap()
+            .blocking_write_and_flush(format!("Hello x{count}, {name}!\n").as_bytes())
+            .unwrap();
+```
+
+  </TabItem>
+</Tabs>
+
+:::note[Why adding a sleep period?]
+The response time of our hello handler is very low. To show that requests are not processed in parallel, we need to ensure a longer response time, which we can exploit in our tests.
+:::
+
+Again we've made changes, so run `wash build` again to compile the updated Wasm component.
+
+```bash
+wash build
+```
+
+Deploy the latest version of our component and try to send multiple requests in parallel.
+
+```bash
+> wash app deploy wadm.yaml
+> seq 1 10 | xargs -P0 -I {} curl --max-time 3 "localhost:8080?name=Alice"
+Hello x1, Alice!
+curl: (28) Operation timed out after 3002 milliseconds with 0 bytes received
+curlc:u r(l2:8 )( 2O8p)e rOapteiroant itoinm etdi med out after 3006 omuillist after 30econ0ds6  wmiitlhl i0s ebcyotnedss recei vwith 0 bytes reed
+ceived
+curl: (28) Operation timed out after 3006 milliseconds with 0 bytes received
+curl: (28) Operation timed out after 3005 milliseconds with 0 bytes received
+curl: (28) Operation timed out after 3005 milliseconds with 0 bytes received
+curl: (28) Operation timed out after 3003 milliseconds with 0 bytes received
+curl: (28) Operation timed out after 3005 milliseconds with 0 bytes received
+curl: (28) Operation timed out after 3001 milliseconds with 0 bytes received
+```
+
+As you can see, only the first `curl` command receives the expected response in time, while all the others run into a timeout. However, if you check the logs of the WasmCloud host, you will see that multiple requests have been received and forwarded to our component one after the other.
+
+```txt
+2024-10-20T19:29:30.897232Z  INFO log: wasmcloud_host::wasmbus::handler: Greeting Bob component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:30.897253Z  INFO log: wasmcloud_host::wasmbus::handler: Sleep for 2 to simulate longer processing time component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:32.905355Z  INFO log: wasmcloud_host::wasmbus::handler: Replying greeting 'Hello x1, Bob!' component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:32.906138Z  INFO log: wasmcloud_host::wasmbus::handler: Greeting Bob component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:32.906258Z  INFO log: wasmcloud_host::wasmbus::handler: Sleep for 2 to simulate longer processing time component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:34.914152Z  INFO log: wasmcloud_host::wasmbus::handler: Replying greeting 'Hello x2, Bob!' component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:34.914992Z  INFO log: wasmcloud_host::wasmbus::handler: Greeting Bob component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:34.915023Z  INFO log: wasmcloud_host::wasmbus::handler: Sleep for 2 to simulate longer processing time component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:36.923568Z  INFO log: wasmcloud_host::wasmbus::handler: Replying greeting 'Hello x3, Bob!' component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:36.924326Z  INFO log: wasmcloud_host::wasmbus::handler: Greeting Bob component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:36.924351Z  INFO log: wasmcloud_host::wasmbus::handler: Sleep for 2 to simulate longer processing time component_id="rust_hello_world-http_component" level=Level::Info context=""
+2024-10-20T19:29:38.933227Z  INFO log: wasmcloud_host::wasmbus::handler: Replying greeting 'Hello x4, Bob!' component_id="rust_hello_world-http_component" level=Level::Info context=""
+```
+
+:::note[Checking the `DEBUG` logs of the wasmCloud host]
+You can also check the wasmCloud host's `DEBUG` logs for more detailed information. In these logs, you can clearly see that for received requests, our hello component is instantiated sequentially.
+:::
+
+If you want you can also check the received and forwarded messages in the corresponding NATS subject.
+
+```bash
+nats sub "*.*.wrpc.>"
+```
+
+:::note[Why are not all requests forwarded to our component?]
+TBD
+
+**Note:** After multiple requests were received but timed out, it is no longer possible to send further requests to our hello application for the reasons mentioned above. To continue, we must first delete and redeploy our application.
+:::
+
+To receive multiple requests in parallel, we need to instruct wasmCloud to scale our component according to the incoming load.
+WebAssembly can be easily scaled due to its small size, portability, and [wasmtime](https://wasmtime.dev/)'s ability to efficiently instantiate multiple instances of a single WebAssembly component. We leverage these aspects to make it simple to scale your applications with wasmCloud. Components only use resources when they're actively processing requests, so you can specify the number of replicas you want to run and wasmCloud will automatically scale up and down to meet demand. Let's scale up our hello world application to 100 replicas by editing `wadm.yaml`:
 
 ```yaml {15-17}
 apiVersion: core.oam.dev/v1beta1
@@ -37,11 +139,32 @@ spec:
       traits:
         - type: spreadscaler
           properties:
-            # Update the scale to 100
-            instances: 100
+            instances: 1 { // [!code --]
+            # Update the scale to 100 // [!code ++:2]
+            replicas: 100
+...
 ```
 
-Now your hello application is ready to deploy v0.0.3 with 100 replicas, meaning it can handle up to 100 concurrent incoming HTTP requests. Just run `wash app deploy wadm.yaml` again, wasmCloud will be configured to automatically scale your component based on incoming load.
+Now our hello component is ready to be deployed as version 0.0.3 with 100 replicas, meaning it can handle up to 100 simultaneous incoming HTTP requests. Just run `wash app deploy wadm.yaml` again and wasmCloud will be able to automatically scale the component according to the incoming load. Let's deploy the component and try again to send multiple requests in parallel.
+
+```bash
+> wash app deploy wadm.yaml
+> seq 1 10 | xargs -P0 -I {} curl --max-time 3 "localhost:8080?name=Bob"
+Hello x1, Bob!
+Hello x2, Bob!
+Hello x3, Bob!
+Hello x5, Bob!
+Hello x4, Bob!
+Hello x6, Bob!
+Hello x8, Bob!
+Hello x7, Bob!
+Hello x9, Bob!
+Hello x10, Bob!
+```
+
+:::note[Utilization planing is important]
+As you have seen, if a component receives too many requests in parallel, it may break down and wasmCloud will not be able to forward further requests. Therefore, it is important to plan and manage the specified number of replicas for Spreadscaler components according to the expected load.
+:::
 
 ## Distribute Globally 🌍
 
