@@ -191,49 +191,6 @@ export const incomingHandler = {
 ```
 
   </TabItem>
-  <TabItem value="python" label="Python">
-
-Let's extend this application to do more than just say "Hello!" 
-
-Using the `path_with_query` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "hello world!" 
-
-We'll also add a helper function to keep our code readable.
-
-:::info
-If you're using an IDE or would like to look at the imports, you can generate the bindings using `componentize-py` to get IDE suggestions and autofills.
-
-```bash
-componentize-py bindings .
-```
-:::
-
-```python
-class IncomingHandler(exports.IncomingHandler):
-    def handle(self, _: IncomingRequest, response_out: ResponseOutparam): # [!code --]
-    def handle(self, request: IncomingRequest, response_out: ResponseOutparam): # [!code ++]
-        # Construct the HTTP response to send back
-        outgoingResponse = OutgoingResponse(Fields.from_list([]))
-        # Set the status code to OK
-        outgoingResponse.set_status_code(200)
-        outgoingBody = outgoingResponse.body()
-
-        # Write our Hello message to the response body
-        outgoingBody.write().blocking_write_and_flush(bytes("Hello from Python!\n", "utf-8")) # [!code --]
-        name = get_name_from_path(request.path_with_query()) # [!code ++]
-        outgoingBody.write().blocking_write_and_flush(bytes("Hello {}!\n".format(name), "utf-8")) # [!code ++]
-        OutgoingBody.finish(outgoingBody, None)
-        # Set and send the HTTP response
-        ResponseOutparam.set(response_out, Ok(outgoingResponse))
-
-def get_name_from_path(path: str) -> str: # [!code ++:6]
-    parts = path.split("=")
-    if len(parts) == 2:
-        return parts[-1]
-    else:
-        return "World"
-```
-
-  </TabItem>
 </Tabs>
 
 After saving your changes, `wash dev` automatically builds and runs the updated application. 
@@ -289,11 +246,11 @@ func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWrite
 
   body := httpResponse.Body().Unwrap()
   bodyWrite := body.Write().Unwrap()
-  name := getNameFromPath(request.PathWithQuery().Unwrap()) // [!code ++:7]
+  path := request.PathWithQuery().Unwrap() // [!code ++:7]
 
   http.WasiLoggingLoggingLog(http.WasiLoggingLoggingLevelInfo(), "", fmt.Sprintf("Greeting %s", name))
   bucket := http.WasiKeyvalue0_2_0_draft_StoreOpen("").Unwrap()
-  count := http.WasiKeyvalue0_2_0_draft_AtomicsIncrement(bucket, name, 1).Unwrap()
+  count := http.WasiKeyvalue0_2_0_draft_AtomicsIncrement(bucket, path, 1).Unwrap()
 
   bodyWrite.BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello x%d, %s!\n", count, name))).Unwrap()
   bodyWrite.BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap() // [!code --]
@@ -408,43 +365,6 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
   // Set the created response
   ResponseOutparam.set(resp, { tag: 'ok', val: outgoingResponse });
 }
-```
-
-  </TabItem>
-
-    <TabItem value="python" label="Python">
-
-Now let's use the atomic increment function to keep track of how many times we've greeted each person.
-
-```python
-from hello import exports
-from hello.types import Ok
-from hello.imports.types import (
-    IncomingRequest, ResponseOutparam,
-    OutgoingResponse, Fields, OutgoingBody
-)
-from hello.imports.atomics import increment # [!code ++]
-from hello.imports.store import open # [!code ++]
-from hello.imports.logging import (log, Level) # [!code ++]
-
-class IncomingHandler(exports.IncomingHandler):
-    def handle(self, request: IncomingRequest, response_out: ResponseOutparam):
-        # Construct the HTTP response to send back
-        outgoingResponse = OutgoingResponse(Fields.from_list([]))
-        # Set the status code to OK
-        outgoingResponse.set_status_code(200)
-        outgoingBody = outgoingResponse.body()
-
-        # Write our Hello message to the response body
-        name = get_name_from_path(request.path_with_query())
-        log(Level.INFO, "", "Greeting {}".format(name)) # [!code ++:5]
-        bucket = open("")
-        count = increment(bucket, name, 1)
-
-        outgoingBody.write().blocking_write_and_flush(bytes("Hello x{}, {}!\n".format(count, name), "utf-8"))
-        OutgoingBody.finish(outgoingBody, None)
-        # Set and send the HTTP response
-        ResponseOutparam.set(response_out, Ok(outgoingResponse))
 ```
 
   </TabItem>
