@@ -1,0 +1,401 @@
+---
+title: 'Add Features'
+sidebar_position: 2
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Add Features
+
+Going from "Hello World" to a more complex application starts with two steps:
+
+* Identify the [**capabilities**](/docs/concepts/capabilities.mdx) your application needs. (Think common requirements like serving HTTP, storing key-value pairs, or logging.)
+* Add [**interfaces**](/docs/concepts/interfaces.mdx) for those capabilities. 
+
+When you're writing a wasmCloud application, you don't have to worry about how a capability is fulfilled as long as you're writing to a standard interface&mdash;you can simply focus on your code.
+
+In this tutorial, we'll add more features to our application by plugging in **key-value** and **logging** capabilities.
+
+:::info[Prerequisites]
+This tutorial assumes you're following directly from the previous tutorial. If you don't have a "Hello world" application running with `wash dev`, complete [**Quickstart**](/docs/tour/hello-world.mdx) first.
+:::
+
+## Add functionality
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="tinygo" label="Go">
+
+Let's extend this application to do more than just say "Hello!" 
+
+Using the `PathWithQuery` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!" 
+
+To make this code more readable, we'll add a helper function to extract the name from the path.
+
+```go
+package main
+
+import (
+  "fmt"
+  "strings"
+  http "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen"
+)
+
+// Helper type aliases to make code more readable
+type HttpRequest = http.ExportsWasiHttp0_2_0_IncomingHandlerIncomingRequest
+type HttpResponseWriter = http.ExportsWasiHttp0_2_0_IncomingHandlerResponseOutparam
+type HttpOutgoingResponse = http.WasiHttp0_2_0_TypesOutgoingResponse
+type HttpError = http.WasiHttp0_2_0_TypesErrorCode
+
+type HttpServer struct{}
+
+func init() {
+  httpserver := HttpServer{}
+  // Set the incoming handler struct to HttpServer
+  http.SetExportsWasiHttp0_2_0_IncomingHandler(httpserver)
+}
+
+func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
+  // Construct HttpResponse to send back
+  headers := http.NewFields()
+  httpResponse := http.NewOutgoingResponse(headers)
+  httpResponse.SetStatusCode(200)
+
+  body := httpResponse.Body().Unwrap()
+  bodyWrite := body.Write().Unwrap()
+  bodyWrite.BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap() // [!code --]
+  name := getNameFromPath(request.PathWithQuery().Unwrap()) // [!code ++]
+  bodyWrite.BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello %s!\n", name))).Unwrap() // [!code ++]
+
+  // Send HTTP response
+  okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+  bodyWrite.Drop()
+  http.StaticOutgoingBodyFinish(body, http.None[http.WasiHttp0_2_0_TypesTrailers]())
+  http.StaticResponseOutparamSet(responseWriter, okResponse)
+}
+
+func getNameFromPath(path string) string { // [!code ++:8]
+  parts := strings.Split(path, "=")
+  if len(parts) == 2 {
+    return parts[1]
+  }
+  return "World"
+}
+
+//go:generate wit-bindgen tiny-go wit --out-dir=gen --gofmt
+func main() {}
+```
+
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+Let's extend this application to do more than just say "Hello!" 
+
+Using the `path_with_query` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
+
+```rust
+wit_bindgen::generate!({
+  generate_all
+});
+
+use exports::wasi::http::incoming_handler::Guest;
+use wasi::http::types::*;
+
+struct HttpServer;
+
+impl Guest for HttpServer {
+  fn handle(_request: IncomingRequest, response_out: ResponseOutparam) { // [!code --]
+  fn handle(request: IncomingRequest, response_out: ResponseOutparam) { // [!code ++]
+      let response = OutgoingResponse::new(Fields::new());
+      response.set_status_code(200).unwrap();
+      let response_body = response.body().unwrap();
+      let name = match request // [!code ++:11]
+          .path_with_query()
+          .unwrap()
+          .split("=")
+          .collect::<Vec<&str>>()[..]
+      {
+          // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
+          ["/?name", name] => name.to_string(),
+          // query string is anything else or empty e.g. localhost:8080
+          _ => "World".to_string(),
+      };
+      response_body
+          .write()
+          .unwrap()
+          .blocking_write_and_flush(b"Hello from Rust!\n") // [!code --]
+          .blocking_write_and_flush(format!("Hello, {}!\n", name).as_bytes()) // [!code ++]
+          .unwrap();
+      OutgoingBody::finish(response_body, None).expect("failed to finish response body");
+      ResponseOutparam::set(response_out, Ok(response));
+  }
+}
+
+export!(HttpServer);
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+Let's extend this application to do more than just say "Hello!" 
+
+Using the `pathWithQuery` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "hello world!" 
+
+To make this code more readable, we'll add a helper function to extract the name from the path.
+
+```typescript
+import { IncomingRequest, ResponseOutparam, OutgoingBody, OutgoingResponse, Fields } from "wasi:http/types@0.2.0";
+
+// Implementation of wasi-http incoming-handler
+//
+// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
+function handle(req: IncomingRequest, resp: ResponseOutparam) {
+  // Start building an outgoing response
+  const outgoingResponse = new OutgoingResponse(new Fields());
+
+  // Access the outgoing response body
+  let outgoingBody = outgoingResponse.body();
+  {
+    // Create a stream for the response body
+    let outputStream = outgoingBody.write();
+    const name = getNameFromPath(req.pathWithQuery() || "") // [!code ++]
+    // Write "hello [name]" to the response stream // [!code ++]
+    outputStream.blockingWriteAndFlush(
+      new Uint8Array(new TextEncoder().encode("hello from Typescript")) // [!code --]
+      new Uint8Array(new TextEncoder().encode(`Hello ${name}!\n`)) // [!code ++]
+    );
+    // @ts-ignore: This is required in order to dispose the stream before we return
+    outputStream[Symbol.dispose]();
+  }
+
+  // Set the status code for the response
+  outgoingResponse.setStatusCode(200);
+  // Finish the response body
+  OutgoingBody.finish(outgoingBody, undefined);
+  // Set the created response
+  ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
+}
+
+function getNameFromPath(path: string): string { // [!code ++:8]
+  const parts = path.split("=");
+  if (parts.length == 2) {
+    return parts[1];
+  }
+  return "world";
+}
+
+export const incomingHandler = {
+  handle,
+};
+
+```
+
+  </TabItem>
+</Tabs>
+
+After saving your changes, `wash dev` automatically builds and runs the updated application. 
+
+We can `curl` the application again:
+
+```shell
+curl localhost:8000
+```
+```text
+Hello, World!
+```
+```shell
+curl 'localhost:8080?name=Bob'
+```
+```text
+Hello, Bob!
+```
+
+## Add persistent storage
+
+Now let's add persistent storage to keep a record of each person that this application greeted. 
+
+We'll use the **key-value capability** for this. We don't need to pick a library or a specific vendor implementation&mdash;all we have to do is add the interface to our component.
+
+We can use the `wasi:keyvalue` interface for interacting with a key value store, and the `wasi:logging` interface to log the name of each person we greet. Before we can use those interfaces, we'll need to add them to our `wit/world.wit` file:
+
+```wit
+package wasmcloud:hello;
+
+world hello {
+  import wasi:keyvalue/atomics@0.2.0-draft; // [!code ++]
+  import wasi:keyvalue/store@0.2.0-draft; // [!code ++]
+  import wasi:logging/logging; // [!code ++]
+
+  export wasi:http/incoming-handler@0.2.0;
+}
+```
+
+We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface and general logging operations via `wasi:logging`.
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="tinygo" label="Go">
+
+Now let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+```go
+func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
+  // Construct HttpResponse to send back
+  headers := http.NewFields()
+  httpResponse := http.NewOutgoingResponse(headers)
+  httpResponse.SetStatusCode(200)
+
+  body := httpResponse.Body().Unwrap()
+  bodyWrite := body.Write().Unwrap()
+  path := request.PathWithQuery().Unwrap() // [!code ++:7]
+
+  http.WasiLoggingLoggingLog(http.WasiLoggingLoggingLevelInfo(), "", fmt.Sprintf("Greeting %s", name))
+  bucket := http.WasiKeyvalue0_2_0_draft_StoreOpen("").Unwrap()
+  count := http.WasiKeyvalue0_2_0_draft_AtomicsIncrement(bucket, path, 1).Unwrap()
+
+  bodyWrite.BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello x%d, %s!\n", count, name))).Unwrap()
+  bodyWrite.BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap() // [!code --]
+
+  // Send HTTP response
+  okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
+  bodyWrite.Drop()
+  http.StaticOutgoingBodyFinish(body, http.None[http.WasiHttp0_2_0_TypesTrailers]())
+  http.StaticResponseOutparamSet(responseWriter, okResponse)
+}
+```
+
+  </TabItem>
+    <TabItem value="rust" label="Rust">
+
+Now let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+```rust
+    let name = match request
+        .path_with_query()
+        .unwrap()
+        .split("=")
+        .collect::<Vec<&str>>()[..]
+    {
+        // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
+        ["/?name", name] => name.to_string(),
+        // query string is anything else or empty e.g. localhost:8080
+        _ => "World".to_string(),
+    };
+
+    wasi::logging::logging::log( // [!code ++:16]
+        wasi::logging::logging::Level::Info,
+        "",
+        &format!("Greeting {name}"),
+    );
+
+    let bucket =
+        wasi::keyvalue::store::open("").expect("failed to open empty bucket");
+    let count = wasi::keyvalue::atomics::increment(&bucket, &name, 1)
+        .expect("failed to increment count");
+
+    response_body
+        .write()
+        .unwrap()
+        .blocking_write_and_flush(format!("Hello x{count}, {name}!\n").as_bytes())
+        .unwrap();
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+Now let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+:::info[Missing Imports]
+
+At the time of writing, JCO does not generate types for `wasi:logging` or `wasi:keyvalue`. This is
+a known issue and will be resolved in a future release. For now, you can tell the TypeScript
+compiler to ignore the missing types by adding `//@ts-expect-error` before each import statement.
+Simply including the import statement will allow the host to provider the functionality at runtime.
+
+:::
+
+```typescript
+import {
+  IncomingRequest,
+  ResponseOutparam,
+  OutgoingBody,
+  OutgoingResponse,
+  Fields,
+} from 'wasi:http/types@0.2.0';
+
+//@ts-expect-error -- these types aren't currently generated by JCO // [!code ++:6]
+import { log } from 'wasi:logging/logging';
+//@ts-expect-error -- these types aren't currently generated by JCO
+import { increment } from 'wasi:keyvalue/atomics@0.2.0-draft';
+// @ts-expect-error -- these types aren't currently generated by JCO
+import { open } from 'wasi:keyvalue/store@0.2.0-draft';
+
+// Implementation of wasi-http incoming-handler
+//
+// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
+function handle(req: IncomingRequest, resp: ResponseOutparam) {
+  // Start building an outgoing response
+  const outgoingResponse = new OutgoingResponse(new Fields());
+
+  // Access the outgoing response body
+  let outgoingBody = outgoingResponse.body();
+  // Write to the response stream // [!code ++:8]
+  const name = getNameFromPath(req.pathWithQuery() || '');
+
+  log('info', '', `Greeting ${name}`);
+
+  // Increment the bucket's count
+  const bucket = open('');
+  const count = increment(bucket, name, 1);
+
+  {
+    // Create a stream for the response body
+    let outputStream = outgoingBody.write();
+    // Write hello world to the response stream
+    outputStream.blockingWriteAndFlush(
+      new Uint8Array(new TextEncoder().encode(`Hello x${count}, ${name}!\n`)), // [!code ++]
+    );
+    // @ts-ignore: This is required in order to dispose the stream before we return
+    outputStream[Symbol.dispose]();
+  }
+
+  // Set the status code for the response
+  outgoingResponse.setStatusCode(200);
+  // Finish the response body
+  OutgoingBody.finish(outgoingBody, undefined);
+  // Set the created response
+  ResponseOutparam.set(resp, { tag: 'ok', val: outgoingResponse });
+}
+```
+
+  </TabItem>
+</Tabs>
+
+We've made changes, so once we save, `wash dev` will once again automatically update the running application. 
+
+```shell
+curl 'localhost:8080?name=Bob'
+```
+```text
+Hello x1, Bob!
+```
+```shell
+curl 'localhost:8080?name=Bob'
+```
+```text
+Hello x2, Bob!
+```
+```shell
+curl 'localhost:8080?name=Alice'
+```
+```text
+Hello x1, Alice!
+```
+
+## Next steps
+
+In this tutorial, you added a few more features and persistent storage to a simple microservice. You also got to see the process of developing with capabilities, where you can... 
+
+* Write purely functional code that doesn't require you to pick a library or vendor upfront
+* Change your application *separately* from its non-functional requirements 
+
+So far, the `wash dev` process has satisfied our application's capability requirements automatically, so we can move quickly and focus on code. In the next tutorial, we'll look under the hood and learn how to **extend and deploy applications** manually, plugging in different [**providers**](/docs/concepts/providers.mdx) to deliver our capabilities.
