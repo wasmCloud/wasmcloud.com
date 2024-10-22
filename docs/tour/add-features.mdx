@@ -28,28 +28,33 @@ This tutorial assumes you're following directly from the previous tutorial. If y
 
 Let's extend this application to do more than just say "Hello!"
 
-Using the [Query](https://pkg.go.dev/net/url#URL.Query) method on the incoming request URL, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
+Using the [FormValue](https://pkg.go.dev/net/http#Request.FormValue) method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
 
 ```go
+//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
 import (
-	"fmt" // [!code ++]
-	"net/http"
+  "fmt"
+  "net/http"
 
-	"go.wasmcloud.dev/component/net/wasihttp"
+  "go.wasmcloud.dev/component/net/wasihttp"
 )
 
 func init() {
-	wasihttp.HandleFunc(handleRequest)
+  wasihttp.HandleFunc(handleRequest)
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name") // [!code ++]
-	if len(name) == 0 { // [!code ++]
-		name = "World" // [!code ++]
-	} // [!code ++]
-	w.Write([]byte(fmt.Sprintf("Hello, %s!\n", name))) // [!code ++]
-	w.Write([]byte("Hello from Go!\n")) // [!code --]
+  name := "World" // [!code ++]
+  if len(r.FormValue("name")) > 0 { // [!code ++]
+    name = r.FormValue("name") // [!code ++]
+  } // [!code ++]
+  fmt.Fprintf(w, "Hello, %s!\n", name) // [!code ++]
+  fmt.Fprintf(w, "Hello from Go!\n") // [!code --]
 }
+
+// Since we don't run this program like a CLI, the `main` function is empty. Instead,
+// we call the `handleRequest` function when an HTTP request is received.
+func main() {}
 ```
 
   </TabItem>
@@ -193,7 +198,7 @@ package wasmcloud:hello;
 world hello {
   import wasi:keyvalue/atomics@0.2.0-draft; // [!code ++]
   import wasi:keyvalue/store@0.2.0-draft; // [!code ++]
-  import wasi:logging/logging; // [!code ++]
+  import wasi:logging/logging@0.1.0-draft; // [!code ++]
 
   export wasi:http/incoming-handler@0.2.0;
 }
@@ -207,46 +212,49 @@ We've given our application the ability to perform atomic incrementation and sto
 Now let's use the atomic increment function to keep track of how many times we've greeted each person.
 
 ```go
+//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
 package main
 
 import (
-	"fmt"
-	"net/http"
+  "fmt"
+  "net/http"
 
-	atomics "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen/wasi/keyvalue/atomics"  // [!code ++]
-	store "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen/wasi/keyvalue/store"  // [!code ++]
-	"go.wasmcloud.dev/component/log/wasilog"  // [!code ++]
-	"go.wasmcloud.dev/component/net/wasihttp"
+  atomics "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen/wasi/keyvalue/atomics"  // [!code ++]
+  store "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen/wasi/keyvalue/store"  // [!code ++]
+  "go.wasmcloud.dev/component/log/wasilog"  // [!code ++]
+  "go.wasmcloud.dev/component/net/wasihttp"
 )
 
 func init() {
-	wasihttp.HandleFunc(handleRequest)
+  wasihttp.HandleFunc(handleRequest)
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-	logger := wasilog.ContextLogger("handleRequest")  // [!code ++]
+  logger := wasilog.ContextLogger("handleRequest")  // [!code ++]
 
-	name := r.URL.Query().Get("name")
-	if len(name) == 0 {
-		name = "World"
-	}
-	logger.Info(fmt.Sprintf("Greeting %s", name)) // [!code ++]
+  name := "World"
+  if len(r.FormValue("name")) > 0 {
+    name = r.FormValue("name")
+  }
+  logger.Info("Greeting", "name", name) // [!code ++]
 
-	kvStore := store.Open("") // [!code ++:11]
-	if err := kvStore.Err(); err != nil {
-		w.Write([]byte("Error: " + err.String()))
-		return
-	}
-	value := atomics.Increment(*kvStore.OK(), name, 1)
-	if err := value.Err(); err != nil {
-		w.Write([]byte("Error: " + err.String()))
-		return
-	}
-	w.Write([]byte(fmt.Sprintf("Hello x%d, %s!\n", value, name)))
-	w.Write([]byte(fmt.Sprintf("Hello, %s!\n", name))) // [!code --]
+  kvStore := store.Open("default") // [!code ++:11]
+  if err := kvStore.Err(); err != nil {
+    w.Write([]byte("Error: " + err.String()))
+    return
+  }
+  value := atomics.Increment(*kvStore.OK(), name, 1)
+  if err := value.Err(); err != nil {
+    w.Write([]byte("Error: " + err.String()))
+    return
+  }
+
+  fmt.Fprintf(w, "Hello x%d, %s!\n", *value.OK(), name) // [!code ++]
+  fmt.Fprintf(w, "Hello, %s!\n", name) // [!code --]
 }
 
-//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
+// Since we don't run this program like a CLI, the `main` function is empty. Instead,
+// we call the `handleRequest` function when an HTTP request is received.
 func main() {}
 ```
 
