@@ -10,8 +10,8 @@ import TabItem from '@theme/TabItem';
 
 Going from "Hello World" to a more complex application starts with two steps:
 
-* Identify the [**capabilities**](/docs/concepts/capabilities.mdx) your application needs. (Think common requirements like serving HTTP, storing key-value pairs, or logging.)
-* Add [**interfaces**](/docs/concepts/interfaces.mdx) for those capabilities. 
+- Identify the [**capabilities**](/docs/concepts/capabilities.mdx) your application needs. (Think common requirements like serving HTTP, storing key-value pairs, or logging.)
+- Add [**interfaces**](/docs/concepts/interfaces.mdx) for those capabilities.
 
 When you're writing a wasmCloud application, you don't have to worry about how a capability is fulfilled as long as you're writing to a standard interface&mdash;you can simply focus on your code.
 
@@ -26,70 +26,36 @@ This tutorial assumes you're following directly from the previous tutorial. If y
 <Tabs groupId="lang" queryString>
   <TabItem value="tinygo" label="Go">
 
-Let's extend this application to do more than just say "Hello!" 
+Let's extend this application to do more than just say "Hello!"
 
-Using the `PathWithQuery` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!" 
-
-To make this code more readable, we'll add a helper function to extract the name from the path.
+Using the [Query](https://pkg.go.dev/net/url#URL.Query) method on the incoming request URL, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
 
 ```go
-package main
-
 import (
-  "fmt"
-  "strings"
-  http "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen"
+	"fmt" // [!code ++]
+	"net/http"
+
+	"go.wasmcloud.dev/component/net/wasihttp"
 )
 
-// Helper type aliases to make code more readable
-type HttpRequest = http.ExportsWasiHttp0_2_0_IncomingHandlerIncomingRequest
-type HttpResponseWriter = http.ExportsWasiHttp0_2_0_IncomingHandlerResponseOutparam
-type HttpOutgoingResponse = http.WasiHttp0_2_0_TypesOutgoingResponse
-type HttpError = http.WasiHttp0_2_0_TypesErrorCode
-
-type HttpServer struct{}
-
 func init() {
-  httpserver := HttpServer{}
-  // Set the incoming handler struct to HttpServer
-  http.SetExportsWasiHttp0_2_0_IncomingHandler(httpserver)
+	wasihttp.HandleFunc(handleRequest)
 }
 
-func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
-  // Construct HttpResponse to send back
-  headers := http.NewFields()
-  httpResponse := http.NewOutgoingResponse(headers)
-  httpResponse.SetStatusCode(200)
-
-  body := httpResponse.Body().Unwrap()
-  bodyWrite := body.Write().Unwrap()
-  bodyWrite.BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap() // [!code --]
-  name := getNameFromPath(request.PathWithQuery().Unwrap()) // [!code ++]
-  bodyWrite.BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello %s!\n", name))).Unwrap() // [!code ++]
-
-  // Send HTTP response
-  okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-  bodyWrite.Drop()
-  http.StaticOutgoingBodyFinish(body, http.None[http.WasiHttp0_2_0_TypesTrailers]())
-  http.StaticResponseOutparamSet(responseWriter, okResponse)
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name") // [!code ++]
+	if len(name) == 0 { // [!code ++]
+		name = "World" // [!code ++]
+	} // [!code ++]
+	w.Write([]byte(fmt.Sprintf("Hello, %s!\n", name))) // [!code ++]
+	w.Write([]byte("Hello from Go!\n")) // [!code --]
 }
-
-func getNameFromPath(path string) string { // [!code ++:8]
-  parts := strings.Split(path, "=")
-  if len(parts) == 2 {
-    return parts[1]
-  }
-  return "World"
-}
-
-//go:generate wit-bindgen tiny-go wit --out-dir=gen --gofmt
-func main() {}
 ```
 
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-Let's extend this application to do more than just say "Hello!" 
+Let's extend this application to do more than just say "Hello!"
 
 Using the `path_with_query` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
 
@@ -115,9 +81,9 @@ impl Guest for HttpServer {
           .split("=")
           .collect::<Vec<&str>>()[..]
       {
-          // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
+          // query string is "/?name=<name>" e.g. localhost:8000?name=Bob
           ["/?name", name] => name.to_string(),
-          // query string is anything else or empty e.g. localhost:8080
+          // query string is anything else or empty e.g. localhost:8000
           _ => "World".to_string(),
       };
       response_body
@@ -137,9 +103,9 @@ export!(HttpServer);
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
 
-Let's extend this application to do more than just say "Hello!" 
+Let's extend this application to do more than just say "Hello!"
 
-Using the `pathWithQuery` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "hello world!" 
+Using the `pathWithQuery` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "hello world!"
 
 To make this code more readable, we'll add a helper function to extract the name from the path.
 
@@ -193,26 +159,29 @@ export const incomingHandler = {
   </TabItem>
 </Tabs>
 
-After saving your changes, `wash dev` automatically builds and runs the updated application. 
+After saving your changes, `wash dev` automatically builds and runs the updated application.
 
 We can `curl` the application again:
 
 ```shell
 curl localhost:8000
 ```
+
 ```text
 Hello, World!
 ```
+
 ```shell
-curl 'localhost:8080?name=Bob'
+curl 'localhost:8000?name=Bob'
 ```
+
 ```text
 Hello, Bob!
 ```
 
 ## Add persistent storage
 
-Now let's add persistent storage to keep a record of each person that this application greeted. 
+Now let's add persistent storage to keep a record of each person that this application greeted.
 
 We'll use the **key-value capability** for this. We don't need to pick a library or a specific vendor implementation&mdash;all we have to do is add the interface to our component.
 
@@ -238,29 +207,47 @@ We've given our application the ability to perform atomic incrementation and sto
 Now let's use the atomic increment function to keep track of how many times we've greeted each person.
 
 ```go
-func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
-  // Construct HttpResponse to send back
-  headers := http.NewFields()
-  httpResponse := http.NewOutgoingResponse(headers)
-  httpResponse.SetStatusCode(200)
+package main
 
-  body := httpResponse.Body().Unwrap()
-  bodyWrite := body.Write().Unwrap()
-  path := request.PathWithQuery().Unwrap() // [!code ++:7]
+import (
+	"fmt"
+	"net/http"
 
-  http.WasiLoggingLoggingLog(http.WasiLoggingLoggingLevelInfo(), "", fmt.Sprintf("Greeting %s", name))
-  bucket := http.WasiKeyvalue0_2_0_draft_StoreOpen("").Unwrap()
-  count := http.WasiKeyvalue0_2_0_draft_AtomicsIncrement(bucket, path, 1).Unwrap()
+	atomics "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen/wasi/keyvalue/atomics"  // [!code ++]
+	store "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen/wasi/keyvalue/store"  // [!code ++]
+	"go.wasmcloud.dev/component/log/wasilog"  // [!code ++]
+	"go.wasmcloud.dev/component/net/wasihttp"
+)
 
-  bodyWrite.BlockingWriteAndFlush([]uint8(fmt.Sprintf("Hello x%d, %s!\n", count, name))).Unwrap()
-  bodyWrite.BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap() // [!code --]
-
-  // Send HTTP response
-  okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-  bodyWrite.Drop()
-  http.StaticOutgoingBodyFinish(body, http.None[http.WasiHttp0_2_0_TypesTrailers]())
-  http.StaticResponseOutparamSet(responseWriter, okResponse)
+func init() {
+	wasihttp.HandleFunc(handleRequest)
 }
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	logger := wasilog.ContextLogger("handleRequest")  // [!code ++]
+
+	name := r.URL.Query().Get("name")
+	if len(name) == 0 {
+		name = "World"
+	}
+	logger.Info(fmt.Sprintf("Greeting %s", name)) // [!code ++]
+
+	kvStore := store.Open("") // [!code ++:11]
+	if err := kvStore.Err(); err != nil {
+		w.Write([]byte("Error: " + err.String()))
+		return
+	}
+	value := atomics.Increment(*kvStore.OK(), name, 1)
+	if err := value.Err(); err != nil {
+		w.Write([]byte("Error: " + err.String()))
+		return
+	}
+	w.Write([]byte(fmt.Sprintf("Hello x%d, %s!\n", value, name)))
+	w.Write([]byte(fmt.Sprintf("Hello, %s!\n", name))) // [!code --]
+}
+
+//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
+func main() {}
 ```
 
   </TabItem>
@@ -275,9 +262,9 @@ Now let's use the atomic increment function to keep track of how many times we'v
         .split("=")
         .collect::<Vec<&str>>()[..]
     {
-        // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
+        // query string is "/?name=<name>" e.g. localhost:8000?name=Bob
         ["/?name", name] => name.to_string(),
-        // query string is anything else or empty e.g. localhost:8080
+        // query string is anything else or empty e.g. localhost:8000
         _ => "World".to_string(),
     };
 
@@ -370,32 +357,37 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
   </TabItem>
 </Tabs>
 
-We've made changes, so once we save, `wash dev` will once again automatically update the running application. 
+We've made changes, so once we save, `wash dev` will once again automatically update the running application.
 
 ```shell
-curl 'localhost:8080?name=Bob'
+curl 'localhost:8000?name=Bob'
 ```
+
 ```text
 Hello x1, Bob!
 ```
+
 ```shell
-curl 'localhost:8080?name=Bob'
+curl 'localhost:8000?name=Bob'
 ```
+
 ```text
 Hello x2, Bob!
 ```
+
 ```shell
-curl 'localhost:8080?name=Alice'
+curl 'localhost:8000?name=Alice'
 ```
+
 ```text
 Hello x1, Alice!
 ```
 
 ## Next steps
 
-In this tutorial, you added a few more features and persistent storage to a simple microservice. You also got to see the process of developing with capabilities, where you can... 
+In this tutorial, you added a few more features and persistent storage to a simple microservice. You also got to see the process of developing with capabilities, where you can...
 
-* Write purely functional code that doesn't require you to pick a library or vendor upfront
-* Change your application *separately* from its non-functional requirements 
+- Write purely functional code that doesn't require you to pick a library or vendor upfront
+- Change your application _separately_ from its non-functional requirements
 
 So far, the `wash dev` process has satisfied our application's capability requirements automatically, so we can move quickly and focus on code. In the next tutorial, we'll look under the hood and learn how to **extend and deploy applications** manually, plugging in different [**providers**](/docs/concepts/providers.mdx) to deliver our capabilities.
