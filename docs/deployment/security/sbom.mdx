@@ -1,0 +1,77 @@
+---
+title: 'Software Bill of Materials (SBOM)'
+description: 'Generating SBOMs with wasmCloud'
+sidebar_position: 5
+---
+# Securing your wasmCloud supply chain with SBOMs
+
+[**Software Bills of Materials (SBOMs)**](https://edu.chainguard.dev/open-source/sbom/what-is-an-sbom/) describe the set of software dependencies (sometimes called the "software supply chain") used to build an application. 
+
+The U.S. National Institute of Science and Technology (NIST) recommends that organizations utilize SBOMs to mitigate and swiftly remediate [software supply chain attacks](https://www.cisa.gov/sites/default/files/publications/defending_against_software_supply_chain_attacks_508.pdf), and enterprises are increasingly adopting SBOMs as part of their security frameworks. 
+
+WebAssembly modules and components have the intrinsic advantage of bringing nothing else except for the direct dependencies needed for building the application itself, and generating an SBOM for a wasmCloud application is a straightforward process using standard tooling from the cloud native ecosystem.
+
+This document outlines the tooling and steps necessary to build and verify SBOMs for wasmCloud applications.
+
+### Prerequisites
+
+In addition to the wasmCloud tooling (`wash`) and language-specific tooling described in the [wasmCloud Quickstart](/docs/tour/hello-world?lang=tinygo), you will need the following tools:
+
+* [`syft`](https://github.com/anchore/syft?tab=readme-ov-file#installation) for SBOM generation
+* [`grype`](https://github.com/anchore/grype?tab=readme-ov-file#installation) (and optionally [`trivy`](https://github.com/aquasecurity/trivy?tab=readme-ov-file#get-trivy)) for vulnerability scanning
+
+### Example: Generating an SBOM
+
+For this example, we'll use the "Hello world" template (in the language of your choice):
+
+Create a new component:
+
+```shell
+wash new component hello
+```
+`wash` will list a set of templates to use as the basis for your project. 
+
+```shell
+? Select a project template: ›
+  hello-world-rust: a hello-world component (in Rust) that responds over an HTTP connection
+  hello-world-tinygo: a hello-world component (in TinyGo) that responds over an HTTP connection
+  hello-world-typescript: a hello-world component (in TypeScript) that responds over an HTTP connection
+```
+**Use the arrow keys and press return** to select one of the options above, corresponding to your language. 
+
+After a moment, `wash` will create a new directory called `hello` with all of the required project files for building a component from your chosen language. 
+
+Navigate to the `hello` project directory:
+
+```shell
+cd hello
+```
+Running the `wash build` command will update your local dependencies (in addition to compiling a component):
+
+```shell
+wash build
+```
+
+To generate SBOM for your application, run: 
+
+```shell
+syft scan dir:. --output spdx-json=sbom.spdx.json
+```
+
+This will output a file called `sbom.spdx.json` in your project directory. 
+
+To scan your SBOM for vulnerabilities, run:
+
+```shell
+grype sbom.spdx.json
+```
+
+Grype will compare the dependencies listed in your SBOM against the tool's vulnerability database. The output should look like this:
+
+```text
+ ✔ Vulnerability DB                [updated]  
+ ✔ Scanned for vulnerabilities     [0 vulnerability matches]  
+   ├── by severity: 0 critical, 0 high, 0 medium, 0 low, 0 negligible
+   └── by status:   0 fixed, 0 not-fixed, 0 ignored 
+No vulnerabilities found
+```
