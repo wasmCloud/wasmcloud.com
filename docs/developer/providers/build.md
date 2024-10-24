@@ -79,3 +79,51 @@ x86_64-macos
 ```
 
 With the build complete, now we can [continue to testing](./test).
+
+## Interface dependencies and `wash build`
+
+:::warning
+Some provider implementations may have issues with the new dependency fetching&mdash;see [the section below on migration](#migrating-from-wit-deps) for additional details
+:::
+
+You may have noticed that one of the commands that `wash build` runs for you is the equivalent of `wkg wit fetch`. `wkg` is a CLI tool provided by the ByteCode Alliance as part of the [Wasm package tooling](https://github.com/bytecodealliance/wasm-pkg-tools) project. It is meant to be a standard set of configuration and tooling that can be used across all languages. `wash` is directly integrated into this tooling with some additional helpers to make it automatically aware of `wasmcloud` namespaced interfaces. If you use `wkg`, you will be using the same configuration and lock files that `wash` uses. The tooling works by reading the specified world in your wit files and downloading the appropriate dependencies automatically into the `wit/deps` directory. As such, in most cases you should add `wit/deps` to your `.gitignore` file and commit the generated `wkg.lock` file.
+
+Without any additional configuration, `wash` can download dependencies from the following namespaces (i.e. the `wasi` in `wasi:http@0.2.1`):
+
+- `wasi`
+- `wasmcloud`
+- `wrpc`
+- `ba`
+
+So in most basic cases, all of this dependency fetching and management should be fairly transparent! However, as your usage of Wasm grows, you are likely to use dependencies that are not in the above namespaces (such as internal registries or other remappings). Also, if you plan to publish any custom interfaces, you will need to configure your registry with credentials.
+
+:::warning
+Please note the configuration format is subject to change, including some additional override configurations options within the `wasmcloud.toml` file. Things should be backwards compatible, but be aware that things may change (and will likely be simpler)!
+:::
+
+The default configuration file for `wash` is located inside of the standard configuration directory at `~/.wash/package_config.toml`. 
+
+Below is an extremely simple configuration showing the basics of a file that can be used to configure `wkg` to download and publish dependencies to/from a private registry. For more complete information on the configuration options, see the [Wasm package tooling documentation](https://github.com/bytecodealliance/wasm-pkg-tools#configuration).
+
+```toml
+[namespace_registries]
+# The namespace maps to a configuration that tells the client where to download dependencies from.
+# If you are running a heavily used and/or large registry, see https://github.com/bytecodealliance/wasm-pkg-tools#well-known-metadata
+# for more information on how to configure a well-known metadata file, which simplifies this configuration section.
+custom = { registry = "custom", metadata = { preferredProtocol = "oci", "oci" = { registry = "ghcr.io", namespacePrefix = "myorg/interfaces/" } } }
+
+# The registry section is used to configure the client to authenticate to the registry. The name
+# "custom" must match the `registry` key in the namespace_registries section.
+[registry."custom".oci]
+auth = { username = "open", password = "sesame" }
+```
+
+With the above configuration, if a package named `custom:regex@0.1.0` is found, it will attempt to download it from `ghcr.io/myorg/interfaces/custom/regex:0.1.0`, using the credentials provided in the `auth` section (if needed). If the registry is public, you can omit the `registry` section at the bottom entirely.
+
+### Migrating from `wit-deps`
+
+Older versions of `wash` required a separate step using a `wit-deps` tool to download dependencies. This is no longer necessary with the newest versions of `wash`. To preserve backwards compatibility, if a `deps.toml` file is found in the `wit` directory of the project, `wash` will not fetch dependencies for you. To migrate to the new deps management, simply remove the `deps.toml` file and run `wash build` again. `wash build` will automatically remove all the old dependencies and download the new ones into your `wit/deps` directory.
+
+:::warning
+If you are using some of the provided wrpc interfaces like `wrpc:blobstore`, you will need to continue using `wit-deps`. This is due to an issue where some of the wrpc interfaces use syntax that is not yet available in the main WIT parser (but will be when WASI 0.3 is released) which causes the dependency resolution to fail.
+:::
