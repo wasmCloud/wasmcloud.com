@@ -1,12 +1,12 @@
-<h1><a id="logging"></a>World logging</h1>
+<h1><a id="unversioned_logging"></a>World unversioned-logging</h1>
 <ul>
 <li>Exports:
 <ul>
-<li>interface <a href="#wasi_logging_logging_0_1_0_draft"><code>wasi:logging/logging@0.1.0-draft</code></a></li>
+<li>interface <a href="#wasi_logging_logging"><code>wasi:logging/logging</code></a></li>
 </ul>
 </li>
 </ul>
-<h2><a id="wasi_logging_logging_0_1_0_draft"></a>Export interface wasi:logging/logging@0.1.0-draft</h2>
+<h2><a id="wasi_logging_logging"></a>Export interface wasi:logging/logging</h2>
 <hr />
 <h3>Types</h3>
 <h4><a id="level"></a><code>enum level</code></h4>
