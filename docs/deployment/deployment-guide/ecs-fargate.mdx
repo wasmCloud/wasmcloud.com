@@ -1,0 +1,149 @@
+---
+title: "Deploy with ECS Fargate"
+date: 2024-10-24T00:00:00+00:00
+icon: 'ti-anchor' # themify icon pack : https://themify.me/themify-icons
+description: "Deploy wasmCloud on Amazon's ECS Fargate service"
+sidebar_position: 1
+type: 'docs'
+---
+
+## Overview
+
+This deployment guide demonstrates how to deploy wasmCloud using [Amazon's Elastic Container Service (ECS) Fargate](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html) service. 
+
+To follow this guide, you will need an [Amazon Web Services](https://aws.amazon.com/) account.
+
+## Install tools
+
+This guide uses the [**Terraform CLI**](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli) and a local installation of the [**wasmCloud Shell (`wash`)** CLI](/docs/installation.mdx)
+
+### Install Terraform CLI
+
+On macOS, you can use [Homebrew](https://brew.sh/) to install the Terraform CLI:
+
+```shell
+brew install hashicorp/tap/terraform
+```
+
+On Windows, you can use [Chocolatey](https://chocolatey.org/) to install the Terraform CLI:
+
+```shell
+choco install terraform
+```
+
+For installation on Linux distributions, see the [documentation for Terraform CLI installation](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli).
+
+### Install `wash`
+
+Once wasmCloud is deployed to ECS Fargate, you can use the **wasmCloud Shell (`wash`)** CLI to manage wasmCloud applications. If you do not have `wash` installed locally, follow the instructions below.
+
+On macOS, you can use [Homebrew](https://brew.sh/) to install `wash`:
+
+```shell
+brew install wasmcloud/wasmcloud/wash
+```
+
+On Ubuntu and Debian Linux, you can use `apt` to install `wash`:
+
+```shell
+curl -s https://packagecloud.io/install/repositories/wasmcloud/core/script.deb.sh | sudo bash
+```
+
+```shell
+sudo apt install wash
+```
+
+On Windows, you can use [Chocolatey](https://chocolatey.org/) to install `wash`:
+
+```shell
+choco install wash
+```
+
+We support other package managers and the option to install from source. If you'd like to use a different installation method, see the [**Installation**](/docs/installation) page.
+
+Verify that `wash` is installed by running:
+
+```shell
+wash --version
+```
+
+## Instance requirements
+
+Below are the required elements of a wasmCloud deployment on ECS Fargate:
+
+- 1x NATS instance
+  - Public Load Balancer exposing port 4222 (`wash` access)
+  - Ephemeral Volume for Jetstream
+- 1x wasmCloud wadm instance
+- 1x wasmCloud worker instance
+  - Autoscaling based on CPU usage
+  - Capacity: 1 min, 1 max (configurable)
+- 1x wasmCloud ingress instance
+  - Public Load Balancer exposing port 80 (`http` access)
+
+## Deploy wasmCloud with Terraform
+
+Download the Terraform files from the `deploy/ecs-fargate` directory in the [wasmCloud community contributions](https://github.com/wasmCloud/wasmCloud-contrib) repository. 
+
+```shell
+git clone https://github.com/wasmcloud/wasmcloud-contrib.git
+```
+```shell
+cd deploy/ecs-fargate
+```
+
+Create a file named `terraform.tvfars` with the following content:
+
+```hcl
+aws_region              = "us-east-2"
+
+# If using aws cli profile (SSO), set it here
+aws_profile             = "enterprise-dev"
+
+# CIDRs for wash access ( default none )
+nats_allowed_cidrs      = ["45.74.99.13/32"]
+
+# CIDRs for http access ( default 0.0.0/0 )
+wasmcloud_allowed_cidrs = ["45.74.99.13/32"]
+```
+
+Apply the Terraform configuration:
+
+```shell
+terraform init
+```
+```shell
+terraform apply
+```
+
+## Manage wasmCloud with `wash`
+
+Create an environment variable connecting your local `wash` CLI to your deployed wasmCloud host:
+
+```shell
+export WASMCLOUD_CTL_HOST="$(terraform output -raw nats_lb)"
+```
+Test `wash` connectivity:
+
+```shell
+wash get inventory
+```
+
+## Deploy and access applications
+
+Once `wash` is set up, deploy a sample application from the `wasmcloud-on-ecs-fargate` directory:
+
+```shell
+wash app deploy ./hello-world-wadm.yaml
+```
+
+To access the application, create an environment variable connecting your local `wash` CLI to the wasmCloud endpoint:
+
+```shell
+export WASMCLOUD_LB="$(terraform output -raw wasmcloud_public_lb)"
+```
+Test the application:
+
+```shell
+curl -i http://$WASMCLOUD_LB
+```
