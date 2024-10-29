@@ -62,47 +62,35 @@ func main() {}
 
 Let's extend this application to do more than just say "Hello!"
 
-Using the `path_with_query` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
+Using methods on the incoming [`http::Request`](https://docs.rs/http/1.1.0/http/request/struct.Request.html), we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
 
 ```rust
-wit_bindgen::generate!({
-  generate_all
-});
+use wasmcloud_component::http;
 
-use exports::wasi::http::incoming_handler::Guest;
-use wasi::http::types::*;
+struct Component;
 
-struct HttpServer;
+http::export!(Component);
 
-impl Guest for HttpServer {
-  fn handle(_request: IncomingRequest, response_out: ResponseOutparam) { // [!code --]
-  fn handle(request: IncomingRequest, response_out: ResponseOutparam) { // [!code ++]
-      let response = OutgoingResponse::new(Fields::new());
-      response.set_status_code(200).unwrap();
-      let response_body = response.body().unwrap();
-      let name = match request // [!code ++:11]
-          .path_with_query()
-          .unwrap()
-          .split("=")
-          .collect::<Vec<&str>>()[..]
-      {
-          // query string is "/?name=<name>" e.g. localhost:8000?name=Bob
-          ["/?name", name] => name.to_string(),
-          // query string is anything else or empty e.g. localhost:8000
-          _ => "World".to_string(),
-      };
-      response_body
-          .write()
-          .unwrap()
-          .blocking_write_and_flush(b"Hello from Rust!\n") // [!code --]
-          .blocking_write_and_flush(format!("Hello, {}!\n", name).as_bytes()) // [!code ++]
-          .unwrap();
-      OutgoingBody::finish(response_body, None).expect("failed to finish response body");
-      ResponseOutparam::set(response_out, Ok(response));
-  }
+impl http::Server for Component {
+    fn handle(
+        _request: http::IncomingRequest, // [!code --]
+        request: http::IncomingRequest, // [!code ++]
+    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
+        let (parts, _body) = request.into_parts(); // [!code ++:11]
+        let query = parts
+            .uri
+            .query()
+            .map(ToString::to_string)
+            .unwrap_or_default();
+        let name = match query.split("=").collect::<Vec<&str>>()[..] {
+            ["name", name] => name,
+            _ => "World",
+        };
+        Ok(http::Response::new(format!("Hello, {name}!\n")))
+        Ok(http::Response::new("Hello from Wasm!\n")) // [!code --]
+    }
 }
 
-export!(HttpServer);
 ```
 
   </TabItem>
@@ -264,34 +252,42 @@ func main() {}
 Now let's use the atomic increment function to keep track of how many times we've greeted each person.
 
 ```rust
-    let name = match request
-        .path_with_query()
-        .unwrap()
-        .split("=")
-        .collect::<Vec<&str>>()[..]
-    {
-        // query string is "/?name=<name>" e.g. localhost:8000?name=Bob
-        ["/?name", name] => name.to_string(),
-        // query string is anything else or empty e.g. localhost:8000
-        _ => "World".to_string(),
-    };
+use wasmcloud_component::http; // [!code --]
+use wasmcloud_component::http::ErrorCode; // [!code ++:3]
+use wasmcloud_component::wasi::keyvalue::*;
+use wasmcloud_component::{http, info};
 
-    wasi::logging::logging::log( // [!code ++:16]
-        wasi::logging::logging::Level::Info,
-        "",
-        &format!("Greeting {name}"),
-    );
+struct Component;
 
-    let bucket =
-        wasi::keyvalue::store::open("default").expect("failed to open empty bucket");
-    let count = wasi::keyvalue::atomics::increment(&bucket, &name, 1)
-        .expect("failed to increment count");
+http::export!(Component);
 
-    response_body
-        .write()
-        .unwrap()
-        .blocking_write_and_flush(format!("Hello x{count}, {name}!\n").as_bytes())
-        .unwrap();
+impl http::Server for Component {
+    fn handle(
+        request: http::IncomingRequest,
+    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
+        let (parts, _body) = request.into_parts();
+        let query = parts
+            .uri
+            .query()
+            .map(ToString::to_string)
+            .unwrap_or_default();
+        let name = match query.split("=").collect::<Vec<&str>>()[..] {
+            ["name", name] => name,
+            _ => "World",
+        };
+
+        info!("Greeting {name}"); // [!code ++:10]
+
+        let bucket = store::open("default").map_err(|e| {
+            ErrorCode::InternalError(Some(format!("failed to open KV bucket: {e:?}")))
+        })?;
+        let count = atomics::increment(&bucket, &name, 1).map_err(|e| {
+            ErrorCode::InternalError(Some(format!("failed to increment counter: {e:?}")))
+        })?;
+
+        Ok(http::Response::new(format!("Hello x{count}, {name}!\n")))
+    }
+}
 ```
 
   </TabItem>
