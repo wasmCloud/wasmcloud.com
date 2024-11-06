@@ -8,7 +8,7 @@ draft: false
 The first step in creating our new provider is to generate a new project from a template. We provide an example template to generate a capability provider that has scaffolding to implement the `wasmcloud:messaging` interface. This page will walk you through generating this capability provider and then implementing the functionality using [NATS](https://nats.io).
 
 :::info[Dependencies]
-To create this capability provider you'll need to install [wash](/docs/installation.mdx) and the [Rust toolchain](https://www.rust-lang.org/tools/install). After implementing, you'll also want the [nats CLI](https://github.com/nats-io/natscli) to send your provider messages.
+To create this capability provider you'll need to install [wash](/docs/installation.mdx), the [Rust toolchain](https://www.rust-lang.org/tools/install), and `wit-bindgen-wrpc` (available by running `cargo install wrpc` or as a [release binary](https://github.com/bytecodealliance/wrpc/releases) in the `wrpc` repo). After implementing, you'll also want the [nats CLI](https://github.com/nats-io/natscli) to send your provider messages.
 :::
 
 ## The messaging interface
