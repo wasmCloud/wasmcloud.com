@@ -76,75 +76,51 @@ Once wasmCloud is deployed to your kind cluster, you can use the **wasmCloud She
 
 Once a `kind` cluster is running locally, you can run wasmCloud on Kubernetes with the [wasmCloud Kubernetes operator](https://github.com/wasmCloud/wasmcloud-operator). An operator is an extension that uses custom Kubernetes resources to manage an application&mdash;you can [learn more about the Kubernetes operator pattern in the Kubernetes documentation](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
 
-Before deploying the operator, it is necessary to deploy two prerequisites to the cluster:
-
-- **[NATS](/docs/ecosystem/nats/)** (with Jetstream enabled)
-- **[wasmCloud Application Deployment Manager (wadm)](/docs/ecosystem/wadm/)** 
-
-The following steps will help you deploy the prerequisites to your Kubernetes cluster, then deploy the operator.
-
-### Deploy NATS
-
-NATS is the open source connective technology that wasmCloud uses to create a unified topology across any number of environments. Add the NATS Helm repository:
+In order to deploy wasmCloud on kind, first install the `wasmcloud-platform` Helm chart. By default, the chart installs NATS, `wadm`, and the wasmCloud operator subchart.
 
 ```shell
-helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+helm upgrade --install \
+    wasmcloud-platform \
+    --values https://raw.githubusercontent.com/wasmCloud/wasmcloud/main/charts/wasmcloud-platform/values.yaml \
+    oci://ghcr.io/wasmcloud/charts/wasmcloud-platform \
+    --dependency-update
 ```
 
-Install the upstream NATS Helm chart to start a cluster with the `values.yaml` file from the wasmCloud operator repository:
+Wait for all components to install and `wadm-nats` communications to establish:
 
 ```shell
-helm upgrade --install -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/nats-values.yaml nats nats/nats
+kubectl rollout status deploy,sts -l app.kubernetes.io/name=nats
+```
+```shell
+kubectl wait --for=condition=available --timeout=600s deploy -l app.kubernetes.io/name=wadm
+```
+```shell
+kubectl wait --for=condition=available --timeout=600s deploy -l app.kubernetes.io/name=wasmcloud-operator
 ```
 
-Validate the installation with:
+Next create a wasmCloud host:
 
 ```shell
-kubectl rollout status deploy,sts -l app.kubernetes.io/instance=nats
+helm upgrade --install \
+    wasmcloud-platform \
+    --values https://raw.githubusercontent.com/wasmCloud/wasmcloud/main/charts/wasmcloud-platform/values.yaml \
+    oci://ghcr.io/wasmcloud/charts/wasmcloud-platform \
+    --dependency-update \
+    --set "hostConfig.enabled=true"
 ```
 
-#### Deploy wadm
-
-wasmCloud Application Deployment Manager (wadm) enables declarative application deployment and management for wasmCloud. You can deploy wadm to your Kubernetes cluster with a Helm chart:
+If the deployment is successful, you should receive the note:
 
 ```shell
-helm install wadm -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/wadm-values.yaml oci://ghcr.io/wasmcloud/charts/wadm
+✨ Congratulations! Your wasmCloud platform has been deployed successfully.
+   - 🛀 To use the wash cli with your new wasmCloud platform, run:
+    kubectl port-forward service/nats 4222:4222 4223:4223
+
+   - 🗺️  To launch the wasmCloud dashboard on http://localhost:3030, in a different terminal window, run:
+     wash ui
 ```
 
-Validate the installation with:
-
-```shell
-kubectl rollout status deploy -l app.kubernetes.io/instance=wadm
-```
-
-#### Deploy the wasmCloud operator
-
-To deploy the operator:
-
-```shell
-kubectl apply -k https://github.com/wasmCloud/wasmcloud-operator/deploy/base
-```
-
-Validate that the pods are ready:
-
-```shell
-kubectl rollout status deploy -l app=wasmcloud-operator -n wasmcloud-operator
-```
-Validate that the apiservice is available:
-
-```shell
-kubectl wait --for condition=available apiservices.apiregistration.k8s.io v1beta1.core.oam.dev
-```
-
-### Create wasmCloud host
-
-Apply the `wasmcloud-host` manifest:
-
-```shell
-kubectl apply -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/wasmcloud-host.yaml
-```
-
-Check wasmCloud host status:
+If you'd like, you can check wasmCloud host status:
 
 ```shell
 kubectl describe wasmcloudhostconfig wasmcloud-host
