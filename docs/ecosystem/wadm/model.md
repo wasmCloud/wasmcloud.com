@@ -106,7 +106,7 @@ Take a look at the following sample `spreadscaler` spec:
 traits:
 - type: spreadscaler
     properties:
-    replicas: 4
+    instances: 4
     spread:
         - name: eastcoast
           weight: 80
@@ -126,7 +126,7 @@ If you leave the `requirements` section blank then all hosts will be considered 
 traits:
 - type: spreadscaler
     properties:
-    replicas: 4
+    instances: 4
 ```
 
 ⚠️ _NOTE_: if you define a label/value pair requirement and wadm is unable to find hosts that match this constraint, it will consider this a deployment failure and will _not_ fall back to arbitrary placement.
@@ -139,7 +139,7 @@ The `daemonscaler` trait is an alternative to the `spreadscaler` trait. It is a 
 traits:
 - type: daemonscaler
     properties:
-      replicas: 4
+      instances: 4
       spread:
           - name: eastcoast
           requirements:
@@ -203,7 +203,7 @@ spec:
         # Govern the spread/scheduling of the component
         - type: spreadscaler
           properties:
-            replicas: 1
+            instances: 1
         # Link to KVredis with local connection
         - type: link
           properties:
