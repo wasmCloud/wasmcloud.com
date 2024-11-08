@@ -37,7 +37,7 @@ For example, given the following spread:
 traits:
 - type: spreadscaler
     properties:
-    replicas: 5
+    instances: 5
     spread:
         - name: eastcoast
         requirements:
