@@ -85,7 +85,7 @@ docker run -d --name redis -p 6379:6379 redis
 On the [wasmCloud GitHub Packages page](https://github.com/orgs/wasmCloud/packages?repo_name=wasmCloud), we can find a [`keyvalue-redis` image](https://github.com/wasmCloud/wasmCloud/pkgs/container/keyvalue-redis) (also linked in the Capability Catalog) that enables us to deploy the provider:
 
 ```text
-ghcr.io/wasmcloud/keyvalue-redis:0.28.1
+ghcr.io/wasmcloud/keyvalue-redis:0.28.2
 ```
 
 :::note[What are those images?]
@@ -94,89 +94,34 @@ The wasmCloud ecosystem uses the [OCI image specification](https://github.com/op
 
 ### Deploying the application with a key-value provider
 
-First, let's start a local wasmCloud environment in "detached" mode so we can keep working in our terminal:
+We can still use `wash dev`, we'll just need to override the `wasi:keyvalue` capability dependency with the Redis provider. Open up the `wasmcloud.toml` file and add the following lines to the end:
 
-```shell
-wash up -d
+```toml
+name = "http-hello-world"
+version = "0.1.0"
+language = "<your_language>"
+type = "component"
+
+[component]
+wasm_target = "wasm32-wasip2"
+
+[[dev.overrides.imports]] # [!code ++:4]
+interface_spec = "wasi:keyvalue@0.2.0-draft"
+image_ref = "ghcr.io/wasmcloud/keyvalue-redis:0.28.2"
+config = { values = { url = "redis://127.0.0.1:6379" } }
 ```
 
-Instead of the default NATS `keyvalue` provider used by `wash dev`, we want to use the Redis provider:
+When `wash dev` finds your component's dependency on a `keyvalue` capability, it will instead deploy the Redis provider instead of the NATS provider.
 
 ![manual deploy diagram](../images/quickstart-diagram-2.png)
 
-To deploy a wasmCloud application manually, we use an [**application manifest**](/docs/ecosystem/wadm/model) written in YAML, much like a Kubernetes manifest.
-
-This `.yaml` file defines the relationships between the components and providers that make up our application, along with other important configuration details. It is conventionally named `wadm.yaml` after the [**wasmCloud Application Deployment Manager**](/docs/ecosystem/wadm/index.md) that handles scheduling.
-
-We can modify our `wadm.yaml` to include the Redis provider and match the diagram above.
-
-Open `wadm.yaml` in your code editor and make the changes below.
-
-```yaml
-apiVersion: core.oam.dev/v1beta1
-kind: Application
-metadata:
-  name: hello-world
-  annotations:
-    description: 'HTTP hello world demo'
-spec:
-  components:
-    - name: http-component
-      type: component
-      properties:
-        # Your manifest will point to the path of the built component, you can also
-        # start published components from OCI registries
-        image: file://./build/http_hello_world_s.wasm
-      traits:
-        - type: spreadscaler
-          properties:
-            replicas: 1
-        # The new key-value link configuration # [!code ++:11]
-        - type: link
-          properties:
-            target: kvredis
-            namespace: wasi
-            package: keyvalue
-            interfaces: [atomics, store]
-            target_config:
-              - name: redis-url
-                properties:
-                  url: redis://127.0.0.1:6379
-    # The new capability provider # [!code ++:5]
-    - name: kvredis
-      type: capability
-      properties:
-        image: ghcr.io/wasmcloud/keyvalue-redis:0.28.1
-    - name: httpserver
-      type: capability
-      properties:
-        image: ghcr.io/wasmcloud/http-server:0.22.0
-      traits:
-        - type: link
-          properties:
-            target: http-component
-            namespace: wasi
-            package: http
-            interfaces: [incoming-handler]
-            source_config:
-              - name: default-http
-                properties:
-                  address: 127.0.0.1:8080
-```
-
-Once you save `wadm.yaml`, we can deploy from the project directory:
+Once you save `wasmcloud.toml`, we can start our developer loop up again. We'll take a look at the actual change this made to how `wash dev` generated your application later in the tutorial, so we can also output that application manifest to the current directory for later inspection.
 
 ```shell
-wash app deploy wadm.yaml
+wash dev --manifest-output-dir .
 ```
 
-Check the status of the app:
-
-```shell
-wash app list
-```
-
-Once the application status is `Deployed`, we can `curl` the application like before:
+Once your application is `Deployed`, we can `curl` the application like before:
 
 ```shell
 curl 'localhost:8000?name=Bob'
@@ -204,36 +149,88 @@ Hello x1, Alice!
 
 Note that our increments are starting over again&mdash;after all, we swapped out the dev key-value store for a totally different one!
 
-When you're done with the application, delete it from the wasmCloud environment:
+When you're done with development, you can stop `wash dev` with CTRL+C..
 
-```shell
-wash app delete hello-world
+## The Application Manifest
+
+In addition to the `wasmcloud.toml` file that contains information about how to build your application, `wash dev` generates an **application manifest** that describes how to deploy your application. This manifest is a YAML file that can be used to deploy your application to any wasmCloud host.
+
+Let's take a look at the application manifest that `wash dev` wrote out, which will be a filename like `dev-<session-id>-http-hello-world.yaml`:
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: dev-smdy8c-http-hello-world
+  annotations:
+    wasmcloud.dev/session-id: sMdY8c
+  labels:
+    wasmcloud.dev/generated-by: wash-dev-0.36.1
+spec:
+  components:
+    # Your Wasm component
+    - name: sMdY8c-http-hello-world
+      type: component
+      properties:
+        image: file:///Users/wasmcloud/path/to/build/http_hello_world_s.wasm
+        id: sMdY8c-http-hello-world
+      traits:
+        # Can handle 100 concurrent requests
+        - type: spreadscaler
+          properties:
+            instances: 100
+        # Link all `wasi:keyvalue` operations to the Redis provider
+        - type: link
+          properties:
+            namespace: wasi
+            package: keyvalue
+            interfaces:
+              - store
+              - atomics
+            target:
+              name: sMdY8c-dep-custom-wasi-keyvalue-atomics/store
+    # Your overridden key-value provider, Redis
+    - name: sMdY8c-dep-custom-wasi-keyvalue-atomics/store
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.28.2
+        config:
+          - name: custom-wasi-keyvalue-default
+            properties:
+              url: redis://127.0.0.1:6379
+      traits: []
+    - name: sMdY8c-dep-http-server
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.23.2
+      traits:
+        - type: link
+          properties:
+            namespace: wasi
+            package: http
+            interfaces:
+              - incoming-handler
+            source:
+              config:
+                - name: wasi-http-config
+                  properties:
+                    address: 127.0.0.1:8000
+            target:
+              name: sMdY8c-http-hello-world
 ```
 
-Shut down the environment:
-
-```shell
-wash down
-```
+{/* TODO: More detail */}
 
 ## Log files
 
-If you encounter any problems, wasmCloud log files may contain useful error messages, and it's good to know how to find them. The tabs below, organized by how you started the wasmCloud environment, show you where to find logs:
+If you encounter any problems, wasmCloud log files may contain useful error messages, and it's good to know how to find them. `wash dev` will create a unique log file for each session and will output the location of that log in the startup text:
 
-<Tabs groupId="env" queryString >
-  <TabItem value="local" label="Local" default>
-
-By default, logs from `wash up` are automatically output to your terminal. If you ran the command
-with the `--detached` flag, logs can be found in `~/.wash/downloads/wasmcloud.log`
-
-  </TabItem>
-  <TabItem value="docker" label="Docker">
-
-Logs from hosts running in Docker, if started with our docker compose, can be found by running
-`docker logs wasmcloud`.
-
-  </TabItem>
-</Tabs>
+```plaintext
+...
+🔧 Successfully started wasmCloud instance
+✅ Successfully started host, logs writing to /Users/wasmcloud/.wash/dev/<session_id>/wasmcloud.log
+...
+```
 
 ## Next steps
 
