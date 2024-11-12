@@ -11,10 +11,67 @@ import washboard_hello from '../images/washboard_hello.png';
 
 So far, our hello world application can only handle a single request at a time. This is because a dedicated instance of our hello component is instantiated for each request received, but currently only a single replica is defined for it in `wadm.yaml`. Accordingly, wasmCloud instructs [wasmtime](https://wasmtime.dev/) to instantiate only a single instance for our component at any time to process incoming requests. As a result, requests received at the same time are processed sequentially, one after the other. Let's check this quickly.
 
-<Tabs groupId="lang" queryString>
-  <TabItem value="rust" label="Rust">
-
 For test and demonstration purposes, we add a simple `sleep` to the handler to simulate a longer processing time:
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="go" label="Go">
+
+```go
+//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"time" // [!code ++]
+
+	atomics "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen/wasi/keyvalue/atomics"
+	store "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen/wasi/keyvalue/store"
+	"go.wasmcloud.dev/component/log/wasilog"
+	"go.wasmcloud.dev/component/net/wasihttp"
+)
+
+func init() {
+	// Register the handleRequest function as the handler for all incoming requests.
+	wasihttp.HandleFunc(handleRequest)
+}
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	logger := wasilog.ContextLogger("handleRequest")
+
+	name := "World"
+	if len(r.FormValue("name")) > 0 {
+		name = r.FormValue("name")
+	}
+	logger.Info("Greeting", "name", name)
+
+	sleep := 2 * time.Second // [!code ++:3]
+	logger.Info(fmt.Sprintf("Sleep for %v to simulate longer processing time", sleep))
+	time.Sleep(sleep)
+
+	kvStore := store.Open("default")
+	if err := kvStore.Err(); err != nil {
+		w.Write([]byte("Error: " + err.String()))
+		return
+	}
+	value := atomics.Increment(*kvStore.OK(), name, 1)
+	if err := value.Err(); err != nil {
+		w.Write([]byte("Error: " + err.String()))
+		return
+	}
+
+	logger.Info(fmt.Sprintf("Replying greeting 'Hello x%d, %s!'", *value.OK(), name)) // [!code ++]
+
+	fmt.Fprintf(w, "Hello x%d, %s!\n", *value.OK(), name)
+}
+
+// Since we don't run this program like a CLI, the `main` function is empty. Instead,
+// we call the `handleRequest` function when an HTTP request is received.
+func main() {}
+```
+
+  </TabItem>
+  <TabItem value="rust" label="Rust">
 
 ```rust
 ...
@@ -64,7 +121,7 @@ struct HttpServer;
 The response time of our hello handler is very low. To show that requests are not processed in parallel, we need to ensure a longer response time, which we can exploit in our tests.
 :::
 
-Again we've made changes, so run `wash build` again to compile the updated Wasm component.
+Because we've made changes, run `wash build` again to compile the updated Wasm component.
 
 ```bash
 wash build
@@ -91,9 +148,9 @@ curl: (28) Operation timed out after 3001 milliseconds with 0 bytes received
 ```
 
   </TabItem>
-  <TabItem value="Windows Powershell" label="Windows Powershell">
+  <TabItem value="Windows" label="Windows">
 
-```bash
+```powershell
 > wash app deploy wadm.yaml
 > 1..10 | ForEach-Object -Parallel { curl --max-time 3 'localhost:8080?name=Alice' }
 Hello x1, Alice!
@@ -190,9 +247,9 @@ Hello x10, Bob!
 ```
 
   </TabItem>
-  <TabItem value="Windows Powershell" label="Windows Powershell">
+  <TabItem value="Windows" label="Windows">
 
-```bash
+```powershell
 > wash app deploy wadm.yaml
 > 1..10 | ForEach-Object -Parallel { curl --max-time 3 'localhost:8080?name=Bob' }
 Hello x1, Bob!
