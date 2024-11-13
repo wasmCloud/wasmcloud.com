@@ -81,12 +81,11 @@ use std::{thread, time}; // [!code ++]
 
 struct HttpServer;
 ...
-        {
-            // query string is "/?name=<name>" e.g. localhost:8080?name=Bob
-            ["/?name", name] => name.to_string(),
-            // query string is anything else or empty e.g. localhost:8080
-            _ => "World".to_string(),
-        };
+        wasi::logging::logging::log(
+            wasi::logging::logging::Level::Info,
+            "",
+            &format!("Greeting {name}"),
+        );
 
         let sleep = time::Duration::from_secs(2); // [!code ++:7]
         wasi::logging::logging::log(
@@ -113,6 +112,39 @@ struct HttpServer;
             .blocking_write_and_flush(format!("Hello x{count}, {name}!\n").as_bytes())
             .unwrap();
 ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+  ```typescript
+  ...
+    // Write to the response stream
+    const name = getNameFromPath(req.pathWithQuery() || '');
+
+    log('info', '', `Greeting ${name}`);
+
+    const sleep = 2000; // [!code ++:3]
+    log('info', '', `Sleep for ${sleep} to simulate longer processing time`);
+    await new Proise(resolve => setTimeout(resolve, sleep));
+
+    // Increment the bucket's count
+    const bucket = open('default');
+    const count = increment(bucket, name, 1);
+
+    log('info', '', `Replying greeting - Hello x{count}, {name}!`); // [!code ++]
+
+    {
+      // Create a stream for the response body
+      let outputStream = outgoingBody.write();
+      // Write hello world to the response stream
+      outputStream.blockingWriteAndFlush(
+        new Uint8Array(new TextEncoder().encode(`Hello x${count}, ${name}!\n`)),
+      );
+      // @ts-ignore: This is required in order to dispose the stream before we return
+      outputStream[Symbol.dispose]();
+    }
+  ...
+  ```
 
   </TabItem>
 </Tabs>
@@ -202,7 +234,7 @@ TBD
 :::
 
 To receive multiple requests in parallel, we need to instruct wasmCloud to scale our component according to the incoming load.
-WebAssembly can be easily scaled due to its small size, portability, and [wasmtime](https://wasmtime.dev/)'s ability to efficiently instantiate multiple instances of a single WebAssembly component. We leverage these aspects to make it simple to scale your applications with wasmCloud. Components only use resources when they're actively processing requests, so you can specify the number of replicas you want to run and wasmCloud will automatically scale up and down to meet demand. Let's scale up our hello world application to 100 replicas by editing `wadm.yaml`:
+WebAssembly can be easily scaled due to its small size, portability, and [wasmtime](https://wasmtime.dev/)'s ability to efficiently instantiate multiple instances of a single WebAssembly component. We leverage these aspects to make it simple to scale your applications with wasmCloud. Components only use resources when they're actively processing requests, so you can specify the number of replicas you want to run and wasmCloud will automatically scale up and down to meet demand. Let's allow our hello world application to scale up to 100 instances simultaneously by editing `wadm.yaml`:
 
 ```yaml {15-17}
 apiVersion: core.oam.dev/v1beta1
@@ -226,7 +258,7 @@ spec:
 ...
 ```
 
-Now our hello component is ready to be deployed as version 0.0.3 with 100 replicas, meaning it can handle up to 100 simultaneous incoming HTTP requests. Just run `wash app deploy wadm.yaml` again and wasmCloud will be able to automatically scale the component according to the incoming load. Let's deploy the component and try again to send multiple requests in parallel.
+Now our hello component is ready to be deployed as version 0.0.3 with up to 100 instances, meaning it can handle up to 100 simultaneous incoming HTTP requests. Just run `wash app deploy wadm.yaml` again and wasmCloud will be able to automatically scale the component according to the incoming load. Let's deploy the component and try again to send multiple requests in parallel.
 
 <Tabs groupId="lang" queryString>
   <TabItem value="Linux/macOS" label="Linux/macOS">
@@ -268,7 +300,7 @@ Hello x10, Bob!
 </Tabs>
 
 :::note[Utilization planing is important]
-As you have seen, if a component receives too many requests in parallel, it may break down and wasmCloud will not be able to forward further requests. Therefore, it is important to plan and manage the specified number of replicas for Spreadscaler components according to the expected load.
+As you have seen, if a component receives too many requests in parallel, it may break down and wasmCloud will not be able to forward further requests. Therefore, it is important to plan and manage the specified maximum number of concurrent instances for Spreadscaler components according to the expected load.
 :::
 
 ## Distribute Globally 🌍
