@@ -14,7 +14,7 @@ So far, our hello world application can only handle a single request at a time. 
 For test and demonstration purposes, we add a simple `sleep` to the handler to simulate a longer processing time:
 
 <Tabs groupId="lang" queryString>
-  <TabItem value="go" label="Go">
+  <TabItem value="tinygo" label="Go">
 
 ```go
 //go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
@@ -74,43 +74,48 @@ func main() {}
   <TabItem value="rust" label="Rust">
 
 ```rust
-...
-use exports::wasi::http::incoming_handler::Guest;
-use wasi::http::types::*;
+use wasmcloud_component::http::ErrorCode;
+use wasmcloud_component::wasi::keyvalue::*;
+use wasmcloud_component::{http, info};
 use std::{thread, time}; // [!code ++]
 
-struct HttpServer;
-...
-        wasi::logging::logging::log(
-            wasi::logging::logging::Level::Info,
-            "",
-            &format!("Greeting {name}"),
-        );
+struct Component;
 
-        let sleep = time::Duration::from_secs(2); // [!code ++:7]
-        wasi::logging::logging::log(
-          wasi::logging::logging::Level::Info,
-          "",
-          &format!("Sleep for {} to simulate longer processing time", sleep.as_secs()),
-        );
+http::export!(Component);
+
+impl http::Server for Component {
+    fn handle(
+        request: http::IncomingRequest,
+    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
+        let (parts, _body) = request.into_parts();
+        let query = parts
+            .uri
+            .query()
+            .map(ToString::to_string)
+            .unwrap_or_default();
+        let name = match query.split("=").collect::<Vec<&str>>()[..] {
+            ["name", name] => name,
+            _ => "World",
+        };
+
+        info!("Greeting {name}");
+
+        let sleep = time::Duration::from_secs(2); // [!code ++:3]
+        info!("Sleep for {} to simulate longer processing time", sleep.as_secs());
         thread::sleep(sleep);
 
-        let bucket =
-            wasi::keyvalue::store::open("").expect("failed to open empty bucket");
-        let count = wasi::keyvalue::atomics::increment(&bucket, &name, 1)
-            .expect("failed to increment count");
+        let bucket = store::open("default").map_err(|e| {
+            ErrorCode::InternalError(Some(format!("failed to open KV bucket: {e:?}")))
+        })?;
+        let count = atomics::increment(&bucket, &name, 1).map_err(|e| {
+            ErrorCode::InternalError(Some(format!("failed to increment counter: {e:?}")))
+        })?;
 
-        wasi::logging::logging::log( // [!code ++:5]
-            wasi::logging::logging::Level::Info,
-            "",
-            &format!("Replying greeting 'Hello x{count}, {name}!'"),
-        );
+        info!("Replying greeting 'Hello x{count}, {name}!'"); // [!code ++]
 
-        response_body
-            .write()
-            .unwrap()
-            .blocking_write_and_flush(format!("Hello x{count}, {name}!\n").as_bytes())
-            .unwrap();
+        Ok(http::Response::new(format!("Hello x{count}, {name}!\n")))
+    }
+}
 ```
 
   </TabItem>
@@ -217,20 +222,39 @@ As you can see, only the first `curl` command receives the expected response in 
 2024-10-20T19:29:38.933227Z  INFO log: wasmcloud_host::wasmbus::handler: Replying greeting 'Hello x4, Bob!' component_id="rust_hello_world-http_component" level=Level::Info context=""
 ```
 
-:::note[Checking the `DEBUG` logs of the wasmCloud host]
-You can also check the wasmCloud host's `DEBUG` logs for more detailed information. In these logs, you can clearly see that for received requests, our hello component is instantiated sequentially.
+:::note[Checking the `DEBUG` or `TRACE` logs of the wasmCloud host]
+You can also check the wasmCloud host's `DEBUG` or `TRACE` logs for more detailed information (e.g. using `wash up --log-level=debug`). In these logs, you can clearly see that for received requests, our hello component is instantiated sequentially.
 :::
 
 If you wish, you can also use `wash spy` to check which messages the capability providers and the hello component have received and sent
+
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="tinygo" label="Go">
+
+```bash
+wash spy --experimental tinygo_hello_world-http_component
+```
+
+  </TabItem>
+  <TabItem value="rust" label="Rust">
 
 ```bash
 wash spy --experimental rust_hello_world-http_component
 ```
 
-:::note[Why are not all requests forwarded to our component?]
-TBD
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
 
-**Note:** After multiple requests were received but timed out, it is no longer possible to send further requests to our hello application for the reasons mentioned above. To continue, we must first delete and redeploy our application.
+```bash
+wash spy --experimental typescript_hello_world-http_component
+```
+
+  </TabItem>
+</Tabs>
+
+:::note[Requests are not forwarded to our component anymore]
+After multiple requests were received but timed out, it is no longer possible to send further requests to our hello application. The reason for this is that the httpserver capability provider is no longer able to invoke the hello component via NATS. To continue, we must first delete and redeploy our application.
 :::
 
 To receive multiple requests in parallel, we need to instruct wasmCloud to scale our component according to the incoming load.
