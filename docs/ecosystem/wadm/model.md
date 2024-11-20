@@ -76,14 +76,14 @@ To define a **capability provider**, we include a `capability` component, as fol
 
 ```yaml
 - name: keyvalue
-      type: capability
-      properties:
-        image: ghcr.io/wasmcloud/keyvalue-redis:0.27.0
-        id: kvredis
-        config:
-          - name: url
-            properties:
-              url: redis://127.0.0.1:6379
+  type: capability
+  properties:
+    image: ghcr.io/wasmcloud/keyvalue-redis:0.27.0
+    id: kvredis
+    config:
+      - name: url
+        properties:
+        url: redis://127.0.0.1:6379
 ```
 
 Just like when manipulating a lattice _imperatively_, the thing that differentiate one capability provider from another is its `id`, which can be specified here or ommitted in favor of wadm generating an identifier (recommended.). Configuration can be specified here for the provider and it will be accessible at runtime via the data passed to the provider, see the [keyvalue-redis](https://github.com/wasmCloud/wasmCloud/blob/main/crates/provider-keyvalue-redis/src/lib.rs#L64) provider for example usage.
@@ -105,17 +105,17 @@ Take a look at the following sample `spreadscaler` spec:
 ```yaml
 traits:
 - type: spreadscaler
-    properties:
+  properties:
     instances: 4
     spread:
-        - name: eastcoast
-          weight: 80
-          requirements:
-            zone: us-east-1
-        - name: westcoast
-          weight: 20
-          requirements:
-            zone: us-west-1
+    - name: eastcoast
+      weight: 80
+      requirements:
+        zone: us-east-1
+    - name: westcoast
+      weight: 20
+      requirements:
+        zone: us-west-1
 ```
 
 This definition states that, for this component (a spread scaler can apply to a `component` or `capability`), you want a total of 4 instances, with 80% of them going to hosts with the `zone` label set to `us-east-1` and 20% of them going to hosts with the `zone` label set to `us-west-1`. Because this system uses labels as selectors, and you can set any arbitrary label on your hosts, you can define practically any conditions for the spread rules.
@@ -125,7 +125,7 @@ If you leave the `requirements` section blank then all hosts will be considered 
 ```yaml
 traits:
 - type: spreadscaler
-    properties:
+  properties:
     instances: 4
 ```
 
@@ -138,15 +138,15 @@ The `daemonscaler` trait is an alternative to the `spreadscaler` trait. It is a 
 ```yaml
 traits:
 - type: daemonscaler
-    properties:
-      instances: 4
-      spread:
-          - name: eastcoast
-          requirements:
-              zone: us-east-1
-          - name: westcoast
-          requirements:
-              zone: us-west-1
+  properties:
+    instances: 4
+    spread:
+    - name: eastcoast
+      requirements:
+        zone: us-east-1
+    - name: westcoast
+      requirements:
+        zone: us-west-1
 ```
 
 Note that this looks similar to the above `spreadscaler` spec, but the `daemonscaler` is responsible for running a certain number of instances of a component on _every host_ that matches the label requirements. So, instead of running **4** total instances, it will run **4** instances on every host that either has the `zone` label set to `us-east-1` or `us-west-1`. If you leave off the `spread` key entirely, it will run the specified number of instances on _every host_ in your lattice.
