@@ -14,4 +14,4 @@ The following page on wadm API usage is an overview of the high-level functional
 wash app --help
 ```
 
-Please refer the [CLI reference](/docs/cli/#wash-app) of `wash app` for a detailed usage guide.
+Please refer the [CLI reference](/docs/cli/wash#wash-app) of `wash app` for a detailed usage guide.

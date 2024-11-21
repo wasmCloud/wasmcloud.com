@@ -7,7 +7,7 @@ draft: false
 
 When you're ready to publish your provider, you can push it to an OCI registry. First-party wasmCloud providers are [hosted on GitHub Packages](https://ghcr.io/wasmcloud/wasmcloud), for example, but any OCI-compliant registry is supported.
 
-You can use [`wash push`](/docs/cli/#wash-push) to push your provider to the registry:
+You can use [`wash push`](/docs/cli/wash#wash-push) to push your provider to the registry:
 
 ```shell
 wash push your.registry.io/messaging-nats:0.0.1 /path/to/artifact
