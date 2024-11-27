@@ -2,11 +2,14 @@ import * as React from 'react';
 
 const LIVE_NOW = 'Live now!';
 
-/** This one is specifically used to set the time using Date.setUTCHours()
- */
-type TimeHourMinuteSecondMilli = [number, number, number, number];
-const START: TimeHourMinuteSecondMilli = [17, 0, 0, 0];
-const END: TimeHourMinuteSecondMilli = [18, 0, 0, 0];
+const DAYS_MS = 24 * 60 * 60 * 1000;
+const HOURS_MS = 60 * 60 * 1000;
+const MINUTES_MS = 60 * 1000;
+const TEN_MINUTES_MS = 10 * MINUTES_MS;
+
+const MEETING_DAY = 3; // Wednesday
+const MEETING_HOUR = 13; // 1pm
+const MEETING_LENGTH = 1; // 1 hour
 
 function useIsLive() {
   const [countdown, setCountdown] = React.useState('Join us!');
@@ -16,23 +19,27 @@ function useIsLive() {
 
     function updateCountdown() {
       const now = new Date();
-      const wednesday = getWednesday();
-      const [start, end] = getStartEnd(wednesday);
+      try {
+        const [start, end] = getStartEnd();
 
-      if (now >= start && now <= end) {
-        setCountdown(LIVE_NOW);
-      } else {
-        // calculate the time until the next wasmCloud Wednesday
-        const diff = wednesday.getTime() - now.getTime();
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        if (now >= start && now <= end) {
+          setCountdown(LIVE_NOW);
+        } else {
+          // calculate the time until the next wasmCloud Wednesday
+          const diff = start.getTime() - now.getTime();
+          const days = Math.floor(diff / DAYS_MS);
+          const hours = Math.floor((diff % DAYS_MS) / HOURS_MS);
+          const minutes = Math.floor((diff % HOURS_MS) / MINUTES_MS);
 
-        // update the countdown
-        setCountdown(`${days ? `${days}d ` : ''}${hours ? `${hours}h ` : ''}${minutes}m`);
+          // update the countdown
+          setCountdown(`${days ? `${days}d ` : ''}${hours ? `${hours}h ` : ''}${minutes}m`);
+        }
+
+        timeout = setTimeout(updateCountdown, 60 * 1000); // 60 seconds
+      } catch {
+        // unable to determine dates, just show the default message
+        setCountdown('Join us!');
       }
-
-      timeout = setTimeout(updateCountdown, 60 * 1000); // 60 seconds
     }
 
     updateCountdown();
@@ -43,37 +50,62 @@ function useIsLive() {
   }, []);
 
   const isLive = countdown === LIVE_NOW;
-  const wednesday = getWednesday();
-  const [start, end] = getStartEnd(wednesday);
-  const tenMinutesBefore = new Date(start.getTime() - 10 * 60 * 1000);
+  const [start] = getStartEnd();
+  const tenMinutesBeforeStart = new Date(start.getTime() - TEN_MINUTES_MS);
   const now = new Date();
-  const showLinks = isLive || now >= tenMinutesBefore;
+  const showLinks = isLive || now >= tenMinutesBeforeStart;
 
-  return { countdown, isLive, showLinks, wednesday, start, end };
+  return { countdown, isLive, showLinks };
 }
 
-function getWednesday() {
-  const now = new Date();
-  const wednesday = new Date();
-  wednesday.setUTCHours(...START);
-  if (now.getUTCDay() <= 3) {
-    wednesday.setDate(wednesday.getDate() + (3 - now.getUTCDay()));
+function getStartEnd() {
+  const now = new Date(getTimeInNYC());
+  const start = new Date(getTimeInNYC({ hour: MEETING_HOUR, minute: 0 }));
+
+  const meetingDayIsLaterThisWeek = now.getDay() < MEETING_DAY;
+  const meetingDayIsToday = now.getDay() === MEETING_DAY;
+  const meetingIsNotOver = meetingDayIsToday && now.getHours() < MEETING_HOUR + MEETING_LENGTH;
+
+  if (meetingDayIsLaterThisWeek || (meetingDayIsToday && meetingIsNotOver)) {
+    start.setDate(start.getDate() + (start.getDay() - MEETING_DAY));
   } else {
-    wednesday.setDate(wednesday.getDate() + (10 - now.getUTCDay()));
+    start.setDate(start.getDate() + (MEETING_DAY + 7 - start.getDay()));
   }
-  const [, end] = getStartEnd(wednesday);
-  if (now >= end) {
-    wednesday.setDate(wednesday.getDate() + 7);
-  }
-  return wednesday;
+
+  const end = new Date(start);
+  end.setHours(start.getHours() + MEETING_LENGTH);
+
+  return [start, end];
 }
 
-function getStartEnd(time) {
-  const start = new Date(time.getTime());
-  start.setUTCHours(...START);
-  const end = new Date(time.getTime());
-  end.setUTCHours(...END);
-  return [start, end];
+function getTimeInNYC({ hour, minute }: { hour?: number; minute?: number } = {}) {
+  const now = new Date();
+  now.setHours(hour ?? now.getHours(), minute ?? now.getMinutes(), 0, 0);
+
+  // Using Intl.DateTimeFormat to get the NYC TZ offset in the format we need. This
+  // accounts for Wednesdays that are in daylight saving time.
+  const offsetToNy = parseInt(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Australia/Sydney',
+      timeZoneName: 'shortOffset',
+      hour: 'numeric',
+    })
+      .formatToParts()
+      .find(({ type }) => type === 'timeZoneName')
+      .value.replace(/GMT([+-]\d+)/, '$1'),
+    10,
+  );
+
+  // Adjust the current UTC time to NYC time by adding the offset
+  now.setUTCHours(now.getUTCHours() + offsetToNy);
+
+  // Format the offset to a string with leading zero like "+05:00"
+  const prefix = offsetToNy < 0 ? '-' : '+';
+  const padding = Math.abs(offsetToNy) < 10 ? '0' : '';
+  const offsetString = `${prefix}${padding}${Math.abs(offsetToNy)}:00`;
+
+  // Return the time in NYC as an ISO string, replacing the Z with the correct timezone offset
+  return now.toISOString().replace(/Z$/, offsetString);
 }
 
 export default useIsLive;
