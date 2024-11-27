@@ -2,7 +2,6 @@ import React from 'react';
 import { Section, SectionColor } from '@site/src/pages/_components/section';
 import { SectionHeading } from '@site/src/pages/_components/section-heading';
 import { SectionTag } from '@site/src/pages/_components/section-tag';
-import useIsLive from '@site/src/pages/_hooks/use-is-live';
 import styles from './get-involved.module.css';
 import { Links } from '@site/src/constants';
 import { SectionContent } from '@site/src/pages/_components/section-content';
