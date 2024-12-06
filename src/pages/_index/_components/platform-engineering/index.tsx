@@ -29,14 +29,14 @@ const SECTION_CONTENT: {
   ),
 };
 
-const VIDEO_CONTENT: [UseCasesContent, UseCasesContent] = [
+const VIDEO_CONTENT: [UseCasesContent, UseCasesContent, UseCasesContent] = [
   {
-    name: 'Platform Engineering with wasmCloud',
+    name: 'Elevating Serverless Platforms with Wasm',
     url: 'https://www.youtube.com/watch?v=wRsBQkP2rPY&list=PL25tdRgIAXStcnLCeE_GUTjbTNxFaDnBJ&index=1',
     content: (
       <>
         <p>
-          The CNCF wasmCloud playlist on YouTube includes the lastest sessions exploring organizations' platform engineering use-cases for wasmCloud.
+          Vamsi Sangavarapu and Ritesh Rai of American Express explore how Wasm and CNCF wasmCloud are revolutionizing their enterprise multi-tenant Function-as-a-Service platform.
         </p>
       </>
     ),
@@ -49,6 +49,19 @@ const VIDEO_CONTENT: [UseCasesContent, UseCasesContent] = [
         <p>
           Colin Murphy from Adobe and Douglas Rodrigues from Akamai discuss how they use CNCF wasmCloud to run WebAssembly across
           cloud services, Kubernetes clusters, and edges.
+        </p>
+      </>
+    ),
+  },
+  {
+    name: 'Distributed Capabilities: Wasm on the Factory Floor',
+    url: 'https://www.youtube.com/watch?v=fQdkNGZqYZA',
+    content: (
+      <>
+        <p>
+          Jochen Rau and Tyler Schoppe demonstrate how Machine Metrics is using CNCF wasmCloud
+          to move platform capabilities across edges and clouds with redundancy and dynamic
+          fault-tolerance.
         </p>
       </>
     ),
