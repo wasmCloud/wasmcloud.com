@@ -31,14 +31,12 @@ const SECTION_CONTENT: {
 
 const VIDEO_CONTENT: [UseCasesContent, UseCasesContent] = [
   {
-    name: 'Distributed Capabilities',
-    url: 'https://www.youtube.com/watch?v=fQdkNGZqYZA',
+    name: 'Platform Engineering with wasmCloud',
+    url: 'https://www.youtube.com/watch?v=wRsBQkP2rPY&list=PL25tdRgIAXStcnLCeE_GUTjbTNxFaDnBJ&index=1',
     content: (
       <>
         <p>
-          Jochen Rau and Tyler Schoppe demonstrate how Machine Metrics is utilizing Wasm components
-          to move platform capabilities across edges and clouds with redundancy and dynamic
-          fault-tolerance using CNCF wasmCloud.
+          The CNCF wasmCloud playlist on YouTube includes the lastest sessions exploring organizations' platform engineering use-cases for wasmCloud.
         </p>
       </>
     ),
