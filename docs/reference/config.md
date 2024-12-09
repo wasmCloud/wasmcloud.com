@@ -93,7 +93,81 @@ See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/w
 | html_target    | string | `./html` | Directory to output HTML  |
 | codegen_config | string | `.`      | Path to codegen.toml file |
 
-### Overrides config - `[overrides]`
+### WIT dependency fetch/pull configuration - `[registry.pull]`
+
+When fetching or pulling WIT interfaces, it can be useful to provide and/or override paths that are used by default. This effect can be achieved with the `pull` member of the `registry` configuration section.
+
+Configuration for `registry.pull` can be specified as a TOML table, as in the following example `wasmcloud.toml`:
+
+```toml
+name = "example-component"
+language = "rust"
+type = "component"
+
+[component]
+wasm_target = "wasm32-wasip2"
+
+[registry.pull]
+sources = [
+    { target = "wasmcloud:bus", source = "oci://ghcr.io/wasmcloud/targets" },
+    { target = "test-components:testing", source = "file://extra-wit/pingpong.wit" },
+    { target = "wasi:config", source = "https://github.com/WebAssembly/wasi-config/archive/v0.2.0-draft.tar.gz" },
+    { target = "wasi:blobstore", source = "git+https://github.com/WebAssembly/wasi-blobstore.git" },
+    { target = "wasi:messaging", source = "git+ssh://github.com/WebAssembly/wasi-messaging.git" },
+]
+```
+
+Configuration for `registry.pull` can also be specified as TOML array fo tables, as in the following *equivalent* `wasmcloud.toml`:
+
+```toml
+name = "example-component"
+language = "rust"
+type = "component"
+
+[component]
+wasm_target = "wasm32-wasip2"
+
+[[registry.pull.sources]]
+target = "wasmcloud:bus"
+source = "oci://ghcr.io/wasmcloud/targets"
+
+[[registry.pull.sources]]
+target = "test-components:testing"
+source = "file://extra-wit/pingpong.wit"
+
+[[registry.pull.sources]]
+target = "wasi:config"
+source = "https://github.com/WebAssembly/wasi-config/archive/v0.2.0-draft.tar.gz"
+
+[[registry.pull.sources]]
+target = "wasi:blobstore"
+source = "git+https://github.com/WebAssembly/wasi-blobstore.git"
+
+[[registry.pull.sources]]
+target = "wasi:messaging"
+source = "git+ssh://github.com/WebAssembly/wasi-messaging.git"
+```
+
+The two above configurations have an identical effect.
+
+The `target` used for an override can be at multiple levels:
+
+- Namespace (ex. `wasi`)
+- Package (ex. `wasi:config`)
+
+For advanced use cases, overrides can also be specified with versions like so:
+
+```toml
+[[registry.pull.sources]]
+target = "wasi:messaging@0.2.1-draft"
+source = "git+ssh://github.com/WebAssembly/wasi-messaging.git"
+```
+
+### Overrides config (local files only) - `[overrides]`
+
+:::warning[deprecated]
+`overrdies` works, but is deprecated in favor of `registry.pull.sources`.
+:::
 
 Overrides are key-value pairs that can be used to override locations of wit dependencies. The key name should match the package reference without a version (e.g. `wasi:http`).
 
