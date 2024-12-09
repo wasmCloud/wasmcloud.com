@@ -93,7 +93,89 @@ See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/w
 | html_target    | string | `./html` | Directory to output HTML  |
 | codegen_config | string | `.`      | Path to codegen.toml file |
 
-### Overrides config - `[overrides]`
+### WIT dependency fetch/pull configuration - `[registry].pull`
+
+When fetching or pulling [WIT][wit] interfaces (e.g. [`wasi:keyvalue`][wasi-keyvalue], [`wasi:http`][wasi-http]), it can be useful to provide and/or override default sources.
+This effect can be achieved with the `pull` member of the `[registry]` configuration section in `wasmcloud.toml`.
+
+Configuration for `[registry].pull` can be specified as a TOML table, as in the following example `wasmcloud.toml`:
+
+```toml
+name = "example-component"
+language = "rust"
+type = "component"
+
+[component]
+wasm_target = "wasm32-wasip2"
+
+[registry.pull]
+sources = [
+    { target = "wasmcloud:bus", source = "oci://ghcr.io/wasmcloud/targets" },
+    { target = "test-components:testing", source = "file://extra-wit/pingpong.wit" },
+    { target = "wasi:config", source = "https://github.com/WebAssembly/wasi-config/archive/v0.2.0-draft.tar.gz" },
+    { target = "wasi:blobstore", source = "git+https://github.com/WebAssembly/wasi-blobstore.git" },
+    { target = "wasi:messaging", source = "git+ssh://github.com/WebAssembly/wasi-messaging.git" },
+]
+```
+
+Configuration for `registry.pull` can also be specified as a TOML array of tables, as in the following *equivalent* `wasmcloud.toml`:
+
+```toml
+name = "example-component"
+language = "rust"
+type = "component"
+
+[component]
+wasm_target = "wasm32-wasip2"
+
+[[registry.pull.sources]]
+target = "wasmcloud:bus"
+source = "oci://ghcr.io/wasmcloud/targets"
+
+[[registry.pull.sources]]
+target = "test-components:testing"
+source = "file://extra-wit/pingpong.wit"
+
+[[registry.pull.sources]]
+target = "wasi:config"
+source = "https://github.com/WebAssembly/wasi-config/archive/v0.2.0-draft.tar.gz"
+
+[[registry.pull.sources]]
+target = "wasi:blobstore"
+source = "git+https://github.com/WebAssembly/wasi-blobstore.git"
+
+[[registry.pull.sources]]
+target = "wasi:messaging"
+source = "git+ssh://github.com/WebAssembly/wasi-messaging.git"
+```
+
+The two above configurations have an identical effect.
+
+The `target` used for an override can be at multiple levels:
+
+- Namespace (ex. `wasi`)
+- Package (ex. `wasi:config`)
+
+For advanced use cases, overrides can also be specified with versions like so:
+
+```toml
+[[registry.pull.sources]]
+target = "wasi:messaging@0.2.1-draft"
+source = "git+ssh://github.com/WebAssembly/wasi-messaging.git"
+```
+
+[wit]: https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md
+[wasi-keyvalue]: https://github.com/WebAssembly/wasi-keyvalue
+[wasi-http]: https://github.com/WebAssembly/wasi-http
+
+### Overrides config (local files only) - `[overrides]`
+
+:::warning[deprecated]
+The `[overrides]` section differs from `[registry].pull` in that it only intended for *local file based overrides*. The `[registry].pull` supports overriding OCI registries,
+files, and other sources for WIT packages.
+
+While projects that use `[overrides]` will continue to work, consider migrating to use `[registry].pull`.
+:::
 
 Overrides are key-value pairs that can be used to override locations of wit dependencies. The key name should match the package reference without a version (e.g. `wasi:http`).
 
