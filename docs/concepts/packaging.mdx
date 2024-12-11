@@ -1,0 +1,86 @@
+---
+title: "Packaging"
+icon: 'ti-anchor' # themify icon pack : https://themify.me/themify-icons
+description: 'Packaging and distribution with OCI artifacts'
+sidebar_position: 8
+type: 'docs'
+---
+## Overview
+
+The wasmCloud ecosystem uses the [Open Container Initiative (OCI) image specification](https://github.com/opencontainers/image-spec) to package components, providers, and WIT interfaces as OCI artifacts.
+
+While we sometimes refer to them as "images," these artifacts **are not *container* images**—nonetheless, they conform to OCI standards and may be stored on any OCI-compatible registry. You can think of the OCI artifact layer as a thin shell of metadata wrapped around the component, WIT interface, or provider.
+
+Using the OCI specification for packaging means:
+
+- **wasmCloud can integrate** with organizations' existing cloud native tooling such as registries.
+- **Components and WIT interfaces are portable** across the WebAssembly (Wasm) ecosystem, which uses OCI as a common packaging standard.
+
+## WebAssembly and OCI artifacts
+
+The OCI specification enables users to create "artifacts," providing a standard set of guidelines for packaging objects other than container images.
+
+WebAssembly components are a compelling use-case for OCI artifacts because, unlike containers, the same WebAssembly binary can run on any architecture or operating system. WebAssembly components can leverage the existing base of OCI tooling, enabling organizations to easily start packaging, distributing, and running components with OCI artifacts across environments.
+
+## wasmCloud and OCI artifacts
+
+In the wasmCloud ecosystem, we use OCI images in two primary contexts:
+
+- Packaging parts of an application (e.g. components and providers)
+- WIT interface dependency management
+
+Both of these use-cases are aligned with the wider [WebAssembly ecosystem's implementation of OCI for component packaging](https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/) and WIT interface dependency management, making both components and interfaces portable across platforms adopting open standards.
+
+While it shouldn’t bear on day-to-day use, note that capability providers are stored as OCI packages in a wasmCloud-specific format distinct from the OCI artifact format used for components.
+
+### Publishing components and providers as OCI artifacts
+
+You can publish components and providers as OCI artifacts using the wasmCloud Shell (`wash`) CLI.
+
+You can learn more about publishing component artifacts to registries (and pulling them for local use) [on the Publishing page in the Developer Guide for components](/docs/developer/components/publish). This page outlines how to authenticate to a registry and provide credentials via environment variables, command line flags, or a `wasmcloud.toml` configuration file.
+
+You can learn more about publishing provider artifacts to registries [on the Publishing page in the Developer Guide for providers](/docs/developer/providers/publish).
+
+### Running components and providers from OCI artifacts
+
+Once a component or provider is published to a registry, you can include it in a [wasmCloud Application Deployment Manager (`wadm`)](/docs/ecosystem/wadm/) application manifest, like so:
+
+```yaml
+- name: http-server
+  type: capability
+  properties:
+    image: ghcr.io/wasmcloud/http-server:0.23.2
+```
+
+In the manifest excerpt above, the `http-server` capability provider is included in an application via an artifact (or "image") stored on a GitHub Packages registry. You can learn more about application manifests on the [Defining Applications](/docs/ecosystem/wadm/model) page.
+
+When an application is deployed, the wasmCloud host fetches the artifact from the specified registry address and caches the contents in a local directory called `wasmcloud_ocicache`. (You can drain the cache with the [`wash drain oci`](/docs/cli/wash#wash-drain-oci) or [`wash drain all`](/docs/cli/wash#wash-drain-all) commands.)
+
+No additional software outside of the wasmCloud ecosystem is required to run a component packaged as an OCI artifact—for example, you do **not** need a container runtime to run a component packaged as an OCI artifact.
+
+### WIT interface dependency management
+
+The wasmCloud (and wider WebAssembly) ecosystem uses OCI artifacts to package and distribute [WebAssembly Interface Type (WIT) interfaces](/docs/concepts/interfaces) that define the contracts between entities and typically serve as dependencies for a WebAssembly component.
+
+`wash` builds on a set of open source tooling called [Wasm Package Tools](https://github.com/bytecodealliance/wasm-pkg-tools) to handle the following jobs:
+
+- Checking for WIT package dependencies
+- Fetching WIT packages from known registries
+- Pushing packages to your own registry
+
+If you set a [well-known interface](/docs/concepts/interfaces/#well-known-interfaces) as an import or export in your specified world file (usually `world.wit`), `wash` will ensure that you have the proper packages in your project directory when you build. The tooling reads the world and downloads the appropriate dependencies automatically into the `wit/deps` directory. With no further configuration, `wash` can download dependencies from the following well-known namespaces:
+
+- `wasi`: Interfaces proposed for the common [WebAssembly System Interface (WASI) standard](https://wasi.dev/)
+- `wasmcloud`: Interfaces maintained as part of the wasmCloud project (see the [Capability Catalog](/docs/capabilities/) to find first-party interfaces)
+- `wrpc`: [Interfaces](/docs/reference/wasi/wrpc-interfaces) maintained as part of the WIT-over-RPC (wRPC) project
+- `ba`: Interfaces maintained by the [Bytecode Alliance](https://bytecodealliance.org/)
+
+For interfaces outside of those well-known namespaces (such as your own custom interfaces), you can configure `wash` and to fetch those interfaces from a given registry. See the [Developer Guide](/docs/developer/components/build#interface-dependencies-and-wash-build) for more information.
+
+## Further reading
+
+- [Official OCI Image List for Capability Providers](/docs/reference/official-oci/)
+- [OCI Registries](/docs/deployment/netconf/registries)
+- [Developer Guide: Components - Publish](/docs/developer/components/publish)
+- [Developer Guide: Providers - Publish](/docs/developer/providers/publish)
+- [Developer Guide: Components - Build (Interface Dependencies)](/docs/developer/components/build#interface-dependencies-and-wash-build)
