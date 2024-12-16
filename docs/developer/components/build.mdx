@@ -8,36 +8,56 @@ draft: false
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The [wash CLI](/docs/installation) includes a `build` command that is used to build all [components](/docs/concepts/components). The [`wash build`](/docs/cli/wash#wash-build) CLI reference page has more information on each of the command's flags. The rest of this page will focus on practical examples of using the `wash build` command.
+The [`wash` CLI command](/docs/installation) includes a `build` subcommand that can be used to build [WebAssembly components](/docs/concepts/components).
 
-You can see the list of supported [languages](/docs/reference/config#wasmcloudtoml-spec) in the `wasmcloud.toml` specification. At the time of writing this guide, this includes Rust and TinyGo. If a language is supported in the `wasmcloud.toml` specification, then you can build it simply with:
+:::info
+See the [`wash build` CLI reference page](/docs/cli/wash#wash-build) for more information on available flags.
+:::
 
-```bash
+The rest of this page will focus on practical examples of using the `wash build` command.
+
+## Language support
+
+Some languages (like Rust and Go) have support built-in to `wash`, while others require extra customization. A list of languages
+with built-in support is published [in the `wasmcloud.toml` specification][wasmcloud-toml-spec].
+
+Example projects written in languages with native support can be built by running:
+
+```console
 wash build
 ```
 
 <Tabs groupId="lang" queryString>
     <TabItem value="rust" label="Rust" default>
 
-In a Rust project, the `wash build` command encapsulates a few commands. You can always use the standard Rust toolchain and Bytecode Alliance tools to build your components. However, the `wash build` command will automatically use the necessary tools and build your component for you. A `wash build` command performs the same tasks as the following commands using tooling from the wider ecosystem:
+While you can always use the standard Rust toolchain and Bytecode Alliance tooling (like [`wkg`][wkg] for fetching WIT packages) to build your components,
+`wash build`'s native support for Rust projects makes building components easier.
 
-```bash
-# Fetch wit dependencies
+The `wash build` subcommand performs the same tasks as the following commands using tooling from the wider ecosystem:
+
+```console
+# Fetch wit dependencies (see https://github.com/bytecodealliance/wasm-pkg-tools)
 wkg wit fetch
-# Build the Wasm module
-cargo build --release --target wasm32-wasi
-# Create a Wasm component from the Wasm module by using the wasmtime adapter
-wasm-tools component new ./target/wasm32-wasi/release/module.wasm -o ./build/component.wasm --adapt ./wasi_snapshot_preview1.wasm
-# Sign the Wasm component with your generated keys, using information in wasmcloud.toml
-wash claims sign ./build/component.wasm --destination ./build/component_s.wasm
+# Build the WebAssembly component with the native Rust toolchain
+cargo build --release --target wasm32-wasip2
+# Sign the built WebAssembly component with your generated keys, using information in wasmcloud.toml
+wash claims sign ./target/wasm32-wasip2/release/http_hello_world.wasm --destination http_hello_world_s.wasm
 ```
 
+With native support for Rust implemented in `wash build`, the above simplifies to:
+
+```console
+wash build
+```
     </TabItem>
     <TabItem value="tinygo" label="TinyGo">
 
-In a TinyGo project, the `wash build` command encapsulates a few commands. You can always use the standard Go and TinyGo toolchain and Bytecode Alliance tools to build your components. However, the `wash build` command will automatically use the necessary tools and build your component for you. A `wash build` command performs the same tasks as the following commands using tooling from the wider ecosystem:
+While you can always use the standard Go and TinyGo toolchains and Bytecode Alliance tooling (like [`wkg`][wkg] for fetching WIT packages) to build your components,
+`wash build`'s native support for Go projects makes building components easier.
 
-```bash
+The `wash build` subcommand performs the same tasks as the following commands using tooling from the wider ecosystem:
+
+```console
 # Fetch wit dependencies
 wkg wit fetch
 # Generate the types and bindings for the Wasm module
@@ -54,18 +74,36 @@ wash claims sign ./build/component.wasm --destination ./build/component_s.wasm
 rm ./build/embed.wasm ./build/module.wasm
 ```
 
+With native support for Go implemented in `wash build`, the above simplifies to:
+
+```console
+wash build
+```
+
     </TabItem>
 
     <TabItem value="typescript" label="TypeScript">
 
-In a TypeScript project, the wash build command must be overridden in the [wasmcloud.toml](/docs/reference/config) component section to use external tools. TypeScript builds require an [npm](https://github.com/npm/cli) installation and, after running `npm install`, use [ComponentizeJS](https://github.com/bytecodealliance/ComponentizeJS/) to compile transpiled JavaScript code into a WebAssembly Component.
+In a TypeScript project, the `wash build` subcommand must be customized (via the [`[component]` section][config-reference-component] in [wasmcloud.toml][config-reference]) to use external JS-native tooling.
+
+TypeScript builds require an installation of [NodeJS][nodejs] and [`npm`][npm]. After running `npm install`,
+[`jco`][jco] (and [ComponentizeJS][componentize-js] underneath) can be used to compile the transpiled JavaScript code into a WebAssembly Component.
 
 ```toml
 [component]
 build_command = "npm run build"
 ```
 
-In our quickstart example, a `wash build` command performs the same tasks as the following commands using tooling from the wider ecosystem:
+An example `build` script in your `package.json` might look like the following:
+
+```json
+  "scripts": {
+    "build:js": "tsc",
+    "build:component": "jco componentize -w wit -o dist/your-component.wasm dist/your-component.js",
+    "build": "npm run build:js && npm run build:component",
+```
+
+In our quickstart example, the `wash build` subcommand performs the same tasks as the following commands using tooling from the wider ecosystem:
 
 ```bash
 # Fetch wit dependencies
@@ -84,14 +122,20 @@ wash build --sign-only --config-path wasmcloud.toml
 
     <TabItem value="python" label="Python">
 
-In a Python project, the wash build command must be overridden in the [wasmcloud.toml](/docs/reference/config) component section to use external tools. Python builds require a [Python](https://www.python.org/), [pip](https://pip.pypa.io/en/stable/installation/) installation and a [componentize-py](https://github.com/bytecodealliance/componentize-py/) to compile Python code into a WebAssembly Component.
+In a Python project, the `wash build` subcommand must be customized (via the [`[component]` section][config-reference-component] in [`wasmcloud.toml`][config-reference]) to use external Python-native tooling.
+
+Python builds require an installation of [Python](https://www.python.org/), [`pip`](https://pip.pypa.io/en/stable/installation/) and [`componentize-py`](https://github.com/bytecodealliance/componentize-py/)
+(which can be installed with `pip`).
+
+With Python ecosystem tooling in place, we can compile Python code into a WebAssembly Component. Modify the `[component]` section of
+`wasmcloud.toml` to have the following `build_command`:
 
 ```toml
 [component]
 build_command = "componentize-py -d ./wit -w hello componentize app -o build/http_hello_world.wasm"
 ```
 
-In our quickstart example, a `wash build` command performs the same tasks as the following commands using tooling from the wider ecosystem:
+In our quickstart example, the `wash build` subcommand performs the same tasks as the following commands using tooling from the wider ecosystem:
 
 ```bash
 # Fetch wit dependencies
@@ -106,7 +150,9 @@ wash build --sign-only --config-path wasmcloud.toml
 
     <TabItem value="unlisted" label="My Language Isn't Listed">
 
-`wash build` has an escape hatch in the `wasmcloud.toml` specification which will let you specify your own build command for languages that we don't have official support for. For example, following the [ComponentizeJS](https://github.com/bytecodealliance/ComponentizeJS/blob/main/EXAMPLE.md) example to build a JavaScript Component, you can set up your `wasmcloud.toml` file like so:
+The `wash build` subcommand allows for building arbitrary languages into WebAssembly components via [configuring `wasmcloud.toml`][config-reference], for languages without built-in support.
+
+For example, following the [Javascript ComponentizeJS example documentation](https://github.com/bytecodealliance/ComponentizeJS/blob/main/EXAMPLE.md), you can set up your `wasmcloud.toml` file like so:
 
 ```toml
 name = "componentize-js"
@@ -120,11 +166,24 @@ build_artifact = "hello.component.wasm"
 destination = "hello_s.component.wasm"
 ```
 
-Overriding the `build_command` allows you to use an external script or command to build the component, then specifying where the `build_artifact` is (wherever the component should be after the build command completes) lets `wash` still sign the component using your generated keys and information in the `wasmcloud.toml` file. Note that this command does not have full support for environment variables or multiple commands and should be in the form of "command arg1 arg2 arg...". It's recommended to use an external script to handle more complex build commands.
+Overriding the `build_command` allows you to use an external script or command to build the component, then specifying where the `build_artifact` is (wherever the component should be after the build command completes) lets `wash` still
+sign the component using your generated keys and other configuration in `wasmcloud.toml`.
+
+Note that running `wash build` with a custom `build_command` configured does not have full support for environment variables or multiple commands
+and should be in the form of "command arg1 arg2 arg...". It's recommended to use a single external script to handle more complex build commands.
 
     </TabItem>
 
 </Tabs>
+
+[js-example-http-hello-world]: https://github.com/wasmCloud/wasmCloud/tree/main/examples/typescript/components/http-hello-world
+[wasmcloud-toml-spec]: /docs/reference/config#wasmcloudtoml-spec
+[config-reference]: /docs/reference/config
+[config-reference-component]: https://wasmcloud.com/docs/reference/config#type-config---component
+[nodejs]: https://nodejs.org
+[npm]: https://github.com/npm/cli
+[componentize-js]: https://github.com/bytecodealliance/ComponentizeJS
+[jco]: https://github.com/bytecodealliance/jco
 
 ## Interface dependencies and `wash build`
 
@@ -137,9 +196,11 @@ Without any additional configuration, `wash` can download dependencies from the 
 - `wrpc`: [Interfaces](/docs/reference/wasi/wrpc-interfaces) maintained as part of the WIT-over-RPC (wRPC) project
 - `ba`: Interfaces maintained by the [Bytecode Alliance](https://bytecodealliance.org/)
 
-In most cases, dependency fetching and management should be fairly straightforward! As your usage of Wasm grows, however, you are likely to use dependencies that are not in the above namespaces (such as internal registries or other remappings). Also, if you plan to publish any custom interfaces, you will need to configure your registry with credentials. For instructions on registry authentication, see the [Publish](./publish.mdx) page. 
+In most cases, dependency fetching and management should be fairly straightforward! As your usage of Wasm grows, however, you are likely to use dependencies that are not in the above namespaces (such as internal registries or other remappings). Also, if you plan to publish any custom interfaces, you will need to configure your registry with credentials. For instructions on registry authentication, see the [Publish](./publish.mdx) page.
 
 WIT interfaces are packaged and distributed as OCI artifacts. You can learn more about how the wasmCloud ecosystem uses OCI artifacts on the [Packaging](/docs/concepts/packaging.mdx) page.
+
+[wkg]: https://github.com/bytecodealliance/wasm-pkg-tools
 
 ### Migrating from `wit-deps`
 
