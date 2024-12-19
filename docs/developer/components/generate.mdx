@@ -9,17 +9,20 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import HubspotForm from 'react-hubspot-form';
 
-We provide example templates for creating [components](/docs/concepts/components) in Rust, TinyGo, Python, and TypeScript. You can use these templates to create a new component project, or you can use them as a reference for creating your own component from scratch. As other languages are updated to use the same component APIs that wasmtime uses, we will add templates for those languages as well.
-
 <Tabs groupId="lang" queryString>
   <TabItem value="rust" label="Rust" default>
-Creating the scaffold for a new component in Rust is easy. We will create a component that accepts an HTTP request and responds with "Hello from Rust!". To create your new component project, change to the directory where you want the project to be created, and enter the command below. The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+Let's create a component that accepts an HTTP request and responds with "Hello from Rust!" 
+
+To create your new component project, change to the directory where you want the project to be created, and enter the command below. 
+
+* The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+* Every new wasmCloud project is created from a template. If you do not specify a template, `wash` will give you options to select. In this case, we're using the `hello-world-rust` template. You can find [this template hosted in the wasmCloud monorepo](https://github.com/wasmCloud/wasmCloud/tree/main/examples/rust/components/http-hello-world). 
 
 ```bash
 wash new component hello --template-name hello-world-rust
 ```
 
-Let's change into the newly-created folder `hello` and take a look at the generated project. The file `src/lib.rs` includes a `wit-bindgen` generate macro, an imports section, a struct `HttpServer`, and an `impl` block that implements the `Guest` trait for the component struct. Let's walk through these sections in detail.
+Navigate to the new `hello` directory and take a look at the generated project. The file `src/lib.rs` includes a `wit-bindgen` generate macro, an imports section, a struct `HttpServer`, and an `impl` block that implements the `Guest` trait for the component struct. Let's walk through these sections in detail.
 
 ```rust
 wit_bindgen::generate!();
@@ -65,84 +68,73 @@ export!(HttpServer);
 
   </TabItem>
   <TabItem value="tinygo" label="TinyGo">
-Creating the scaffold for a new component in TinyGo is easy. We will create a component that accepts an HTTP request and responds with "Hello from Go!". To create your new component project, change to the directory where you want the project to be created, and enter the command below. The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+Let's create a component that accepts an HTTP request and responds with "Hello from Go!" 
+
+To create your new component project, change to the directory where you want the project to be created, and enter the command below. 
+
+* The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+* Every new wasmCloud project is created from a template. If you do not specify a template, `wash` will give you options to select. In this case, we're using the `hello-world-tinygo` template. You can find [this template hosted in the wasmCloud monorepo](https://github.com/wasmCloud/wasmCloud/tree/main/examples/golang/components/http-hello-world). 
 
 ```bash
 wash new component hello --template-name hello-world-tinygo
 ```
 
-Let's change into the newly-created folder `hello` and take a look at the generated project. The file `hello.go` will include imports, a `main` function, a `Hello` struct, and an HTTP handler. Let's walk through these pieces in depth.
+Navigate to the new `hello` directory and take a look at the generated project. The file `main.go` includes imports, `init` and `handleRequest` functions, and an empty `main` function. 
+
+Let's walk through these pieces in depth.
 
 ```go
+//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
 package main
 
 import (
-	http "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen"
+	"fmt"
+	"net/http"
+
+	"go.wasmcloud.dev/component/net/wasihttp"
 )
 
-// Helper type aliases to make code more readable
-type HttpRequest = http.ExportsWasiHttp0_2_0_IncomingHandlerIncomingRequest
-type HttpResponseWriter = http.ExportsWasiHttp0_2_0_IncomingHandlerResponseOutparam
-type HttpOutgoingResponse = http.WasiHttp0_2_0_TypesOutgoingResponse
-type HttpError = http.WasiHttp0_2_0_TypesErrorCode
-```
-
-The import section of this file is simple, we just import our generated types and bindings from the `gen` directory and create some type aliases to make the code more readable. These type aliases will go away once we aren't working with pinned release candidate versions of WASI interfaces.
-
-```go
-type HttpServer struct{}
-
 func init() {
-	httpserver := HttpServer{}
-	// Set the incoming handler struct to HttpServer
-	http.SetExportsWasiHttp0_2_0_IncomingHandler(httpserver)
+	// Register the handleRequest function as the handler for all incoming requests.
+	wasihttp.HandleFunc(handleRequest)
 }
-```
 
-The `init` section of this file is where we set the incoming handler struct to `HttpServer`. This is the struct that will handle incoming HTTP requests.
-
-```go
-func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
-	// Construct HttpResponse to send back
-	headers := http.NewFields()
-	httpResponse := http.NewOutgoingResponse(headers)
-	httpResponse.SetStatusCode(200)
-	body := httpResponse.Body().Unwrap()
-	bodyWrite := body.Write().Unwrap()
-	bodyWrite.BlockingWriteAndFlush([]uint8("Hello from Go!\n")).Unwrap()
-
-	// Send HTTP response
-	okResponse := http.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-	bodyWrite.Drop()
-	http.StaticOutgoingBodyFinish(body, http.None[http.WasiHttp0_2_0_TypesTrailers]())
-	http.StaticResponseOutparamSet(responseWriter, okResponse)
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Hello from Go!\n")
 }
-```
 
-The business logic of our component is contained within the `Handle` method. Within the `Handle` method, the component receives the HTTP request, creates an `OutgoingResponse` and writes that response out back to the requesting http client (such as a `curl` command or a web browser).
-
-```go
-//go:generate wit-bindgen tiny-go wit --out-dir=gen --gofmt
+// Since we don't run this program like a CLI, the `main` function is empty. Instead,
+// we call the `handleRequest` function when an HTTP request is received.
 func main() {}
 ```
 
-Lastly, this Go directive will ensure that when we build our project with `tinygo build`, the `wit-bindgen` tool will be run to generate the types and bindings for our component.
+* **The Go directive at the very top** ensures that when we build our project with `tinygo build`, the `wit-bindgen-go` tool will be run to generate the bindings for our component from the `hello` WIT world found in the `./wit` directory. Bindings will be generated in the `gen` directory.
+* **In the import section**, we import Go's standard `fmt` and `net/http` libraries. We also import the `wasihttp` package, which provides an implementation of `http.Handler` backed by `wasi:http`&mdash;enabling us to write idiomatic Go using a language-agnostic WASI interface.
+* **In the `init` section**, we set the `handleRequest` function to handle incoming HTTP requests.
+* **In the `handleRequest` function**, we respond to an HTTP request by printing `Hello from Go!`
+* **The main function is empty**, since the component doesn't run like a CLI, but instead runs the `handleRequest` function when triggered by an HTTP request.
+
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-Creating the scaffold for a new component in TypeScript is easy. We will create a component that accepts an HTTP request and responds with "Hello from TypeScript!". To create your new component project, change to the directory where you want the project to be created, and enter the command below. The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+Let's create a component that accepts an HTTP request and responds with "Hello from TypeScript!  
+
+To create your new component project, change to the directory where you want the project to be created, and enter the command below. 
+
+* The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+* Every new wasmCloud project is created from a template. If you do not specify a template, `wash` will give you options to select. In this case, we're using the `hello-world-typescript` template. You can find [this template hosted in the wasmCloud monorepo](https://github.com/wasmCloud/wasmCloud/tree/main/examples/typescript/components/http-hello-world). 
 
 ```bash
 wash new component hello --template-name hello-world-typescript
 ```
 
-Let's change into the newly-created folder `hello` and take a look at the generated project. The file `http-hello-world.ts` will include imports and a `handle` function exported under `incomingHandler`. Let's walk through these pieces in depth.
+Navigate to the new `hello` directory and take a look at the generated project. The file `http-hello-world.ts` will include imports and a `handle` function exported under `incomingHandler`. Let's walk through these pieces in depth.
 
 ```typescript
 import { IncomingRequest, ResponseOutparam, OutgoingResponse, Fields } from 'wasi:http/types@0.2.0';
 ```
 
-The import section of this file is simple, we just import our generated types (from `jco`) for the WASI HTTP interface.
+The import section of this file imports our generated types (from `jco`) for the WASI HTTP interface.
 
 ```typescript
 // Implementation of wasi-http incoming-handler
@@ -186,13 +178,18 @@ Lastly, this export statement includes the `handle` function under the `incoming
 
   </TabItem>
   <TabItem value="python" label="Python">
-Creating the scaffold for a new component in Python is easy. We will create a component that accepts an HTTP request and responds with "Hello from Python!". To create your new component project, change to the directory where you want the project to be created, and enter the command below. The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+Let's create a component that accepts an HTTP request and responds with "Hello from Python!" 
+
+To create your new component project, change to the directory where you want the project to be created, and enter the command below. 
+
+* The first term on the command (`hello`) is the project name. If you choose a different project name, the name of the subdirectory and some symbols in the generated code will be different from the example code in this guide.
+* Every new wasmCloud project is created from a template. If you do not specify a template, `wash` will give you options to select. In this case, we're using the `hello-world-python` template. You can find [this template hosted in the wasmCloud monorepo](https://github.com/wasmCloud/wasmCloud/tree/main/examples/python/components/http-hello-world). 
 
 ```bash
 wash new component hello --template-name hello-world-python
 ```
 
-Let's change into the newly-created folder `hello` and take a look at the generated project. The file `app.py` will include imports and a `handle` function on a `IncomingHandler` class. Let's walk through these pieces in depth.
+Navigate to the new `hello` directory and take a look at the generated project. The file `app.py` will include imports and a `handle` function on a `IncomingHandler` class. Let's walk through these pieces in depth.
 
 ```python
 from hello import exports
@@ -203,7 +200,7 @@ from hello.imports.types import (
 )
 ```
 
-The import section of this file is simple, we just import our generated types (from `componentize-py`) for the WASI HTTP interface.
+In the import section of this file, we import our generated types (from `componentize-py`) for the WASI HTTP interface.
 
 ```python
 class IncomingHandler(exports.IncomingHandler):
@@ -250,7 +247,7 @@ We're looking to add more examples in languages that support Wasm components. If
 If you use an IDE that comes with code completion and hover-tooltips, you'll be able to see documentation and get strongly-typed guidance as you develop code to interact with the WASI interfaces.
 
 :::info
-The above component example works without any modification in wasmCloud, but is specifically built using standard WebAssembly tooling. You do not need to use a wasmCloud specific SDK to build components, and the above example will work directly with any WebAssembly runtime that supports the Wasm component model.
+The above component example works without any modification in wasmCloud, but is specifically built using standard WebAssembly tooling. You do not need to use a wasmCloud-specific SDK to build components, and the above example will work directly with any WebAssembly runtime that supports the Wasm component model.
 :::
 
 ### Something's missing
