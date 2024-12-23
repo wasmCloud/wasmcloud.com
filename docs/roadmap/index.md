@@ -1,6 +1,6 @@
 ---
 id: 'index'
-title: '2024 Q3 Roadmap'
+title: '2024 Q4 Roadmap'
 date: 2024-07-17T00:00:00+00:00
 description: 'wasmCloud Development Roadmap for Q4 2024'
 sidebar_position: 995
