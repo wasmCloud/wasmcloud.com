@@ -1,5 +1,5 @@
 const Links = {
-  YOUTUBE: 'https://www.youtube.com/watch?v=7DqwgBnd5RM',
+  YOUTUBE: 'https://www.youtube.com/watch?v=ZqNy4337XLA',
   PLAYLIST: 'https://www.youtube.com/@wasmCloud/streams',
   CALENDAR:
     'https://calendar.google.com/calendar/r/eventedit/copy/MnA2a2R1MnI2aGxucDZwNjUxMmVuMW1lb2FfMjAyNDA3MTBUMTcwMDAwWiBjXzZjbTVodWQ4ZXZ1bnM0cGU1Z2d1M2g5cXJzQGc',
