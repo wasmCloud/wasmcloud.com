@@ -7,11 +7,45 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import washboard_hello from '../images/washboard_hello.png';
 
+In the previous steps, we started a developer loop, added two [**interfaces**](/docs/concepts/interfaces.mdx) (`wasi:logging` and `wasi:keyvalue`), and extended our application with pluggable [**capabilities**](/docs/concepts/capabilities.mdx).
+
+Now we'll learn how to:
+
+- Scale our application to handle multiple parallel requests
+- Distribute an application globally
+- Use the wasmCloud dashboard
+
+:::info[Prerequisites]
+This tutorial assumes you're following directly from the previous steps. Make sure to complete [**Quickstart**](/docs/tour/hello-world.mdx), [**Add Features**](/docs/tour/add-features.mdx), and [**Extend and Deploy**](/docs/tour/extend-and-deploy.mdx) first.
+:::
+
 ## Scaling up 📈
 
-So far, our hello world application can only handle a single request at a time. This is because a dedicated instance of our hello component is instantiated for each request received, but currently only a single replica is defined for it in `wadm.yaml`. Accordingly, wasmCloud instructs [wasmtime](https://wasmtime.dev/) to instantiate only a single instance for our component at any time to process incoming requests. As a result, requests received at the same time are processed sequentially, one after the other. Let's check this quickly.
+So far, our application can only handle a single request at a time. This is because only a single **instance** is defined for it in the application manifest (`wadm.yaml`), as a property of the `spreadscaler`:
 
-For test and demonstration purposes, we add a simple `sleep` to the handler to simulate a longer processing time:
+```yaml {14-16}
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello-world
+  annotations:
+    description: 'HTTP hello world demo'
+spec:
+  components:
+    - name: http-component
+      type: component
+      properties:
+        image: file://./build/http_hello_world_s.wasm
+      traits:
+        - type: spreadscaler
+          properties:
+            instances: 1
+...
+```
+
+Following the specification in the manifest, wasmCloud instructs the [host](/docs/concepts/hosts.mdx)'s WebAssembly runtime ([wasmtime](/docs/ecosystem/wasmtime/)) to instantiate **only a single instance of our component** at any time to process incoming requests. As a result, requests received at the same time are processed sequentially, one after the other. 
+
+Let's try adding a simple `sleep` to the handler to simulate a longer processing time:
 
 <Tabs groupId="lang" queryString>
   <TabItem value="tinygo" label="Go">
@@ -164,14 +198,43 @@ Because we've made changes, run `wash build` again to compile the updated Wasm c
 wash build
 ```
 
-Deploy the latest version of our component and try to send multiple requests in parallel.
+If you stopped your local wasmCloud environment and Redis server in the previous tutorial, start them up again: 
+
+```shell
+wash up -d
+```
+<Tabs groupId="env" queryString>
+  <TabItem value="local" label="Local Redis Server" default>
+
+```shell
+redis-server &
+```
+
+  </TabItem>
+  <TabItem value="docker" label="Docker">
+
+```shell
+docker run -d --name redis -p 6379:6379 redis
+```
+
+  </TabItem>
+</Tabs>
+
+Deploy the latest version of our application:
+
+```shell
+wash app deploy wadm.yaml
+```
+
+Now we'll try to send multiple requests in parallel.
 
 <Tabs groupId="lang" queryString>
   <TabItem value="Linux/macOS" label="Linux/macOS">
 
-```bash
-> wash app deploy wadm.yaml
-> seq 1 10 | xargs -P0 -I {} curl --max-time 3 "localhost:8080?name=Alice"
+```shell
+seq 1 10 | xargs -P0 -I {} curl --max-time 3 "localhost:8000?name=Alice"
+```
+```text
 Hello x1, Alice!
 curl: (28) Operation timed out after 3002 milliseconds with 0 bytes received
 curl: (28) Operation timed out after 3006 milliseconds with 0 bytes received
@@ -187,8 +250,9 @@ curl: (28) Operation timed out after 3001 milliseconds with 0 bytes received
   <TabItem value="Windows" label="Windows">
 
 ```powershell
-> wash app deploy wadm.yaml
-> 1..10 | ForEach-Object -Parallel { curl --max-time 3 'localhost:8080?name=Alice' }
+1..10 | ForEach-Object -Parallel { curl --max-time 3 'localhost:8000?name=Alice' }
+```
+```text
 Hello x1, Alice!
 curl: (28) Operation timed out after 3002 milliseconds with 0 bytes received
 curl: (28) Operation timed out after 3006 milliseconds with 0 bytes received
@@ -206,7 +270,7 @@ curl: (28) Operation timed out after 3001 milliseconds with 0 bytes received
 
 As you can see, only the first `curl` command receives the expected response in time, while all the others run into a timeout. However, if you check the logs of the wasmCloud host, you will see that multiple requests have been received and forwarded to our component one after the other.
 
-```txt
+```text
 2024-10-20T19:29:30.897232Z  INFO log: wasmcloud_host::wasmbus::handler: Greeting Bob component_id="rust_hello_world-http_component" level=Level::Info context=""
 2024-10-20T19:29:30.897253Z  INFO log: wasmcloud_host::wasmbus::handler: Sleep for 2 to simulate longer processing time component_id="rust_hello_world-http_component" level=Level::Info context=""
 2024-10-20T19:29:32.905355Z  INFO log: wasmcloud_host::wasmbus::handler: Replying greeting 'Hello x1, Bob!' component_id="rust_hello_world-http_component" level=Level::Info context=""
@@ -225,53 +289,35 @@ As you can see, only the first `curl` command receives the expected response in 
 You can also check the wasmCloud host's `DEBUG` or `TRACE` logs for more detailed information (e.g. using `wash up --log-level=debug`). In these logs, you can clearly see that for received requests, our hello component is instantiated sequentially.
 :::
 
-If you wish, you can also use `wash spy` to check which messages the capability providers and the hello component have received and sent
-
-
-<Tabs groupId="lang" queryString>
-  <TabItem value="tinygo" label="Go">
+If you wish, you can also use `wash spy` to check which messages the capability providers and the hello component have received and sent.
 
 ```bash
-wash spy --experimental tinygo_hello_world-http_component
+wash spy --experimental hello_world-http_component
 ```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-```bash
-wash spy --experimental rust_hello_world-http_component
-```
-
-  </TabItem>
-  <TabItem value="typescript" label="TypeScript">
-
-```bash
-wash spy --experimental typescript_hello_world-http_component
-```
-
-  </TabItem>
-</Tabs>
 
 :::note[Requests are not forwarded to our component anymore]
 After multiple requests were received but timed out, it is no longer possible to send further requests to our hello application. The reason for this is that the httpserver capability provider is no longer able to invoke the hello component via NATS. To continue, we must first delete and redeploy our application.
 :::
 
-To receive multiple requests in parallel, we need to instruct wasmCloud to scale our component according to the incoming load.
-WebAssembly can be easily scaled due to its small size, portability, and [wasmtime](https://wasmtime.dev/)'s ability to efficiently instantiate multiple instances of a single WebAssembly component. We leverage these aspects to make it simple to scale your applications with wasmCloud. Components only use resources when they're actively processing requests, so you can specify the number of replicas you want to run and wasmCloud will automatically scale up and down to meet demand. Let's allow our hello world application to scale up to 100 instances simultaneously by editing `wadm.yaml`:
+To receive multiple requests in parallel, we need to instruct wasmCloud to scale our component according to the incoming load. WebAssembly components can be easily scaled due to the small size and portability of the binaries as well as [wasmtime](https://wasmtime.dev/)'s ability to efficiently instantiate multiple instances of a given component. 
 
-```yaml {15-17}
+We leverage these aspects to make it simple to scale your applications with wasmCloud. Components only use resources when they're actively processing requests, so you can **specify the number of instances you want to run** and **wasmCloud will automatically scale up and down to meet demand**. 
+
+Let's allow our application to scale up to 100 instances simultaneously by editing the application manifest in `wadm.yaml`:
+
+```yaml {14-17}
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
   name: hello-world
   annotations:
-    description: 'HTTP hello world demo using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)'
+    description: 'HTTP hello world demo'
 spec:
   components:
     - name: http-component
       type: component
       properties:
-        image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+        image: file://./build/http_hello_world_s.wasm
       traits:
         - type: spreadscaler
           properties:
@@ -281,14 +327,23 @@ spec:
 ...
 ```
 
-Now our hello component is ready to be deployed as version 0.0.3 with up to 100 instances, meaning it can handle up to 100 simultaneous incoming HTTP requests. Just run `wash app deploy wadm.yaml` again and wasmCloud will be able to automatically scale the component according to the incoming load. Let's deploy the component and try again to send multiple requests in parallel.
+Our application is ready to be deployed again with up to 100 instances, meaning it can handle up to 100 simultaneous incoming HTTP requests. 
+
+Deploy the application again:
+
+```shell
+wash app deploy wadm.yaml
+```
+
+Now wasmCloud will be able to automatically scale the component according to the incoming load. Let's try sending multiple requests in parallel again.
 
 <Tabs groupId="lang" queryString>
   <TabItem value="Linux/macOS" label="Linux/macOS">
 
-```bash
-> wash app deploy wadm.yaml
-> seq 1 10 | xargs -P0 -I {} curl --max-time 3 "localhost:8080?name=Bob"
+```shell
+seq 1 10 | xargs -P0 -I {} curl --max-time 3 "localhost:8000?name=Bob"
+```
+```text
 Hello x1, Bob!
 Hello x2, Bob!
 Hello x3, Bob!
@@ -305,8 +360,9 @@ Hello x10, Bob!
   <TabItem value="Windows" label="Windows">
 
 ```powershell
-> wash app deploy wadm.yaml
-> 1..10 | ForEach-Object -Parallel { curl --max-time 3 'localhost:8080?name=Bob' }
+> 1..10 | ForEach-Object -Parallel { curl --max-time 3 'localhost:8000?name=Bob' }
+```
+```text
 Hello x1, Bob!
 Hello x2, Bob!
 Hello x3, Bob!
@@ -323,8 +379,41 @@ Hello x10, Bob!
 </Tabs>
 
 :::note[Utilization planning is important]
-As you have seen, if a component receives too many requests in parallel, it may break down and wasmCloud will not be able to forward further requests. Therefore, it is important to plan and manage the specified maximum number of concurrent instances for Spreadscaler components according to the expected load.
+As we've seen, if a component receives too many requests in parallel, it may break down and wasmCloud will not be able to forward further requests. Therefore, it is important to plan and manage the specified maximum number of concurrent instances for Spreadscaler components according to the expected load.
 :::
+
+When you're done with the application, delete it from the wasmCloud environment:
+
+```shell
+wash app delete hello-world
+```
+
+Shut down the environment:
+
+```shell
+wash down
+```
+
+Stop your Redis server:
+
+<Tabs groupId="env" queryString>
+  <TabItem value="local" label="Local Redis Server" default>
+
+Enter CTRL+C.
+
+```shell
+redis-cli shutdown
+```
+
+  </TabItem>
+  <TabItem value="docker" label="Docker">
+
+```shell
+docker stop redis
+```
+
+  </TabItem>
+</Tabs>
 
 ## Distribute Globally 🌍
 
@@ -338,13 +427,13 @@ kind: Application
 metadata:
   name: hello-world
   annotations:
-    description: 'HTTP hello world demo using the WebAssembly Component Model and WebAssembly Interfaces Types (WIT)'
+    description: 'HTTP hello world demo'
 spec:
   components:
     - name: http-component
       type: component
       properties:
-        image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+        image: file://./build/http_hello_world_s.wasm
       traits:
         - type: spreadscaler
           properties:
