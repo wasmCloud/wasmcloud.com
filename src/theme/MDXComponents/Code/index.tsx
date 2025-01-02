@@ -51,12 +51,12 @@ function CodeBlock(props: ComponentProps<'code'>): JSX.Element {
     <div className={codeBlockStyles.CodeBlock}>
       <div className={codeBlockStyles.header}>
         <div>{language}</div>
+        <CopyButton className={codeBlockStyles.button} code={code} />
       </div>
       <div className={codeBlockStyles.content}>
         <pre className={clsx(codeBlockStyles.pre, 'shiki')}>
           <code {...props} ref={codeRef} />
         </pre>
-        <CopyButton className={codeBlockStyles.button} code={code} />
       </div>
     </div>
   );
