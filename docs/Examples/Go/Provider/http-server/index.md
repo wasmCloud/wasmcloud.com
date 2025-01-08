@@ -1,6 +1,7 @@
 # http-server
 
-This example demonstrates how to forward requests to components exporting `wasi:http/incoming-handler`.
+[This example](https://github.com/wasmCloud/go/tree/main/examples/provider/http-server) demonstrates
+how to forward requests to components exporting `wasi:http/incoming-handler`.
 
 It starts a http server listening on port 8080 containing 2 routes:
 

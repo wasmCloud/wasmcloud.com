@@ -1,6 +1,7 @@
 # Keyvalue inmemory golang provider
 
-This provider implements `wrpc:keyvalue/store@0.2.0-draft`.
+[This provider example](https://github.com/wasmCloud/go/tree/main/examples/provider/keyvalue-inmemory)
+is implements `wrpc:keyvalue/store@0.2.0-draft`.
 
 ## Notable files
 

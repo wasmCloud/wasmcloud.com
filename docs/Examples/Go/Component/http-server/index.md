@@ -1,6 +1,7 @@
-# Go HTTP Password Checker
+# Go HTTP Server
 
-This repository contains a WebAssembly Component compiled using [TinyGo][tinygo], which:
+[This example](https://github.com/wasmCloud/go/tree/main/examples/component/http-server) is a
+WebAssembly Component compiled using [TinyGo][tinygo], which:
 
 - Implements a [`wasi:http`][wasi-http]-compliant HTTP handler
 - Uses the [`httpserver` provider][httpserver-provider] to serve requests
