@@ -1,6 +1,7 @@
 # 🐘 SQLDB Postgres Example
 
-This folder contains a WebAssembly component that makes use of:
+[This example](https://github.com/wasmCloud/go/tree/main/examples/component/sqldb-postgres-query) is
+a WebAssembly component that makes use of:
 
 - The [`wasmcloud:postgres` WIT contract](https://github.com/wasmCloud/wasmCloud/tree/main/wit/postgres)
 - The

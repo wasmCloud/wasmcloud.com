@@ -1,7 +1,8 @@
 # Custom WIT example
 
-This example shows how to combine the wasmCloud Component SDK with your custom interfaces. You can
-find the custom interface in `wit/world.wit`. It should look something like this:
+[This example](https://github.com/wasmCloud/go/tree/main/examples/component/invoke) shows how to
+combine the wasmCloud Component SDK with your custom interfaces. You can find the custom interface
+in `wit/world.wit`. It should look something like this:
 
 ```wit
 interface invoker {
