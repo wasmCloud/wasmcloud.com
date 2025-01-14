@@ -8,7 +8,7 @@ sidebar_position: 4
 ---
 
 The most common way to interact with a Wadm installation (which could be a single server or a
-cluster) is through the [wash](./usage.md) command-line tool or the [Rust client
+cluster) is through the [wash](/docs/ecosystem/wadm/usage/) command-line tool or the [Rust client
 crate](https://docs.rs/wadm-client/latest/wadm_client/). However, if you are planning on creating
 your own integration or writing a non-Rust language binding, then this reference will help.
 

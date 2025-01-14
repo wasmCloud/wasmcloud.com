@@ -11,7 +11,7 @@ A provider archive can be uploaded to, or downloaded from, OCI registries.
 
 ## Build
 
-Providers are always compiled in "release" mode. `wash` has support to compile a capability provider for your native target with `wash build`, as long as a [wasmcloud.toml](/docs/reference/config) file is present. The following section will continue on from the [Create](./create.md) page where we built a NATS messaging provider, but you can follow the same steps for any capability provider project.
+Providers are always compiled in "release" mode. `wash` has support to compile a capability provider for your native target with `wash build`, as long as a [wasmcloud.toml](/docs/reference/config/) file is present. The following section will continue on from the [Create](/docs/developer/providers/create/) page where we built a NATS messaging provider, but you can follow the same steps for any capability provider project.
 
 ```bash
 > wash build
@@ -78,7 +78,7 @@ x86_64-windows
 x86_64-macos
 ```
 
-With the build complete, now we can [continue to testing](./test).
+With the build complete, now we can [continue to testing](/docs/developer/providers/test).
 
 ## Interface dependencies and `wash build`
 
