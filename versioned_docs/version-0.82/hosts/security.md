@@ -19,7 +19,7 @@ Every actor in the ecosystem is a WebAssembly module that contains an embedded [
 
 In our ecosystem, the issuer of an actor is the unique public key of an **account** (see the _Key Types_ section below), and the subject of an actor is the actor's public key.
 
-The [wash](/docs/0.82/ecosystem/wash) tool is responsible for creating keys and extracting and embeddeding signed JWTs within actor modules.
+The [wash](/docs/0.82/ecosystem/wash) tool is responsible for creating keys and extracting and embedding signed JWTs within actor modules.
 
 Each JWT embedded within an actor is cryptographically signed using the [ed25519](https://ed25519.cr.yp.to/) signature algorithm. For information on why we chose this method of security over others, please check out our [Archictural Decision Record](https://wasmcloud.github.io/adr/).
 
@@ -53,7 +53,7 @@ In addition to the standard claims required by all [JSON Web Token (JWT)](https:
 
 Here one of the most important fields in the `wascap` object is the `caps` field, which contains an array of _capability contract IDs_. Each capability provider must conform to a single, globally unique contract identifier. This ID is typically prefixed with a namespace or vendor prefix, but is not a requirement.
 
-The preceding token indicates that the _Key Value Counter_ actor has been granted access to the Key-Value and HTTP Server capabilities, _without regard_ for which specific provider is used to satisfy those capabilities. In other words, this actor can use _any_ key-value provider, be it Redis or Cassandra or Consul. If you want to further limit which capabilities can be used by actors at runtime, you can define and utlize an [OPA](https://www.openpolicyagent.org/) policy.
+The preceding token indicates that the _Key Value Counter_ actor has been granted access to the Key-Value and HTTP Server capabilities, _without regard_ for which specific provider is used to satisfy those capabilities. In other words, this actor can use _any_ key-value provider, be it Redis or Cassandra or Consul. If you want to further limit which capabilities can be used by actors at runtime, you can define and utilize an [OPA](https://www.openpolicyagent.org/) policy.
 
 ### Managing Keys
 

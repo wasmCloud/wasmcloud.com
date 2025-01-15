@@ -14,7 +14,7 @@ This command creates a new project from an existing template. A user may create 
 ### `actor`
 When creating a new actor project, a user may select from the following templates to create a skeleton:
 
-- hello-world-rust: A hello-world actor in Rust thay responds over an HTTP connection
+- hello-world-rust: A hello-world actor in Rust that responds over an HTTP connection
 - hello-world-tinygo: A hello-world actor in TinyGo that responds over an HTTP connection
 - hello-world-typescript: A hello-world actor in TypeScript that responds over an HTTP connection
 - hello-world-python: A hello-world actor in Python that responds over an HTTP connection
@@ -61,7 +61,7 @@ wash new interface example-project --template-name factorial-interface
 #### Options
 The following options can be used for all `wash new` subcommands:
 
-`--git` Github repository url. Requires 'git' to be installed in PATH
+`--git` GitHub repository url. Requires 'git' to be installed in PATH
 
 `--output` (Alias `-o`) Specify output format (text or json) [default: text]
 

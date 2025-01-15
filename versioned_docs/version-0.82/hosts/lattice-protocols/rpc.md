@@ -56,7 +56,7 @@ If you're looking to construct your own invocations manually, you'll need this h
 
 The reason we go to such lengths with the invocation is to prevent a malicious entity that has compromised enough credentials to gain access to an RPC NATS connection from actually performing any function calls. Without a valid **cluster seed** (which is injected into a host runtime at startup), an intruder cannot forge an invocation, even if they have unfettered access to NATS.
 
-Monitoring tools could be configuted to detect faked invocations in real time and produce alerts.
+Monitoring tools could be configured to detect faked invocations in real time and produce alerts.
 
 The claims data structure can be found in the [wascap](https://github.com/wasmCloud/wascap/blob/main/src/jwt.rs) crate.
 
