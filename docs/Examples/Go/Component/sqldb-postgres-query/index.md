@@ -24,7 +24,7 @@ Before starting, ensure that you have the following installed in addition to the
 
 ## 👟 Quickstart
 
-As with all other examples, you can get started quickly by using whe [Wasmcloud SHell
+As with all other examples, you can get started quickly by using the [Wasmcloud SHell
 (`wash`)][wash].
 
 Since `wash` supports declarative deployments (powered by [Wasmcloud Application Deployment Manager

@@ -42,4 +42,4 @@ templates = "codegen/templates/rust"
 
 ## Specifying the name of the starting template
 
-HTML documentation generation (guided by the `[html]` language section of the project codegen.toml) uses a template called `namespace` for the primary html page. Ypu can override the name of the template used by adding `doc_template = "mypage"` to the `[html.parameters]` section.
+HTML documentation generation (guided by the `[html]` language section of the project codegen.toml) uses a template called `namespace` for the primary html page. You can override the name of the template used by adding `doc_template = "mypage"` to the `[html.parameters]` section.

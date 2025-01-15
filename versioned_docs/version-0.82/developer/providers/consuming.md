@@ -33,7 +33,7 @@ One possible design with a better[^1] abstraction might be defining the business
 
 We could design this actor to respond to an RPC-style operation called "Checkout" that could be invoked directly by another actor in the lattice, or we could expose an HTTP server operation that handles a POST to the `/cart/{cartId}/checkout` URL, or we could use a `wasmcloud:messaging` capability provider to deliver a message from a subscription that triggers the checkout operation.
 
-For the sake of example, let's take a look at what it might look like to respond directly to a checkout operation via actor-to-actor RPC (this is non-compiling psuedocode):
+For the sake of example, let's take a look at what it might look like to respond directly to a checkout operation via actor-to-actor RPC (this is non-compiling pseudocode):
 
 ```rust
 /// perform checkout operation:

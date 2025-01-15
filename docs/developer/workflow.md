@@ -108,7 +108,7 @@ When run this way, `wash up` will start a single host lattice as normal, but *al
 
 ### Easily deploy a wadm application manifest continuously
 
-If you have your host running in a seperate shell/terminal window and want to avoid having to constantly `wash app delete` in-between changes to your project and/or manifest, you can run `wash app deploy` with the `--replace` option:
+If you have your host running in a separate shell/terminal window and want to avoid having to constantly `wash app delete` in-between changes to your project and/or manifest, you can run `wash app deploy` with the `--replace` option:
 
 ```console
 wash app deploy --replace path/to/your/wadm.yaml
@@ -116,7 +116,7 @@ wash app deploy --replace path/to/your/wadm.yaml
 
 Running `wash app deploy` with the `--replace` flag makes wash attempt to delete the application before attempting to deploy it.
 
-Combine this with a tool like [`cargo watch`][cargo-watch] (in the Rust ecosystem) and you can continously re-deploy your manifest any time your Rust project changes:
+Combine this with a tool like [`cargo watch`][cargo-watch] (in the Rust ecosystem) and you can continuously re-deploy your manifest any time your Rust project changes:
 
 ```console
 cargo watch -- wash app deploy --replace path/to/your/wadm.yaml

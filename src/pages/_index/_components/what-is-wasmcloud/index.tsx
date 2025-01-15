@@ -65,7 +65,7 @@ const SWITCHER_CONTENT: Array<{
         title: 'Integrate with Existing Stacks',
         description: (
           <>
-            wasmCloud has first-tier support for Kubernetes, AWS, Azure, GCP, Jenkins, Github
+            wasmCloud has first-tier support for Kubernetes, AWS, Azure, GCP, Jenkins, GitHub
             Actions, ArgoCD, Backstage, Chainguard, Databases, Messaging, and more.
           </>
         ),

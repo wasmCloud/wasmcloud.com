@@ -3,7 +3,7 @@ title: "Tips"
 draft: false
 ---
 
-This section conatains some suggestions and tips for writing and debugging interface definitions.
+This section contains some suggestions and tips for writing and debugging interface definitions.
 
 - [Use lint and validation tools](./lint-validate/)
  

@@ -51,7 +51,7 @@ There are many smaller tasks that are included as well, such as [namespacing our
 
 ## Diagram
 
-The diagram below shows a loose organization of critical tasks into 3 sections: Stabilizing APIs, WebAssembly standards, and wasmCloud functionality. This roadmap is unordered as each individual task can be completed indepedently, so no rigid order is necessary. The diagram is also not exhaustive, as there are many smaller tasks that are not included. You can view the full-size version [here](/docs/images/2024q1roadmap.png).
+The diagram below shows a loose organization of critical tasks into 3 sections: Stabilizing APIs, WebAssembly standards, and wasmCloud functionality. This roadmap is unordered as each individual task can be completed independently, so no rigid order is necessary. The diagram is also not exhaustive, as there are many smaller tasks that are not included. You can view the full-size version [here](/docs/images/2024q1roadmap.png).
 
 ![Q1 2024 Roadmap](/docs/images/2024q1roadmap.png)
 

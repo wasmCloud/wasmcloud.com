@@ -64,7 +64,7 @@ For more information, see [**Providers**](/docs/concepts/providers).
 
 ### Provider Archive
 
-A provider archive is a compressed file containing a provider's binary (or multiple binaries if multiple architectures are supported) and any other necessary files for distrubution such as claims. Provider archives are used to distribute providers to wasmCloud hosts.
+A provider archive is a compressed file containing a provider's binary (or multiple binaries if multiple architectures are supported) and any other necessary files for distribution such as claims. Provider archives are used to distribute providers to wasmCloud hosts.
 
 ### `wadm`
 
