@@ -41,4 +41,4 @@ The following events are emitted on a special topic, `wasmbus.rpcevt.{lattice-id
 | Type                  | Fields                                                                                                                                                         | Description                 |
 | :-------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------- |
 | `invocation_failed`   | **`source`** (`public_key`, `contract_id`, `link_name`)<br/> **`dest`** (`public_key`, `contract_id`, `link_name`) <br/>`operation`<br/> `bytes` (payload len) | An RPC failure notification |
-| `invocation_succeeded` | _Same as above_                                                                                                                                               | An RPC success notification |
+| `invocation_suceeded` | _Same as above_                                                                                                                                                | An RPC success notification |
