@@ -15,7 +15,7 @@ The 2024 Q4 Roadmap was brainstormed and planned in the [09 Oct 2024 community m
 
 ## Retrospective
 
-The [2024 Q3 roadmap](./2024-q3.md) primarily focused on continual improvement of the developer experience for writing wasmCloud applications. Focusing on an RFC for an improved `wash dev`, issues for native debugging support for components, and requests for more idiomatic language support, the Q3 roadmap sought to improve our core experience over large sweeping features.
+The [2024 Q3 roadmap](/docs/roadmap/2024-q3.md) primarily focused on continual improvement of the developer experience for writing wasmCloud applications. Focusing on an RFC for an improved `wash dev`, issues for native debugging support for components, and requests for more idiomatic language support, the Q3 roadmap sought to improve our core experience over large sweeping features.
 
 Another (personal) goal for the Q3 roadmap was to ensure that at least half of the features on the roadmap were community contributed, and though not all features landed during the Q3 period, over half of the issues were assigned to community contributors!
 

@@ -13,7 +13,7 @@ To create this capability provider you'll need to install [wash](/docs/installat
 
 ## The messaging interface
 
-This capability provider will _provide_ the functionality for the `wasmcloud:messaging` interface. Interfaces are defined in WebAssembly Interface Type (WIT)&mdash;if you're new to WIT, see the [Interfaces](/docs/developer/interfaces/creating-an-interface) section for an introduction to WIT, worlds, interfaces, imports and exports, and how all of these concepts tie together.
+This capability provider will _provide_ the functionality for the `wasmcloud:messaging` interface. Interfaces are defined in WebAssembly Interface Type (WIT)&mdash;if you're new to WIT, see the [Interfaces](/docs/developer/interfaces/creating-an-interface/) section for an introduction to WIT, worlds, interfaces, imports and exports, and how all of these concepts tie together.
 
 Let's take a look at the [WIT for this interface](https://github.com/wasmCloud/messaging):
 
@@ -214,7 +214,7 @@ We perform the same steps to fetch the NATS client, and instead of publishing a 
 
 ## Testing the provider
 
-Now that you've implemented all of the `import` and `export` functions for this provider, it's ready to test. Inside of the project directory you can run `wash build` to compile and package your provider into a provider archive. For more information on building, check out the [build](./build.md) page. We'll use a prebuilt wasmCloud example component that uses `wasmcloud:messaging` to test this provider.
+Now that you've implemented all of the `import` and `export` functions for this provider, it's ready to test. Inside of the project directory you can run `wash build` to compile and package your provider into a provider archive. For more information on building, check out the [build](/docs/developer/providers/build) page. We'll use a prebuilt wasmCloud example component that uses `wasmcloud:messaging` to test this provider.
 
 To generate the example component, use the following command. You can do this inside of your current project directory or as a separate folder:
 

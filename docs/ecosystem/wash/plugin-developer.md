@@ -13,7 +13,7 @@ wash plugins are available starting with version 0.28.
 :::
 
 This guide assumes some familiarity with building Wasm components. If you're not familiar with Wasm
-components and WIT, please read our existing [developer documentation](../../developer/components) first.
+components and WIT, please read our existing [developer documentation](/docs/developer/components/) first.
 
 ## Creating a plugin
 

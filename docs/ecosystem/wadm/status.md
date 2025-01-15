@@ -11,7 +11,7 @@ This page details the four different statuses that an application can have and w
 
 ## Undeployed
 
-The `Undeployed` state is assigned to an application after you use the [wadm API](./api.md) to put an application. This application is stored in the model store but none of the resources in the application are deployed or managed by wadm.
+The `Undeployed` state is assigned to an application after you use the [wadm API](/docs/ecosystem/wadm/api/) to put an application. This application is stored in the model store but none of the resources in the application are deployed or managed by wadm.
 
 You can **deploy** any application that has the `Undeployed` status by running `wash app deploy <app> <version>`. Any deployed application can be **undeployed** by running `wash app undeploy <app>`.
 
@@ -49,6 +49,6 @@ traits:
         weight: 20
 ```
 
-The application will be in the `Failed` state if there aren't connected hosts with the `zone=us-east-1` and `zone=us-west-1` [labels](../../deployment/hosts/labels).
+The application will be in the `Failed` state if there aren't connected hosts with the `zone=us-east-1` and `zone=us-west-1` [labels](/docs/deployment/hosts/labels).
 
 You can get more information about why an application is in the failed status by running `wash app status <app>` to see the reason why the application is in the failed state.
