@@ -1,86 +1,114 @@
 # Go HTTP Client
 
 [This example](https://github.com/wasmCloud/go/tree/main/examples/component/http-client) is a
-WebAssembly Component compiled using [TinyGo][tinygo], which:
+WebAssembly component that calls a random number generator service to get random numbers.
+
+The application...
 
 - Implements a [`wasi:http`][wasi-http]-compliant HTTP handler
 - Uses the [`httpserver` provider][httpserver-provider] to serve requests
-- Calls a random number generator service to get random numbers using [`wasi:http`][wasi-http]
-- Can be declaratively provisioned with [`wadm`][wadm]
+- Can be declaratively provisioned in a [wasmCloud][wasmCloud] environment
 
 [wasi-http]: https://github.com/WebAssembly/wasi-http
 [httpserver-provider]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-http-server
 [httpclient-provider]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-http-client
-[wadm]: https://github.com/wasmCloud/wadm
-[tinygo]: https://tinygo.org/getting-started/install/
+[wasmCloud]: https://wasmcloud.com/docs/intro
 [wash]:  https://wasmcloud.com/docs/ecosystem/wash/
 [wasm-tools]: https://github.com/bytecodealliance/wasm-tools#installation
 
-# Dependencies
+## 📦 Dependencies
 
-Before starting, ensure that you have the following installed in addition to the Go toolchain:
+Before starting, ensure that you have the following installed in addition to the Go (1.23+) toolchain:
 
-- The [TinyGo toolchain][tinygo]
-- [`wash`, the WAsmcloud SHell][wash] installed.
-- [`wasm-tools`][wasm-tools] for Go bindings
+- [`tinygo`](https://tinygo.org/getting-started/install/) for compiling Go (always use the latest version)
+- [`wasm-tools`](https://github.com/bytecodealliance/wasm-tools#installation) for Go bindings
+- [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation) for building and running the components and wasmCloud environment
 
-# Quickstart
+## 👟 Run the example
 
-To get started developing this repository quickly, clone the repo and run `wash dev`:
+Clone the [wasmCloud/go repository](https://github.com/wasmcloud/go): 
 
-```console
+```shell
+git clone https://github.com/wasmCloud/go.git
+```
+
+Change directory to `examples/component/http-client`:
+
+```shell
+cd examples/component/http-client
+```
+
+In addition to the standard elements of a Go project, the example directory includes the following files and directories:
+
+- `build/`: Target directory for compiled `.wasm` binaries
+- `gen/`: Target directory for Go bindings of [interfaces](https://wasmcloud.com/docs/concepts/interfaces)
+- `wit/`: Directory for WebAssembly Interface Type (WIT) packages that define interfaces
+- `wadm.yaml`: Declarative application manifest
+- `wasmcloud.lock`: Automatically generated lockfile for WIT packages
+- `wasmcloud.toml`: Configuration file for a wasmCloud application
+
+### Start a local development loop
+
+Run `wash dev` to start a local development loop:
+
+```shell
 wash dev
 ```
 
-`wash dev` does many things for you:
+The `wash dev` command will:
 
-- Starts the [wasmCloud host][wasmcloud-host] that can run your WebAssembly component
-- Builds this project
-- Builds a declarative WADM manifest consisting of:
+- Start a local wasmCloud environment
+- Build this component
+- Deploy your application and all requirements to run the application locally, including...
   - Your locally built component
-  - A [HTTP server provider][httpserver-provider] which will receive requests from the outside world
+  - The [HTTP server provider][httpserver-provider], which will receive requests from the outside world
     (on port 8000 by default)
-  - A [HTTP client provider][httpclient-provider] which will call a random number generator service
+  - The [HTTP client provider][httpclient-provider], which will call a random number generator service
   - Necessary links between providers and your component so your component can handle web traffic
-- Deploys the built manifest (i.e all dependencies to run this application) locally
-- Watches your code for changes and re-deploys when necessary.
+- Watch your code for changes and re-deploy when necessary.
 
-[wasmcloud-host]: https://wasmcloud.com/docs/concepts/hosts
+Once the application is deployed, open another terminal tab. To ensure that the application has reached `Deployed` status, you can use `wash app list`:
 
-## Send a request to the running component
+```shell
+wash app list
+```
 
-Once `wash dev` is serving your component, to send a request to the running component (via the HTTP
-server provider). It will call an upstream API and return a list of random numbers:
+### Send a request
 
-```console
+When you send a request, the component will call an upstream API and return a list of random numbers:
+
+```shell
 curl localhost:8000
+```
+```text
 [438,424,166,260,681]
 ```
 
-# Issues/ FAQ
+### Clean up
 
-<summary>
-<description>
+You can stop the `wash dev` process with `Ctrl-C`.
 
-## `curl` produces a "failed to invoke" error
+## ⚠️ Issues/FAQ
 
-</description>
+### `curl` produces a "failed to invoke" error
 
-If `curl`ing produces
+If `curl`ing produces...
 
-```
-curl localhost:8000
+```text
 failed to invoke `wrpc:http/incoming-handler.handle`: failed to invoke `wrpc:http/incoming-handler@0.1.0.handle`: failed to shutdown synchronous parameter channel: not connected%
 ```
 
-You *may* need to just wait a little bit -- the HTTP server takes a second or two to start up.
+...the HTTP server may not have finished starting up. You can check that the application has reached `Deployed` status with `wash app list`. 
 
-If the issue *persists*, you *may* have a lingering HTTP server provider running on your system. You
-can use `pgrep` to find it:
+If the issue persists, you may have a lingering HTTP server provider running on your system. You can use `pgrep` to check:
 
-```console
-❯ pgrep -la ghcr_io
+```shell
+pgrep -la ghcr_io
+```
+```text
 4007604 /tmp/wasmcloudcache/NBCBQOZPJXTJEZDV2VNY32KGEMTLFVP2XJRZJ5FWEJJOXESJXXR2RO46/ghcr_io_wasmcloud_http_server_0_23_1
 ```
 
-</summary>
+## 📖 Further reading
+
+For more on building components, see the [Component Developer Guide](https://wasmcloud.com/docs/developer/components/) in the wasmCloud documentation. 
