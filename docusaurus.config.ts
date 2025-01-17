@@ -102,6 +102,7 @@ const config = (async (): Promise<Config> => {
             authorsMapPath: '../authors.yml', // relative to blog directory
             blogListComponent: '@theme/wasmcloud/blog/list-page',
             blogPostComponent: '@theme/wasmcloud/blog/post-page',
+            onInlineAuthors: 'throw',
           },
           docs: {
             editUrl: 'https://github.com/wasmCloud/wasmcloud.com/edit/main/',
@@ -160,6 +161,7 @@ const config = (async (): Promise<Config> => {
           authorsMapPath: '../authors.yml', // relative to community directory
           blogListComponent: '@theme/wasmcloud/community/list-page',
           blogPostComponent: '@theme/wasmcloud/community/post-page',
+          onInlineAuthors: 'ignore',
         } satisfies PluginContentBlogOptions,
       ],
       [
