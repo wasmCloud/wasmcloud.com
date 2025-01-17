@@ -52,7 +52,11 @@ function siteBaseUrl() {
   if (process.env.NODE_ENV === 'development') {
     return 'http://localhost:3000';
   }
-  if (process.env.NETLIFY && process.env.CONTEXT === 'deploy-preview') {
+  if (
+    process.env.NETLIFY &&
+    process.env.CONTEXT === 'deploy-preview' &&
+    process.env.DEPLOY_PRIME_URL
+  ) {
     return process.env.DEPLOY_PRIME_URL;
   }
   return 'https://wasmcloud.com';
@@ -66,6 +70,9 @@ const config = (async (): Promise<Config> => {
       description: 'The secure, distributed, WebAssembly application platform',
       tagline_1: 'Build applications in any language.',
       tagline_2: 'Deploy them anywhere.',
+    },
+    future: {
+      experimental_faster: true,
     },
     url: siteBaseUrl(),
     baseUrl: '/',
@@ -207,10 +214,10 @@ const config = (async (): Promise<Config> => {
           }),
         ],
       },
-//      announcementBar: {
-//        id: 'announcement',
-//        content: `📢 Announcement content goes here.`,
-//      },
+      // announcementBar: {
+      //   id: 'announcement',
+      //   content: `📢 Announcement content goes here.`,
+      // },
       footer: {
         links: [
           {

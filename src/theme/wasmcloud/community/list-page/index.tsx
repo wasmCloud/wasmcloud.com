@@ -3,7 +3,6 @@ import clsx from 'clsx';
 
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import { PageMetadata, HtmlClassNameProvider, ThemeClassNames } from '@docusaurus/theme-common';
-import BlogLayout from '@theme/BlogLayout';
 import BlogListPaginator from '@theme/BlogListPaginator';
 import SearchMetadata from '@theme/SearchMetadata';
 import type { Props } from '@theme/BlogListPage';
