@@ -1,11 +1,10 @@
 import BlogPostItemHeaderInfo from '@theme/BlogPostItem/Header/Info';
 import BlogPostItemHeaderAuthors from '@theme/BlogPostItem/Header/Authors';
-import { useBaseUrlUtils } from '@docusaurus/useBaseUrl';
 import Link from '@docusaurus/Link';
 import styles from './styles.module.css';
 import clsx from 'clsx';
 import type BlogPostItemType from '@theme/BlogPostItem';
-import { useBlogPost } from '@docusaurus/theme-common/internal';
+import { useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import type { WrapperProps } from '@docusaurus/types';
 import MDXContent from '@theme/MDXContent';
 

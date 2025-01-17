@@ -5,7 +5,7 @@ import Link from '@docusaurus/Link';
 import styles from './styles.module.css';
 import clsx from 'clsx';
 import type BlogPostItemType from '@theme/BlogPostItem';
-import { useBlogPost } from '@docusaurus/theme-common/internal';
+import { useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import type { WrapperProps } from '@docusaurus/types';
 
 type Props = WrapperProps<typeof BlogPostItemType>;

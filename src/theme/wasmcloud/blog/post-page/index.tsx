@@ -1,13 +1,13 @@
 import React, { type ReactNode } from 'react';
 import clsx from 'clsx';
 import { HtmlClassNameProvider, ThemeClassNames } from '@docusaurus/theme-common';
-import { BlogPostProvider, useBlogPost } from '@docusaurus/theme-common/internal';
+import { BlogPostProvider, useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import BlogPostPageMetadata from '@theme/BlogPostPage/Metadata';
 import BlogPostPageStructuredData from '@theme/BlogPostPage/StructuredData';
 import Layout from '@theme/Layout';
 import TOC from '@theme/TOC';
 import type { Props } from '@theme/BlogPostPage';
-import Unlisted from '@theme/Unlisted';
+import Unlisted from '@theme/ContentVisibility/Unlisted';
 import styles from './styles.module.css';
 import BlogPostItem from '../post-item';
 import Link from '@docusaurus/Link';
