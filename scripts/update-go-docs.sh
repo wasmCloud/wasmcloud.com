@@ -19,9 +19,7 @@ while IFS= read -r -d '' file
 do
     # Get the relative path of the file from the repo root
     rel_path=$(dirname "${file#"$docs_dir/"}")
-    # This uppercases the first letter of each word in the path so the sidebar is correct. We may
-    # change this in the future with some metadata in the docs repo
-    target_dir="$(git rev-parse --show-toplevel)/docs/Examples/Go/${rel_path^}"
+    target_dir="$(git rev-parse --show-toplevel)/docs/examples/go/${rel_path}"
     # Create the target directory structure
     mkdir -p "${target_dir}"
     # Copy the file to the docs repo
