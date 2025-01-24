@@ -94,6 +94,9 @@ See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/w
 | codegen_config | string | `.`      | Path to codegen.toml file |
 
 ### WIT dependency fetch/pull configuration - `[registry].pull`
+:::info
+The `[registry].pull` section requires `wash v0.38.0+`.
+:::
 
 When fetching or pulling [WIT][wit] interfaces (e.g. [`wasi:keyvalue`][wasi-keyvalue], [`wasi:http`][wasi-http]), it can be useful to provide and/or override default sources.
 This effect can be achieved with the `pull` member of the `[registry]` configuration section in `wasmcloud.toml`.
