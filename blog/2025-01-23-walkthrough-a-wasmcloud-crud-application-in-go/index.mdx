@@ -3,7 +3,7 @@ title: "Walkthrough: A wasmCloud CRUD application in Go"
 authors: [ericgregory]
 slug: 2025-01-23-walkthrough-a-wasmclod-crud-application-in-go
 image: './images/crud-go.webp'
-date: "2025-01-23"
+date: "2025-01-27"
 description: "Explore a simple CRUD application in Go, compile the code to a WebAssembly component, and run it on wasmCloud using swappable, vendorless capabilities for HTTP service and key-value storage."
 ---
 
@@ -25,7 +25,7 @@ We'll need a few tools for this walkthrough:
 - The [**Go (1.23+) toolchain**](https://go.dev/doc/install) and [**TinyGo**](https://tinygo.org/getting-started/install/) let us compile Go code to a WebAssembly component. The TinyGo project moves quickly, so always use the latest version.
 - [**`wasm-tools`**](https://github.com/bytecodealliance/wasm-tools#installation) is a utility that helps generate bindings between language-agnostic [interfaces](/docs/concepts/interfaces/) and Go.
 
-## Download the example
+## Run the example
 
 To download the example, you can clone the [wasmCloud/go repository](https://github.com/wasmcloud/go): 
 
@@ -39,6 +39,55 @@ Change directory to `examples/component/http-keyvalue-crud`:
 cd examples/component/http-keyvalue-crud
 ```
 
+We'll start by running the example and seeing what it does&mdash;then we'll take a look under the hood and see how it all works. 
+
+From the project directory, run:
+
+```shell
+wash dev
+```
+
+This will start a dev loop that automatically builds and deploys your app (in a local wasmCloud environment) and continuously watches for changes.
+
+In a new terminal tab, you can view your wasmCloud apps and check status:
+
+```shell
+wash app list
+```
+
+Once the app status for `http-keyvalue-crud` is `Deployed`, we can test a POST against our app with `curl`:
+
+```shell
+curl -X POST localhost:8000/crud/mario -d '{"itsa": "me", "woo": "hoo"}'
+```
+
+We should get the result:
+
+```text
+{"message":"Set mario", "value":"{"itsa": "me", "woo": "hoo"}"}
+```
+
+We can test a GET and DELETE as well:
+
+```shell
+curl localhost:8000/crud/mario
+```
+```text
+{"message":"Got mario", "value":"{"itsa": "me", "woo": "hoo"}"}
+```
+```shell
+curl -X DELETE localhost:8000/crud/mario
+```
+```text
+{"message":"Deleted mario"}
+```
+
+You can press Ctrl+C in your first terminal tab to stop the dev loop. 
+
+Now let's take a step back and see how the pieces of this application fit together.
+
+## Exploring the component project
+
 In wasmCloud, a [**component**](/docs/concepts/components) is a WebAssembly component dedicated to an application's creative logic. Typically, we will simply refer to this as a "component." The code in this directory is for a Go application that compiles to a component. 
 
 Here we have the standard `go.mod` file for a Go project and a `.go` file for the application. We also have a few more pieces that make up a wasmCloud project:
@@ -51,7 +100,7 @@ Here we have the standard `go.mod` file for a Go project and a `.go` file for th
 - `wasmcloud.lock`: Automatically generated lockfile for WIT packages
 - `wasmcloud.toml`: Configuration file for a wasmCloud application
 
-Let's take a tour of the major pieces of the project and see how they all fit together.
+Let's take a tour of the major pieces of the project.
 
 ## Understanding the interfaces
 
@@ -406,64 +455,27 @@ When we wrote the code for our WebAssembly component, we didn't worry about how 
 
 It's important to emphasize that different providers could just as easily do the same jobs. The same component we wrote could perform CRUD operations against *any* key-value store as long as a provider exists for it. (And if a provider doesn't exist yet, you can always [create one](/docs/developer/providers/).)
 
-## Launch and run
+It's *also* important to note that we didn't have to think about the manifest when we used `wash dev`. Because components define their interface requirements (and the functions they expose to other entities) in the `.wasm` binaries themselves, it's possible to reason programmatically about manifests and generate them automatically, which is exactly what `wash dev` does. 
 
-Start a local wasmCloud environment (using the `-d`/`--detached` flag to run in the background):
+When the `wash dev` process sees a well-known interface in a binary, it fulfills the requirement with an appropriate provider, which is why we never had to think about which key-value store we were using when we first ran this application.
+
+## Launch and run (manually)
+
+The `wash dev` subcommand launched a local wasmCloud environment and deployed the application automatically. This time, we'll perform the same steps manually. Start a local wasmCloud environment (using the `-d`/`--detached` flag to run in the background):
 
 ```shell
 wash up -d 
 ```
 
-Now we're ready to launch the application:
+Now you can launch the application:
 
 ```shell
 wash app deploy wadm.yaml
 ```
 
-To view your wasmCloud apps and check status:
+Once again, we can check the app's status with `wash app list`.
 
-```shell
-wash app list
-```
-
-Once the app status is `Deployed`, we can test a POST against our app with `curl`:
-
-```shell
-curl -X POST localhost:8000/crud/mario -d '{"itsa": "me", "woo": "hoo"}'
-```
-
-We should get the result:
-
-```text
-{"message":"Set mario", "value":"{"itsa": "me", "woo": "hoo"}"}
-```
-
-We can test a GET and DELETE as well:
-
-```shell
-curl localhost:8000/crud/mario
-```
-```text
-{"message":"Got mario", "value":"{"itsa": "me", "woo": "hoo"}"}
-```
-```shell
-curl -X DELETE localhost:8000/crud/mario
-```
-```text
-{"message":"Deleted mario"}
-```
-
-If we want to update our application, we can `wash build`, update the version in `wadm.yaml`, and `wash app deploy wadm.yaml` again.
-
-If you want to iterate more quickly, rather than `wash build` and `wash up` and `wash app deploy`, from your project directory you can simply run:
-
-```shell
-wash dev
-```
-
-This will start a dev loop that automatically builds and deploys your app and continuously watches for changes. (If you would like to try `wash dev`, I'd recommend first cleaning up your existing deployment according to the instructions below.)
-
-## Clean up
+If we want to update our application (and we're not using the dev loop), we can `wash build` and `wash app deploy wadm.yaml` again.
 
 Once you're finished with the example, you can delete the application from your wasmCloud environment by referring either to the application name (`http-keyvalue-crud`) or deployment manifest you used to launch it:
 
