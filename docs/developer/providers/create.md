@@ -103,7 +103,9 @@ async fn dispatch_msg(component_id: &str, nats_msg: async_nats::Message) {
     // TODO: Send the message to the component's `wasmcloud:messaging/handler.handle-message` function //[!code --]
     todo!("Use wasmcloud:messaging/handler for NATS provider") // [!code --]
     if let Err(e) = wasmcloud::messaging::handler::handle_message( // [!code ++]
-        &get_connection().get_wrpc_client(component_id), // [!code ++]
+        &get_connection().get_wrpc_client(component_id)
+            .await // [!code ++]
+            .context("failed to get wrpc client")?;, // [!code ++]
         &msg, // [!code ++]
     ) // [!code ++]
     .await // [!code ++]
