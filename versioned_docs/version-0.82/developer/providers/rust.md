@@ -119,4 +119,4 @@ Also, we need to make one edit to the project Makefile: change the last part of 
 CAPABILITY_ID = "wasmcloud:examples:payments"
 ```
 
-Let's [create the provider archive](./create-par)
+Let's [create the provider archive](../create-par/)

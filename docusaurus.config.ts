@@ -69,6 +69,7 @@ const config = (async (): Promise<Config> => {
     },
     url: siteBaseUrl(),
     baseUrl: '/',
+    trailingSlash: true,
     onBrokenLinks: 'throw',
     onBrokenMarkdownLinks: 'warn',
     favicon: '/favicon.ico',

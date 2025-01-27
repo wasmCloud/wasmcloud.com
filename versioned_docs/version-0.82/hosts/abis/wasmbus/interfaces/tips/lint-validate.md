@@ -1,5 +1,5 @@
 ---
-title: "Lint and validate checks"
+title: 'Lint and validate checks'
 draft: false
 ---
 
@@ -17,4 +17,4 @@ To check the model against validation rules, type
 wash validate
 ```
 
-See [errors](./error-messages/) for information on understanding errors from these commands.
+See [errors](../error-messages/) for information on understanding errors from these commands.
