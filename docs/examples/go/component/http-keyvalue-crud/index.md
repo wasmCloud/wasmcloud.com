@@ -26,9 +26,9 @@ cd examples/component/http-keyvalue-crud
 
 In addition to the standard elements of a Go project, the example directory includes the following files and directories:
 
-- `build/`: Target directory for compiled `.wasm` binaries
-- `gen/`: Target directory for Go bindings of [interfaces](https://wasmcloud.com/docs/concepts/interfaces)
-- `wit/`: Directory for WebAssembly Interface Type (WIT) packages that define interfaces
+- `/build`: Target directory for compiled `.wasm` binaries
+- `/gen`: Target directory for Go bindings of [interfaces](https://wasmcloud.com/docs/concepts/interfaces)
+- `/wit`: Directory for WebAssembly Interface Type (WIT) packages that define interfaces
 - `bindings.wadge.go`: Automatically generated test bindings
 - `wadm.yaml`: Declarative application manifest
 - `wasmcloud.lock`: Automatically generated lockfile for WIT packages
