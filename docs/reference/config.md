@@ -196,7 +196,7 @@ It can also be used to override a version requirement for a package, but this is
 "my:local-dep" = { version = "^0.1.0" }
 ```
 
-### Dev Overrides Config (Imports) - `[[dev.overrides.imports]]`
+### Dev Overrides Config (Imports and Exports) - `[[dev.overrides.imports]]` or `[[dev.overrides.exports]]`
 
 Dev overrides enable users to override the `wash dev` process defaults when satisfying a capability requirement. For example, `wash dev` automatically satisfies a key-value store requirement with the NATS-KV provider, but a dev override could enable a user to use the Redis key-value provider in a dev loop.
 
@@ -207,3 +207,5 @@ Dev overrides can be useful for specifying third-party providers as well as prov
 | interface_spec | string | Interface specification (e.g., `"wasi:keyvalue@0.2.0-draft"`)           |
 | image_ref      | string | OCI image reference (e.g., `"ghcr.io/wasmcloud/keyvalue-redis:0.28.2"`) |
 | config         | object | Configuration (e.g., `{ values = { url = "redis://127.0.0.1:6379" } }`) |
+| secrets        | object | Secrets that should be provided to the entity                           |
+| link_name      | string | Link name that should be used to reference the component. This is only required when there are *multiple* conflicting overrides (i.e. there is no "default") |
