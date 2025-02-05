@@ -1,6 +1,7 @@
 ---
-title: 'Scale and Distribute'
+title: 'Deploy and Scale'
 sidebar_position: 3
+slug: deploy-and-scale
 ---
 
 import Tabs from '@theme/Tabs';
@@ -11,17 +12,86 @@ In the previous steps, we started a developer loop, added two [**interfaces**](/
 
 Now we'll learn how to:
 
-- Scale our application to handle multiple parallel requests
+- Declaratively deploy an application in a local wasmCloud environment
+- Scale an application to handle multiple parallel requests
 - Distribute an application globally
 - Use the wasmCloud dashboard
 
 :::info[Prerequisites]
-This tutorial assumes you're following directly from the previous steps. Make sure to complete [**Quickstart**](/docs/tour/hello-world.mdx), [**Add Features**](/docs/tour/add-features.mdx), and [**Extend and Deploy**](/docs/tour/extend-and-deploy.mdx) first.
+This tutorial assumes you're following directly from the previous steps. Make sure to complete [**Quickstart**](/docs/tour/hello-world.mdx), [**Add Features**](/docs/tour/add-features.mdx), and [**Customize and Extend**](/docs/tour/customize-and-extend/) first.
 :::
+
+### Declaratively deploying the application
+
+We will continue to use the Redis key-value capability provider as in the [Customize and Extend](/docs/tour/customize-and-extend/) step, but this time we will specify the provider using a declarative [**application manifest**](/docs/ecosystem/wadm/model) written in YAML, much like a Kubernetes manifest.
+
+This `.yaml` file defines the relationships between the components and providers that make up our application, along with other important configuration details. It is conventionally named `wadm.yaml` after the [**wasmCloud Application Deployment Manager**](/docs/ecosystem/wadm/index.md) that handles scheduling.
+
+We can modify our `wadm.yaml` to include the Redis provider.
+
+Open `wadm.yaml` in your code editor and make the changes below.
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: hello-world # [!code ++:3]
+  annotations:
+    description: 'HTTP hello world demo'
+spec:
+  components:
+    - name: http-component
+      type: component
+      properties:
+        # Your manifest will point to the path of the built component; you can also
+        # start published components from OCI registries
+        image: file://./build/http_hello_world_s.wasm
+      traits:
+        - type: spreadscaler
+          properties:
+            instances: 1
+        # The new key-value link configuration # [!code ++:11]
+        - type: link
+          properties:
+            target: kvredis
+            namespace: wasi
+            package: keyvalue
+            interfaces: [atomics, store]
+            target_config:
+              - name: redis-url
+                properties:
+                  url: redis://127.0.0.1:6379
+    # The new capability provider # [!code ++:5]
+    - name: kvredis
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/keyvalue-redis:0.28.2
+    - name: httpserver
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.25.0
+      traits:
+        - type: link
+          properties:
+            target: http-component
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler]
+            source_config:
+              - name: default-http
+                properties:
+                  address: 127.0.0.1:8000
+```
+
+* `kvredis` is defined as a `capability` provider and fetched from an OCI image.
+* `http-component` connects to `kvredis` via a runtime `link`.
+    - The **link definition** specifies the interface and configuration through which the component and provider will communicate.
+
+Save your changes to `wadm.yaml`.
 
 ## Scaling up 📈
 
-So far, our application can only handle a single request at a time. This is because only a single **instance** is defined for it in the application manifest (`wadm.yaml`), as a property of the `spreadscaler`:
+So far, our application can only handle a single request at a time. This is because only a single **instance** is defined for it in the application manifest as a property of the `spreadscaler`:
 
 ```yaml {14-16}
 apiVersion: core.oam.dev/v1beta1
@@ -202,17 +272,20 @@ async function handle(req: IncomingRequest, resp: ResponseOutparam) { // [!code 
 The response time of our hello handler is very low. To show that requests are not processed in parallel, we need to ensure a longer response time, which we can exploit in our tests.
 :::
 
-Because we've made changes, run `wash build` again to compile the updated Wasm component.
+Because we've made changes, run `wash build` to compile the updated Wasm component.
 
 ```bash
 wash build
 ```
 
-If you stopped your local wasmCloud environment and Redis server in the previous tutorial, start them up again: 
+Start a local wasmCloud environment (using the `-d`/`--detached` flag to run in the background):
 
 ```shell
 wash up -d
 ```
+
+If you stopped the Redis server in the previous tutorial, start it up again: 
+
 <Tabs groupId="env" queryString>
   <TabItem value="local" label="Local Redis Server" default>
 
@@ -230,7 +303,7 @@ docker run -d --name redis -p 6379:6379 redis
   </TabItem>
 </Tabs>
 
-Deploy the latest version of our application:
+Manually deploy the application:
 
 ```shell
 wash app deploy wadm.yaml

@@ -218,7 +218,7 @@ The values in these fields are a simple key-value map that will be passed as lin
 
 ## Putting it all together
 
-So far we've seen bits and pieces of the application specification YAML. Here's the complete manifest for the [Extend and Deploy](/docs/tour/extend-and-deploy.mdx) step of the [Quickstart](/docs/tour/hello-world.mdx) example:
+So far we've seen bits and pieces of the application specification YAML. Here's the complete manifest for the [Customize and Extend](/docs/tour/customize-and-extend/) step of the [Quickstart](/docs/tour/hello-world.mdx) example:
 
 ```yaml
 apiVersion: core.oam.dev/v1beta1
