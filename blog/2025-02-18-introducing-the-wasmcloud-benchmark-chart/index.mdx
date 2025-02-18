@@ -1,7 +1,13 @@
 ---
 title: "Introducing the wasmCloud benchmark chart"
 authors: [ericgregory]
+slug: 2025-02-18-introducing-the-wasmcloud-benchmark-chart
+image: './images/benchmark-header.webp'
+date: "2025-02-18"
+description: "Learn about the Helm chart for benchmarking wasmCloud."
 ---
+
+![Introducing the wasmCloud benchmark chart](./images/benchmark-header.webp)
 
 As wasmCloud adoption has accelerated, we've seen an increased demand for more sophisticated benchmarking options. To fulfill this need, wasmCloud maintainer [Taylor Thomas](https://github.com/thomastaylor312) recently introduced a new [**wasmCloud `benchmark` Helm chart**](https://github.com/wasmCloud/wasmCloud/tree/main/charts/benchmark) for users running wasmCloud on Kubernetes. 
 
@@ -37,9 +43,32 @@ To install the `benchmark` chart:
 helm upgrade --install my-benchmark --version 0.2.0 oci://ghcr.io/wasmcloud/charts/benchmark --wait --set test.url=http://hello-world:8000
 ```
 
-When you run this command, `test.url` is a required value that specifies a URL (accessible from within the Kubernetes cluster) that the benchmark will test against. Typically this will be a component with an HTTP service&mdash;the "Hello World!" component deployed in the Kubernetes guide should work just fine. 
+When you run this command, `test.url` is a required value that specifies a URL (accessible from within the Kubernetes cluster) that the benchmark will test against. Typically this will be a component with an HTTP service&mdash;the ["Hello World!" application deployed in the Kubernetes guide](https://github.com/wasmCloud/wasmcloud-operator/blob/main/examples/quickstart/hello-world-application.yaml) should work just fine. 
 
-Once the chart is successfully installed, you can get the logs and output of the test by running:
+k6 load-testing works by simulating a given number of requests from a given number of virtual users. The default configuration is suitable for a production-grade environment; if you're testing out the installation and usage on something a little humbler (like a local kind cluster), you may want to modify the test via a `values.yaml` file. You can set criteria like arrival rate, test duration, and maximum virtual users:
+
+```yaml
+test:
+  scenarios:
+    default:
+      rate: 1000
+      duration: "1m"
+      preAllocatedVUs: 25
+      maxVUs: 500
+
+```
+
+:::note[]
+If you'd like to experiment with k6 on its own in a local environment, the [k6 dashboard](https://github.com/grafana/xk6-dashboard) is a fantastic tool.
+:::
+
+Once the `benchmark` chart is successfully installed, the tests will start automatically. Running this command will let you know when tests are complete:
+
+```shell
+kubectl wait -n default --timeout 90s --for=jsonpath='{.status.stage}'=finished testruns/my-benchmark-test
+```
+
+You can get the logs and output of the test by running:
 
 ```shell
 kubectl logs -n default -l k6_cr=my-benchmark-test,runner=true --tail=-1
@@ -60,7 +89,7 @@ kubectl port-forward -n default svc/my-benchmark-grafana 3000:80
 ```
 Then open http://localhost:3000 in your browser and navigate to the "Test Environment" dashboard in the dashboards section.
 
-TK SCREENSHOT
+![Screenshot of Test Environment dashboard](./images/perf-charts.webp)
 
 When you're done, you can clear the test results by running:
 
@@ -68,7 +97,7 @@ When you're done, you can clear the test results by running:
 kubectl delete cm -n default -l k6-result=true,k6-test-name=my-benchmark-test
 ```
 
-For advanced options TK
+For advanced options, see the [chart's GitHub repo](https://github.com/wasmCloud/wasmCloud/tree/main/charts/benchmark#advanced-usage). 
 
 ## Next steps
 
