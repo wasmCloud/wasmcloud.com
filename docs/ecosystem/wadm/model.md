@@ -259,7 +259,7 @@ spec:
     - name: httpserver
       type: capability
       properties:
-        image: ghcr.io/wasmcloud/http-server:0.25.0
+        image: ghcr.io/wasmcloud/http-server:0.26.0
       traits:
         # Link definition for httpserver -> http-component
         - type: link
@@ -271,7 +271,7 @@ spec:
             source_config:
               - name: default-http
                 properties:
-                  address: 127.0.0.1:8000
+                  address: 0.0.0.0:8000
 ```
 
 ## Further reading
