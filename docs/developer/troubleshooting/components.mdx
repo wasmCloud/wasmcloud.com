@@ -37,7 +37,7 @@ Even though port 5000 may be available on your host's network, networking works 
 
 ### Failing to invoke a component
 
-#### Missing Runtime Links
+#### Missing runtime links
 
 Invocations are only allowed between components and providers that have been [linked](/docs/concepts/linking-components/). Omitting a link will result in a runtime error when the host denies the invocation:
 
@@ -54,6 +54,24 @@ wash get links
 The command line wasmCloud shell (aka [wash](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-cli)) attempts to safeguard against misspellings, though it is unable to determine if a particular link is between the intended component and provider.
 
 If any of the component ID, provider ID, link name, or contract ID are misspelled or omitted, then the host will deny the invocation.
+
+### Chunking errors
+
+When using the `wasi-http` interface directly, failed invocations can be the result of chunking errors caused by incorrect sequence of `wasi-http` operations. In this case, the component blocks during write and never finishes because the buffer becomes full.
+
+The proper sequence of operations when using `wasi-http` directly in a Rust-based component is as follows:
+
+1. Create an `OutgoingResponse`
+2. Get the response body
+3. Set the `ResponseOutparam` to that response
+4. Get the `OutputStream` write handle to the response body
+5. In a loop, `blocking_write_and_flush` until the call returns 0 or the stream is closed
+6. Drop the output stream
+7. Finish the outgoing body
+
+Refer to component examples like [Blobby](https://github.com/wasmCloud/wasmCloud/blob/main/examples/rust/components/blobby/src/lib.rs#L175) to see this in practice. 
+
+In general, we recommend using a library like [`wasmcloud-component`](https://docs.rs/wasmcloud-component/0.2.0/wasmcloud_component/http/index.html) that abstracts HTTP operations. 
 
 ## Troubleshooting invocations
 
