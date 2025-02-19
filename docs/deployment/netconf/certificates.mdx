@@ -12,6 +12,90 @@ wasmCloud can be configured to trust additional certificates when establishing s
 ./wasmcloud --tls-ca-path /path/to/cert.pem --tls-ca-path /path/to/another-cert.pem ...
 ```
 
+### Passing CAs to the wasmCloud host on Kubernetes
+
+When using the wasmCloud operator on Kubernetes, you can pass one or more Certificate Authorities (CAs) into wasmCloud via ConfigMaps and Secrets.
+
+CAs can be defined as in the examples below:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: org-authorities
+data:
+  dontmountme: |
+    -----BEGIN CERTIFICATE-----
+    Custom CA certificate bundle.
+    -----END CERTIFICATE-----
+  root.crt: |
+    -----BEGIN CERTIFICATE-----
+    Custom CA certificate bundle.
+    -----END CERTIFICATE-----
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: email-authorities
+stringData:
+  email.crt: |
+    -----BEGIN CERTIFICATE-----
+    Custom CA certificate bundle.
+    -----END CERTIFICATE-----
+  notifications.crt: |
+    -----BEGIN CERTIFICATE-----
+    Custom CA certificate bundle.
+    -----END CERTIFICATE-----
+```
+
+The CAs are then passed as part of a wasmCloud host definition:
+
+```yaml
+apiVersion: k8s.wasmcloud.dev/v1alpha1
+kind: WasmCloudHostConfig
+metadata:
+  name: wasmcloud-host
+spec:
+  lattice: default
+  version: "1.0.4"
+  natsAddress: nats://nats-cluster.default.svc.cluster.local
+  certificates:
+    authorities:
+      - name: org-wide-authorities
+         configmap:
+           name: org-authorities
+      - name: partner-authorities
+         secret:
+           secretName: email-authorities
+```
+
+The `authorities` list follows the [Volume convention](https://pkg.go.dev/k8s.io/api/core/v1#VolumeSource).
+
+The wasmCloud operator mounts the `org-authorities` ConfigMap into the wasmCloud host container under `/wasmcloud/certificates/ca-org-wide-authorities`. Note that the authority name is prefixed with `ca-`.
+
+The operator scans the ConfigMap for items that end in `.crt` (i.e., certificates) and appends them to the arguments passed to wasmCloud host. For example, if the ConfigMap includes the keys `dontmountme` and `root.crt`, only `root.crt` will be passed into wasmCloud as `--tls-ca-path /wasmcloud/certificates/ca-org-wide-authorities/root.crt`.
+
+The operator uses the same process when passing CAs defined as Secrets.
+
+#### Configuration via `hostConfig`
+
+When deploying wasmCloud on Kubernetes with the [`wasmcloud-platform` Helm chart](https://github.com/wasmCloud/wasmCloud/tree/main/charts/wasmcloud-platform), you can configure wasmCloud hosts to use additional CAs in the chart's `values.yaml` file under [`hostConfig`](https://github.com/wasmCloud/wasmCloud/blob/main/charts/wasmcloud-platform/values.yaml#L70-L83):
+
+```yaml
+hostConfig:
+  enabled: true
+  # Other configuration...
+  certificates:
+    authorities:
+      - name: intermediate-ca
+        configMap:
+          name: private-intermediate-ca
+      - name: private-root-ca
+        secret:
+          secretName: private-root-ca
+```
+
 ### Troubleshooting
 
 When deploying components from your OCI registry that uses private or self-signed SSL certificates, wasmCloud may return errors like the following:
