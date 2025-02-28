@@ -6,7 +6,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 The lattice control interface provides a way for clients to interact with the lattice to issue

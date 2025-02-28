@@ -6,7 +6,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 This section is still under construction. If there is specific content you'd like to see here, please [file an issue for this site](https://github.com/wasmCloud/wasmCloud.com/issues/new).

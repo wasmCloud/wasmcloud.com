@@ -4,7 +4,7 @@ sidebar_position: 3
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 NATS leaf nodes are a simple concept but they enable an incredible amount of power, flexibility, and use cases. A leaf node allows NATS servers to bridge or join security domains. On any given server, you can set up [leaf node remotes](https://docs.nats.io/running-a-nats-service/configuration/leafnodes) that tether one account space on one side of the node to a different account space on the other side of the node.

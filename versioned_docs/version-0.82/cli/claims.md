@@ -6,7 +6,7 @@ description: "wash claims command reference"
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 Every actor in a wasmCloud environment claims its capabilities or the features it can interact with to supplement its current behavior. These capabilities are claimed in the form of JSON Web Tokens (JWTs). `wash claims` will assist you to generate, manage and view these JWTs for wasmCloud actors. Following are the subcommands available under `wash claims`.

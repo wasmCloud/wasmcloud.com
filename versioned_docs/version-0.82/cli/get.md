@@ -6,7 +6,7 @@ description: "wash get command reference"
 --- 
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 Wash get helps you in retrieving information about your lattice. It can help you retrieve all the links in the lattice, hosts, their inventories and claims. Following are the subcommands available under `wash get`:

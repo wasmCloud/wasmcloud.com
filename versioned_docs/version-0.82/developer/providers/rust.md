@@ -6,7 +6,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 Creating a capability provider involves creating a native executable. All capability provider executables have the same basic requirements:

@@ -6,7 +6,7 @@ description: "wash keys command reference"
 --- 
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 This command helps a user to generate NATS keys and manage them. Following are the subcommands available under `wash keys`.

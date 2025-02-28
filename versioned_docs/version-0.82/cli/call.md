@@ -6,7 +6,7 @@ description: "wash call command reference"
 --- 
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 Wash call can be used to directly invoke an actor. This can be useful when debugging, especially when the actor isn't directly accessible via external channels such as HTTP. It is not recommended to use wash call in production environments.

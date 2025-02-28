@@ -6,7 +6,7 @@ description: "wash par command reference"
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 `wash par` gives a user the capacity to interact with provider archives. A user may create, inspect or modify provider archive files. Following are the subcommands available under `wash par`.

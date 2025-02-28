@@ -4,7 +4,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 This document applies to interface crates built from `.smithy` models, and provides some information about how and when source files are updated.

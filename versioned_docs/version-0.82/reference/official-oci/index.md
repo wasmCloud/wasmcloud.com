@@ -6,7 +6,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 We maintain a list of all officially supported, continually updated, first-party images managed by the wasmcloud team in our GitHub repositories. Refer to the [providers directory](https://github.com/wasmCloud/wasmCloud/tree/release/v0.82.0/crates/providers) for the latest updated versions of our first party capability providers, and the [examples directory](https://github.com/wasmCloud/wasmCloud/tree/main/examples) for the latest updated versions of our example actors and providers.

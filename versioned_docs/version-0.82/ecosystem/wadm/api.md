@@ -8,7 +8,7 @@ sidebar_position: 4
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 The normal way to interact with a `wadm` installation (which could be a single server or a cluster)

@@ -4,7 +4,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 The lint and validation checks are very useful for finding problems in smithy model files. They will detect syntax errors, missing dependencies, and style errors.
