@@ -5,7 +5,9 @@ sidebar_position: 4
 description: "wash capture command reference"
 --- 
 
-v
+<head>
+  <meta name="robots" content="noindex" />
+</head>
 
 Wash capture helps in capturing snapshots of the state of a lattice and assists in debugging cluster invocations using operations like replay. This is currently an experimental feature and you would have to pass the `--experimental` flag or set the `WASH_EXPERIMENTAL` environment variable to true. This tool provides three options - enable capture mode, disable capture mode or replay a captured file. A user must first enable capture mode by passing the `--enable` flag. Once capture mode is enabled, a user can capture snapshots at any time by running `wash capture --experimental`, which will download the snapshot file to the current directory. The snapshot files can be viewed by passing the file path to the `replay` subcommand. To disable capture mode, pass the `--disable` flag. 
 
