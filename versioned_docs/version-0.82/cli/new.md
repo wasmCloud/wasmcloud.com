@@ -6,7 +6,7 @@ description: "wash new command reference"
 --- 
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 This command creates a new project from an existing template. A user may create an actor, provider or an interface project. This command takes you through the process in an interactive way. Following are the subcommands available under `wash new`:

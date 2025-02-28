@@ -6,7 +6,7 @@ description: "wash ctx command reference"
 --- 
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 `wash ctx` provides a user with tools to interact with wasmCloud host configuration contexts. By default, the host configuration context is stored in a `host_config.json` file in your `$HOME/.wash/contexts` directory. This command will help you to interactively manage host contexts by performing operations such as addition, removal and editing of contexts. Following are the available subcommands under `wash ctx`:

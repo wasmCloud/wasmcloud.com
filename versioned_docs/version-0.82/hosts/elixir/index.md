@@ -8,7 +8,7 @@ sidebar_position: 6
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 :::warning

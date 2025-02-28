@@ -8,7 +8,7 @@ sidebar_position: 2
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 The **w**asmCloud **A**pplication **D**eployment **M**anager uses the [Open Application Model](https://oam.dev/) to define application specifications. Because this specification is extensible and platform agnostic, it makes for an ideal way to represent applications with metadata specific to wasmCloud. Don't worry if OAM seems overwhelming, you don't need to know much about it. We're using it as a way of defining application components in a flexible way that's familiar to a lot of people who have been working in the cloud space.

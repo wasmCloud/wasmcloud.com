@@ -7,7 +7,7 @@ type: 'docs'
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 At its core, wasmCloud is a messaging system, and a scalable messaging system needs well-defined API contracts.

@@ -7,7 +7,7 @@ description: "wasmCloud's original stable ABI"
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 If you know in advance the memory and data exchange characteristics of your WebAssembly modules, and you know the lifetimes of the data being exchanged, and you can predict the kind of long-lived pointer behavior you'll have, then by all means use every tool and code generator at your disposal (e.g. [wasm-bindgen](https://rustwasm.github.io/docs/wasm-bindgen/)).

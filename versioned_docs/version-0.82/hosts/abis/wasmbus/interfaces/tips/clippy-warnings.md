@@ -4,7 +4,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 ## Clippy warning on `&String` parameters

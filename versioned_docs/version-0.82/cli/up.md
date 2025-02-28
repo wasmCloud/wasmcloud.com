@@ -6,7 +6,7 @@ description: "wash up command reference"
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 `wash up` lets you easily start a wasmCloud host to play around or develop with. To start off, it spins up a NATS Server (if you don't have one running) on port `4222` and along with it a wasmCloud host. It also starts wadm to manage your declarative deployments. If you successively run `wash up` it will spawn multiple wasmCloud hosts that will connect to the originally created NATS server. By default, the host runs in an interactive mode in your terminal. If you add a `-d` flag to this command, the host will run in a detached mode.

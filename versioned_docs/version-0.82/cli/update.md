@@ -6,7 +6,7 @@ description: "wash update command reference"
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 `wash update` updates an actor running in a host to a new reference. The user may supply the actor ID, its host ID and the new OCI reference of the actor that needs to replace the actor in this actor ID.

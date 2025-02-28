@@ -6,7 +6,7 @@ description: "wash app command reference"
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 When deploying apps using [wadm](../ecosystem/wadm/index.md), the easiest way to manage these apps is using `wash app`. `wash app` provides us with all the tools needed to add, remove and get the necessary details of your deployed as well as undeployed applications. Following are the subcommands available under `wash app`.

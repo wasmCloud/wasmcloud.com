@@ -6,7 +6,7 @@ description: "wash inspect command reference"
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 Inspect helps you to examine the capabilities of a wasmCloud component. It accepts the path to the wasmCloud actor or provider and prints out the properties of that component.

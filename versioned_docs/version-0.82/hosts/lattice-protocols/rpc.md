@@ -6,7 +6,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 At its core, the _lattice_ is essentially a _Remote Procedure Call (RPC)_ bus layer built on top of the NATS message broker. When the lattice

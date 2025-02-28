@@ -6,7 +6,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 wasmbus has a few core requirements. The first is that the protocol must never expose the internal allocation strategy of either side of the conversation. This allows that same allocation strategy to change over time without requiring a rebuild and redeploy of any WebAssembly modules.

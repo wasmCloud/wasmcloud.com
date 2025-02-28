@@ -6,7 +6,7 @@ description: "wash link command reference"
 --- 
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 This command will assist you to add remove and query all the links in the lattice. Following are the subcommands available in `wash link`:

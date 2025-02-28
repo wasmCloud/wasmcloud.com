@@ -7,7 +7,7 @@ sidebar_position: 3
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 Using `wadm` typically involves using the `wash` command line tool. However, you can also use wash's supporting library in your Rust application or, if you continue to the next section, you'll see the API reference if you want to interact with wadm directly over a NATS connection.

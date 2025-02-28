@@ -7,7 +7,7 @@ description: 'Support for wit-defined WebAssembly components'
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 The [WebAssembly component model](https://github.com/WebAssembly/component-model) holds the promise of ushering in an even more powerful programming paradigm than WebAssembly modules. With components, we can bolt together incredible new forms of compute from small building blocks. For more information on our thoughts on the component model's future, check out the blog post [For the wit!](https://cosmonic.com/blog/engineering/for-the-wit-my-first-day-with-components)

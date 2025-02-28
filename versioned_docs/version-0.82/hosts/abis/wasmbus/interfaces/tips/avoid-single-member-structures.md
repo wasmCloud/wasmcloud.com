@@ -4,7 +4,7 @@ draft: false
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 A function is modeled as an operation, with an optional `input` type

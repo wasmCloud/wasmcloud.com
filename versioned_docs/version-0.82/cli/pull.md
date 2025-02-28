@@ -6,7 +6,7 @@ description: "wash pull command reference"
 --- 
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 This command pulls an artifact from an OCI compliant registry.

@@ -7,7 +7,7 @@ description: "A detailed specification on the requirements for being a good citi
 ---
 
 <head>
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex" />
 </head>
 
 wasmCloud's _lattice_ network protocols are all open and language agnostic and use NATS as the underlying transport. This section describes the various requirements
