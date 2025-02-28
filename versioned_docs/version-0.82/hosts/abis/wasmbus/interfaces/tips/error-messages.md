@@ -3,6 +3,10 @@ title: "Error messages"
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 Error messages from the smithy model parser, invoked by `build.rs` in Rust project, can be very long and detailed, sometimes more verbose than you need.
 
 Errors from `wash lint` or `wash validate` are usually more specific.

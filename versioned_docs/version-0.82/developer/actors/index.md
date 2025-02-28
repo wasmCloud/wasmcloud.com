@@ -5,6 +5,10 @@ sidebar_position: 2
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 :::warning[Changing in 1.0+]
 The term "actor" is deprecated. wasmCloud 1.0 and later simply refer to this entity as a **component**, reflecting wasmCloud's standardization around WebAssembly components. You can learn more [here](/docs/concepts/components).
 :::

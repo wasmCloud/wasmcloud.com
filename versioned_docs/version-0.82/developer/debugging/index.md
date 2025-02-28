@@ -6,6 +6,10 @@ draft: false
 description: 'Troubleshooting and Diagnosing problems with wasmCloud'
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 The following sections detail ways to track down errors with specific wasmCloud components, as well as some of the most common issues we see when getting started with wasmCloud applications. It's recommended to start with the [Host Troubleshooting](./host) guide first, as it details how to find wasmCloud's logs.
 
 - [Host Troubleshooting](./host)

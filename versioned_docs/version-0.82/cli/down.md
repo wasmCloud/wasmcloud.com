@@ -5,6 +5,10 @@ sidebar_position: 9
 description: "wash down command reference"
 --- 
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 This command will stop all the resources started by `wash up`. Primarily, it will stop the wasmCloud host and NATS leaf that were started on your local machine. If there is a single host running on your machine, `wash down` will stop that singular host. In case of multiple hosts, the user gets a choice to stop a specific host or all the running hosts on the system. To stop a specific host in a multiple host scenario, pass the `--host-id` flag to the command. To stop currently running hosts, pass the `--all` flag.
 
 ### Usage

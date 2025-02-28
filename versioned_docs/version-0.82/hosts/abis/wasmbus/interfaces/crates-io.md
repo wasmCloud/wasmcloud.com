@@ -3,6 +3,10 @@ title: 'Rust crates'
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 This document applies to interface crates built from `.smithy` models, and provides some information about how and when source files are updated.
 
 Interface projects contain one or more `.smithy` files, and a `codegen.toml`, which references the paths to the smithy files and to the output directories for the target languages.`codegen.toml` and `.smithy` files are language-agnostic, so they live one directory level above the `rust` folder, which contains `Cargo.toml`, `build.rs`, and the rust `src` folder.

@@ -3,6 +3,10 @@ title: 'Single-member structures'
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 A function is modeled as an operation, with an optional `input` type
 for its parameters, and an optional `output` type for its return value.
 If either input or output type is a structure containing one member, it

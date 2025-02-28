@@ -5,6 +5,10 @@ sidebar_position: 10
 description: "wash drain command reference"
 --- 
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 Wash drain helps you in managing contents of local wasmCloud caches. This command allows you to clear caches selectively for various items downloaded while working on a wasmCloud environment. Following are the subcommands available under `wash drain`:
 
 - `all`

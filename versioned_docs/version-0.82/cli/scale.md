@@ -5,6 +5,10 @@ sidebar_position: 22
 description: 'wash scale command reference'
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 `wash scale` supports scaling the actors in your lattice to handle concurrent requests. It accepts the host ID on which the actor is running and the reference of the actor to scale as required arguments. It also accepts a `--max-concurrent` value that specifies the maximum number of instances this actor can run concurrently. By default, the value is an unbounded level of concurrency. A value of zero is equivalent to stopping the actor.
 
 ### Usage

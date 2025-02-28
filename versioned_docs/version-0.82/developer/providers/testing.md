@@ -5,6 +5,10 @@ sidebar_position: 10
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 There are two ways to test a capability provider.
 
 The first method loads the provider into a test harness, and issues rpc calls to it to verify responses. This type of testing can be useful for "unit" tests - evaluating the provider in an isolated, controlled context. For examples of providers that use this kind of testing, look in the `tests` folder of [kvredis](https://github.com/wasmCloud/capability-providers/tree/main/kvredis) and [httpserver](https://github.com/wasmCloud/capability-providers/tree/main/httpserver-rs). These two capability providers exhibit different directions for rpc: kvredis, an example of a [`providerReceive`](/docs/0.82/hosts/abis/wasmbus/interfaces/traits#wasmbus) service, receives commands from actors, and httpserver, an example of an [`actorReceive`](/docs/0.82/hosts/abis/wasmbus/interfaces/traits#wasmbus) service, sends messages to actors.

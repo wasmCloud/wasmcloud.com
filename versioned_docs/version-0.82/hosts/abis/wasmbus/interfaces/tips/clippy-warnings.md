@@ -3,6 +3,10 @@ title: "Clippy warnings"
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 ## Clippy warning on `&String` parameters
 
 If your `.smithy` model has an operation whose input parameter is a 'String', clippy may generate the following warning:

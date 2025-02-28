@@ -5,6 +5,10 @@ sidebar_position: 7
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 Creating a capability provider involves creating a native executable. All capability provider executables have the same basic requirements:
 
 - Accept a [Host Data](https://wasmcloud.github.io/interfaces/html/org_wasmcloud_core.html#host_data) object from `stdin` immediately upon starting the executable. The host data is a base64 encoded JSON object with a trailing newline making it easy to pull from the `stdin` pipe.

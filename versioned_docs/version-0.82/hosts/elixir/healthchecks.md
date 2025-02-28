@@ -5,6 +5,10 @@ sidebar_position: 12
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 :::warning
 wasmCloud's [Elixir host runtime](https://github.com/wasmcloud/wasmcloud-otp) has been deprecated. The [Rust wasmCloud runtime](https://github.com/wasmCloud/wasmCloud) is receiving all new features
 :::

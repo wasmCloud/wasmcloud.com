@@ -5,6 +5,10 @@ sidebar_position: 9
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 It's a fairly easy matter to declare a dependency on the Payments interface crate for a new actor project. However, the difficult question isn't _how_ can an actor utilize this new payments provider, but _why_ and _when_?
 
 There are a couple of different approaches here, with their own pros and cons.

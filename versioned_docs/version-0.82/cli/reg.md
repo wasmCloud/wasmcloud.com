@@ -5,6 +5,10 @@ sidebar_position: 18
 description: "wash reg command reference"
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 `wash reg` allows users to interact with OCI compliant registries and their artifacts. A user may pull artifacts from the registry to use in their projects. They may also push their own projects to registries to use in various lattices. Following are the subcommands available under `wash reg`.
 
 - `push`

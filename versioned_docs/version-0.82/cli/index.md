@@ -6,6 +6,10 @@ description: 'The wasmCloud Shell (wash) CLI'
 type: 'docs'
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 **_wash_** (the _wasmCloud Shell_) is a single command-line interface (CLI) to handle all of your wasmCloud tooling needs. This CLI has a number of sub-commands that help you interact with the wasmCloud ecosystem.
 
 ```

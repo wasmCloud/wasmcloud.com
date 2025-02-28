@@ -6,6 +6,10 @@ draft: false
 description: "wasmCloud's original stable ABI"
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 If you know in advance the memory and data exchange characteristics of your WebAssembly modules, and you know the lifetimes of the data being exchanged, and you can predict the kind of long-lived pointer behavior you'll have, then by all means use every tool and code generator at your disposal (e.g. [wasm-bindgen](https://rustwasm.github.io/docs/wasm-bindgen/)).
 
 A large number of use cases for WebAssembly fall into this pattern--treating the `.wasm` file much like a precompiled dependency with strongly-typed wrappers (think of how a compiler generates typed shims based on usage to support _generics_) similar to a dynamically-loaded library (.so, .dll, .dylib, etc).

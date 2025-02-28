@@ -7,6 +7,10 @@ type: "docs"
 sidebar_position: 0
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 ![wadm logo](https://raw.githubusercontent.com/wasmCloud/wadm/main/wadm.png)
 
 If you've been reading the tutorials or going through the reference guide in order, then by now you should be pretty familiar with what we call _imperative deployment_. This involves using the `wash` tool (or invoking the control interface directly) to send imperatives or _commands_ to a lattice. These commands are things like telling a host to start or stop an actor, start or stop a provider, etc.

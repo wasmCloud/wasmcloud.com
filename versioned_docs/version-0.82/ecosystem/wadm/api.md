@@ -7,6 +7,10 @@ type: 'docs'
 sidebar_position: 4
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 The normal way to interact with a `wadm` installation (which could be a single server or a cluster)
 is through the [wash](./usage.md) command-line tool. However, if you are planning on
 creating your own integration or writing a non-Rust language binding, then this reference will help.
