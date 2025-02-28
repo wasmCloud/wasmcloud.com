@@ -5,6 +5,10 @@ sidebar_position: 3
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 The lattice control interface provides a way for clients to interact with the lattice to issue
 control commands and queries. This interface is a message broker protocol that supports
 functionality for starting and stopping actors and providers, declaring link definitions, monitoring

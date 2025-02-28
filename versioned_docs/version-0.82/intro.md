@@ -2,6 +2,10 @@
 sidebar_position: 0
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 # What is wasmCloud?
 
 wasmCloud is a **universal application platform** that helps you build and run globally distributed WebAssembly applications on any cloud and any edge.

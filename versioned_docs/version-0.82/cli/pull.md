@@ -5,6 +5,10 @@ sidebar_position: 19
 description: "wash pull command reference"
 --- 
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 This command pulls an artifact from an OCI compliant registry.
 
 #### Usage

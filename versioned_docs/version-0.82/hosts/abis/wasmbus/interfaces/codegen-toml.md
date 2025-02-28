@@ -3,6 +3,10 @@ title: 'codegen.toml files'
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 This document describes the syntax and functions of `codegen.toml` files.
 
 ## [[models]]

@@ -6,6 +6,10 @@ draft: false
 description: 'Requirements and conditions all hosts must meet'
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 In the preceding section of the documentation, we talked about how there are no restrictions in place preventing developers from building their own bespoke wasmCloud hosts that are optimized for specific environments.
 
 In this section, we'll talk about the specification and requirements for wasmCloud

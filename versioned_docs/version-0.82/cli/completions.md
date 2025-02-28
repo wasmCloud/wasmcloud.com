@@ -5,6 +5,10 @@ sidebar_position: 6
 description: "wash completions command reference"
 --- 
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 Shell completions for wash commands can be enabled with the use of `wash completions`. This feature will help you to easily navigate the CLI interface as it will recommend auto-completions for wash subcommands. Currently, shell completions can be generated for the following supported shell types:
 
 - `zsh`

@@ -3,6 +3,10 @@ title: 'Code generation'
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 You only need to read this section if you want to customize code generation, write a new target language generator, or if you want to know more about how it works.
 
 ## Code generation as code

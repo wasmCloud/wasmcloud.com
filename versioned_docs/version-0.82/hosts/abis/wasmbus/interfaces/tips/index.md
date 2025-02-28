@@ -3,6 +3,10 @@ title: "Tips"
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 This section contains some suggestions and tips for writing and debugging interface definitions.
 
 - [Use lint and validation tools](./lint-validate/)

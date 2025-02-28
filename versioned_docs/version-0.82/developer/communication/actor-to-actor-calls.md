@@ -6,6 +6,10 @@ description: 'Actor to Actor RPC'
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 The ability for one actor to call another actor is critical to being able to create _composable_ actor systems. wasmCloud supports RPC-style communication between actors, even if those actors are running in hosts scattered across disparate infrastructure, connected only via the [lattice](/docs/0.82/reference/glossary#lattice).
 
 ### Identifying actors

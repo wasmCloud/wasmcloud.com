@@ -5,6 +5,10 @@ sidebar_position: 1
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 When you decide to create a new capability provider, you have two options:
 
 - Create a provider for a brand new interface contract.

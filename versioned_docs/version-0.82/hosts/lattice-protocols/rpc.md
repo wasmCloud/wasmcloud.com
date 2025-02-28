@@ -5,6 +5,10 @@ sidebar_position: 2
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 At its core, the _lattice_ is essentially a _Remote Procedure Call (RPC)_ bus layer built on top of the NATS message broker. When the lattice
 is enabled, participants in lattice RPC must conform to a set of standards in order to be able to send and handle messages.
 

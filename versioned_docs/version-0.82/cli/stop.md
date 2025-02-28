@@ -5,6 +5,10 @@ sidebar_position: 24
 description: "wash stop command reference"
 --- 
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 `wash stop` allows you to stop an actor, provider or a host. The user may specify if they want to stop an actor or a provider and pass the OCI reference of that entity to the command. To specify a host to stop the actor or provider, pass the host ID using the `--host-id` flag. Following are the available subcommads:
 
 - `actor`

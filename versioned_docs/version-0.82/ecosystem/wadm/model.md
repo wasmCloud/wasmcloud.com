@@ -7,6 +7,10 @@ type: 'docs'
 sidebar_position: 2
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 The **w**asmCloud **A**pplication **D**eployment **M**anager uses the [Open Application Model](https://oam.dev/) to define application specifications. Because this specification is extensible and platform agnostic, it makes for an ideal way to represent applications with metadata specific to wasmCloud. Don't worry if OAM seems overwhelming, you don't need to know much about it. We're using it as a way of defining application components in a flexible way that's familiar to a lot of people who have been working in the cloud space.
 
 In this model, an application `specification` is a set of metadata about the app, as well as a list of `components`. Each component within an application is decorated with various `traits`. These core building blocks allow us to make it very easy to define incredibly powerful deployments. wasmCloud defines a number of traits that are specific to our hosts, but let's go through the model from top to bottom.

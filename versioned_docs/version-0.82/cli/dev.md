@@ -5,6 +5,10 @@ sidebar_position: 8
 description: "wash dev command reference"
 --- 
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 Starts a local dev loop for an actor. Takes a local `wasmcloud.toml` file to deploy the specified actor and accepts a host ID to specify the host to deploy on. This is an experimental feature and needs `--experimental` flag to run.
 
 ### Usage

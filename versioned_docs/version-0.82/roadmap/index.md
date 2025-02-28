@@ -7,6 +7,10 @@ sidebar_position: 998
 type: 'docs'
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 # 2024 Q1 Roadmap (wasmCloud 1.0)
 
 :::info

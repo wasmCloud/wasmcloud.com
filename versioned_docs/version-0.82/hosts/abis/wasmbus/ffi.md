@@ -5,6 +5,10 @@ sidebar_position: 6
 draft: false
 ---
 
+<head>
+  <meta name="robots" content="noindex">
+</head>
+
 For the curious, here is the exact list of the wasmbus protocol's functions. The guest always imports from a module called `wasmbus`, and all function names are preceded by two underscores to avoid accidental collisions with other exported functions.
 
 | Function                | Owner | Description                                                                                                                                                         |
