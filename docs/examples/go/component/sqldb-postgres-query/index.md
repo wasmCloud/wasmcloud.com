@@ -1,6 +1,6 @@
-# Go SQLDB Postgres 🐘 
+# Go SQLDB Postgres 🐘
 
-[This example](https://github.com/wasmCloud/go/tree/main/examples/component/sqldb-postgres-query) is a WebAssembly component that can query a PostgresDB database.  
+[This example](https://github.com/wasmCloud/go/tree/main/examples/component/sqldb-postgres-query) is a WebAssembly component that can query a PostgresDB database.
 
 The application...
 
@@ -11,10 +11,14 @@ The application...
 
 ## 📦 Dependencies
 
+> [!WARNING]
+> Due to incompatibilities introduced in `wasm-tools` v1.226.0, you must a version of
+> `wasm-tools` <= 1.225.0 is **required** for running this example.
+
 Before starting, ensure that you have the following installed in addition to the Go (1.23+) toolchain:
 
 - [`tinygo`](https://tinygo.org/getting-started/install/) for compiling Go (always use the latest version)
-- [`wasm-tools`](https://github.com/bytecodealliance/wasm-tools#installation) for Go bindings
+- [`wasm-tools` (<=1.225.0)](https://github.com/bytecodealliance/wasm-tools#installation) for Go bindings
 - [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation) for building and running the components and wasmCloud environment
 - [`docker`][docker] for easily running instances of [`postgres`]
 
@@ -37,7 +41,7 @@ docker run \
 
 ## 👟 Run the example
 
-Clone the [wasmCloud/go repository](https://github.com/wasmcloud/go): 
+Clone the [wasmCloud/go repository](https://github.com/wasmcloud/go):
 
 ```shell
 git clone https://github.com/wasmCloud/go.git
@@ -126,4 +130,4 @@ You can also run tests using [wadge](https://github.com/wasmCloud/wadge). Becaus
 
 ## 📖 Further reading
 
-For more on building components, see the [Component Developer Guide](https://wasmcloud.com/docs/developer/components/) in the wasmCloud documentation. 
+For more on building components, see the [Component Developer Guide](https://wasmcloud.com/docs/developer/components/) in the wasmCloud documentation.
