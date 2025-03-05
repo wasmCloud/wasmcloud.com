@@ -1,0 +1,477 @@
+---
+title: "Deploy with AWS EKS"
+date: 2024-08-08T00:00:00+00:00
+icon: 'ti-anchor' # themify icon pack : https://themify.me/themify-icons
+description: "Deploy wasmCloud on a Kubernetes cluster with the AWS Elastic Kubernetes Service (EKS)"
+sidebar_position: 1
+type: 'docs'
+---
+
+## Overview
+
+This deployment guide demonstrates how to deploy wasmCloud to a Kubernetes cluster using AWS' Elastic Kubernetes Service (EKS) service, and then run wasmCloud applications built from WebAssembly components. 
+
+To follow this guide, you will need an account for [AWS](https://signin.aws.amazon.com/signup?request_type=register).
+
+## Set up your CLI tools
+
+This guide uses the **AWS CLI tool**, **`eksctl`**, **`kubectl`**, **Helm**, and the **wasmCloud Shell (`wash`)** CLI. 
+
+### Install `kubectl`
+
+Install the `kubectl` CLI for Kubernetes cluster management. 
+
+On macOS, you can use [Homebrew](https://brew.sh/):
+
+```shell
+brew install kubernetes-cli
+```
+On Linux systems, you can use `curl` to download the latest release:
+
+```shell
+curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+```
+Use `chmod` to make the `kubectl` binary executable:
+
+```shell
+chmod +x ./kubectl
+```
+Add the binary to your PATH:
+
+```shell
+sudo mv ./kubectl /usr/local/bin/kubectl
+```
+
+### Install Helm
+
+[Helm](https://helm.sh/) serves as a package manager for Kubernetes. Follow the instructions on the [Helm install page](https://helm.sh/docs/intro/install/) or use the project's install script:
+
+```shell
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+chmod 700 get_helm.sh
+./get_helm.sh
+```
+
+### Install wash
+
+Once wasmCloud is deployed to your EKS cluster, you can use the **wasmCloud Shell (`wash`)** CLI to manage wasmCloud applications. If you do not have `wash` installed locally, follow the instructions on the [install page](https://wasmcloud.com/docs/installation).
+
+### Install AWS CLI tools
+
+If you do not already have an EKS cluster on AWS, follow Amazon's documentation for setup, including instructions on installing the AWS CLI tool:
+
+* [Installing or updating to the latest version of the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+* [Set up AWS CLI](https://docs.aws.amazon.com/eks/latest/userguide/install-awscli.html) 
+* [Set up kubectl and eksctl](https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html)
+
+You can test that you have set up and configured the AWS CLI by running the following command:
+
+```shell
+aws sts get-caller-identity --query Account --output text
+```
+
+## Set up your EKS cluster
+
+Create a cluster configuration file (`config.yaml`), substituting your preferred values:
+
+```yaml
+# config.yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: wasmcloud-cluster
+  region: us-east-1
+
+nodeGroups:
+  - name: ng-wasmcloud
+    instanceType: t2.small
+    desiredCapacity: 2
+```
+
+It can be convenient to assign your preferred cluster name and region to environment variables:
+
+```shell
+WASMCLOUD_EKS_CLUSTER_NAME=wasmcloud-cluster
+```
+```shell
+WASMCLOUD_EKS_CLUSTER_REGION=us-east-1
+```
+
+Use the `eksctl` CLI tool to create an EKS cluster with your configuration file:
+
+```shell
+eksctl create cluster -f config.yaml
+```
+
+Set up IAM and the CSI driver so that the NATS StorageClass is provisioned:
+
+```shell
+eksctl utils associate-iam-oidc-provider \
+  --region=$WASMCLOUD_EKS_CLUSTER_REGION \
+  --cluster=$WASMCLOUD_EKS_CLUSTER_NAME \
+  --approve
+```
+```shell
+eksctl create iamserviceaccount \
+  --region $WASMCLOUD_EKS_CLUSTER_REGION \
+  --name ebs-csi-controller-sa \
+  --namespace kube-system \
+  --cluster $WASMCLOUD_EKS_CLUSTER_NAME \
+  --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
+  --role-only \
+  --role-name AmazonEKS_EBS_CSI_DriverRole \
+  --approve
+```
+```shell
+eksctl create addon \
+  --name aws-ebs-csi-driver \
+  --region $WASMCLOUD_EKS_CLUSTER_REGION \
+  --cluster $WASMCLOUD_EKS_CLUSTER_NAME \
+  --service-account-role-arn arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/AmazonEKS_EBS_CSI_DriverRole
+```
+```shell
+eksctl utils migrate-to-pod-identity \
+  --region $WASMCLOUD_EKS_CLUSTER_REGION \
+  --cluster $WASMCLOUD_EKS_CLUSTER_NAME \
+  --approve
+```
+
+## Deploying wasmCloud
+
+In order to deploy wasmCloud, we will install the `wasmcloud-platform` Helm chart. By default, the chart installs NATS, `wadm`, and the wasmCloud operator subchart. 
+
+We'll need to use some custom values for an EKS deployment. The most important change is to set the storage class. Use the values below in a `values.yaml` file:
+
+```yaml
+# values.yaml
+fullnameOverride: "wasmcloud-platform"
+nameOverride: "wasmcloud-platform"
+
+nats:
+  # Whether to install the nats chart (https://nats-io.github.io/k8s/helm/charts/nats)
+  enabled: true
+  fullnameOverride: "nats"
+  nameOverride: "nats"
+  container:
+    image:
+      repository: nats
+      tag: 2.10.16-alpine
+  reloader:
+    image:
+      repository: natsio/nats-server-config-reloader
+      tag: 0.14.3
+  # Source: https://github.com/wasmCloud/wasmcloud-operator/blob/main/examples/quickstart/nats-values.yaml
+  config:
+    cluster:
+      enabled: true
+      replicas: 3
+    leafnodes:
+      enabled: true
+    websocket:
+      enabled: true
+      port: 4223
+    jetstream:
+      enabled: true
+      fileStore:
+        enabled: true
+        pvc:
+          enabled: true
+          size: 2Gi
+          storageClassName: gp2
+      merge:
+        domain: default
+
+wadm:
+  # Whether to install the wadm chart (oci://ghcr.io/wasmcloud/charts/wadm)
+  enabled: true
+  fullnameOverride: "wadm"
+  nameOverride: "wadm"
+  # Source: https://github.com/wasmCloud/wasmcloud-operator/blob/main/examples/quickstart/wadm-values.yaml
+  wadm:
+    image:
+      repository: ghcr.io/wasmcloud/wadm
+      tag: v0.15.0
+    config:
+      nats:
+        server: "nats://nats-headless.default.svc.cluster.local"
+        # creds:
+        #   jwt: ""
+        #   seed: ""
+        #   # If you're using the wasmCloud Operator, the secret could be created by the chart using the '.hostConfig.natsCredentialsFile' setting.
+        #   secretName: ""
+        #   key: "nats.creds"
+  resources: {}
+
+operator:
+  # Whether to install the wasmcloud-operator chart (oci://ghcr.io/wasmcloud/charts/wasmcloud-operator)
+  # Make sure to either install wasmCloud Operator or wasmCloud Host, not both
+  enabled: true
+  fullnameOverride: "wasmcloud-operator"
+  nameOverride: "wasmcloud-operator"
+  # image:
+  #   tag: 0.3.2
+
+host:
+  # Whether to install the wasmcloud-host chart (oci://ghcr.io/wasmcloud/charts/wasmcloud-host)
+  # Make sure to either install wasmCloud Operator or wasmCloud Host, not both
+  enabled: false
+  fullnameOverride: "wasmcloud"
+  nameOverride: "wasmcloud"
+
+hostConfig:
+  # Whether to use the wasmCloud host configuration custom resource; defaults to "false".
+  enabled: false
+  name: wasmcloud-host
+  lattice: default
+  # # Number of hosts (pods). Defaults to 1.
+  # hostReplicas: 1
+  # Which version of wasmCloud to use; defaults to "latest"
+  version: "1.2.1"
+  # registryCredentialsFile: config.json
+  # natsCredentialsFile: secret.yaml
+  resources:
+    nats: {}
+    wasmCloudHost: {}
+```
+
+```shell
+helm upgrade --install \
+    wasmcloud-platform \
+    --values ./values.yaml \
+    oci://ghcr.io/wasmcloud/charts/wasmcloud-platform \
+    --dependency-update
+```
+
+Wait for all components to install and `wadm-nats` communications to establish:
+
+```shell
+kubectl rollout status deploy,sts -l app.kubernetes.io/name=nats
+```
+```shell
+kubectl wait --for=condition=available --timeout=600s deploy -l app.kubernetes.io/name=wadm
+```
+```shell
+kubectl wait --for=condition=available --timeout=600s deploy -l app.kubernetes.io/name=wasmcloud-operator
+```
+
+Next create a wasmCloud host:
+
+```shell
+helm upgrade --install wasmcloud-platform \
+  --values ./values.yaml \
+  oci://ghcr.io/wasmcloud/charts/wasmcloud-platform \
+  --dependency-update \
+  --set "hostConfig.enabled=true"
+```
+
+If the deployment is successful, you should receive the note:
+
+```shell
+✨ Congratulations! Your wasmCloud platform has been deployed successfully.
+   - 🛀 To use the wash cli with your new wasmCloud platform, run:
+    kubectl port-forward service/nats 4222:4222 4223:4223
+
+   - 🗺️  To launch the wasmCloud dashboard on http://localhost:3030, in a different terminal window, run:
+     wash ui
+```
+
+If you'd like, you can check wasmCloud host status:
+
+```shell
+kubectl describe wasmcloudhostconfig wasmcloud-host
+```
+
+## Run a WebAssembly component on Kubernetes
+
+When you `kubectl apply` a [wasmCloud application manifest](/docs/ecosystem/wadm/model), the cluster automatically provisions the component workload with wasmCloud. 
+
+This example uses the [`hello-world-application.yaml` manifest](https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/hello-world-application.yaml) included in the operator's quickstart. (The [source code for the application](https://github.com/wasmCloud/wasmCloud/tree/main/examples/rust/components/http-hello-world) is available in the wasmCloud repository.)
+
+Below is an excerpt of the manifest:
+
+```yaml {7-7}
+...
+spec:
+  components:
+    - name: http-component
+      type: component
+      properties:
+        image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+...
+```
+The component is packaged as an OCI artifact and specified in the `image` field. This isn't a container, but a component conforming to OCI standards, meaning that it can be used with existing registries for container images. 
+
+Run `kubectl apply`: 
+
+```shell
+kubectl apply -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/hello-world-application.yaml
+```
+
+Check the deployment status:
+
+```shell
+kubectl get application
+```
+
+```shell
+APPLICATION   DEPLOYED VERSION   LATEST VERSION   STATUS
+hello-world   v0.0.1             v0.0.1           Deployed
+```
+
+When you run a wasmCloud application that uses the `httpserver` provider with a daemonscaler, as this one does, the operator automatically creates a Kubernetes service for the application. 
+
+:::warning[HTTP Server Address]
+When you're using the HTTP Server provider in an application that will run on Kubernetes with the wasmCloud operator, make sure the application manifest configures the provider to use the address `0.0.0.0`, for example:
+
+```yaml {15-15}
+- name: httpserver
+  type: capability
+  properties:
+    image: ghcr.io/wasmcloud/http-server:0.26.0
+  traits:
+    - type: link
+      properties:
+        target: http-component
+        namespace: wasi
+        package: http
+        interfaces: [incoming-handler]
+        source_config:
+          - name: default-http
+            properties:
+              address: 0.0.0.0:8000
+```
+
+Because of the way the application runs within a wasmCloud host pod, using `127.0.0.1` results in networking errors when running on Kubernetes. 
+:::
+
+View services:
+
+```shell
+kubectl get services
+```
+```text
+NAME                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                        AGE
+hello-world          ClusterIP   10.105.170.131   <none>        8000/TCP                                       2m53s
+kubernetes           ClusterIP   10.96.0.1        <none>        443/TCP                                        9m39s
+nats                 ClusterIP   10.102.201.180   <none>        4222/TCP,7422/TCP,4223/TCP                     7m54s
+nats-headless        ClusterIP   None             <none>        4222/TCP,7422/TCP,4223/TCP,6222/TCP,8222/TCP   7m54s
+wasmcloud-host       ClusterIP   10.102.144.92    <none>        4222/TCP                                       6m32s
+wasmcloud-operator   ClusterIP   10.96.73.87      <none>        8443/TCP                                       7m54s
+
+```
+
+### Test the application
+
+On a cluster without ingress (such as this one), you can still test the component from within the wasmCloud host container where the application is running. 
+
+Assign the wasmCloud host pod name to an environment variable:
+
+```shell
+WASMCLOUD_HOST_POD=$(kubectl get pods -o jsonpath="{.items[*].metadata.name}" -l app.kubernetes.io/instance=wasmcloud-host)
+```
+Port-forward the wasmCloud host's port 8000:
+
+```shell
+kubectl port-forward pods/$WASMCLOUD_HOST_POD 8000
+```
+`curl` the application:
+
+```shell
+curl http://localhost:8000
+```
+
+You should get the response:
+
+```plaintext
+Hello from Rust!
+```
+
+### Debugging
+
+You can use `kubectl` to get logs from the wasmCloud host running on your cluster:
+
+```shell
+kubectl logs -l app.kubernetes.io/instance=wasmcloud-host -c wasmcloud-host
+```
+
+You can use a debug pod to test connections to an HTTP application's service from within the cluster:
+
+```shell
+kubectl run -i --tty --rm debug --image=curlimages/curl --restart=Never -- sh
+```
+
+Once the command prompt appears, you can try running `curl` against the service name and port of your application. For the `hello-world` application in the guide above, this would look like:
+
+```shell
+curl hello-world:8000
+```
+
+### Common mistakes
+
+* If you're having trouble deploying an application, make sure your wadm application manifest references an OCI image and not a local file.
+* If a service is not automatically generated for an application using the httpserver provider, check to ensure that the provider uses `daemonscaler` in the application manifest. (You can see an example of this in the [`hello-world-application` manifest](https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/hello-world-application.yaml).)
+* If you're having trouble connecting to an application that uses the HTTP Server provider, make sure it is configured to use the address `0.0.0.0`. 
+
+### Manage applications with `wash`
+
+Connect your local `wash` with the wasmCloud deployment. `4222` is the port for the NATS service and `4223` is the port for NATS websockets.
+
+```shell
+kubectl port-forward service/nats 4222:4222 4223:4223
+```
+
+Now you can use your local `wash` toolchain with your wasmCloud deployment:
+
+```shell
+wash get inventory
+```
+The output should look like this:
+
+```plaintext
+  Host labels                                                                     
+  hostcore.arch                 aarch64                                           
+  hostcore.os                   linux                                             
+  hostcore.osfamily             unix                                              
+  kubernetes                    true                                              
+                                                                                  
+  Component ID                  Name                           Max count          
+  hello_world-http_component    http-hello-world               1                  
+                                                                                  
+  Provider ID                   Name                                              
+  hello_world-httpserver        http-server-provider   
+```
+
+## Clean up
+
+Delete the `hello-world` application:
+
+```shell
+kubectl delete -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/hello-world-application.yaml
+```
+
+Delete the wasmCloud host and associated resources:
+
+```shell
+kubectl delete -f https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/wasmcloud-host.yaml
+```
+
+All resources installed via Helm can be removed with [`helm uninstall`](https://helm.sh/docs/helm/helm_uninstall/):
+
+```shell
+helm uninstall wasmcloud-platform
+```
+
+Follow the instructions from the AWS EKS documentation to [delete your cluster and nodes](https://docs.aws.amazon.com/eks/latest/userguide/getting-started-eksctl.html#gs-eksctl-clean-up). Generally, you'll use the following commands.
+
+Delete the `aws-ebs-csi-driver` EKS addon:
+
+```shell
+eksctl delete addon --cluster $WASMCLOUD_EKS_CLUSTER_NAME --region $WASMCLOUD_EKS_CLUSTER_REGION --name aws-ebs-csi-driver --preserve
+```
+
+Delete the cluster: 
+
+```shell
+eksctl delete cluster -f config.yaml --disable-nodegroup-eviction
+```
