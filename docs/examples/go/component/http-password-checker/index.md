@@ -1,6 +1,6 @@
 # Go HTTP Password Checker
 
-[This example](https://github.com/wasmCloud/go/tree/main/examples/component/http-password-checker) is a WebAssembly component that checks password strength over HTTP. 
+[This example](https://github.com/wasmCloud/go/tree/main/examples/component/http-password-checker) is a WebAssembly component that checks password strength over HTTP.
 
 The application...
 
@@ -17,6 +17,13 @@ The application...
 
 ## 📦 Dependencies
 
+> [!WARNING]
+> Due to incompatibilities introduced in `wasm-tools` v1.226.0, a version of
+> `wasm-tools` <= 1.225.0 is **required** for running this example.
+>
+> You can install `wasm-tools` [v1.225.0 from upstream releases](https://github.com/bytecodealliance/wasm-tools/releases/tag/v1.225.0), or use
+> `cargo` ([Rust toolchain](https://doc.rust-lang.org/cargo/getting-started/installation.html)) -- (i.e. `cargo install --locked wasm-tools@1.225.0`)
+
 Before starting, ensure that you have the following installed in addition to the Go (1.23+) toolchain:
 
 - [`tinygo`](https://tinygo.org/getting-started/install/) for compiling Go (always use the latest version)
@@ -25,7 +32,7 @@ Before starting, ensure that you have the following installed in addition to the
 
 ## 👟 Run the example
 
-Clone the [wasmCloud/go repository](https://github.com/wasmcloud/go): 
+Clone the [wasmCloud/go repository](https://github.com/wasmcloud/go):
 
 ```shell
 git clone https://github.com/wasmCloud/go.git
@@ -98,7 +105,7 @@ If `curl`ing produces...
 failed to invoke `wrpc:http/incoming-handler.handle`: failed to invoke `wrpc:http/incoming-handler@0.1.0.handle`: failed to shutdown synchronous parameter channel: not connected%
 ```
 
-...the HTTP server may not have finished starting up. You can check that the application has reached `Deployed` status with `wash app list`. 
+...the HTTP server may not have finished starting up. You can check that the application has reached `Deployed` status with `wash app list`.
 
 If the issue persists, you may have a lingering HTTP server provider running on your system. You can use `pgrep` to check:
 
@@ -113,4 +120,4 @@ pgrep -la ghcr_io
 
 To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/tour/adding-capabilities?lang=go) section of the wasmCloud documentation.
 
-For more on building components, see the [Component Developer Guide](https://wasmcloud.com/docs/developer/components/) in the wasmCloud documentation. 
+For more on building components, see the [Component Developer Guide](https://wasmcloud.com/docs/developer/components/) in the wasmCloud documentation.
