@@ -1,7 +1,7 @@
 # Go Component SDK with Custom WIT
 
 [This example](https://github.com/wasmCloud/go/tree/main/examples/component/invoke) is a WebAssembly component that demonstrates how to
-use the wasmCloud [Go Component SDK](https://github.com/wasmCloud/go/tree/main/component) in conjunction with your own custom [WIT interfaces](https://wasmcloud.com/docs/concepts/interfaces). 
+use the wasmCloud [Go Component SDK](https://github.com/wasmCloud/go/tree/main/component) in conjunction with your own custom [WIT interfaces](https://wasmcloud.com/docs/concepts/interfaces).
 
 You can find this application's custom interface in `wit/world.wit`:
 
@@ -13,6 +13,13 @@ interface invoker {
 
 ## 📦 Dependencies
 
+> [!WARNING]
+> Due to incompatibilities introduced in `wasm-tools` v1.226.0, a version of
+> `wasm-tools` <= 1.225.0 is **required** for running this example.
+>
+> You can install `wasm-tools` [v1.225.0 from upstream releases](https://github.com/bytecodealliance/wasm-tools/releases/tag/v1.225.0), or use
+> `cargo` (Rust toolchain) if installed to install `1.225.0` -- (i.e. `cargo install --locked wasm-tools@1.225.0`)
+
 Before starting, ensure that you have the following installed in addition to the Go (1.23+) toolchain:
 
 - [`tinygo`](https://tinygo.org/getting-started/install/) for compiling Go (always use the latest version)
@@ -21,7 +28,7 @@ Before starting, ensure that you have the following installed in addition to the
 
 ## 👟 Run the example
 
-Clone the [wasmCloud/go repository](https://github.com/wasmcloud/go): 
+Clone the [wasmCloud/go repository](https://github.com/wasmcloud/go):
 
 ```shell
 git clone https://github.com/wasmCloud/go.git
@@ -112,4 +119,4 @@ Hello from the invoker!
 
 ## 📖 Further reading
 
-For more on custom interfaces, see the [Interface Developer Guide](https://wasmcloud.com/docs/developer/interfaces/creating-an-interface) in the wasmCloud documentation. 
+For more on custom interfaces, see the [Interface Developer Guide](https://wasmcloud.com/docs/developer/interfaces/creating-an-interface) in the wasmCloud documentation.

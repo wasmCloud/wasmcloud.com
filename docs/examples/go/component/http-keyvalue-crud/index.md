@@ -4,6 +4,13 @@
 
 ## 📦 Dependencies
 
+> [!WARNING]
+> Due to incompatibilities introduced in `wasm-tools` v1.226.0, a version of
+> `wasm-tools` <= 1.225.0 is **required** for running this example.
+>
+> You can install `wasm-tools` [v1.225.0 from upstream releases](https://github.com/bytecodealliance/wasm-tools/releases/tag/v1.225.0), or use
+> `cargo` ([Rust toolchain](https://doc.rust-lang.org/cargo/getting-started/installation.html)) -- (i.e. `cargo install --locked wasm-tools@1.225.0`)
+
 Before starting, ensure that you have the following installed in addition to the Go (1.23+) toolchain:
 
 - [`tinygo`](https://tinygo.org/getting-started/install/) for compiling Go (always use the latest version)
