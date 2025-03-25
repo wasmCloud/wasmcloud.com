@@ -1,0 +1,58 @@
+name: Sync example docs (rust)
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-docs-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout docs repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: ./wasmcloud.com
+
+      - name: Checkout wasmCloud repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: ./wasmcloud
+          repository: wasmCloud/wasmCloud
+
+      - name: Sync docs
+        id: sync-docs
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const { updateDocs } = await import("${{ github.workspace }}/scripts/update-docs.mjs");
+            await updateDocs({
+              outputFolder: "./wasmcloud.com/docs/examples/rust",
+              readmePaths: [
+                "./wasmcloud/examples/rust/components/**/README.md",
+                "./wasmcloud/examples/rust/providers/messaging-nats/README.md",
+              ],
+              skipProjects: [
+                "echo-messaging-0-3-0",
+              ],
+            })
+
+      - name: Create Docs PR
+        if: steps.sync-docs.outputs.docs_changed == 'true'
+        uses: peter-evans/create-pull-request@5e914681df9dc83aa4e4905692ca88beb2f9e91f # v7.0.5
+        with:
+          path: ./wasmcloud.com
+          base: main
+          commit-message: Updates Rust example docs from wasmcloud
+          title: 'chore: Update Rust example docs'
+          body: |
+            Updates Rust example docs from wasmcloud-go. This is an automatically generated PR.
+          branch: chore/update-rust-example-docs
+          delete-branch: true
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          committer: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          signoff: true
