@@ -202,10 +202,10 @@ Dev overrides enable users to override the `wash dev` process defaults when sati
 
 Dev overrides can be useful for specifying third-party providers as well as providers for custom interfaces that are not well-known to the `wash dev` process.
 
-| Setting        | Type   | Description                                                             |
-| -------------- | ------ | ----------------------------------------------------------------------- |
-| interface_spec | string | Interface specification (e.g., `"wasi:keyvalue@0.2.0-draft"`)           |
-| image_ref      | string | OCI image reference (e.g., `"ghcr.io/wasmcloud/keyvalue-redis:0.28.2"`) |
-| config         | object | Configuration (e.g., `{ values = { url = "redis://127.0.0.1:6379" } }`) |
-| secrets        | object | Secrets that should be provided to the entity                           |
+| Setting        | Type   | Description                                                                                                                                                  |
+|----------------|--------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| interface_spec | string | Interface specification (e.g., `"wasi:keyvalue@0.2.0-draft"`)                                                                                                |
+| image_ref      | string | OCI image reference (e.g., `"ghcr.io/wasmcloud/keyvalue-redis:0.28.2"`)                                                                                      |
+| config         | object | Configuration (e.g., `{ values = { url = "redis://127.0.0.1:6379" } }`)                                                                                      |
+| secrets        | object | Secrets that should be provided to the entity                                                                                                                |
 | link_name      | string | Link name that should be used to reference the component. This is only required when there are *multiple* conflicting overrides (i.e. there is no "default") |
