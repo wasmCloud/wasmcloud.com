@@ -1,0 +1,149 @@
+---
+title: 'Advanced'
+date: '2025-03-27T14:14:02.260Z'
+sidebar_position: 7
+draft: false
+---
+
+wasmCloud can help build simple components *and* complex components. While `wash` and wasmCloud utility libraries (in Rust, crates like [`wasmcloud-component`][wasmcloud-component])
+provide what you'll need to build components along with useful helpers, adding complexity can sometimes make it difficult to use ecosystem tooling.
+
+This page documents some advanced use-cases for more complex components, along with implementation and configuration patterns.
+
+[wasmcloud-component]: https://crates.io/crates/wasmcloud-component
+
+# Reusing code from helper libraries with custom interfaces (e.g. `wasmcloud-component`)
+
+When building a component that contains custom interfaces *in addition* to using a standardized interfaces like `wasi:http`, your component's WIT interface might look something like this:
+
+```wit
+package example:component;
+
+interface transform {
+   transform-bytes: func(data: list<u8>) -> result<list<u8>, string>;
+}
+
+world transformer {
+   export transform;
+   export wasi:http/incoming-handler@0.2.2;
+}
+```
+
+While it's not important how the `transform-bytes` function works, what's important is that from the same component we expose *both*
+a `wasi:http/incoming-handler` and the original `transform` interface.
+
+It's *likely* that this component makes it possible to run transformation logic both when called directly from a Wasm host
+(via `example:component/transform.transform-bytes`), *and* when called via a HTTP request (i.e. `wasi:http/incoming-handler.handle`,
+triggered via a web request to the wasmCloud HTTP provider).
+
+[`wasmcloud-component`][wasmcloud-component] makes it incredibly easy to deal with web requests, providing utilities familiar to
+Rust developers based on standard ecosystem types rather than the robust (but often verbose) fully generated `wasi:http` bindings.
+
+Using `wasmcloud-component` means you can write code like this:
+
+```rust
+// ...
+
+/// Implementation of our WASI interfaces will hang from this struct
+struct Component;
+
+// ... implementation of the transform trait for the component ...
+
+// Implementation of our standardized `wasi:http` interface
+//
+// By using the Server trait, we can fill out the wasi:http/incoming-handler impl via
+// a much more native interface rather than only generated bindings
+impl wasmcloud_component::http::Server for Component {
+    fn handle(
+        request: http::IncomingRequest,
+    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
+        // ...
+    }
+}
+```
+
+## Problem: Helper crates with pre-defined WASI exports
+
+While `wasmcloud_component` is helpful, in the example component it causes an issue -- the component must implement *two* exports:
+
+- `wasi:http/incoming-handler` (`wasmcloud-component` helps with this)
+- `transform`
+
+**The `wasmcloud_component` crate can't know anything about `transform`, but this causes a problem because `wasmcloud_component` performs**
+**the primary interface export for *all* of the bindings of the component**
+
+This causes an issue when building our component that often looks like the following:
+
+```
+linking with `wasm-component-ld` failed: exit status: 1
+error: failed to encode component
+
+          Caused by:
+              0: failed to decode world from module
+              1: module was not valid
+              2: failed to find export of interface `example:component/transform` function `transform-bytes`
+```
+
+## Solution: Merging pre-defined exports with local custom interfaces, using `wit-bindgen` manually
+
+To make this work properly, we'll need to write code that uses [`wit-bindgen`][wit-bindgen], rather than *just* `wasmcloud-component`:
+
+```rust
+mod bindings {
+    use super::Component;
+
+    wit_bindgen::generate!({
+        with: {
+            // Here we re-use the existing bindings that were generated in `wasmcloud_component`.
+            //
+            // Due to this re-use, the `wasmcloud::http::export!` will work properly and satisfy
+            // the types that are expected by *our* component, because we instruct wit-bindgen
+            // that the appropriate types for the import *are* the ones from `wasmcloud_component`.
+            //
+            // If we were to try to `generate` this binding ourselves, we'd have similarly *named*
+            // interfaces, but the code in `wasmcloud_component` could not reference the modules &
+            // types generated in this crate -- they'd be named similarly, but be different (so you'd
+            // get an error that [your version of] the interface wasn't satisfied, despite
+            // the wasmcloud_component export! below).
+            //
+            // For info on options to generate!, see:
+            //   https://docs.rs/wit-bindgen/0.38.0/wit_bindgen/macro.generate.html
+            //
+            "wasi:http/incoming-handler@0.2.2": wasmcloud_component::wasi::exports::http::incoming_handler,
+        },
+        generate_all
+    });
+
+    export!(Component);
+    wasmcloud_component::http::export!(Component);
+}
+
+/// Implementation of our WASI interfaces will hang from this struct
+struct Component;
+
+use bindings::exports::example::component::transform;
+
+// Implementation of our custom `transform` interface
+impl transform::Guest for Component {
+    fn transform_bytes(_data: Vec<u8>) -> Result<Vec<u8>, String> {
+        todo!()
+    }
+}
+
+// Implementation of our standardized `wasi:http` interface
+//
+// By using the Server trait, we can fill out the wasi:http/incoming-handler impl via
+// a much more native interface rather than only generated bindings
+impl http::Server for Component {
+    fn handle(
+        request: http::IncomingRequest,
+    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
+        todo!()
+    }
+}
+```
+
+By dropping down to "manual" `wit-bindgen`, we can use the `with` option to specify that we want to *reuse* bindings made available by another crate in our current crate,
+keeping the use of the better ergonomics of `http::Server` while still being able to export our `transform::Guest` implementation via the `Component` struct.
+
+[wit-bindgen]: https://crates.io/crates/wit-bindgen
