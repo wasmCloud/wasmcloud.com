@@ -106,7 +106,23 @@ wash up --wadm-manifest path/to/your/wadm.yaml
 
 When run this way, `wash up` will start a single host lattice as normal, but *also* deploy your provided manifest to the running lattice, so you can interact with your application as soon as possible.
 
-### Easily deploy a wadm application manifest continuously
+### Easily deploy an application continuously
+
+The recommended way to do local iterative development with fast feedback loops is [`wash dev`][wash-dev].
+
+In a wasmCloud project with a `wasmcloud.toml` file present, run the following:
+
+```console
+wash dev
+```
+
+This will start a local wasmCloud host, build your project, and react to changes to local code, redeploying your project as necessary.
+
+[wash-dev]: https://wasmcloud.com/docs/cli/wash#wash-dev
+
+#### Other ways to deploy a manually (deprecated)
+
+While the methods below aren't recommended, they can also be used to deploy a manifest repeatedly.
 
 If you have your host running in a separate shell/terminal window and want to avoid having to constantly `wash app delete` in-between changes to your project and/or manifest, you can run `wash app deploy` with the `--replace` option:
 
