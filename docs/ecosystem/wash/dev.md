@@ -95,3 +95,11 @@ You should see output similar to the following:
 $ curl localhost:8000
 Hello from Rust!
 ```
+
+## Configuring `wash` (and `wash dev`)
+
+Configuration for `wash` is stored in `wasmcloud.toml`. While template projects contain basic options, there are many more to consider. 
+
+See [the `wasmcloud.toml` config reference][reference-toml-config] for more information.
+
+[reference-toml-config]: /docs/reference/config
