@@ -5,6 +5,12 @@ on:
     - cron: '0 1 * * *'
   workflow_dispatch:
 
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/sync-examples-rust.yml'
+
 permissions:
   contents: write
   pull-requests: write
@@ -29,8 +35,8 @@ jobs:
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
-            const { updateDocs } = await import("${{ github.workspace }}/scripts/update-docs.mjs");
-            await updateDocs({
+            const { updateDocs } = await import("${{ github.workspace }}/wasmcloud.com/scripts/update-docs.mjs");
+            const result = await updateDocs({
               outputFolder: "./wasmcloud.com/docs/examples/rust",
               readmePaths: [
                 "./wasmcloud/examples/rust/components/**/README.md",
@@ -39,10 +45,12 @@ jobs:
               skipProjects: [
                 "echo-messaging-0-3-0",
               ],
-            })
+            }, { glob })
+            core.setOutput('docs_changed', result.docs_changed);
 
       - name: Create Docs PR
-        if: steps.sync-docs.outputs.docs_changed == 'true'
+        id: create-pr
+        if: github.event_name != 'pull_request' && steps.sync-docs.outputs.docs_changed == 'true'
         uses: peter-evans/create-pull-request@5e914681df9dc83aa4e4905692ca88beb2f9e91f # v7.0.5
         with:
           path: ./wasmcloud.com
@@ -53,6 +61,37 @@ jobs:
             Updates Rust example docs from wasmcloud-go. This is an automatically generated PR.
           branch: chore/update-rust-example-docs
           delete-branch: true
-          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
-          committer: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          author: wasmCloud Automation Bot <151542377+wasmcloud-automation-app[bot]@users.noreply.github.com>
+          committer: wasmCloud Automation Bot <151542377+wasmcloud-automation-app[bot]@users.noreply.github.com>
           signoff: true
+
+      - name: Workflow Summary
+        id: workflow-summary
+        if: ${{ always() }}
+        env:
+          UPDATE_DOCS: ${{ steps.sync-docs.outcome }}
+          PR_CREATION: ${{ steps.create-pr.outcome }}
+          ANY_CHANGED: ${{ steps.sync-docs.outputs.docs_changed }}
+        run: | #shell
+          echo "### Docs Sync Result" >> $GITHUB_STEP_SUMMARY
+
+          case "$UPDATE_DOCS" in
+            success)   echo "- ✅ \`updateDocs()\` was called and completed successfully" >> $GITHUB_STEP_SUMMARY;;
+            skipped)   echo "- ⏭️ \`updateDocs()\` was skipped" >> $GITHUB_STEP_SUMMARY;;
+            cancelled) echo "- 🚫 \`updateDocs()\` was cancelled" >> $GITHUB_STEP_SUMMARY;;
+            failure)   echo "- ❌ \`updateDocs()\` failed" >> $GITHUB_STEP_SUMMARY;;
+          esac
+
+          case "$ANY_CHANGED" in
+            false) echo "- 🟰 Docs were not changed (not a problem, probably just nothing new)" >> $GITHUB_STEP_SUMMARY;;
+            true) echo "- ✅ Docs were changed" >> $GITHUB_STEP_SUMMARY;;
+          esac
+
+          case "$PR_CREATION" in
+            success)   echo "- ✅ PR created" >> $GITHUB_STEP_SUMMARY;;
+            skipped)   echo "- ⏭️ PR creation was skipped" >> $GITHUB_STEP_SUMMARY;;
+            cancelled) echo "- 🚫 PR creation was cancelled" >> $GITHUB_STEP_SUMMARY;;
+            failure)   echo "- ❌ PR creation failed" >> $GITHUB_STEP_SUMMARY;;
+          esac
+
+          echo "" >> $GITHUB_STEP_SUMMARY
