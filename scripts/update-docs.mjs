@@ -1,5 +1,7 @@
+// @ts-check
+
 import { env } from 'node:process';
-import { mkdir, cp, stat, readFile, glob } from 'node:fs/promises';
+import { mkdir, cp, stat, readFile } from 'node:fs/promises';
 import { resolve, basename, dirname, join, sep as pathSeparator } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -17,10 +19,16 @@ const DEFAULT_OUTPUT_FOLDER = join(tmpdir(), 'update-docs-output');
  * @param {string} cfg.outputFolder - Folder into which READMEs will be copied (listed by project name)
  * @param {string[]} cfg.readmePaths - Paths/Glob patterns to READMEs that should be copied (case-sensitive)
  * @param {string[]} [cfg.skipProjects] - project names to skip (ex. 'custom-template')
+ * @param {object} ctx - Extra context from the actions runner
+ * @param {object} ctx.glob - @actions/glob import for matching paths
  */
-export async function updateDocs(cfg) {
+export async function updateDocs(cfg, ctx = { glob: undefined }) {
   if (!cfg) {
     throw new Error('cfg not provided');
+  }
+
+  if (!ctx.glob) {
+    throw new Error('glob function not provided');
   }
 
   const readmePaths = cfg.readmePaths;
@@ -41,7 +49,8 @@ export async function updateDocs(cfg) {
   for (let readmeGlob of readmePaths) {
     console.error(`\n\nprocessing path/glob [${readmeGlob}]`);
     // Handle every readme path that matches the glob
-    for await (const readmePath of glob(readmeGlob)) {
+    const pathGlob = await ctx.glob.create(readmeGlob);
+    for await (const readmePath of pathGlob.globGenerator()) {
       const projectName = guessProjectName(readmePath);
       console.error(`\nprocessing project name [${projectName}] @ [${readmePath}]...`);
 
@@ -94,7 +103,7 @@ export async function updateDocs(cfg) {
 
   // Return whether the docs have changed
   const result = {
-    'docs_changed': docsChanged,
+    docs_changed: docsChanged,
   };
   console.log(`\nRETURNING:\n${JSON.stringify(result, null, 2)}`);
   return result;
@@ -102,6 +111,7 @@ export async function updateDocs(cfg) {
 
 /** Guess the project name of a readme path */
 function guessProjectName(readmePath) {
+  console.error(`guessing project name from path [${JSON.stringify(readmePath)}]...`);
   return basename(dirname(readmePath));
 }
 
@@ -123,10 +133,16 @@ function guessComponentOrProvider(readmePath) {
  */
 async function main() {
   await updateDocs({
-    readmePaths: env.README_PATHS ?? DEFAULT_README_PATHS,
+    readmePaths: env.README_PATHS ? [env.README_PATHS] : DEFAULT_README_PATHS,
     outputFolder: env.OUTPUT_FOLDER ?? DEFAULT_OUTPUT_FOLDER,
-    skipProjects: env.SKIP_PROJECTS ?? DEFAULT_SKIP_PROJECTS,
+    skipProjects: env.SKIP_PROJECTS ? [env.SKIP_PROJECTS] : DEFAULT_SKIP_PROJECTS,
   });
 }
 
-await main();
+// If this file is being executed directly, run the main function
+if (import.meta?.filename && import.meta?.filename === process.argv[1]) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
