@@ -330,6 +330,13 @@ const config = (async (): Promise<Config> => {
           rel: 'stylesheet',
         },
       },
+      {
+        tagName: 'img',
+        attributes: {
+          src: 'https://static.scarf.sh/a.png?x-pxid=c2e66ae7-621b-4451-8c30-36d2c33d804b',
+          referrerpolicy: 'no-referrer-when-downgrade',
+        },
+      },
     ],
 
     onBrokenAnchors: 'throw',
