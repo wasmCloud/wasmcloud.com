@@ -234,7 +234,7 @@ const config = (async (): Promise<Config> => {
               {
                 label: 'Community Meeting Notes',
                 to: '/community',
-              },
+              }
             ],
           },
           {
@@ -281,6 +281,7 @@ const config = (async (): Promise<Config> => {
           },
         ],
         copyright: `Copyright © ${new Date().getFullYear()} wasmCloud LLC. All rights reserved. The Linux Foundation has registered trademarks and uses trademarks. For a list of trademarks of The Linux Foundation, please see our Trademark Usage page: https://www.linuxfoundation.org/trademark-usage. Built with Docusaurus.`,
+        scarf: `https://static.scarf.sh/a.png?x-pxid=c2e66ae7-621b-4451-8c30-36d2c33d804b`
       },
       algolia: {
         apiKey: 'f0ef30f3d98ce5e9a7dd7579bb221dfc',
