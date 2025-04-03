@@ -1,0 +1,258 @@
+---
+title: 'Components'
+date: 2024-09-26T11:02:05+06:00
+sidebar_position: 1
+description: 'How to develop WebAssembly components with Typescript'
+---
+
+# Building components with Typescript
+
+While most may be familiar with building WebAssembly modules to run in browser contexts, Javascript and Typescript
+can also be used to develop WebAssembly components which run everywhere (including on servers and browsers).
+
+This is possible because of a few tools that work together:
+
+- [**StarlingMonkey**][sm] is a robust, performant JS engine that compiles to WebAssembly to evaluate Javascript
+- [**ComponentizeJS**][cjs] turns Javascript code into WebAssembly components that use the StarlingMonkey engine to execute
+- [**Jco**][jco] bundles `componentize-js`, generates WIT bindings, and enables WASI components to run in [NodeJS][nodejs] and the browser
+
+[ts]: https://typescriptlang.org
+[cjs]: https://github.com/bytecodealliance/componentize-js
+[jco]: https://github.com/bytecodealliance/jco
+[sm]: https://github.com/bytecodealliance/StarlingMonkey
+[nodejs]: https://nodejs.org/
+
+[`wasmCloud/Typescript`](https://github.com/wasmCloud/typescript/tree/main) contains Typescript ecosystem libraries and
+examples that work with wasmCloud, serving as a centralized home for templates, example components, and more.
+
+## Javascript-native tooling, with a little bit of Rust
+
+While [NodeJS][nodejs] uses the WebAssembly runtime available via [V8][v8] (and even contains a somewhat
+outdated [`WASI` implementation][nodejs-docs-wasi]), [`jco`][jco], [`componentize-js`][cjs] and [StarlingMonkey][sm] provide and
+integrate with the latest in WebAssembly standards and interfaces.
+
+`jco` serves as the primary entrypoint into the WebAssembly Javascript ecosystem, bundling key feature for Javascript development into a single package:
+
+- Building WebAssembly components given Javascript code (possibly transpiled)
+- Generating Typescript types to match [WebAssembly Interface Type (WIT)][wit] interfaces
+- Transpiling WebAssembly components (from any language) to run in NodeJS or the browser with host bindings
+
+[wit]: https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md
+[v8]: https://v8.dev/
+[nodejs-docs-wasi]: https://nodejs.org/api/wasi.html
+
+## Get started
+
+In this walkthrough, we will:
+
+1. Create a WebAssembly component that responds to HTTP requests using [Jco][jco]
+2. Write a NodeJS host for the WebAssembly component
+3. Write tests that ensure the component works
+
+To be able to follow along, you'll need:
+
+* [NodeJS][nodejs]
+* [NPM][npm]
+* [Jco][npm-jco]
+* [componentize-js][npm-cjs]
+* [wasmCloud Shell (`wash`)][wash-install] CLI 0.36.1+ for building and deploying components
+
+[npm-jco]: https://www.npmjs.com/package/@bytecodealliance/jco
+[npm-cjs]: https://www.npmjs.com/package/@bytecodealliance/componentize-js
+[wash-install]: https://wasmcloud.com/docs/installation
+[nodejs]: https://nodejs.org
+[nodejs]: https://www.npmjs.com/package/npm
+
+### Step 1: Set up with `wash`
+
+The wasmCloud Shell (`wash`) CLI helps developers build WebAssembly component-based applications that can be deployed with wasmCloud, and
+integrates open source tooling to make development easy.
+
+We can use `wash new` to scaffold out a new Typescript project:
+
+```console
+wash new component http-test --template-name hello-world-typescript
+```
+
+Once the command has completed, you may enter the created `http-ts` folder:
+
+```shell
+cd http-test
+```
+
+::::warning[Dependencies]
+Ensure that you have Javscript development tools like `node` and `npm` installed and available on your PATH.
+::::
+
+We can then immediately run `wash build` to build our project as a WebAssembly component:
+
+```console
+wash build
+```
+
+:::tip
+wash places built artifacts in the `build` folder of the current project.
+:::
+
+The `wash inspect` subcommand enables us to examine the new component's imports and exports:
+
+```console
+wash inspect --wit build/http_hello_world_s.wasm
+```
+
+You should see output that looks like the following:
+
+```wit
+package root:component;
+
+world root {
+  import wasi:io/poll@0.2.3;
+  import wasi:clocks/monotonic-clock@0.2.3;
+  import wasi:io/error@0.2.3;
+  import wasi:io/streams@0.2.3;
+  import wasi:http/types@0.2.3;
+  import wasi:cli/stdin@0.2.3;
+  import wasi:cli/stdout@0.2.3;
+  import wasi:cli/stderr@0.2.3;
+  import wasi:cli/terminal-input@0.2.3;
+  import wasi:cli/terminal-output@0.2.3;
+  import wasi:cli/terminal-stdin@0.2.3;
+  import wasi:cli/terminal-stdout@0.2.3;
+  import wasi:cli/terminal-stderr@0.2.3;
+  import wasi:clocks/wall-clock@0.2.3;
+  import wasi:filesystem/types@0.2.3;
+  import wasi:filesystem/preopens@0.2.3;
+  import wasi:random/random@0.2.3;
+  import wasi:http/outgoing-handler@0.2.3;
+
+  export wasi:http/incoming-handler@0.2.3;
+}
+```
+
+:::info
+WIT interfaces are a key feature of WebAssembly components -- they enable defining the interface for your
+component, and enable advanced functionality not otherwise usable from a WebAssembly module like
+filesystem access or serving web requests.
+
+To learn more about WIT interfaces, see the [WIT interface documentation][docs-wit].
+To learn more about standardization of WIT interfaces, see the [WebAssebly System Interface (WASI) documentation][wasi].
+
+To modify the WIT interface for the component, see `wit/world.wit`.
+:::
+
+Now that the component is built, we can start a local developer loop to use our app locally:
+
+```console
+wash dev
+```
+
+While `wash dev` won't return, it will have started a HTTP server that you can send requests to.
+
+:::tip
+`wash dev` is able to start up a HTTP server automatically because it discovers your application's
+dependencies via WIT.
+:::
+
+After a second or two, in another console/tab, we can `curl` the application that was deployed locally:
+
+```
+$ curl localhost:8000
+Hello from Rust!
+```
+
+[wasi]: https://github.com/WebAssembly/wasi
+
+### Step 2: Transpiling our component to run on NodeJS
+
+One important feature of the WebAssembly Javascript tooling is that it can be used as a WebAssembly *host*.
+
+Other hosts utilize WebAssembly runtimes like [`wasmtime`][wasmtime], but since NodeJS runs on V8 which contains it's own WebAssembly
+runtime, it's possible to run WebAssembly directly in NodeJS (or browsers with WebAssembly runtimes included).
+
+Since browsers do not yet support WebAssembly components, we can use `jco` to "transpile" components such that they can be run
+on browsers.
+
+To transpile our component, let's first create a `dist` folder:
+
+```console
+mkdir dist
+```
+
+Then, we can run `jco` transpile via [the `npx` shortcut][npx]:
+
+```console
+npx jco transpile build/http_hello_world_s.wasm -o dist/transpiled
+```
+
+You should see output like the following:
+
+```
+  Transpiled JS Component Files:
+
+ - dist/transpiled/http_hello_world_s.core.wasm                 11.1 MiB
+ - dist/transpiled/http_hello_world_s.core2.wasm                14.4 KiB
+ - dist/transpiled/http_hello_world_s.core3.wasm                5.79 KiB
+ - dist/transpiled/http_hello_world_s.d.ts                      2.25 KiB
+ - dist/transpiled/http_hello_world_s.js                         261 KiB
+ - dist/transpiled/interfaces/wasi-cli-stderr.d.ts              0.16 KiB
+ - dist/transpiled/interfaces/wasi-cli-stdin.d.ts               0.15 KiB
+ - dist/transpiled/interfaces/wasi-cli-stdout.d.ts              0.16 KiB
+ - dist/transpiled/interfaces/wasi-cli-terminal-input.d.ts      0.17 KiB
+ - dist/transpiled/interfaces/wasi-cli-terminal-output.d.ts     0.17 KiB
+ - dist/transpiled/interfaces/wasi-cli-terminal-stderr.d.ts      0.2 KiB
+ - dist/transpiled/interfaces/wasi-cli-terminal-stdin.d.ts       0.2 KiB
+ - dist/transpiled/interfaces/wasi-cli-terminal-stdout.d.ts      0.2 KiB
+ - dist/transpiled/interfaces/wasi-clocks-monotonic-clock.d.ts  0.37 KiB
+ - dist/transpiled/interfaces/wasi-clocks-wall-clock.d.ts        0.2 KiB
+ - dist/transpiled/interfaces/wasi-filesystem-preopens.d.ts     0.19 KiB
+ - dist/transpiled/interfaces/wasi-filesystem-types.d.ts        2.93 KiB
+ - dist/transpiled/interfaces/wasi-http-incoming-handler.d.ts    0.3 KiB
+ - dist/transpiled/interfaces/wasi-http-outgoing-handler.d.ts   0.47 KiB
+ - dist/transpiled/interfaces/wasi-http-types.d.ts              9.88 KiB
+ - dist/transpiled/interfaces/wasi-io-error.d.ts                0.18 KiB
+ - dist/transpiled/interfaces/wasi-io-poll.d.ts                 0.25 KiB
+ - dist/transpiled/interfaces/wasi-io-streams.d.ts              1.14 KiB
+ - dist/transpiled/interfaces/wasi-random-random.d.ts           0.14 KiB
+```
+
+After transpiling the WebAssembly component, normally you can use it from JS contexts with code similar to the following:
+
+```js
+import { someInterface } from "./dist/transpiled/your-component.js";
+
+const result = someInterface.someFunction(...);
+console.log("result", result);
+```
+
+**In this case**, since we're using the standardized [`wasi:http`][wasi-http] `incoming-handler` interface, we can
+skip creating our own harness to run our HTTP serving WebAssembly component and use `jco serve`:
+
+
+```console
+npx jco serve build/http_hello_world_s.wasm
+```
+
+By default `jco serve` will transpile *and* run your component as a web server, and you should see the following output:
+
+```
+npx jco serve build/http_hello_world_s.wasm
+Server listening on port...
+```
+
+You can `curl` `localhost:8000` to trigger your component:
+
+```
+curl localhost:8000
+Hello from Typescript!
+```
+
+[wasi-http]: https://github.com/WebAssembly/wasi-http
+[npx]: https://docs.npmjs.com/cli/v9/commands/npx?v=true
+[wasmtime]: https://wasmtime.dev/
+
+## Next steps
+
+* Explore [WIT interfaces][docs-wit] which can be used to extend and create new functionality.
+* Explore [capabilities](/docs/capabilities/index.mdx) you can use in your wasmCloud application.
+
+[docs-wit]: /docs/concepts/interfaces
