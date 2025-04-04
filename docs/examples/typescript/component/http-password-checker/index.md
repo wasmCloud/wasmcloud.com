@@ -1,6 +1,5 @@
 # Typescript HTTP Password Checker
 
-
 This repository contains a WebAssembly Component written in [Typescript][ts], which:
 
 - Implements a [`wasi:http`][wasi-http]-compliant HTTP handler
