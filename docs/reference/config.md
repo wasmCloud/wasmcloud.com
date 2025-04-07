@@ -5,7 +5,7 @@ sidebar_position: 4
 draft: false
 ---
 
-You can think of `wasmcloud.toml` as the `package.json` or `Cargo.toml` of the wasmCloud ecosystem. It's the main config file for any of your wasmCloud projects. 
+`wasmcloud.toml` is the main configuration file for a wasmCloud project, analogous to a `package.json` or `Cargo.toml` file. 
 
 Let's look at an example:
 
