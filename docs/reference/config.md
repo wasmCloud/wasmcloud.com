@@ -34,7 +34,7 @@ See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/w
 
 | Setting       | Type   | Default                           | Description                                                                                        |
 | ------------- | ------ | --------------------------------- | -------------------------------------------------------------------------------------------------- |
-| name          | string |                                   | Name of the project.                                                                               |
+| `name`          | string |                                   | Name of the project.                                                                               |
 | language      | string |                                   | Language that component or provider is written in. Valid values are: `rust`, `tinygo`, `go`, or `other`. |
 | type          | string |                                   | Type of wasmCloud artifact that is being generated. Valid values are: `component` or `provider`.         |
 | version       | string |                                   | Semantic version of the project.                                                                   |
