@@ -61,7 +61,7 @@ wash dev
 > To do things more manually, see [`docs/slow-start.md`][slow-start-docs].
 
 [wasmcloud-host]: https://wasmcloud.com/docs/concepts/hosts
-[slow-start-docs]: https://github.com/wasmCloud/typescript/tree/main/examples/components/http-streaming/docs
+[slow-start-docs]: https://github.com/wasmCloud/typescript/blob/main/examples/components/http-streaming/docs/slow-start.md
 
 ## Send a request to the running component
 
