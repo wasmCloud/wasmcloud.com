@@ -94,9 +94,20 @@ See the [`build` docs](https://github.com/wasmCloud/wasmCloud/tree/main/crates/w
 
 ### `wash dev` Config - `[dev]`
 
-| Setting   | Type   | Default | Description                                               |
-|-----------|--------|---------|-----------------------------------------------------------|
-| manifests | object | N/A     | Custom manifests to use when developing a given component |
+| Setting   | Type     | Default | Description                                                 |
+|-----------|----------|---------|-------------------------------------------------------------|
+| manifests | object[] | N/A     | Custom manifest(s) to use when developing a given component |
+
+#### `[dev].manifests`
+
+`[dev].manifests` entries are used to control the use of *custom* manifests.
+
+| Setting        | Type   | Default | Description                                                                                 |
+|----------------|--------|---------|---------------------------------------------------------------------------------------------|
+| component_name | string | N/A     | The name of the project for which a custom manifest to be used (`name` in `wasmcloud.toml`) |
+| path           | string | N/A     | Path to the custom manifest that should be used when building                               |
+
+While more than one manifest can be provided, most projects will only use one (for the main component under development).
 
 ### WIT dependency fetch/pull configuration - `[registry].pull`
 
