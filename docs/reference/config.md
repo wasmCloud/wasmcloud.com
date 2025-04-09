@@ -216,6 +216,47 @@ Dev overrides can be useful for specifying third-party providers as well as prov
 | secrets        | object | Secrets that should be provided to the entity                                                                                                                |
 | link_name      | string | Link name that should be used to reference the component. This is only required when there are *multiple* conflicting overrides (i.e. there is no "default") |
 
+#### Example: Overriding a generated providers
+
+When writing components, `wash dev` will attempt to satisfy things like imports and exports automatically with *existing* providers.
+
+If we were developing an application that returns "Hello World" to any HTTP request, we might have a WIT that looks like this:
+
+```wit
+package example:http-hello-world;
+
+world component {
+    export wasi:http/incoming-handler@0.2.2;
+}
+```
+
+`wash dev` recognizes the `wasi:http/incoming-handler` export and knows that this component *likely* relies on a HTTP server that is receiving requests from the outside world
+and forwarding them to the component. By default, `wash dev` will fill in the latest configured version of [wasmCloud's HTTP server provider][provider-http-server].
+
+But what if we wanted to use a custom provider that can handle this export?
+
+Here's an example of what configuration might look like to override the HTTP server provider used for our component:
+
+```toml
+[[dev.overrides.exports]]
+interface_spec = "wasi:http/incoming-handler@0.2.3"
+image_ref = "ghcr.io/wasmcloud/http-server:0.24.0"
+config = { values = { address = "127.0.0.1:8083" } }
+```
+
+Here, we specify a few things to make sure a custom HTTP server provider is picked:
+
+- `[[dev.overrides.imports]]` - this section is for overriding the dependencies `wash dev` would normally automatically generate
+- `interface_spec` - This is the interface that we should be be generating a provider for
+- `image_ref` - The custom reference to the provider we'd like to run
+- `config` - Optional configuration that the provider should use. In this case, we configure the address we want our custom HTTP server provider to listen on.
+
+With the above configuration, we can control the generated manifest and ensure that a custom version of a provider is picked.
+
+Another way to accomplish the same goal is to use a *custom* manifest, explained in the next section.
+
+[provider-http-server]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-http-server
+
 ### Using custom WADM manifests with `wash dev`
 
 To use a custom WADM manifest with `wash dev`, the `[dev.manifests]` setting can be used:
