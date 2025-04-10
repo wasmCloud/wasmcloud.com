@@ -87,7 +87,7 @@ As mentioned above, an import is a function that a provider will invoke on a Web
 We're going to implement the `dispatch_msg` function about halfway down in `src/nats.rs`. In place of the TODO, we'll use the generated interface function for `wasmcloud::messaging::handler::handle_message`, with the wRPC client, to invoke a component:
 
 ```rust
-async fn dispatch_msg(component_id: &str, nats_msg: async_nats::Message) {
+async fn dispatch_msg(component_id: &str, nats_msg: async_nats::Message) -> anyhow::Result<()> {
     let msg = BrokerMessage {
         body: nats_msg.payload.into(),
         reply_to: nats_msg.reply.map(|s| s.to_string()),
@@ -102,19 +102,22 @@ async fn dispatch_msg(component_id: &str, nats_msg: async_nats::Message) {
 
     // TODO: Send the message to the component's `wasmcloud:messaging/handler.handle-message` function //[!code --]
     todo!("Use wasmcloud:messaging/handler for NATS provider") // [!code --]
-    if let Err(e) = wasmcloud::messaging::handler::handle_message( // [!code ++]
-        &get_connection().get_wrpc_client(component_id)
+    if let Err(e) = bindings::wasmcloud::messaging::handler::handle_message( // [!code ++]
+        &get_connection() // [!code ++]
+            .get_wrpc_client(component_id) // [!code ++]
             .await // [!code ++]
-            .context("failed to get wrpc client")?;, // [!code ++]
+            .context("failed to get wrpc client")?, // [!code ++]
+        nats_msg.headers, // [!code ++]
         &msg, // [!code ++]
     ) // [!code ++]
-    .await // [!code ++]
+    .await? // [!code ++]
     { // [!code ++]
         error!( // [!code ++]
             error = %e, // [!code ++]
             "Unable to send message" // [!code ++]
         ); // [!code ++]
     } // [!code ++]
+    Ok(()) // [!code ++]
 }
 ```
 
