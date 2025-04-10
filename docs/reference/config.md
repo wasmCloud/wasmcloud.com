@@ -246,13 +246,13 @@ and forwarding them to the component. By default, `wash dev` will fill in the la
 
 But what if we wanted to use a custom provider that can handle this export?
 
-Here's an example of what configuration might look like to override the HTTP server provider used for our component:
+Here's an example of what configuration might look like to configure the HTTP server provider used for our component:
 
 ```toml
 [[dev.overrides.exports]]
 interface_spec = "wasi:http/incoming-handler@0.2.3"
 image_ref = "ghcr.io/wasmcloud/http-server:0.24.0"
-config = { values = { address = "127.0.0.1:8083" } }
+link_config = { values = { address = "127.0.0.1:8083" } }
 ```
 
 Here, we specify a few things to make sure a custom HTTP server provider is picked:
@@ -260,7 +260,8 @@ Here, we specify a few things to make sure a custom HTTP server provider is pick
 - `[[dev.overrides.imports]]` - this section is for overriding the dependencies `wash dev` would normally automatically generate
 - `interface_spec` - This is the interface that we should be be generating a provider for
 - `image_ref` - The custom reference to the provider we'd like to run
-- `config` - Optional configuration that the provider should use. In this case, we configure the address we want our custom HTTP server provider to listen on.
+- `link_config` - Optional configuration that should be attached to the provider's links.
+  - In this case, we configure the address we want our custom HTTP server provider to listen on.
 
 With the above configuration, we can control the generated manifest and ensure that a custom version of a provider is picked.
 
