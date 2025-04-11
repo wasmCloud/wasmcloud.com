@@ -1,25 +1,25 @@
 ---
-title: "Deploy with Google Kubernetes Engine (GKE)"
+title: "Deploy with Azure Kubernetes Service (AKS)"
 date: 2024-08-08T00:00:00+00:00
 icon: 'ti-anchor' # themify icon pack : https://themify.me/themify-icons
-description: "Deploy wasmCloud on a Kubernetes cluster with Google Cloud's Google Kubernetes Engine (GKE)"
-sidebar_position: 3
+description: "Deploy wasmCloud on a Kubernetes cluster with the Azure Kubernetes Service (AKS)"
+sidebar_position: 2
 type: 'docs'
 ---
 
 ## Overview
 
-This deployment guide demonstrates how to deploy wasmCloud to a Kubernetes cluster using Google Cloud's Google Kubernetes Engine (GKE) service, and then run wasmCloud applications built from WebAssembly components. 
+This deployment guide demonstrates how to deploy wasmCloud to a Kubernetes cluster using Azure Kubernetes Service (AKS), and then run wasmCloud applications built from WebAssembly components. 
 
-To follow the guide, you will need an account for [Google Cloud](https://cloud.google.com/). In this example, we will use the [`gcloud` CLI](https://cloud.google.com/sdk/docs/install) and [GKE Autopilot](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview).
+To follow this guide, you will need an account for [Azure](https://azure.microsoft.com/free/).
 
-:::warning[Quota requirements]
-To follow this guide, you should have **Persistent Disk SSD (GB)** quota of around 750 GB (which will require a quota increase for new Google Cloud accounts). 
-:::
+## Deploy an AKS cluster
+
+Before you get started, you will need an AKS cluster. The Azure documentation includes instructions for creating an AKS cluster via [Mac/Linux CLI](https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-deploy-cli), [PowerShell](https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-deploy-powershell), or the [Azure web portal](https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-deploy-portal). 
 
 ## Set up your CLI tools
 
-This guide uses the **Google Cloud CLI tool**, **`kubectl`**, **Helm**, and the **wasmCloud Shell (`wash`)** CLI. 
+This guide uses **`kubectl`**, **Helm**, and the **wasmCloud Shell (`wash`)** CLI. 
 
 ### Install `kubectl`
 
@@ -58,150 +58,18 @@ chmod 700 get_helm.sh
 
 ### Install wash
 
-Once wasmCloud is deployed to your EKS cluster, you can use the **wasmCloud Shell (`wash`)** CLI to manage wasmCloud applications. If you do not have `wash` installed locally, follow the instructions on the [install page](https://wasmcloud.com/docs/installation).
+Once wasmCloud is deployed to your AKS cluster, you can use the **wasmCloud Shell (`wash`)** CLI to manage wasmCloud applications. If you do not have `wash` installed locally, follow the instructions on the [install page](https://wasmcloud.com/docs/installation).
 
-### Install Google Cloud CLI tooling
-
-Follow the instructions in Google Cloud's documentations to [install and authenticate the `gcloud` CLI](https://cloud.google.com/sdk/docs/install).
-
-Once you have set up the `gcloud` CLI, install the `beta` and `gke-gcloud-auth-plugin` tools.
-
-```shell
-gcloud components install beta
-```
-```shell
-gcloud components install gke-gcloud-auth-plugin
-```
-
-## Set up your GKE cluster
-
-It can be convenient to assign your preferred project, cluster name, and region to environment variables.
-
-To get the identifier for your current Google Cloud project:
-
-```shell
-gcloud config get-value project
-```
-
-```shell
-WASMCLOUD_GKE_CLUSTER_NAME=wasmcloud-cluster
-```
-```shell
-WASMCLOUD_GKE_CLUSTER_REGION=us-east1
-```
-```shell
-WASMCLOUD_GKE_PROJECT=project-identifier-012345-a1
-```
-
-Use the `gcloud` CLI to create a GKE Autopilot cluster.
-
-```shell
-gcloud beta container --project "$WASMCLOUD_GKE_PROJECT" clusters create-auto "$WASMCLOUD_GKE_CLUSTER_NAME" --region "$WASMCLOUD_GKE_CLUSTER_REGION" --release-channel "regular" --tier "standard" --enable-ip-access --no-enable-google-cloud-access --network "projects/$WASMCLOUD_GKE_PROJECT/global/networks/default" --subnetwork "projects/$WASMCLOUD_GKE_PROJECT/regions/$WASMCLOUD_GKE_CLUSTER_REGION/subnetworks/default" --cluster-ipv4-cidr "/17" --binauthz-evaluation-mode=DISABLED
-```
 
 ## Deploying wasmCloud
 
 In order to deploy wasmCloud, we will install the `wasmcloud-platform` Helm chart. By default, the chart installs NATS, `wadm`, and the wasmCloud operator subchart. 
 
-We'll need to use some custom values for an EKS deployment. The most important change is to set the storage class. Use the values below in a `values.yaml` file:
-
-```yaml
-# values.yaml
-fullnameOverride: "wasmcloud-platform"
-nameOverride: "wasmcloud-platform"
-
-nats:
-  # Whether to install the nats chart (https://nats-io.github.io/k8s/helm/charts/nats)
-  enabled: true
-  fullnameOverride: "nats"
-  nameOverride: "nats"
-  container:
-    image:
-      repository: nats
-      tag: 2.10.16-alpine
-  reloader:
-    image:
-      repository: natsio/nats-server-config-reloader
-      tag: 0.14.3
-  # Source: https://github.com/wasmCloud/wasmcloud-operator/blob/main/examples/quickstart/nats-values.yaml
-  config:
-    cluster:
-      enabled: true
-      replicas: 3
-    leafnodes:
-      enabled: true
-    websocket:
-      enabled: true
-      port: 4223
-    jetstream:
-      enabled: true
-      fileStore:
-        enabled: true
-        pvc:
-          enabled: true
-          size: 1Gi
-          storageClassName: standard-rwo
-      merge:
-        domain: default
-
-wadm:
-  # Whether to install the wadm chart (oci://ghcr.io/wasmcloud/charts/wadm)
-  enabled: true
-  fullnameOverride: "wadm"
-  nameOverride: "wadm"
-  # Source: https://github.com/wasmCloud/wasmcloud-operator/blob/main/examples/quickstart/wadm-values.yaml
-  wadm:
-    image:
-      repository: ghcr.io/wasmcloud/wadm
-      tag: v0.15.0
-    config:
-      nats:
-        server: "nats://nats-headless.default.svc.cluster.local"
-        # creds:
-        #   jwt: ""
-        #   seed: ""
-        #   # If you're using the wasmCloud Operator, the secret could be created by the chart using the '.hostConfig.natsCredentialsFile' setting.
-        #   secretName: ""
-        #   key: "nats.creds"
-  resources: {}
-
-operator:
-  # Whether to install the wasmcloud-operator chart (oci://ghcr.io/wasmcloud/charts/wasmcloud-operator)
-  # Make sure to either install wasmCloud Operator or wasmCloud Host, not both
-  enabled: true
-  fullnameOverride: "wasmcloud-operator"
-  nameOverride: "wasmcloud-operator"
-  # image:
-  #   tag: 0.3.2
-
-host:
-  # Whether to install the wasmcloud-host chart (oci://ghcr.io/wasmcloud/charts/wasmcloud-host)
-  # Make sure to either install wasmCloud Operator or wasmCloud Host, not both
-  enabled: false
-  fullnameOverride: "wasmcloud"
-  nameOverride: "wasmcloud"
-
-hostConfig:
-  # Whether to use the wasmCloud host configuration custom resource; defaults to "false".
-  enabled: false
-  name: wasmcloud-host
-  lattice: default
-  # # Number of hosts (pods). Defaults to 1.
-  # hostReplicas: 1
-  # Which version of wasmCloud to use; defaults to "latest"
-  version: "1.2.1"
-  # registryCredentialsFile: config.json
-  # natsCredentialsFile: secret.yaml
-  resources:
-    nats: {}
-    wasmCloudHost: {}
-```
-
 ```shell
 helm upgrade --install \
     wasmcloud-platform \
-    --values ./values.yaml \
-    oci://ghcr.io/wasmcloud/charts/wasmcloud-platform \
+    --values https://raw.githubusercontent.com/wasmCloud/wasmcloud/main/charts/wasmcloud-platform/values.yaml \
+    oci://ghcr.io/wasmcloud/charts/wasmcloud-platform:0.1.2 \
     --dependency-update
 ```
 
@@ -221,7 +89,7 @@ Next create a wasmCloud host:
 
 ```shell
 helm upgrade --install wasmcloud-platform \
-  --values ./values.yaml \
+  --values https://raw.githubusercontent.com/wasmCloud/wasmcloud/main/charts/wasmcloud-platform/values.yaml \
   oci://ghcr.io/wasmcloud/charts/wasmcloud-platform \
   --dependency-update \
   --set "hostConfig.enabled=true"
@@ -371,7 +239,6 @@ curl hello-world:8000
 
 ### Common mistakes
 
-* If you have issues deploying the platform chart, check the [GKE web console](https://console.cloud.google.com/kubernetes/list/overview) to ensure that you haven't hit a quota limit. You may need to enable cluster autoscaling. 
 * If you're having trouble deploying an application, make sure your wadm application manifest references an OCI image and not a local file.
 * If a service is not automatically generated for an application using the httpserver provider, check to ensure that the provider uses `daemonscaler` in the application manifest. (You can see an example of this in the [`hello-world-application` manifest](https://raw.githubusercontent.com/wasmCloud/wasmcloud-operator/main/examples/quickstart/hello-world-application.yaml).)
 * If you're having trouble connecting to an application that uses the HTTP Server provider, make sure it is configured to use the address `0.0.0.0`. 
@@ -425,8 +292,9 @@ All resources installed via Helm can be removed with [`helm uninstall`](https://
 helm uninstall wasmcloud-platform
 ```
 
-Follow the instructions from the GKE documentation to [delete your cluster and nodes](https://cloud.google.com/kubernetes-engine/docs/how-to/deleting-a-cluster). Generally, you'll use the following command:
+Follow the instructions from the AKS documentation to [delete your cluster and nodes](https://learn.microsoft.com/en-us/azure/aks/delete-cluster?tabs=azure-cli). If you set up an AKS cluster with the AKS CLI via the [AKS quickstart](https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-deploy-cli), the command would look like this:
 
 ```shell
-gcloud container clusters delete $WASMCLOUD_GKE_CLUSTER_NAME --region $WASMCLOUD_GKE_CLUSTER_REGION
+az aks delete --name $MY_AKS_CLUSTER_NAME --resource-group $MY_RESOURCE_GROUP_NAME
 ```
+
