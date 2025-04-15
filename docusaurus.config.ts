@@ -43,8 +43,8 @@ const rehypeShikiPlugin = [
     ],
     langs: [
       ...(Object.keys(bundledLanguages) as Array<keyof typeof bundledLanguages>),
-      async () => JSON.parse(await fs.readFile('./languages/wit.tmLanguage.json', 'utf-8')),
-      async () => JSON.parse(await fs.readFile('./languages/smithy.tmLanguage.json', 'utf-8')),
+      import('./languages/wit.tmLanguage.json'),
+      import('./languages/smithy.tmLanguage.json'),
     ],
   } as RehypeShikiOptions,
 ];
