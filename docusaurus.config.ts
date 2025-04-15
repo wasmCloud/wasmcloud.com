@@ -6,9 +6,10 @@ import {
 } from '@docusaurus/preset-classic';
 import { Options as PluginContentBlogOptions } from '@docusaurus/plugin-content-blog';
 import { Options as PluginGoogleAnalyticsOptions } from '@docusaurus/plugin-google-analytics';
-import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
 import { Options as PluginGithubStarsOptions } from '@wasmcloud/docusaurus-github-stars';
 import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-hubspot-analytics';
+import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
+import { Options as PluginScarfAnalyticsOptions } from '@wasmcloud/docusaurus-scarf-analytics';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import { bundledLanguages } from 'shiki';
 import {
@@ -179,6 +180,12 @@ const config = (async (): Promise<Config> => {
           hubspotId: process.env.HUBSPOT_ID || 'localdev',
         } satisfies PluginHubspotAnalyticsOptions,
       ],
+      [
+        '@wasmcloud/docusaurus-scarf-analytics',
+        {
+          pixelId: process.env.SCARF_PIXEL_ID || 'localdev',
+        } satisfies PluginScarfAnalyticsOptions,
+      ],
       customPostCssPlugin, // PostCSS plugin function registration
     ],
 
@@ -328,13 +335,6 @@ const config = (async (): Promise<Config> => {
         attributes: {
           href: 'https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Lexend:wght@100..900&family=Inter:wght@100..900&display=swap',
           rel: 'stylesheet',
-        },
-      },
-      {
-        tagName: 'img',
-        attributes: {
-          src: 'https://static.scarf.sh/a.png?x-pxid=c2e66ae7-621b-4451-8c30-36d2c33d804b',
-          referrerpolicy: 'no-referrer-when-downgrade',
         },
       },
     ],
