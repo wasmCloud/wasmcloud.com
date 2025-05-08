@@ -35,10 +35,7 @@ The adapter in [`src/wasmcloud/hono-adapter`](https://github.com/wasmCloud/types
 
 **How it works:**
 
-- The adapter exposes a `serve(app)` function that takes a Hono app and returns a WASI-compatible handler function.
-- When a request comes in, it converts the WASI HTTP request into a standard Web `Request` object.
-- The Hono app processes the request and returns a standard Web `Response`.
-- The adapter reads the response status, headers, and streams the response body (if present) back to the WASI HTTP provider, ensuring compatibility with both text and binary responses.
+- The adapter exposes a `serve(app: Hono)` function that takes a Hono app and adds a 'fetch' event-listener onto the global context. JCO componentize-js supports this (through StarlingMonkey) by automatically adding the necessary imports.
 - Any errors in the request handling are caught and a 500 Internal Server Error is returned to the client.
 
 ## Logging Middleware
@@ -53,3 +50,7 @@ The logging middleware in [`src/wasmcloud/hono-middleware-wasi-logging`](https:/
 - Uses the WASI logging interface for compatibility with wasmCloud and other WASI hosts
 
 This makes it easy to observe and debug your HTTP component's behavior in production or development environments.
+
+## Environment Variables
+
+The example uses the `wasi:config/runtime` interface to pass environment variables to the Hono app. The `env` object is available in the request context, allowing you to access configuration values in your routes and middleware.
