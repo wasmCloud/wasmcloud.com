@@ -44,12 +44,9 @@ Now that we have all that out of the way, onto the roadmap!
 With our new categories, there are some big pieces of work and some good first issues I’d like to propose to the roadmap:
 
 1. `wash plugins` which allow for us to migrate CLI functionality to Wasm and provide extension points for Cosmonic and power users
-2. External providers, which starts with a simplified binary run and then seamlessly works for containers / external processes that speak wRPC
-3. Exploration and proposals for a configurable platform, finding the right abstraction for running a set of providers and "auto configuration" of links instead of using the wadm app model. (Opportunity for us to reframe the wadm CRD into something else)
-4. Embedding NATS/wasmcloud into `wash dev`, deprecating binary launching via wash up, to drastically simplify deployment and prevent all the issues we have with services running leftover
-5. Show component-based logs in the `wash dev` output OR provide a dashboard (otel or otherwise) that can be used to debug applications
-6. Revisit how we store local data for `wash` (aligning with XDG spec)
-7. Consider builtins or a more all encompassing strategy for wash dev (e.g. using all NATS services by default)
+2. Show component-based logs in the `wash dev` output OR provide a dashboard (otel or otherwise) that can be used to debug applications
+3. Revisit how we store local data for `wash` (aligning with XDG spec)
+4. Consider builtins or a more all encompassing strategy for wash dev (e.g. using all NATS services by default)
 
 ## Features
 
