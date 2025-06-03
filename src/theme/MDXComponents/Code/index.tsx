@@ -1,9 +1,9 @@
+import type { Props } from '@theme/MDXComponents/Code';
+import clsx from 'clsx';
 import type { ComponentProps } from 'react';
 import React from 'react';
-import CopyButton from '@theme/CodeBlock/CopyButton';
-import type { Props } from '@theme/MDXComponents/Code';
+import CopyButton from './CopyButton';
 import codeBlockStyles from './CodeBlock.module.css';
-import clsx from 'clsx';
 
 function shouldBeInline(props: Props): boolean {
   return (
@@ -16,6 +16,28 @@ function shouldBeInline(props: Props): boolean {
   );
 }
 
+function nodeIsReactElement<P extends Record<string, unknown>>(
+  node: React.ReactNode,
+  props?: P,
+): node is React.ReactElement<P> {
+  if (!React.isValidElement(node)) return false;
+
+  const hasAllProps = props && Object.keys(props).every((key) => key in (node.props as object));
+  if (!hasAllProps) return false;
+
+  return true;
+}
+
+function hasClassName(node: React.ReactNode, className: string): boolean {
+  if (!nodeIsReactElement(node)) return false;
+  if (typeof node.props.className !== 'string') return false;
+  return node.props.className.includes(className);
+}
+
+// the `\uFEFF` character is the ZERO WIDTH NO-BREAK SPACE that is invisible in most fonts
+const WHITESPACE_REPLACEMENT_STRING = '\uFEFF \n';
+const WHITESPACE_REPLACEMENT_REGEX = new RegExp(`${WHITESPACE_REPLACEMENT_STRING}\n`, 'g');
+
 function getTextForCopy(node: React.ReactNode): string {
   if (node === null) return '';
 
@@ -26,12 +48,12 @@ function getTextForCopy(node: React.ReactNode): string {
     case 'boolean':
       return '';
     case 'object':
-      if (node instanceof Array) return node.map(getTextForCopy).join('');
-      if ('props' in node) {
-        // skip lines that are "removed" in a diff by adding some recognizable whitespace
-        if (node.props.className?.includes('diff remove')) return '\n \n';
-        return getTextForCopy(node.props.children);
-      }
+      if (node instanceof Array) return React.Children.map(node, getTextForCopy).join('');
+      if (!nodeIsReactElement(node)) return '';
+      // when skipping lines that are "removed" in a diff, we also need to remove the following line, so here we are
+      // adding a recognizable but invisible whitespace character which will be stripped later
+      if (hasClassName(node, 'diff remove')) return WHITESPACE_REPLACEMENT_STRING;
+      return getTextForCopy(React.isValidElement(node.props.children) ? node.props.children : null);
     default:
       return '';
   }
@@ -39,10 +61,10 @@ function getTextForCopy(node: React.ReactNode): string {
 
 function stripDiffSpacer(str: string): string {
   // remove the extra space added to removed lines in diffs
-  return str.replace(/\n \n\n/g, '');
+  return str.replace(WHITESPACE_REPLACEMENT_REGEX, '');
 }
 
-function CodeBlock(props: ComponentProps<'code'>): JSX.Element {
+function CodeBlock(props: ComponentProps<'code'>) {
   const codeRef = React.useRef<HTMLElement>(null);
   const language = props.className?.replace(/language-/, '');
   const code = stripDiffSpacer(getTextForCopy(props.children));
@@ -62,6 +84,6 @@ function CodeBlock(props: ComponentProps<'code'>): JSX.Element {
   );
 }
 
-export default function MDXCode(props): JSX.Element {
+export default function MDXCode(props) {
   return shouldBeInline(props) ? <code {...props} /> : <CodeBlock {...props} />;
 }
