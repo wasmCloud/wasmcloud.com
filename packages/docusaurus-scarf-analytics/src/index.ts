@@ -19,6 +19,15 @@ export default async function docusaurusChecks(
             attributes: {
               src: `https://static.scarf.sh/a.png?x-pxid=${options.pixelId}`,
               alt: '',
+              style: [
+                'display:block',
+                'position:absolute',
+                'top:0',
+                'left:0',
+                'width:1px',
+                'height:1px',
+                'pointer-events:none',
+              ].join(';'),
               referrerpolicy: 'no-referrer-when-downgrade',
             },
           },
