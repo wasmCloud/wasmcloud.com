@@ -74,6 +74,7 @@ const config = (async (): Promise<Config> => {
     },
     future: {
       experimental_faster: true,
+      v4: true,
     },
     url: siteBaseUrl(),
     baseUrl: '/',
