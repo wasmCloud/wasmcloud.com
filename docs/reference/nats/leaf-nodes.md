@@ -22,6 +22,8 @@ The recommended architecture for wasmCloud is a Hub-Spoke model for edge deploym
 
 <!-- ![Hub-Spoke Architecture](TODO_hub_spoke_diagram.png) -->
 
+![Hub-Spoke Architecture, credit to https://www.karanpratapsingh.com/blog/nats-topology](/docs/images/nats-hub-spoke.png)
+
 The Hub-Spoke pattern provides:
 
 - **Low latency** for local communications
@@ -31,16 +33,14 @@ The Hub-Spoke pattern provides:
 
 ### Hub-Spoke-Spoke
 
-<!-- TODO: Replace with proper diagram -->
-
-<!-- ![Hub-Spoke-Spoke Architecture](TODO_hub_spoke_spoke_diagram.png) -->
-
 The Hub-Spoke-Spoke pattern extends the benefits to multi-tier deployments:
 
 - **Cloud-to-edge** connectivity
 - **Multi-region** deployments
 - **Hierarchical routing** with intelligent traffic optimization
 - **Global failover** capabilities
+
+Bridging NATS clusters is a complex topic and it's recommended to familiarize yourself with the [NATS super-cluster with gateways documentation](https://docs.nats.io/running-a-nats-service/configuration/gateways).
 
 ## Benefits
 
