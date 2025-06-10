@@ -1,7 +1,7 @@
 ---
 title: 'Official OCI Artifact List for Capability Providers'
 date: 2018-12-29T11:02:05+06:00
-sidebar_position: 2
+sidebar_position: 5
 draft: false
 ---
 
