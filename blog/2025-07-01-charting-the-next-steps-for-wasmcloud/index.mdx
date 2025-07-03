@@ -1,9 +1,9 @@
 ---
 title: "Charting the next steps for wasmCloud"
 authors: [brooksmtownsend]
-slug: 2025-07-01-charting-the-next-steps-for-wasmcloud
+slug: charting-the-next-steps-for-wasmcloud
 image: './images/blog-header.webp'
-date: "2025-07-01"
+date: "2025-07-03"
 description: "Looking back and looking forward to chart the next steps for wasmCloud." 
 ---
 
@@ -31,11 +31,27 @@ Building language-specific SDKs to provide idiomatic experiences has been extrem
 
 ### What doesn’t work
 
-The idea of an **application**, the main unit of orchestration in our wasmCloud application deployment manager (`wadm`), is not quite right. If you’re a developer deploying one application that contains all of your components and platform capabilities, then there isn’t too much issue here, since everything is in the same deployment. However, once you get to deploying many different microservices, it becomes difficult to take advantage of the density of Wasm. If you separate your microservices into separate applications, you need to run an HTTP server per-component, which goes against the entire density model. If you run them all in the same deployment, you can’t manage and deploy your components independently. The pattern that continues to emerge is that wasmCloud should be configured as a *platform* and then the components are deployed as configured components of that *platform*.
+The less-than-wonderful aspects of wasmCloud 1.x can be organized into a few different categories:
+
+#### The application abstraction
+
+The idea of an **application**, the main unit of orchestration in our wasmCloud application deployment manager (`wadm`), is not quite right. 
+
+If you’re a developer deploying one application that contains all of your components and platform capabilities, then there isn’t too much issue here, since everything is in the same deployment. However, once you get to deploying many different microservices, it becomes difficult to take advantage of the density of Wasm. 
+
+If you separate your microservices into separate applications, you need to run an HTTP server per-component, which goes against the entire density model. If you run them all in the same deployment, you can’t manage and deploy your components independently. The pattern that continues to emerge is that wasmCloud should be configured as a *platform* and then the components are deployed as configured components of that *platform*.
 
 ![Diagram, left == multiple providers multiple components on a host, right == multiple components one provider per host. Moar dense.](./images/platform-application-diagram.png)
 
-Seamless distributed networking is a magical aspect of wasmCloud. In distributed systems, magic is a little scarier than it is desirable. If you bring a component to wasmCloud that imports `wasi:keyvalue`, your component call is *automatically* transformed into a distributed NATS request via [wRPC](https://github.com/bytecodealliance/wrpc). So, instead of a nanosecond in-process call to a host function, it’s subject to transport failure, message loss&mdash;all kinds of different issues. Introducing [`wrpc:error`](https://wasmcloud.com/docs/developer/interfaces/error-handling/) support in our interfaces is key evidence of this, as it provides runtime-level error handling of these transport errors. To be clear, component networking via wRPC is a superpower of wasmCloud’s distributed model, but it should be used intentionally rather than implicitly.
+#### The perils of magic
+
+Seamless distributed networking is a magical aspect of wasmCloud. In distributed systems, magic is a little scarier than it is desirable. 
+
+If you bring a component to wasmCloud that imports `wasi:keyvalue`, your component call is *automatically* transformed into a distributed NATS request via [wRPC](https://github.com/bytecodealliance/wrpc). So, instead of a nanosecond in-process call to a host function, it’s subject to transport failure, message loss&mdash;all kinds of different issues. Introducing [`wrpc:error`](https://wasmcloud.com/docs/developer/interfaces/error-handling/) support in our interfaces is key evidence of this, as it provides runtime-level error handling of these transport errors. 
+
+To be clear, component networking via wRPC is a superpower of wasmCloud’s distributed model, but it should be used intentionally rather than implicitly.
+
+#### Host responsibilities
 
 Speaking of nanosecond in-process calls, wouldn’t it be nice if two components running on the same host that are linked together could call each other's functions *directly* instead of going out to NATS? That’s something that wasmCloud doesn’t have today, but certainly could at its runtime layer.
 
@@ -47,9 +63,17 @@ The wasmCloud host is too complex and responsible for too many aspects beyond ru
 
 At the same time, the complexity of the host complicates development. With recent changes to the `wasmcloud-host` library we’ve moved these concerns out of the host itself and into a `nats` module, which is a step in the right direction. There still is a split between `wadm` and `wasmcloud`, where we have a smart operator that’s responsible for scheduling that breaks instructions down into simple commands that the host needs to rebuild to run components properly. This is a huge area of opportunity for wasmCloud: reduce host responsibility and API surface while leaning into NATS’ distributed capabilities at the `wadm` layer instead.
 
+#### Vestigial packaging utilities
+
 We still use `wascap` and `nkeys`, utilities for signing and packaging wasmCloud-specific artifacts. These solved a problem at the time, but are largely unused in today's wasmCloud deployments.
 
-Regarding Wasm interfaces, much of our maintainer budget and time has gone towards development of standard interfaces and maintaining multiple implementations for those interfaces. The main issue arises when we consider our support of standard interfaces that aren’t yet standardized, like the inclusion of `wasi:logging`, `wasi:keyvalue`, `wasi:blobstore`, and `wasi:messaging` as built-in runtime interfaces. The fault isn’t with the folks working on these standards, nor is it with the wasmCloud maintainers who wanted to give these capabilities to developers since Day 1. The lessons to be learned here are that we shouldn’t attempt to maintain many implementations for interfaces that aren’t standardized yet, nor should we build those into wasmCloud itself, as it makes compensating for breaking changes much more difficult.
+#### Interface maintenance
+
+Regarding Wasm interfaces, much of our maintainer budget and time has gone towards development of standard interfaces and maintaining multiple implementations for those interfaces. 
+
+The main issue arises when we consider our support of standard interfaces that aren’t yet standardized, like the inclusion of `wasi:logging`, `wasi:keyvalue`, `wasi:blobstore`, and `wasi:messaging` as built-in runtime interfaces. The fault isn’t with the folks working on these standards, nor is it with the wasmCloud maintainers who wanted to give these capabilities to developers since Day 1. 
+
+The lessons to be learned here are that we shouldn’t attempt to maintain many implementations for interfaces that aren’t standardized yet, nor should we build those into wasmCloud itself, as it makes compensating for breaking changes much more difficult.
 
 ## Looking ahead
 
