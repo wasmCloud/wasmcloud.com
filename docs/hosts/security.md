@@ -8,6 +8,10 @@ description: 'wasmCloud Ecosystem Security'
 
 wasmCloud embraces a [zero trust](https://en.wikipedia.org/wiki/Zero_trust_networks) security model. With the WebAssembly component model, every function call must be declared and embedded in a component's WIT, giving wasmCloud full ability to deny the component from invoking anything or accessing any resources at runtime. See the [policy service](/docs/deployment/security/policy-service) documentation for information on how to evaluate policies to increase the default security of wasmCloud.
 
+:::warning[Planned changes to claims]
+The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans to overhaul claims in the next major release of wasmCloud, leveraging the OCI specification’s existing support for attestation, and using SPIFFE for workload identity. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4693: “Remove usage of wascap and nkeys.”](https://github.com/wasmCloud/wasmCloud/issues/4639)
+:::
+
 ### Embedding JSON web tokens
 
 Every component in the ecosystem is a WebAssembly component that contains an embedded [JSON Web Token](https://jwt.io/). These tokens have a standard set of required fields, including:
