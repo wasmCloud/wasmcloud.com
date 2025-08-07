@@ -7,6 +7,10 @@ type: 'docs'
 sidebar_position: 2
 ---
 
+:::warning[Planned changes to scheduling]
+The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans for an overhaul to scheduling in the next major release of wasmCloud. The new scheduling API will not use NATS to communicate between components by default, but will still support distributed communication via NATS. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4640: “Intentional distributed networking.”](https://github.com/wasmCloud/wasmCloud/issues/4640)
+:::
+
 The **wasmCloud Application Deployment Manager** (`wadm`) uses the [Open Application Model](https://oam.dev/) to define application specifications. Because the OAM specification is extensible and platform-agnostic, it makes for an ideal way to represent applications with metadata specific to wasmCloud. 
 
 :::note[OAM expertise not required]

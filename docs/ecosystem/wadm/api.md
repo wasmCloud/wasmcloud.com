@@ -7,16 +7,14 @@ type: 'docs'
 sidebar_position: 4
 ---
 
+:::warning[Planned changes to scheduling]
+The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans for an overhaul to scheduling in the next major release of wasmCloud. The new scheduling API will not use NATS to communicate between components by default, but will still support distributed communication via NATS. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4640: “Intentional distributed networking.”](https://github.com/wasmCloud/wasmCloud/issues/4640)
+:::
+
 The most common way to interact with a Wadm installation (which could be a single server or a
 cluster) is through the [wash](/docs/ecosystem/wadm/usage/) command-line tool or the [Rust client
 crate](https://docs.rs/wadm-client/latest/wadm_client/). However, if you are planning on creating
 your own integration or writing a non-Rust language binding, then this reference will help.
-
-:::warning
-**The wadm API is not currently 1.0**. This means the API is likely to undergo changes and there may
-be some pieces that aren't yet implemented. This document will be updated as we continue to work on
-the API. All API changes will also be communicated via the release notes for wadm.
-:::
 
 Please note that in production deployments, you will likely be using separate NATS credentials for
 accessing wadm. Please see the [operator guide](/docs/deployment/wadm/) for more information for running
