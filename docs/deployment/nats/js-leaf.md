@@ -3,6 +3,10 @@ title: 'Leaf Node Config (JetStream)'
 sidebar_position: 3
 ---
 
+:::warning[Planned changes to scheduling]
+The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans for an overhaul to scheduling in the next major release of wasmCloud. The new scheduling API will not use NATS to communicate between components by default, but will still support distributed communication via NATS. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4640: “Intentional distributed networking.”](https://github.com/wasmCloud/wasmCloud/issues/4640)
+:::
+
 NATS leaf nodes are a simple concept but they enable an incredible amount of power, flexibility, and use cases. A leaf node allows NATS servers to bridge or join security domains. On any given server, you can set up [leaf node remotes](https://docs.nats.io/running-a-nats-service/configuration/leafnodes) that tether one account space on one side of the node to a different account space on the other side of the node.
 
 This simplicity and power makes leaf nodes work like a universal connector for stitching together disparate infrastructures and they are part of the magic sauce that makes wasmCloud lattices so powerful.

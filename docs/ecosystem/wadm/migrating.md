@@ -7,6 +7,10 @@ type: 'docs'
 sidebar_position: 5
 ---
 
+:::warning[Planned changes to scheduling]
+The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans for an overhaul to scheduling in the next major release of wasmCloud. The new scheduling API will not use NATS to communicate between components by default, but will still support distributed communication via NATS. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4640: “Intentional distributed networking.”](https://github.com/wasmCloud/wasmCloud/issues/4640)
+:::
+
 The manifest format changed between wasmCloud `0.82.0` and wasmCloud `1.0.0`, and this page aims to guide you through converting your manifest to the latest compatible format. This page assumes that any [components](/docs/concepts/components.mdx) you specify in your manifest are built using WIT interfaces.
 
 ## Component changes

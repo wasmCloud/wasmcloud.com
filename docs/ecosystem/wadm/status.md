@@ -7,6 +7,10 @@ type: 'docs'
 sidebar_position: 4
 ---
 
+:::warning[Planned changes to scheduling]
+The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans for an overhaul to scheduling in the next major release of wasmCloud. The new scheduling API will not use NATS to communicate between components by default, but will still support distributed communication via NATS. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4640: “Intentional distributed networking.”](https://github.com/wasmCloud/wasmCloud/issues/4640)
+:::
+
 This page details the four different statuses that an application can have and what they mean. You will see the status of each application on the summary view of `wash app list`, or for an individual application by running `wash app status <app_name>`.
 
 ## Undeployed
