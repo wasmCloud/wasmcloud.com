@@ -15,6 +15,10 @@ A [provider archive](/docs/reference/glossary#provider-archive) (also called a _
 
 A provider archive can be uploaded to, or downloaded from, OCI registries.
 
+:::warning[Planned changes to claims]
+The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans to overhaul claims in the next major release of wasmCloud, leveraging the OCI specification’s existing support for attestation, and using SPIFFE for workload identity. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4693: “Remove usage of wascap and nkeys.”](https://github.com/wasmCloud/wasmCloud/issues/4639)
+:::
+
 ## Build
 
 Providers are always compiled in "release" mode. `wash` has support to compile a capability provider for your native target with `wash build`, as long as a [wasmcloud.toml](/docs/reference/config/) file is present. The following section will continue on from the [Create](/docs/developer/providers/create/) page where we built a NATS messaging provider, but you can follow the same steps for any capability provider project.
