@@ -5,6 +5,12 @@ sidebar_position: 2
 draft: false
 ---
 
+:::warning[Planned changes to providers]
+The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans for an overhaul to capability providers in the next major release of wasmCloud. This overhaul transitions providers to a "wRPC server" model in which WIT interfaces are served via one of the transports available with wRPC (e.g., TCP, NATS, QUIC, or UDP), enabling capability implementations to be written in any language and to be deployed independently in containers. 
+
+For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7), [Issue #4642: “Transition the capability provider model into support for wRPC servers,”](https://github.com/wasmCloud/wasmCloud/issues/4642) and [Issue #4636: "Support configuring a wasmCloud host with shared capability providers."](https://github.com/wasmCloud/wasmCloud/issues/4636)
+:::
+
 A [provider archive](/docs/reference/glossary#provider-archive) (also called a _par file_) is an archive file (in unix 'tar' format) containing platform-specific executable files for a variety of CPU and OS combinations. A typical provider archive file contains executables for 64-bit Linux, x86_64 macOs, aarch64 macOs, and other supported platforms. The par file includes a cryptographically signed JSON Web Token (JWT) that contains a set of claims attestations for the capability provider.
 
 A provider archive can be uploaded to, or downloaded from, OCI registries.

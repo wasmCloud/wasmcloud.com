@@ -5,6 +5,12 @@ sidebar_position: 4
 draft: false
 ---
 
+:::warning[Planned changes to providers]
+The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans for an overhaul to capability providers in the next major release of wasmCloud. This overhaul transitions providers to a "wRPC server" model in which WIT interfaces are served via one of the transports available with wRPC (e.g., TCP, NATS, QUIC, or UDP), enabling capability implementations to be written in any language and to be deployed independently in containers. 
+
+For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7), [Issue #4642: “Transition the capability provider model into support for wRPC servers,”](https://github.com/wasmCloud/wasmCloud/issues/4642) and [Issue #4636: "Support configuring a wasmCloud host with shared capability providers."](https://github.com/wasmCloud/wasmCloud/issues/4636)
+:::
+
 You can publish your provider to any OCI compliant registry that supports **OCI artifacts**. These artifacts are not container images, but conform to OCI standards and may be stored on any OCI-compatible registry. See the [Packaging](/docs/concepts/packaging.mdx) page for more details on how the wasmCloud ecosystem uses OCI artifacts for packaging.
 
 First-party wasmCloud providers are [hosted on GitHub Packages](https://ghcr.io/wasmcloud/wasmcloud), but any OCI-compliant registry is supported. 
