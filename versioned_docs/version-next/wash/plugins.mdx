@@ -1,0 +1,98 @@
+---
+title: "Plugins"
+sidebar_position: 3
+---
+
+# Wasm Shell Plugins
+
+The Wasm Shell (`wash`) CLI is extensible via a component-driven plugin system. New integrations and functionality can be implemented across any language that compiles to a WebAssembly component target, and then the component can plug in directly to `wash`.
+
+## Built-in Plugins
+
+`wash` comes with a few built-in plugins for functionality like using the `wasi-blobstore interface` in `wash dev` sessions or facilitating OAuth. Plugin discovery is automatic, so those plugins being "built-in" simply means that they are included "out of the box." 
+
+## Subcommands
+
+The `wash plugin` command takes the following subcommands:
+
+* `install` - Install a plugin from an OCI reference or file
+* `uninstall` - Uninstall a plugin
+* `list` - List installed plugins
+* `test` - Test a plugin
+
+### Install a plugin
+
+Install a plugin from an OCI reference or file:
+
+```shell
+wash plugin install <SOURCE>
+```
+
+See the command reference for [complete command options](./commands.mdx#wash-plugin-install).
+
+### Uninstall a plugin
+
+Uninstall a plugin by name:
+
+```shell
+wash plugin uninstall <NAME>
+```
+
+See the command reference for [complete command options](./commands.mdx#wash-plugin-uninstall).
+
+### List installed plugins
+
+List installed plugins:
+
+```shell
+wash plugin list
+```
+
+See the command reference for [complete command options](./commands.mdx#wash-plugin-list).
+
+### Test a plugin
+
+Test a plugin by filepath to the component or component project, and the argument you wish to pass to the plugin:
+
+```shell
+wash plugin test <PLUGIN> <ARG>
+```
+
+See the command reference for [complete command options](./commands.mdx#wash-plugin-test).
+
+## Developing plugins
+
+:::warning[Under rapid development]
+The plugin model is under rapid development, and the `wasmcloud:wash/plugin` interface is subject to regular changes. Feedback on the interface is [welcome on the `wash` Issues page](https://github.com/wasmCloud/wash/issues).
+:::
+
+Wasm Shell plugins are standard component projects, with a `wit` directory and WIT world defining imports and exports. You can find examples in [the plugins subfolder on GitHub](https://github.com/wasmCloud/wash/tree/main/plugins).
+
+Plugins export on the [`wasmcloud:wash/plugin` interface](https://github.com/wasmCloud/wash/blob/main/plugins/blobstore-filesystem/wit/deps/wasmcloud-wash-0.0.1/package.wit), and have access to the following WASI interfaces:
+
+1. `wasi@0.2` core interfaces (`cli`, `filesystem`, `io`)
+2. `wasi:http/incoming-handler`: Enables command plugins (see below) to support use-cases for components that can be interacted with over HTTP
+4. `wasi:http/outgoing-handler`: To make outgoing HTTP requests
+5. `wasi:config/runtime`: For configuration fetching
+6. `wasi:logging/logging`: For structured/leveled output
+
+`wash` plugins are integrated into multiple places in the lifecycle of the CLI:
+
+### Hooks 
+
+Plugins can run at various hook points before and after any built-in `wash` command:
+1. `BeforeDev`: Before a `wash dev` session (e.g., Launch an OTEL dashboard for tracing/logging/metrics data)
+2. `BeforePush`: Before an OCI push (e.g., Add an additional annotation onto the OCI artifact config)
+3. `AfterBuild`: After a Wasm binary build (e.g., Use `cosign` to sign a component)
+4. `AfterDev`: After a `wash dev` session (e.g., Inspect the built component and generate a deployment manifest for it)
+
+### Commands
+
+Plugins can also register top-level commands in `wash`, or register top-level commands with a list of subcommands. 
+
+Command plugins are registered directly into the CLI parsing and appear just like built-in commands, but they execute as component plugins. For example, the `oauth` plugin launches an HTTP server on execution of the command. Command plugins do not have their own hooks.
+
+You can see the hook and command flow in the diagram below:
+
+![wash plugin flow](./images/plugin-flow.png)
+

@@ -1,0 +1,389 @@
+---
+title: 'Developer Guide'
+date: 2025-09-10T12:00:00+00:00
+sidebar_position: 0
+draft: false
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import HubspotForm from 'react-hubspot-form';
+
+**Wasm Shell** (`wash`) is the comprehensive command-line tool for developing, building, and publishing WebAssembly components. 
+
+In this guide, you'll learn how to:
+
+* Create a new WebAssembly component project in Rust, Go (TinyGo), or JavaScript (TypeScript)
+* Start a development loop for your component project
+* Compile your project to a WebAssembly component binary
+* Publish your component to an OCI registry
+
+## Prerequisites
+
+This guide requires Wasm Shell (`wash`) and the language toolchain for your language of choice. 
+
+To get started:
+
+* [Install Wasm Shell (`wash`)](../get-started.mdx).
+* Run `wash doctor` to check your system for development dependencies.
+
+## Create a new component project
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust" default>
+
+Let's create a component that accepts an HTTP request and responds with "Hello from Rust!" 
+
+Use `wash new` to create a new component project from a template: 
+
+```shell
+wash new
+```
+
+* Select **Rust**
+* Select **http-hello-world**
+* Type `y` or press return
+</TabItem>
+
+<TabItem value="tinygo" label="TinyGo">
+Let's create a component that accepts an HTTP request and responds with "Hello from Go!" 
+
+Use `wash new` to create a new component project from a template: 
+
+```shell
+wash new
+```
+
+* Select **TinyGo**
+* Select **http-hello-world**
+* Type `y` or press return
+
+</TabItem>
+
+<TabItem value="typescript" label="TypeScript">
+Let's create a component that accepts an HTTP request and responds with "Hello from TypeScript!"  
+
+Use `wash new` to create a new component project from a template: 
+
+```shell
+wash new hello --git https://github.com/wasmCloud/typescript.git --subfolder examples/components/http-hello-world
+```
+
+This command...
+
+* Creates a new project named `hello`...
+* Based on a template found in the `wasmCloud/typescript` Git repository...
+* In the subfolder `examples/components/http-hello-world`
+</TabItem>
+
+<TabItem value="other" label="Other">
+
+We're looking to add more examples in languages that support Wasm components. If you prefer working in a language that isn't listed here, let us know!
+
+{' '}
+
+<div style={{ display: 'flex', flexDirection: 'row' }}>
+  <div style={{ width: '100%' }}>
+    <HubspotForm
+      portalId="20760433"
+      formId="71e74f55-cc30-41de-9d41-e3d9dc159c71"
+      onSubmit={() => console.log('Submitted form')}
+      onReady={(form) => console.log('Form ready for submit')}
+      region="na1"
+      loading={<div>Loading...</div>}
+    />
+  </div>
+</div>
+
+</TabItem>
+</Tabs>
+
+Navigate to the new `http-hello-world` directory and take a look at the generated project. 
+
+## Anatomy of a component project
+
+Component projects are made up of three primary parts:
+
+* **Application code** in your language of choice
+* **Interfaces**: language-agnostic APIs that enable components to interact 
+* **Bindings** that translate your interfaces to the language of your application code
+
+![Anatomy of a component](../images/component-anatomy.png)
+
+### Interfaces
+
+Interfaces are APIs written in [WebAssembly Interface Type (WIT)](https://component-model.bytecodealliance.org/design/wit.html). The WIT files (`.wit`) that make up an interface are typically stored in a `/wit` folder at the root of a project.
+
+Interfaces define contracts between entities that ultimately express a piece of functionality in terms of **imports** and **exports**: 
+
+* **Imports** express a dependency: "I need another entity to fulfill this functionality." 
+* **Exports** express a function exposed to other entities: "I can take care of this functionality."
+
+For example, a component *exporting* on an **HTTP Incoming Handler** interface is exposing a function with an assertion that it can handle incoming HTTP requests.  
+
+By contrast, a component *importing* a **Key-Value Storage** interface is expressing that it requires another entity to expose key-value functionality on the same interface. 
+
+The **WebAssembly System Interface (WASI)** is a group of standards-track interface specifications under development by the WASI Subgroup in the W3C WebAssembly Community Group. WASI interfaces provide standard, namespaced APIs for common functionality, such as [`wasi:http`](https://github.com/WebAssembly/wasi-http).
+
+We'll be using `wasi:http` throughout the rest of this tutorial. 
+
+**Note**: In the definitions above, "entities" often means other WebAssembly components, but not always&mdash;any piece of software could theoretically interact over a WIT interface, and common imports like `wasi:io` or `wasi:logging` are often fulfilled by WebAssembly runtime environments.
+
+:::info[Further reading]
+* Learn more about **WebAssembly Interface Type (WIT)** in the [Component Model documentation](https://component-model.bytecodealliance.org/design/wit.html).
+* Learn more about the **WebAssembly System Interface (WASI)** at [WASI.dev](https://wasi.dev/).
+:::
+
+### Bindings
+
+Interfaces defined in WIT are language-agnostic, so they must be translated to a given language via **bindings**. 
+
+Bindings are generated a bit differently across different languages, but ultimately `wash` and the underlying language toolchain will handle binding generation automatically when you run `wash dev` or `wash build`.
+
+:::info
+If you use an IDE that comes with code completion and hover-tooltips, you'll be able to see documentation and get strongly-typed guidance as you develop code to interact with WASI interfaces and language-specific bindings. For more Wasm developer tooling, see [Useful WebAssembly Tools](./useful-webassembly-tools.mdx).
+:::
+
+## Explore the code
+
+A component's imports and exports are defined in a **WIT world**. You can find this project's WIT world at `./wit/world.wit`:
+
+```wit
+package wasmcloud:hello;
+
+world hello {
+   export wasi:http/incoming-handler@0.2.2;
+}
+```
+
+This component exports on one interface: `wasi:http/incoming-handler`. This means it can *only* interact with other entities by handling incoming HTTP requests, according to contracts defined in v0.2.2 of the `wasi:http` interface. 
+
+It also means that the component *must* export on this interface in order to compile successfully.
+
+Now let's take a look at the application code.
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust" default>
+
+The file `src/lib.rs` imports the `wasmcloud_component` crate and consists of a `Component` struct, an HTTP export, and an `impl` block that implements `http::Server` for the `Component` struct. We'll walk through these sections in detail.
+
+```rust
+use wasmcloud_component::http;
+```
+
+The [`wasmcloud_component`](https://crates.io/crates/wasmcloud-component) crate is a library that abstracts and simplifies the usage of standard interfaces like `wasi:http`, providing utilities familiar to
+Rust developers based on standard ecosystem types rather than the robust (but often verbose) fully generated `wasi:http` bindings.
+
+:::info
+You do not need to use a wasmCloud-specific SDK to build components, and this example will work directly with any WebAssembly runtime that supports the Wasm component model.
+:::
+
+These two imports are bringing in the `Guest` trait to implement our function to be called whenever an incoming HTTP request is received, and the types that we'll use to interact with the HTTP request and response. These are the only two imports that we need to interact with the HTTP server capability.
+
+```rust
+struct Component;
+
+http::export!(Component);
+
+impl http::Server for Component {
+    fn handle(
+        _request: http::IncomingRequest,
+    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
+        Ok(http::Response::new("Hello from Rust!\n"))
+    }
+}
+```
+
+Within the `handle` method, the component receives the HTTP request, creates a response, and writes that response back to the requesting HTTP client (such as a `curl` command or a web browser).
+
+Finally, we use the macro `export!` to specify that the `Component` struct will handle calls over the `wasi:http/incoming-handler` interface that this component exports.
+
+```rust
+export!(HttpServer);
+```
+</TabItem>
+
+<TabItem value="tinygo" label="TinyGo">
+The file `main.go` includes imports, `init` and `handleRequest` functions, and an empty `main` function. 
+
+We'll walk through these pieces in depth.
+
+```go
+//go:generate go tool wit-bindgen-go generate --world hello --out gen ./wit
+
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"go.wasmcloud.dev/component/net/wasihttp"
+)
+
+func init() {
+	// Register the handleRequest function as the handler for all incoming requests.
+	wasihttp.HandleFunc(handleRequest)
+}
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Hello from Go!\n")
+}
+
+// Since we don't run this program like a CLI, the `main` function is empty. Instead,
+// we call the `handleRequest` function when an HTTP request is received.
+func main() {}
+```
+
+* **The Go directive at the very top** ensures that when we build our project with `tinygo build`, the `wit-bindgen-go` tool will be run to generate the bindings for our component from the `hello` WIT world found in the `./wit` directory. Bindings will be generated in the `gen` directory.
+* **In the import section**, we import Go's standard `fmt` and `net/http` libraries. We also import the `wasihttp` package, which provides an implementation of `http.Handler` backed by `wasi:http`&mdash;enabling us to write idiomatic Go using a language-agnostic WASI interface.
+* **In the `init` section**, we set the `handleRequest` function to handle incoming HTTP requests.
+* **In the `handleRequest` function**, we respond to an HTTP request by printing `Hello from Go!`
+* **The main function is empty**, since the component doesn't run like a CLI, but instead runs the `handleRequest` function when triggered by an HTTP request.
+
+## Add a configuration file
+
+To start a developer loop or build a component binary from a Go project, `wash` requires the project's WIT world to be specified in a [configuration file](../config.mdx) called `config.json` at `/.wash`. (When you try to build without a config file, `wash` will prompt you, but we'll go ahead and get it out of the way.)
+
+Create the config file:
+
+```shell
+mkdir .wash && touch ./.wash/config.json
+```
+
+Add the contents below to `config.json`, specifying your WIT world as `hello`:
+
+```json
+{
+  "build": {
+    "tinygo": {
+      "target": "wasip2",
+      "build_flags": [],
+      "disable_go_generate": false,
+      "scheduler": "asyncify",
+      "gc": "conservative",
+      "opt": "z",
+      "panic": "print",
+      "tags": [],
+      "no_debug": true,
+      "wit_world": "hello"
+    },
+    "artifact_path": "build/output.wasm"
+  }
+}
+```
+
+</TabItem>
+
+<TabItem value="typescript" label="TypeScript">
+The file `http-hello-world.ts` will include imports and a `handle` function exported under `incomingHandler`. Let's walk through these pieces in depth.
+
+```typescript
+import {
+  IncomingRequest,
+  ResponseOutparam,
+  OutgoingBody,
+  OutgoingResponse,
+  Fields,
+} from 'wasi:http/types@0.2.0';
+```
+
+The import section of this file imports our generated types (from `jco`) for the WASI HTTP interface.
+
+```typescript
+// Implementation of wasi-http incoming-handler
+//
+// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
+function handle(req: IncomingRequest, resp: ResponseOutparam) {
+  // Start building an outgoing response
+  const outgoingResponse = new OutgoingResponse(new Fields());
+
+  // Access the outgoing response body
+  let outgoingBody = outgoingResponse.body();
+  {
+    // Create a stream for the response body
+    let outputStream = outgoingBody.write();
+    // Write hello world to the response stream
+    outputStream.blockingWriteAndFlush(
+      new Uint8Array(new TextEncoder().encode('Hello from Typescript!\n')),
+    );
+    // @ts-ignore: This is required in order to dispose the stream before we return
+    outputStream[Symbol.dispose]();
+  }
+
+  // Set the status code for the response
+  outgoingResponse.setStatusCode(200);
+  // Finish the response body
+  OutgoingBody.finish(outgoingBody, undefined);
+  // Set the created response
+  ResponseOutparam.set(resp, { tag: 'ok', val: outgoingResponse });
+}
+```
+
+The core logic is contained within the `handle` function, where the component receives the HTTP request, creates an `OutgoingResponse` and writes that response back out to the requesting HTTP client (such as a `curl` command or a web browser).
+
+```typescript
+export const incomingHandler = {
+  handle,
+};
+```
+
+Lastly, this export statement includes the `handle` function under the `incomingHandler` interface, which matches the `wasi:http/incoming-handler` interface declared in the application's [WIT file](https://github.com/wasmCloud/typescript/blob/main/examples/components/http-hello-world/wit/world.wit).
+
+</TabItem>
+
+<TabItem value="other" label="Other">
+
+We're looking to add more examples in languages that support Wasm components. If you prefer working in a language that isn't listed here, let us know!
+
+{' '}
+
+<div style={{ display: 'flex', flexDirection: 'row' }}>
+  <div style={{ width: '100%' }}>
+    <HubspotForm
+      portalId="20760433"
+      formId="71e74f55-cc30-41de-9d41-e3d9dc159c71"
+      onSubmit={() => console.log('Submitted form')}
+      onReady={(form) => console.log('Form ready for submit')}
+      region="na1"
+      loading={<div>Loading...</div>}
+    />
+  </div>
+</div>
+
+</TabItem>
+</Tabs>
+
+:::info[Something's missing]
+Note what's _not_ included in this code: 
+
+* The code is _not_ tightly coupled to any particular HTTP server. It returns an abstraction of an HTTP response. 
+* You don't see the port number or server configuration options anywhere in the code. 
+
+This style of **interface driven development** enables you to write application logic in the language of your choice without having to worry about the non-functional requirements of your application. 
+:::
+
+## Start a development loop
+
+Now we'll start a development loop that runs the component, watches for modifications to the code, and refreshes when we make changes. 
+
+```shell
+wash dev
+```
+
+Now we can send a request to `localhost:8000` with `curl` (in a new tab), or by visiting the address in our browser. 
+
+```shell
+curl localhost:8000
+```
+
+You should see:
+
+```text
+Hello from <your language>
+```
+
+You can stop the development loop with CTRL+C.
+
+## Next steps
+
+In the [next section](./build-and-publish.mdx), we'll compile a component to a `.wasm` binary and publish the artifact to an OCI registry.

@@ -1,0 +1,150 @@
+---
+title: "Configuration"
+sidebar_position: 4
+---
+# Wasm Shell Build Configuration
+
+Wasm Shell builds WebAssembly component binaries by wrapping language-specific utilities like `cargo`, `go`, `npm`, etc. Component builds can be configured via a `config.json` file. 
+
+* Configuration is optional for Rust and TypeScript builds.
+* At the moment, configuration is required for Go (TinyGo) builds.
+
+## Configuration for TinyGo builds
+
+TinyGo builds require a `config.json` configuration file that is stored by default in a `.wash` subfolder of your project directory. This file is required in order to specify the WIT world used by the component.
+
+If you attempt to build without a configuration file, `wash` will generate a `config.json` file at `./.wash/config.json` and return this message:
+
+```text
+TinyGo builds require wit_world to be specified in the configuration. A config file has been created at ./.wash/config.json with a placeholder. Please update the wit_world field to match your WIT world name.
+```
+
+A simple `config.json` file looks like this:
+
+```json {13}
+{
+  "build": {
+    "tinygo": {
+      "target": "wasip2",
+      "build_flags": [],
+      "disable_go_generate": false,
+      "scheduler": "asyncify",
+      "gc": "conservative",
+      "opt": "z",
+      "panic": "print",
+      "tags": [],
+      "no_debug": true,
+      "wit_world": "PLACEHOLDER_WIT_WORLD"
+    },
+    "artifact_path": "build/output.wasm"
+  }
+}
+```
+
+The `wit_world` field of `config.json` should specify the root WIT world in your `./wit` subfolder, often contained in a `world.wit` file. 
+
+In the example below, the WIT world is `hello`:
+
+```wit {2}
+package wasmcloud:hello;
+world hello {
+  include wasmcloud:component-go/imports@0.1.0;
+  import wasi:logging/logging@0.1.0-draft;
+  import wasi:keyvalue/atomics@0.2.0-draft;
+  import wasi:keyvalue/store@0.2.0-draft;
+  export wasi:http/incoming-handler@0.2.0;
+}
+```
+
+The component should compile after updating `config.json`:
+
+```json
+{
+  "build": {
+    "tinygo": {
+      "target": "wasip2",
+      "build_flags": [],
+      "disable_go_generate": false,
+      "scheduler": "asyncify",
+      "gc": "conservative",
+      "opt": "z",
+      "panic": "print",
+      "tags": [],
+      "no_debug": true,
+      "wit_world": "PLACEHOLDER_WIT_WORLD" // [!code --]
+      "wit_world": "hello" // [!code ++]
+    },
+    "artifact_path": "build/output.wasm"
+  }
+}
+```
+
+TinyGo builds use Go, TinyGo, and `wasm-tools`. Configuration fields for TinyGo builds include:
+
+* `target`: Virtual architecture target for the WebAssembly binary. [default: `wasip2`]
+* `build_flags`: TinyGo build flags
+* `disable_go_generate`: Boolean setting for automatically generating Go bindings from WIT interfaces. [default: `false`]
+* `scheduler`: Scheduler to use for TinyGo builds. **Note:** asyncify is a Wasm-specific scheduler and should be used in most cases. ([See TinyGo options for more details](https://tinygo.org/docs/reference/usage/important-options/).) [default: `asyncify`]
+* `gc`: Memory manager selection. ([See TinyGo options for more details](https://tinygo.org/docs/reference/usage/important-options/).) [default: `conservative`]
+* `opt`: Optimization level. ([See TinyGo options for more details](https://tinygo.org/docs/reference/usage/important-options/).) [default: `z`]
+* `panic`: Panic strategy. ([See TinyGo options for more details](https://tinygo.org/docs/reference/usage/important-options/).) [default: `print`]
+* `tags`: Go build tags
+* `no_debug`: Boolean setting for debug mode [default: `true`]
+* `wit_world`: Target WIT world
+* `artifact_path`: Target path for WebAssembly binary output [default: `build/output.wasm`]
+
+:::warning[Common issues]
+For solutions to common issues with TinyGo builds, see the [Frequently Asked Questions (FAQ)](./faq.mdx).
+:::
+
+## Configuration for Rust builds
+
+When you build a WebAssembly component from a Rust project, `wash` automatically generates a `config.json` file at `./.wash/config.json`:
+
+```json
+{
+  "build": {
+    "rust": {
+      "target": "wasm32-wasip2",
+      "cargo_flags": [],
+      "release": false,
+      "features": [],
+      "no_default_features": false
+    }
+  }
+}
+```
+
+Configuration fields for Rust builds include:
+
+* `target`: Virtual architecture target for the WebAssembly binary [default: `wasm32-wasip2`]
+* `cargo_flags`: cargo build flags
+* `release`: Boolean setting for building in release mode [default: `false`]
+* `features`: Defined features
+* `no_default_features`: Boolean setting for excluding default features [default: `false`]
+
+## Configuration for TypeScript builds
+
+When you build a WebAssembly component from a TypeScript project, `wash` automatically generates a `config.json` file at `./.wash/config.json`:
+
+```json
+{
+  "build": {
+    "typescript": {
+      "package_manager": "npm",
+      "build_command": "build",
+      "build_flags": [],
+      "skip_install": false,
+      "source_maps": false
+    }
+  }
+}
+```
+
+Configuration fields for TypeScript builds include:
+
+* `package_manager`: Package manager to use for builds [default: `npm`]
+* `build_command`: Command to use for builds [default: `build`]
+* `build_flags`: TypeScript build flags
+* `skip_install`: Boolean setting for skipping initial install step [default: `false`]
+* `source_maps`: Boolean setting for generating source maps [default: `false`]
