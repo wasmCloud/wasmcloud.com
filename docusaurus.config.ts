@@ -116,6 +116,11 @@ const config = (async (): Promise<Config> => {
               current: {
                 label: '1.x',
               },
+              next: {
+                label: 'next',
+                path: 'next',
+                banner: 'none'
+              },
               0.82: {
                 label: '0.82',
                 path: '0.82',

@@ -1,0 +1,162 @@
+---
+title: "FAQ"
+sidebar_position: 6
+---
+# Wasm Shell Frequently Asked Questions (FAQ)
+
+## General Questions
+
+**How can I run components built with Wasm Shell?**
+
+You can use `wash` to create and publish WebAssembly components for any runtime or runtime environment that supports the [WebAssembly Component Model](https://component-model.bytecodealliance.org/), including wasmCloud, Spin, jco, wasmtime, and others.
+
+## Differences from `wash` v0.x
+
+**What are the differences between __Wasm Shell__ (`wash` v1.x and higher) and __wasmCloud Shell__ (`wash` v0.x and below)?**
+
+**wasmCloud Shell**, the previous iteration of `wash`, was designed as a utility for building WebAssembly components *and* managing wasmCloud deployments. 
+
+**Wasm Shell** (`wash` v1.x and higher) is designed to follow the Unix principle of "doing one thing and doing it well"&mdash;in this case, it is a dedicated utility for WebAssembly component development. Wasm Shell is designed to be extensible via plugins and usable across the Wasm ecosystem. 
+
+This means that many commands and features that were available in `wash` v0.x are not included in Wasm Shell, but may be implemented via plugins. 
+
+The table below outlines major differences in versions:
+
+| FEATURE                                          | Wasm Shell (v1.x and higher)       | wasmCloud Shell (v0.x and below)   | Notes                                                                             |
+| ------------------------------------------------ | ---------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
+| Create a Wasm component project                  | Yes, with `wash new`               | Yes, with `wash new component`     |                                                                                   |
+| Start a development server                       | Yes, with `wash dev`               | Yes, with `wash dev`               |                                                                                   |
+| Build a Wasm binary                              | Yes, with `wash build`             | Yes, with `wash build`             |                                                                                   |
+| Push a component to registry as an OCI artifact  | Yes, with `wash oci push`          | Yes, with `wash push`              | Wasm Shell uses the `oras` library&mdash;learn more in the Registries docs        |
+| Pull a component OCI artifact from a registry    | Yes, with `wash oci pull`          | Yes, with `wash pull`              | Wasm Shell uses the `oras` library&mdash;learn more in the Registries docs        |
+| Extend `wash` via component plugin               | Yes, with `wash plugin`            | Limited experimental support       |                                                                                   |
+| Self-update `wash`                               | Yes, with `wash update`            | No                                 |                                                                                   |
+| Check for component development dependencies     | Yes, with `wash doctor`            | No                                 |                                                                                   |
+| Inspect a component's WIT                        | Yes, with `wash inspect`           | Yes, with `wash inspect`           |                                                                                   |
+| Create a wasmCloud capability provider           | No                                 | Yes, with `wash new provider`      | The capability provider model is being overhauled&mdash;learn more in the Roadmap |
+| Run and manage a wasmCloud host                  | No, may be implemented via plugin  | Yes, with `wash up` and others     |                                                                                   |
+| Washboard UI                                     | No, may be implemented via plugin  | Yes, with `wash ui`                |                                                                                   |
+
+## Troubleshooting
+
+**I'm getting the error `failed to initialize plugin manager` when I run a command&mdash;what could be causing this?**
+
+If you've updated `wash`, changes to WIT may be acting as a breaking change. To address the error, uninstall your plugins, then build and reinstall the plugins.
+
+### Building with TinyGo
+
+**Do I need to use a configuration file for TinyGo builds?**
+
+Yes. TinyGo builds require a `config.json` configuration file that is stored by default in a `.wash` subfolder of your project directory. This file is required in order to specify the WIT world used by the component.
+
+If you attempt to build without a configuration file, `wash` will create a `config.json` file at `./.wash/config.json` and return this message:
+
+```text
+TinyGo builds require wit_world to be specified in the configuration. A config file has been created at ./.wash/config.json with a placeholder. Please update the wit_world field to match your WIT world name.
+```
+
+For instructions on configuring a TinyGo build, see [Configuration](./config.mdx).
+
+#### Common issues with TinyGo builds
+
+There are a number of common issues with TinyGo builds that can be difficult to interpret based on error messages:
+
+##### Missing Function Export
+
+```shell
+error: failed to encode a component from module
+Caused by:
+    0: failed to decode world from module
+    1: module was not valid
+    2: failed to find export of interface `wasmcloud:wash/plugin@0.0.1` function `info`
+`wasm-tools component new` failed: exit status 1
+```
+**What happened:** You didn't export a function that's required by your WIT world definition.
+
+**What to do:** Update your Go code to export all functions required in your WIT world, or remove extraneous functions from your WIT world definition.
+
+##### Imports Not Generated Properly
+
+```shell
+error: failed to encode a component from module
+Caused by:
+    0: failed to decode world from module
+    1: module was not valid
+    2: failed to resolve import `wasi:http/outgoing-handler@0.2.0::handle`
+    3: module requires an import interface named `wasi:http/outgoing-handler@0.2.0`
+`wasm-tools component new` failed: exit status 1
+```
+**What happened:** You don't have your imports generated properly.
+
+**What to do:** Re-generate imports, attempt to build again, and debug imports if unsuccessful.
+
+##### WIT Files Not Available
+
+```shell                  
+error: failed to read path for WIT [./wit]
+Caused by:
+    0: No such file or directory (os error 2)
+`wasm-tools component embed` failed: exit status 1
+```
+**What happened:** Your WIT files aren't available at the specified path.
+
+**What to do:** Ensure that your WIT files are available at the specified path.
+
+##### Importing Unsupported Interface
+
+```shell
+failed to pre-instantiate component
+Caused by:
+    0: component imports instance `wasi:http/types@0.2.0`, but a matching implementation was not found in the linker
+    1: instance export `fields` has the wrong type
+    2: resource implementation is missing
+```
+**What happened:** You are importing an interface that `wash` doesn't know about.
+
+**What to do:** If you believe `wash` should support the interface, [file an issue on GitHub](https://github.com/wasmCloud/wash/issues/new).
+
+##### Missing WIT Interface Definition
+
+```shell
+ERROR tinygo build failed stderr=error: failed to encode a component from module
+Caused by:
+    0: failed to decode world from module
+    1: module was not valid
+    2: failed to resolve import `wasi:logging/logging@0.1.0-draft::log`
+    3: module requires an import interface named `wasi:logging/logging@0.1.0-draft`
+`wasm-tools component new` failed: exit status 1
+TinyGo build failed: error: failed to encode a component from module
+Caused by:
+    0: failed to decode world from module
+    1: module was not valid
+    2: failed to resolve import `wasi:logging/logging@0.1.0-draft::log`
+    3: module requires an import interface named `wasi:logging/logging@0.1.0-draft`
+`wasm-tools component new` failed: exit status 1
+```
+**What happened:** `wash` could not find the WIT definition.
+
+**What to do:** Verify that your WIT definition is available at the expected path.
+
+##### World Not Found - Defaults to CLI
+
+```shell
+➜ wash inspect ./build/output.wasm 
+package root:component;
+world root {
+  import wasi:cli/environment@0.2.0;
+  import wasi:io/error@0.2.0;
+  import wasi:io/streams@0.2.0;
+  import wasi:cli/stdin@0.2.0;
+  import wasi:cli/stdout@0.2.0;
+  import wasi:cli/stderr@0.2.0;
+  import wasi:clocks/monotonic-clock@0.2.0;
+  import wasi:clocks/wall-clock@0.2.0;
+  import wasi:filesystem/types@0.2.0;
+  import wasi:filesystem/preopens@0.2.0;
+  import wasi:random/random@0.2.0;
+  export wasi:cli/run@0.2.0;
+}
+```
+**What happened:** If TinyGo can't find the specified world for some reason, it assumes that you are targeting `wasi:cli/run` instead of your intended target world.
+
+**What to do:** Verify that you have correctly specified your target world in the `config.json` file and that your WIT definition is in the expected path.
