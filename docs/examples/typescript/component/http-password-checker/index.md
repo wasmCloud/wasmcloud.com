@@ -34,7 +34,7 @@ This example also serves as a great example of using JS ecosystem projects, nota
 Building this project relies on the following installed software:
 
 | Name   | Description                                                                                                 |
-|--------|-------------------------------------------------------------------------------------------------------------|
+| ------ | ----------------------------------------------------------------------------------------------------------- |
 | `wash` | [Wasmcloud Shell][wash] controls your [wasmcloud][wasmcloud] host instances and enables building components |
 | `npm`  | [Node Package Manager (NPM)][npm] which manages packages for for the NodeJS ecosystem                       |
 | `node` | [NodeJS runtime][nodejs] (see `.nvmrc` for version)                                                         |
@@ -82,9 +82,7 @@ You should see a JSON response like:
     "data": {
       "strength": "very-weak",
       "length": 4,
-      "contains": [
-        "lowercase"
-      ]
+      "contains": ["lowercase"]
     }
   }
 }
@@ -110,9 +108,9 @@ If `curl`ing produces
 failed to invoke `wrpc:http/incoming-handler.handle`: failed to invoke `wrpc:http/incoming-handler@0.1.0.handle`: failed to shutdown synchronous parameter channel: not connected%
 ```
 
-You *may* need to just wait a little bit -- the HTTP server takes a second or two to start up.
+You _may_ need to just wait a little bit -- the HTTP server takes a second or two to start up.
 
-If the issue *persists*, you *may* have a lingering HTTP server provider running on your system. You can use `pgrep` to find it:
+If the issue _persists_, you _may_ have a lingering HTTP server provider running on your system. You can use `pgrep` to find it:
 
 ```console
 ❯ pgrep -la ghcr_io

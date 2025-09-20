@@ -22,7 +22,7 @@ This component:
 Building this project relies on the following software:
 
 | Name   | Description                                                                                                 |
-|--------|-------------------------------------------------------------------------------------------------------------|
+| ------ | ----------------------------------------------------------------------------------------------------------- |
 | `wash` | [Wasmcloud Shell][wash] controls your [wasmcloud][wasmcloud] host instances and enables building components |
 | `npm`  | [Node Package Manager (NPM)][npm] which manages packages for for the NodeJS ecosystem                       |
 | `node` | [NodeJS runtime][nodejs] (see `.nvmrc` for version)                                                         |
@@ -43,9 +43,10 @@ This results that the output of the `demo.js` script is printed to the console.
 
 # Details
 
-See package.json for the exact commands being run. 
+See package.json for the exact commands being run.
 
 The main entry point is the `start` script (i.e. `npm start`) which performs the following steps:
+
 - `npm install` to download all dependencies
 - building the component
 - transpiling the component so it can be called from javascript
@@ -54,4 +55,3 @@ The main entry point is the `start` script (i.e. `npm start`) which performs the
 ## Bundling
 
 It uses `esbuild` to bundling the javascript together with the dependencies. Some libaries are not compatible with `esbuild`, see the other examples for other bundlers that support plugins.
-

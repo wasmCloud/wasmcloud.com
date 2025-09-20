@@ -28,11 +28,11 @@ This component:
 
 Building this project relies on the following software:
 
-| Name   | Description                                                                                                 |
-|--------|-------------------------------------------------------------------------------------------------------------|
+| Name   | Description                                                                                                                               |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `wash` | [Wasmcloud Shell][wash] controls your [wasmcloud][wasmcloud] host instances and enables building components (version should be >= 0.39.0) |
-| `npm`  | [Node Package Manager (NPM)][npm] which manages packages for for the NodeJS ecosystem                       |
-| `node` | [NodeJS runtime][nodejs] (see `.nvmrc` for version)                                                         |
+| `npm`  | [Node Package Manager (NPM)][npm] which manages packages for for the NodeJS ecosystem                                                     |
+| `node` | [NodeJS runtime][nodejs] (see `.nvmrc` for version)                                                                                       |
 
 [wash]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-cli
 [node]: https://nodejs.org

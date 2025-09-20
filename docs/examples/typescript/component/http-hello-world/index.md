@@ -22,11 +22,11 @@ This component:
 
 Building this project relies on the following software:
 
-| Name   | Description                                                                                                 |
-|--------|-------------------------------------------------------------------------------------------------------------|
-| `wash` | [Wasm Shell][wash] helps build, develop, and publish WebAssembly components                                 |
-| `npm`  | [Node Package Manager (NPM)][npm] manages packages for the NodeJS ecosystem                       |
-| `node` | [NodeJS runtime][nodejs] (see `.nvmrc` for version)                                                         |
+| Name   | Description                                                                 |
+| ------ | --------------------------------------------------------------------------- |
+| `wash` | [Wasm Shell][wash] helps build, develop, and publish WebAssembly components |
+| `npm`  | [Node Package Manager (NPM)][npm] manages packages for the NodeJS ecosystem |
+| `node` | [NodeJS runtime][nodejs] (see `.nvmrc` for version)                         |
 
 [wash]: https://github.com/wasmCloud/wash
 [node]: https://nodejs.org
