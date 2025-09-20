@@ -22,7 +22,7 @@ This component:
 Building this project relies on the following software:
 
 | Name   | Description                                                                                                 |
-|--------|-------------------------------------------------------------------------------------------------------------|
+| ------ | ----------------------------------------------------------------------------------------------------------- |
 | `wash` | [Wasmcloud Shell][wash] controls your [wasmcloud][wasmcloud] host instances and enables building components |
 | `npm`  | [Node Package Manager (NPM)][npm] which manages packages for for the NodeJS ecosystem                       |
 | `node` | [NodeJS runtime][nodejs] (see `.nvmrc` for version)                                                         |
@@ -44,6 +44,7 @@ This results that the output of the `demo.js` script is printed to the console.
 # Details
 
 See package.json for the exact commands being run. But what `npm start` does is:
+
 - `npm install` to download all dependencies
 - building the component
 - transpiling the component so it can be called from javascript
