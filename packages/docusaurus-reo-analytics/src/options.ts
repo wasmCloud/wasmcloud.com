@@ -1,11 +1,11 @@
 import { Joi } from '@docusaurus/utils-validation';
 import type { OptionValidationContext } from '@docusaurus/types';
 
-type Options = { pixelId: string };
+type Options = { clientID: string };
 type PluginOptions = Options;
 
 const schema = Joi.object({
-  pixelId: Joi.string().description('The Pixel ID to use for Scarf tracking').required(),
+  clientID: Joi.string().description('The Client ID to use for Reo tracking').required(),
 });
 
 function validateOptions({
