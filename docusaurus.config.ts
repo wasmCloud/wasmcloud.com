@@ -8,10 +8,9 @@ import { Options as PluginContentBlogOptions } from '@docusaurus/plugin-content-
 import { Options as PluginGoogleAnalyticsOptions } from '@docusaurus/plugin-google-analytics';
 import { Options as PluginGithubStarsOptions } from '@wasmcloud/docusaurus-github-stars';
 import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-hubspot-analytics';
+import { Options as PluginReoAnalyticsOptions } from '@wasmcloud/docusaurus-reo-analytics';
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
-import { Options as PluginScarfAnalyticsOptions } from '@wasmcloud/docusaurus-scarf-analytics';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
-import { bundledLanguages } from 'shiki';
 import {
   transformerMetaHighlight,
   transformerNotationDiff,
@@ -40,11 +39,6 @@ const rehypeShikiPlugin = [
       transformerNotationDiff(),
       transformerNotationHighlight(),
       transformerNotationFocus(),
-    ],
-    langs: [
-      ...(Object.keys(bundledLanguages) as Array<keyof typeof bundledLanguages>),
-      import('./languages/wit.tmLanguage.json'),
-      import('./languages/smithy.tmLanguage.json'),
     ],
   } as RehypeShikiOptions,
 ];
@@ -187,10 +181,10 @@ const config = (async (): Promise<Config> => {
         } satisfies PluginHubspotAnalyticsOptions,
       ],
       [
-        '@wasmcloud/docusaurus-scarf-analytics',
+        '@wasmcloud/docusaurus-reo-analytics',
         {
-          pixelId: process.env.SCARF_PIXEL_ID || 'localdev',
-        } satisfies PluginScarfAnalyticsOptions,
+          clientID: process.env.REO_CLIENT_ID || 'localdev',
+        } satisfies PluginReoAnalyticsOptions,
       ],
       customPostCssPlugin, // PostCSS plugin function registration
     ],
