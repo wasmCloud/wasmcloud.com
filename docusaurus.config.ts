@@ -111,8 +111,8 @@ const config = (async (): Promise<Config> => {
                 label: '1.x',
               },
               next: {
-                label: 'v0.2.0-rc.1',
-                path: 'v0.2.0-rc.1',
+                label: 'v2.0.0-rc.1',
+                path: 'v2.0.0-rc.1',
                 banner: 'none'
               },
               0.82: {
