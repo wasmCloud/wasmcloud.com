@@ -1,0 +1,202 @@
+---
+title: "Custom Resource Definitions (CRDs)"
+sidebar_position: 1
+---
+
+When deployed to Kubernetes, the core primitives of wasmCloud are represented by [**custom resources definitions (CRDs)**](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/).
+
+wasmCloud uses CRDs from the [`runtime.wasmcloud.dev/v1alpha1`](./api-reference.md) API package:
+
+- [Artifact](#artifact) - `runtime.wasmcloud.dev/v1alpha1`
+- [Host](#host) - `runtime.wasmcloud.dev/v1alpha1`
+- [Workload](#workload) - `runtime.wasmcloud.dev/v1alpha1`
+- [WorkloadDeployment](#workloaddeployment) - `runtime.wasmcloud.dev/v1alpha1`
+- [WorkloadReplicaSet](#workloadreplicaset) - `runtime.wasmcloud.dev/v1alpha1`
+
+This document explains each of these custom resources at a high level. For a complete API specification, see the [API reference](./api-reference.md).
+
+:::note[]
+[`WorkloadDeployment`](#workloaddeployment) is the resource used to deploy Wasm workloads&mdash;if you're looking to quickly deploy a component, [start there](#workloaddeployment).  
+:::
+
+## Artifact
+
+An [Artifact](./api-reference.md#artifact) represents a Wasm component that can be referenced by Workloads. Artifacts define the image location and optional image pull secrets for accessing private registries. This can be used to fetch an OCI image and store its contents in a [NATS JetStream Object Store](https://docs.nats.io/nats-concepts/jetstream/obj_store). 
+
+The `Artifact` resource tracks individual revisions, publishing the artifact's location under `Status.ArtifactURL`. A [`WorkloadDeployment`](#workloaddeployment) can reference an Artifact as its component image. A new deployment will be automatically rolled out when a new image is detected.
+
+Example manifest:
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: Artifact
+metadata:
+  name: http-hello-world
+  namespace: default
+spec:
+  image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+  imagePullSecret:
+    name: ghcr-secret
+```
+
+## Host
+
+A [Host](./api-reference.md#host) resource defines a wasmCloud runtime environment, or **host**, which has a unique ID and can run Wasm workloads.
+
+Example manifest:
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: Host
+metadata:
+  name: host-sample
+  namespace: default
+  labels:
+    hostgroup: default
+spec:
+  hostId: NABCDEFGHIJKLMNOPQRSTUVWXYZ234567
+  hostname: host-sample.default
+  httpPort: 4000
+```
+
+## Workload
+
+A [Workload](./api-reference.md#workload) represents an application composed of one or more WebAssembly components and optional services. Workloads define the components, their configurations, volume mounts, and host interfaces they consume.
+
+Workloads are analogous to Kubernetes Pods in that they typically are not managed individually, but are instead owned by a [WorkloadDeployment](#workloaddeployment), much as a Pod is owned by a Deployment.
+
+Example manifest:
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: Workload
+metadata:
+  name: hello-world
+  namespace: default
+spec:
+  hostSelector:
+    hostgroup: default
+  components:
+    - name: http-component
+      image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+      poolSize: 10
+      maxInvocations: 1000
+      localResources:
+        environment:
+          config:
+            LOG_LEVEL: info
+        allowedHosts:
+          - https://api.example.com
+  hostInterfaces:
+    - namespace: wasi
+      package: http
+      interfaces:
+        - incoming-handler
+      config:
+        address: '0.0.0.0:8080'
+  volumes:
+    - name: cache
+      ephemeral: {}
+```
+
+## WorkloadDeployment
+
+A [WorkloadDeployment](./api-reference.md#workloaddeployment) defines the deployment and scaling of Workloads across hosts. It creates and manages WorkloadReplicaSets to ensure the desired number of workload replicas are running.
+
+Example manifest:
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: hello-world
+  namespace: default
+spec:
+  replicas: 3
+  deployPolicy: RollingUpdate
+  artifacts:
+    - name: http-component
+      artifactFrom:
+        name: http-hello-world
+  template:
+    metadata:
+      labels:
+        app: hello-world
+    spec:
+      hostSelector:
+        hostgroup: default
+      components:
+        - name: http-component
+          image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+          poolSize: 10
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            address: '0.0.0.0:8080'
+```
+
+### Host Interfaces
+
+Use the `hostInterfaces` field to define host interfaces used by the workload. This field requires the `namespace`, `package`, and `interfaces` fields, and may optionally take a `config`.
+
+### Runtime Configuration
+
+Runtime configuration values (such as environment variables) may be supplied via the optional `localResources` subfield of the `component` field. 
+
+```yaml
+localResources:
+  environment:
+    config:
+      some_key: some_value
+```
+
+Environmental values may also come from ConfigMaps or Secrets. The following approaches are also valid: 
+
+```yaml
+localResources:
+  environment:
+    configFrom:
+      - name: my-configmap
+    secretFrom:
+      - name: my-secret
+    config:
+      literal_key: literal_value
+```
+
+## WorkloadReplicaSet
+
+A [WorkloadReplicaSet](./api-reference.md#workloadreplicaset) ensures that a given number of Workload replicas are running at once. It is typically managed by a WorkloadDeployment but can be used directly for more granular control.
+
+Example manifest:
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadReplicaSet
+metadata:
+  name: hello-world-v1
+  namespace: default
+spec:
+  replicas: 5
+  template:
+    metadata:
+      labels:
+        app: hello-world
+        version: v1
+    spec:
+      hostSelector:
+        hostgroup: default
+      components:
+        - name: http-component
+          image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+          poolSize: 10
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            address: '0.0.0.0:8080'
+```
