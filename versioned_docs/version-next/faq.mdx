@@ -1,0 +1,59 @@
+---
+title: "FAQ"
+sidebar_position: 6
+---
+
+This page includes frequently asked questions on wasmCloud v2, including common questions about [migration from wasmCloud v1](#migrating-from-wasmcloud-v1).
+
+## General questions
+
+### Do I have to use Kubernetes with wasmCloud v2?
+
+No. The workload API exposed by the runtime can work with any orchestrator, so you can choose or create the solution that suits your environment. You can also use the operator with a stripped-down version of Kubernetes that includes only the K8s API server, for a straightforward but lightweight Kubernetes-native approach. 
+
+In real-world implementations, wasmCloud maintainers have found that the vast majority of users are deploying wasmCloud on Kubernetes. For wasmCloud v2, we're aiming to align smoothly to this most common scenario while preserving flexibility for a variety of deployment patterns including distributed edge environments.
+
+For now, maintainer time is focused on the prevailing Kubernetes use case, but we'd love to hear from folks who are interested in other deployment scenarios, and we strongly encourage contributors who would like to work on other scheduling implementations to get involved. 
+
+## Migrating from wasmCloud v1
+
+### What happened to capability providers? How do I replace providers from my wasmCloud v1 applications?
+
+In wasmCloud v1, capability providers were a solution for delivering stateful or long-running functionality, along with implementations of generic functionality that you wanted to be swappable (e.g., Redis or S3 for key-value storage). 
+
+As an application-level abstraction, providers could be powerful for small-scale applications, but we found that they were ill-suited to larger deployments, where duplicate providers for common capabilities were typically deployed and scaled individually. It became clear that providing capabilities at the host level, rather than at the application level, was a more efficient and scalable approach.
+
+As a result, there are a couple of different ways to provide capabilities in wasmCloud v2:
+
+* **Host plugins**: You can provide capabilities at the host level (typically the best practice) with host plugins, which extend a wasmCloud host with a specific implementation of a given capability according to an interface, and may optionally serve as shared resources, providing functionality to many different components for many different applications. Plugins are built into the host before deployment; you can find a [basic example](https://github.com/wasmCloud/wash/tree/main/crates/wash-runtime#usage) in the `wash-runtime` repository, or check out Brooks' [discussion of host plugin implementation in a recent wasmCloud community call](https://www.youtube.com/live/3DlUjl8gQVs?si=MbTz4MohjYDmE8fI&t=731). 
+
+* **Services**: At the workload level, "service"-style components can be included in a workload (i.e., linked with other components in the workload) and provide long-running functionality through the use of standing triggers. You can find an [example of a cron service component](https://github.com/wasmCloud/wash/tree/main/examples/cron-service) in the `wash/examples` repository.
+
+* **Containerized providers**: This is the most "v1-style" option for providing capabilities in wasmCloud v2: containerize the application that provides the capability. This approach will require manually facilitating communication between your components and the provider.
+
+Look for more documentation and resources on each of these approaches very soon.
+
+### Is the wasmCloud Application Deployment Manager (`wadm`) still a part of wasmCloud v2?
+
+No&mdash;in most deployments, the wasmCloud operator and the Kubernetes API now work together to manage deployments. The operator acts as a reconciler, giving hosts the appropriate instructions to match the state specified to the Kubernetes API. 
+
+Though wasmCloud v2 is designed to operate in a Kubernetes-native way, [it is not restricted to Kubernetes](#do-i-have-to-use-kubernetes-with-wasmcloud-v2). The `wash-runtime` library that acts as Wasm runtime and wasmCloud host exposes a Workload API that any orchestrator or similar deployment manager can use to manage workloads.
+
+In edge use cases, the wasmCloud can currently be deployed with a standalone Kubernetes API server for a lightweight, Kubernetes-native approach. Maintainer time is currently focused on the Kubernetes use case, but we'd love to hear from folks who are interested in other deployment scenarios, and we strongly encourage contributors who would like to work on other scheduling implementations to get involved. 
+
+For more information on the wasmCloud operator, see the [Kubernetes Operator](./kubernetes-operator/index.mdx) section.
+
+### What happened to the "Application" abstraction?
+
+wasmCloud v2 does not use the wasmCloud v1 "Application" as an abstraction or unit of deployment.
+
+Instead, wasmCloud v2 uses the concept of a [Workload](./overview/workloads.mdx), which may include one or more components that communicate over interfaces. Components in the same workload are placed on the same host and linked at runtime.
+
+See the [Platform Overview section for more information on the Workload](./overview/workloads.mdx).
+
+### My wasmCloud v1 application relies on automatic distributed networking. How do distributed applications work in wasmCloud v2?
+
+In wasmCloud v2, we're taking a [deliberate step to make distributed networking more intentional](https://github.com/orgs/wasmCloud/projects/7/views/15?pane=issue&itemId=119180761&issue=wasmCloud%7CwasmCloud%7C4640). As wasmCloud v1 evolved, we found that not every call should be handled distributedly, since adding an extra network hop makes those calls much less performant than an in-process call to a host function. This can mean the difference between 30,000 requests-per-second and 5,000 requests-per-second for a few protocols. To make matters worse, distributed-by-default calls are subject to transport failure and message loss. 
+
+For wasmCloud v2, we don't want every user to pay this steep penalty by default, so we decided to discontinue auto-linking and "automagical" configuration in favor of dramatically improved performance. In practice, this means that when you want to communicate between distributed components, you'll use interfaces like `wasmcloud:messaging` and manually serialize/deserialize messages. 
+
