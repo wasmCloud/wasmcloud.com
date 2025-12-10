@@ -1,0 +1,106 @@
+---
+title: "Filesystems and Volumes"
+---
+
+## Overview
+
+For workloads that utilize external filesystem resources via [`wasi:filesystem`](https://github.com/WebAssembly/WASI/tree/main/proposals/filesystem) preopens, you can mount data from a [Kubernetes Volume](https://kubernetes.io/docs/concepts/storage/volumes/). 
+
+* **Preopens** provide secure access to filesystem resources by mounting them within a component before instantiation.
+* **Kubernetes Volumes** enable containers to access filesystem data.
+
+In a wasmCloud deployment, filesystem data is made available to the containerized wasmClouod host, which may in turn pass data to a component.
+
+In this section of the Operator Manual, you'll learn how to:
+
+* Deploy volumes that provide filesystem resources to the wasmCloud host
+* Create a `WorkloadDeployment` manifest for a component that preopens filesystem resources
+
+## Deploying volumes with wasmCloud hosts
+
+When deploying components that require filesystem resources, you first need to create the volume and make the volume available to the wasmCloud host. 
+
+The sample host configuration excerpt below makes a volume called `wasmcloud-data` available to a host with the `public-ingress` label.
+
+```yaml {20-23}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    wasmcloud.com/hostgroup: public-ingress
+    wasmcloud.com/name: hostgroup
+  name: hostgroup-public-ingress
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      wasmcloud.com/hostgroup: public-ingress
+      wasmcloud.com/name: hostgroup
+  template:
+    metadata:
+      labels:
+        wasmcloud.com/hostgroup: public-ingress
+        wasmcloud.com/name: hostgroup
+    spec:
+      volumes:
+        - name: wasmcloud-data
+          hostPath:
+            path: "/var/data"
+```
+
+* The `name` field assigns a unique name to the volume.
+* The `hostPath.path` field specifies the target path for the file or directory on the host machine.
+
+## Deploying components with filesystem access
+
+To access filesystem resources via the preopens and the wasmCloud host, a component should import `wasi:filesystem`. You can use the Wasm Shell (`wash`) CLI to check your component's imports:
+
+```shell
+wash inspect ./component.wasm 
+```
+
+Output should include:
+
+```wit
+import wasi:filesystem/types@0.2.x;
+import wasi:filesystem/preopens@0.2.x;
+```
+
+The sample WorkloadDeployment manifest below makes the `wasmcloud-data` volume available to the `http-fs-hello` component at the `/assets` path within the component. 
+
+```yaml {11-21}
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: http-fs-hello
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: public-ingress
+      volumes:
+        - name: wasmcloud-data
+          hostPath:
+            path: /var/data # should match path in host deployment
+      components:
+        - name: http-fs-hello
+          image: ghcr.io/<namespace>/http-fs-hello:0.1.2
+          localResources:
+            volumeMounts:
+              - name: wasmcloud-data
+                mountPath: /assets # where data is mounted inside component
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: localhost
+```
+
+* The workload must be assigned to a host with the named volume.
+* Resources defined under the `localResources` field are made available to the component.
+* The `volumeMounts.name` field specifies the volume to use.
+* The `volumeMounts.mountPath` field specifies the path where the data from the volume should be made available within the component.
+* It is not necessary to define `wasi:filesystem` under `hostInterfaces`.
