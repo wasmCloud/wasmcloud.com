@@ -34,15 +34,17 @@ To get started:
 
 Let's create a component that accepts an HTTP request and responds with "Hello from Rust!" 
 
-Use `wash new` to create a new component project from a template: 
+Use `wash new` to create a new component project from an example in a Git repository: 
 
 ```shell
-wash new
+wash new https://github.com/wasmCloud/wash.git --name hello --subfolder examples/http-hello-world
 ```
 
-* Select **Rust**
-* Select **http-hello-world**
-* Type `y` or press return
+This command...
+
+* Creates a new project named `hello`...
+* Based on an example found in the [`wasmCloud/wash`](https://github.com/wasmCloud/wash) Git repository...
+* In the subfolder `examples/http-hello-world`
 </TabItem>
 
 <TabItem value="tinygo" label="TinyGo">
@@ -51,12 +53,14 @@ Let's create a component that accepts an HTTP request and responds with "Hello f
 Use `wash new` to create a new component project from a template: 
 
 ```shell
-wash new
+wash new https://github.com/wasmCloud/wasmCloud.git --name hello --subfolder examples/tinygo/components/http-hello-world
 ```
 
-* Select **TinyGo**
-* Select **http-hello-world**
-* Type `y` or press return
+This command...
+
+* Creates a new project named `hello`...
+* Based on a template found in the `wasmCloud/wasmCloud` Git repository...
+* In the subfolder `examples/tinygo/components/http-hello-world`
 
 </TabItem>
 
@@ -66,7 +70,7 @@ Let's create a component that accepts an HTTP request and responds with "Hello f
 Use `wash new` to create a new component project from a template: 
 
 ```shell
-wash new hello --git https://github.com/wasmCloud/typescript.git --subfolder examples/components/http-hello-world
+wash new https://github.com/wasmCloud/typescript.git --name hello --subfolder examples/components/http-hello-world
 ```
 
 This command...
@@ -98,7 +102,7 @@ We're looking to add more examples in languages that support Wasm components. If
 </TabItem>
 </Tabs>
 
-Navigate to the new `http-hello-world` directory and take a look at the generated project. 
+Navigate to the new `hello` directory and take a look at the generated project. 
 
 ## Anatomy of a component project
 
@@ -165,42 +169,44 @@ Now let's take a look at the application code.
 <Tabs groupId="lang" queryString>
   <TabItem value="rust" label="Rust" default>
 
-The file `src/lib.rs` imports the `wasmcloud_component` crate and consists of a `Component` struct, an HTTP export, and an `impl` block that implements `http::Server` for the `Component` struct. We'll walk through these sections in detail.
+The file `src/lib.rs` imports the `wstd` crate and consists of three simple async functions. We'll walk through these sections in detail.
 
 ```rust
-use wasmcloud_component::http;
+use wstd::http::{Body, Request, Response, StatusCode};
 ```
 
-The [`wasmcloud_component`](https://crates.io/crates/wasmcloud-component) crate is a library that abstracts and simplifies the usage of standard interfaces like `wasi:http`, providing utilities familiar to
-Rust developers based on standard ecosystem types rather than the robust (but often verbose) fully generated `wasi:http` bindings.
+The [`wstd`](https://crates.io/crates/wstd) crate is an async Rust standard library for Wasm components and WASI 0.2 [hosted by the Bytecode Alliance](https://github.com/bytecodealliance/wstd). Importing `wstd` means that we can use `wstd::http` rather than working directly with Rust bindings of the `wasi:http` interface.
 
 :::info
-You do not need to use a wasmCloud-specific SDK to build components, and this example will work directly with any WebAssembly runtime that supports the Wasm component model.
+You do not need to use `wstd` to build components with Rust, but it is standard ecosystem tooling that can help simplify development. This example will work directly with any WebAssembly runtime that supports the Wasm Component Model.
 :::
 
-These two imports are bringing in the `Guest` trait to implement our function to be called whenever an incoming HTTP request is received, and the types that we'll use to interact with the HTTP request and response. These are the only two imports that we need to interact with the HTTP server capability.
+Whenever an incoming HTTP request is received, the main function returns a response depending on whether the endpoint is `/` or not found.
 
 ```rust
-struct Component;
-
-http::export!(Component);
-
-impl http::Server for Component {
-    fn handle(
-        _request: http::IncomingRequest,
-    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
-        Ok(http::Response::new("Hello from Rust!\n"))
+#[wstd::http_server]
+async fn main(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    match req.uri().path_and_query().unwrap().as_str() {
+        "/" => home(req).await,
+        _ => not_found(req).await,
     }
+}
+
+async fn home(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    // Return a simple response with a string body
+    Ok(Response::new("Hello from wasmCloud!\n".into()))
+}
+
+async fn not_found(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    Ok(Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body("Not found\n".into())
+        .unwrap())
 }
 ```
 
-Within the `handle` method, the component receives the HTTP request, creates a response, and writes that response back to the requesting HTTP client (such as a `curl` command or a web browser).
+Within the `home` and `not_found` functions, the application creates appropriate responses, and the component returns those responses back to the requesting HTTP client (such as a `curl` command or a web browser).
 
-Finally, we use the macro `export!` to specify that the `Component` struct will handle calls over the `wasi:http/incoming-handler` interface that this component exports.
-
-```rust
-export!(HttpServer);
-```
 </TabItem>
 
 <TabItem value="tinygo" label="TinyGo">
@@ -267,7 +273,13 @@ Add the contents below to `config.json`, specifying your WIT world as `hello`:
       "no_debug": true,
       "wit_world": "hello"
     },
-    "artifact_path": "build/output.wasm"
+    "component_path": "build/output.wasm"
+  },
+  "wit": {
+    "registries": [],
+    "skip_fetch": true,
+    "wit_dir": null,
+    "sources": {}
   }
 }
 ```
