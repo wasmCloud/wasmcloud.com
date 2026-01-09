@@ -1,0 +1,257 @@
+---
+title: 'Deploy a Wasm Workload'
+sidebar_position: 3
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import HubspotForm from 'react-hubspot-form';
+
+In our previous tutorials, we started a developer loop and added two [**interfaces**](../overview/interfaces.mdx) (`wasi:logging` and `wasi:keyvalue`) to our application. The `wash dev` process satisfied our application's capability requirements automatically, so we could move quickly and focus on code.
+
+Now we'll learn how to:
+
+- Compile your application to a WebAssembly component binary
+- Publish your Wasm binary to an OCI registry
+- Set up a wasmCloud environment on Kubernetes and deploy your Wasm workload
+
+:::info[Prerequisites]
+This tutorial assumes you're following directly from the previous steps. Make sure to complete [**Quickstart**](./index.mdx) and [**Develop a WebAssembly Component**](./develop-a-webassembly-component.mdx) first.
+:::
+
+## Build Wasm binary
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust" default>
+  Use the `wash build` command from the root of a project directory to compile the component into a `.wasm` binary:
+
+  ```shell
+  wash build
+  ```
+
+  By default, the compiled `.wasm` binary for a Rust project is generated at `/target/wasm32-wasip2/debug/`. The output path for the compiled `.wasm` binary [can be configured via `wash`'s `config.json` file](../wash/config.mdx).
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo">
+  Use the `wash build` command from the root of a project directory to compile the component into a `.wasm` binary:
+
+  ```shell
+  wash build --skip-fetch
+  ```
+
+  By default, the compiled `.wasm` binary for a TinyGo project is generated at `/build/`. The output path for the compiled `.wasm` binary [can be configured via `wash`'s `config.json` file](../wash/config.mdx).
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+  Use the `wash build` command from the root of a project directory to compile the component into a `.wasm` binary:
+
+  ```shell
+  wash build
+  ```
+
+  By default, the compiled `.wasm` binary for a TypeScript project is generated at `/dist/`. The output path for the compiled `.wasm` binary [can be configured via `wash`'s `config.json` file](../wash/config.mdx).
+  </TabItem>
+  <TabItem value="unlisted" label="My language isn't listed">
+
+If you prefer working in a language that isn't listed here, let us know!
+
+{' '}
+
+<div style={{ display: 'flex', flexDirection: 'row' }}>
+  <div style={{ width: '100%' }}>
+    <HubspotForm
+      portalId="20760433"
+      formId="71e74f55-cc30-41de-9d41-e3d9dc159c71"
+      onSubmit={() => console.log('Submitted form')}
+      onReady={(form) => console.log('Form ready for submit')}
+      region="na1"
+      loading={<div>Loading...</div>}
+    />
+  </div>
+</div>
+
+  </TabItem>
+  
+</Tabs>
+
+## Publish image
+
+Now we can publish a Wasm binary image to any OCI compliant registry that supports **OCI artifacts**. 
+
+:::note[What is this image?]
+The wasmCloud ecosystem uses the [OCI image specification](https://github.com/opencontainers/image-spec) to package Wasm components&mdash;these images are not container images, but conform to OCI standards and may be stored on any OCI-compatible registry. You can learn more about wasmCloud packaging on the [**Packaging**](../overview/packaging.mdx) page.
+:::
+
+### Authenticate to registry
+
+`wash` supports the usage of Docker credentials for authentication to registries. There are multiple [ways to authenticate with Docker credentials](https://docs.docker.com/reference/cli/docker/login/), including the `docker login` command with the `docker` CLI:
+
+```shell
+docker login <registry> -u <username> -p <password-or-token> 
+```
+
+### Push image to registry
+
+Now we'll push a Wasm component image to a registry. The example below uses GitHub Packages, but you can use any OCI compliant registry that supports OCI artifacts.
+
+If you're following along using GitHub packages, make sure to replace `<namespace>` in the command below with your own GitHub namespace.
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust" default>
+
+```shell
+wash oci push ghcr.io/<namespace>/http-hello-world:0.1.0 ./target/wasm32-wasip2/debug/http_hello_world.wasm
+```
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo">
+
+```shell
+wash oci push ghcr.io/<namespace>/http-hello-world:0.1.0 ./build/http_hello_world.wasm
+```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+```shell
+wash oci push ghcr.io/<namespace>/http-hello-world:0.1.0 ./dist/http_hello_world.wasm
+```
+  </TabItem>
+</Tabs>
+
+* The registry address (including name and tag) is specified for the first option with `wash oci push`.
+* The second option defines the target path for the component binary to push.
+
+:::warning[]
+If you're using GitHub Packages, remember to [make the image public](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility) in order to follow the steps below.
+:::
+
+## Install wasmCloud on Kubernetes
+
+Installation requires the following tools:
+
+- [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl)
+- [Helm](https://helm.sh/docs) v3.8.0+
+
+You'll also need a Kubernetes environment. We recommend [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) for the best local Kubernetes experience. (For more information on running wasmCloud on Kubernetes, see [Kubernetes Operator](../kubernetes-operator/index.mdx).)
+
+You can use the one-liner below to start a `kind` cluster with a configuration from the [`wasmcloud/wash`](https://raw.githubusercontent.com/wasmCloud/wash/refs/heads/main/kind-config.yaml) repository. 
+
+```shell
+curl -fLO https://raw.githubusercontent.com/wasmCloud/wash/refs/heads/main/kind-config.yaml && kind create cluster --config=kind-config.yaml && rm kind-config.yaml
+```
+
+Use Helm to install the wasmCloud operator from an OCI chart image, using the [values for local installation](https://raw.githubusercontent.com/wasmCloud/wash/refs/heads/main/charts/runtime-operator/values.local.yaml):
+
+```shell
+helm install wasmcloud --version 0.1.0 oci://ghcr.io/wasmcloud/charts/runtime-operator -f https://raw.githubusercontent.com/wasmCloud/wash/refs/heads/main/charts/runtime-operator/values.local.yaml
+```
+
+## Deploy Wasm workload
+
+Now we'll deploy our Wasm application using a [`WorkloadDeploment`](../kubernetes-operator/crds.mdx#workloaddeployment) manifest.
+
+Run the following script in your terminal to create a file called `deployment.yaml` containing a manifest. 
+
+```shell
+cat > deployment.yaml << 'EOF'
+  apiVersion: runtime.wasmcloud.dev/v1alpha1
+  kind: WorkloadDeployment
+  metadata:
+    name: http-hello-world
+  spec:
+    replicas: 1
+    template:
+      spec:
+        hostSelector:
+          hostgroup: public-ingress
+        components:
+          - name: http-hello-world
+            image: ghcr.io/<namespace>/http-hello-world:0.1.0
+        hostInterfaces:
+          - namespace: wasi
+            package: http
+            interfaces:
+              - incoming-handler
+            config:
+              host: localhost
+          - namespace: wasi
+            package: keyvalue
+            interfaces:
+              - atomics
+              - store
+EOF
+```
+
+This is a deploymenty manifest for a [Kubernetes custom resource](../kubernetes-operator/crds.mdx). For the purposes of this quickstart, the most important fields to highlight in the specification are:
+
+- `components.image`: This defines the registry address we will use to fetch our Wasm image.
+- `hostInterfaces`: These are the interfaces that the host will allow the Wasm component to utilize. **Without an explicit capability grant, the component will not have access to those interfaces.** Since the WASI HTTP and Key-Value interfaces are [well-known interfaces built in to the host](../overview/interfaces.mdx), all we have to do is enable them.
+
+Open the file and update the image name with the correct registry address. If you're using GitHub Packages, that means replacing `<namespace>` with your GitHub namespace.
+
+```yaml {13}
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: hello-world
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: public-ingress
+      components:
+        - name: http-hello-world
+          image: ghcr.io/<namespace>/http-hello-world:0.1.0
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: localhost
+```
+
+Now use `kubectl` to apply the manifest:
+
+```shell
+kubectl apply -f deployment.yaml
+```
+
+Verify that the Wasm component is successfully deployed:
+
+```shell
+kubectl get workloaddeployments
+```
+
+Use `curl` to invoke the Wasm workload with an HTTP request:
+
+```shell
+curl localhost
+```
+```text
+Hello, World! x1
+```
+
+## What's next?
+
+For our last step, let's run a more complex demo application on wasmCloud. 
+
+We'll use `kubectl` to deploy **Blobby**, a file manager that enables users to upload, download, and delete files from an HTTP server via a web interface.
+
+```shell
+kubectl apply -f TK
+```
+
+Once Blobby is deployed, we can open the web UI at TK address.
+
+TK image
+
+- Enumerate what you can do with it
+
+Blobby brings together WASI interfaces like HTTP and Blobstore to create a fleshed-out application that leaves common, reusable functionality (like HTTP and blob storage) to the host, while sandboxing the code in a secure environment where capabilities must be granted explicitly. 
+
+Ready to take the next steps on your wasmCloud journey?
+
+* If you're a developer, check out the [Developer Guide](../wash/developer-guide/index.mdx) for more detail on the steps we explored in this quickstart.
+* If you're a platform operator, learn more about the [Kubernetes Operator](../kubernetes-operator/index.mdx).
+
+
+
