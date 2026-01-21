@@ -32,7 +32,7 @@ const SECTION_CONTENT: {
 const VIDEO_CONTENT: [UseCasesContent, UseCasesContent, UseCasesContent] = [
   {
     name: 'Elevating Serverless Platforms with Wasm',
-    url: 'https://www.youtube.com/watch?v=wRsBQkP2rPY&list=PL25tdRgIAXStcnLCeE_GUTjbTNxFaDnBJ&index=1',
+    url: 'https://www.youtube.com/embed/wRsBQkP2rPY?si=zWBIgSGCGhTPnqnY',
     content: (
       <>
         <p>
