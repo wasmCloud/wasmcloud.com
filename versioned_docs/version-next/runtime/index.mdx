@@ -8,13 +8,11 @@ toc_max_heading_level: 2
 
 ### wasmCloud's runtime (`wash-runtime`) is a simple, flexible runtime environment for WebAssembly workloads.
 
-:::warning[Under construction]
-This section is under active development&mdash;please check back soon for a more complete reference.
-:::
+[`wash-runtime`](https://github.com/wasmCloud/wash/tree/main/crates/wash-runtime) is a Rust crate that includes Wasmtime as the underlying runtime engine, as well as the wasmCloud host, which serves as a runtime environment for WebAssembly components. A plugin system allows for extension of the host with new and custom capabilities.
 
-[`wash-runtime`](https://github.com/wasmCloud/wash/tree/main/crates/wash-runtime) is a Rust crate that includes Wasmtime as the underlying runtime engine, as well as the wasmCloud host, which serves as a runtime environment for WebAssembly components. A plugin system allows for extension of the host with new and custom capabilities. 
+The runtime provides easy-to-use abstractions over the low-level [Wasmtime API](https://wasmtime.dev/), as well as wasmCloud-specific APIs for managing workloads, handling NATS subscriptions, managing and utilizing host plugins, and more.
 
-The runtime provides easy-to-use abstractions over the low-level [Wasmtime API](https://wasmtime.dev/), as well as wasmCloud-specific APIs for managing workloads, handling NATS subscriptions, managing and utilizing host plugins, and more. 
+For a step-by-step guide to embedding the runtime, see [Building Custom Hosts](./building-custom-hosts.mdx). To extend a host with new capabilities, see [Creating Host Plugins](./creating-host-plugins.mdx).
 
 ## Architecture
 
@@ -28,7 +26,7 @@ The runtime provides three primary abstractions:
 
 ## WASI Interface Support
 
-The crate includes two sets of built-in plugins (toggleable at runtime via feature flags), one working in-memory for development with `wash dev`, and the other backed by NATS for production deployment. Both sets of plugins contain the following interfaces:
+The crate includes two sets of built-in plugins, one working in-memory for development with `wash dev`, and the other backed by NATS for production deployment. Some plugins can be enabled or disabled via Cargo feature flags. Both sets of plugins support the following interfaces:
 
 - `wasi:http`
 - `wasi:keyvalue`
@@ -48,13 +46,9 @@ use std::collections::HashMap;
 
 use wash_runtime::{
     engine::Engine,
-    host::{
-        HostBuilder, HostApi,
-        http::{HttpServer, DynamicRouter},
-    },
-    plugin::{
-        wasi_config::WasiConfig,
-    },
+    host::{HostBuilder, HostApi},
+    plugin::wasi_http::HttpServer,
+    plugin::wasi_config::RuntimeConfig,
     types::{WorkloadStartRequest, Workload},
 };
 
@@ -64,22 +58,20 @@ async fn main() -> anyhow::Result<()> {
     let engine = Engine::builder().build()?;
 
     // Configure plugins
-    let http_router = DynamicRouter::default();
-    let http_handler = HttpServer::new(http_router, "127.0.0.1:8080".parse()?);
-    let wasi_config_plugin = WasiConfig::default();
+    let http_plugin = HttpServer::new("127.0.0.1:8080".parse()?);
+    let config_plugin = RuntimeConfig::default();
 
     // Build and start the host
     let host = HostBuilder::new()
         .with_engine(engine)
-        .with_http_handler(Arc::new(http_handler))
-        .with_plugin(Arc::new(wasi_config_plugin))?
+        .with_plugin(Arc::new(http_plugin))?
+        .with_plugin(Arc::new(config_plugin))?
         .build()?;
 
     let host = host.start().await?;
 
     // Start a workload
     let req = WorkloadStartRequest {
-        workload_id: uuid::Uuid::new_v4().to_string(), // or any id you like
         workload: Workload {
             namespace: "test".to_string(),
             name: "test-workload".to_string(),
