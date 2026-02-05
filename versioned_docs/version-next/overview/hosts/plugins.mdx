@@ -5,10 +5,100 @@ toc_max_heading_level: 2
 
 ### Host plugins extend hosts with additional capabilities.
 
-:::warning[Under construction]
-This section is under active development&mdash;please check back soon for a more complete reference.
+Plugins provide capabilities at the host level, extending a wasmCloud host with specific implementations of [interfaces](../interfaces.mdx). Each plugin implements a **WIT world**—a collection of imports and exports that are directly linked to workloads at runtime.
+
+Plugins allow you to customize how your host handles common operations like HTTP requests, key-value storage, configuration, and logging. You can use the built-in plugins provided by `wash-runtime`, or implement custom plugins for specialized requirements.
+
+## Built-in plugins
+
+The [`wash-runtime`](https://github.com/wasmCloud/wash/tree/main/crates/wash-runtime) crate includes built-in plugins for common WASI interfaces. These plugins come in two variants: in-memory implementations for local development (used by `wash dev`), and NATS-backed implementations for production deployments.
+
+| Plugin | Interface | Description |
+|--------|-----------|-------------|
+| **HTTP** | `wasi:http` | HTTP client and server capabilities |
+| **Key-Value** | `wasi:keyvalue` | Key-value storage operations |
+| **Blobstore** | `wasi:blobstore` | Blob/object storage operations |
+| **Config** | `wasi:config` | Runtime configuration access |
+| **Logging** | `wasi:logging` | Structured logging output |
+| **Filesystem** | `wasi:filesystem` | File system access within workload boundaries |
+| **Messaging** | `wasmcloud:messaging` | Message passing and pub/sub communication |
+
+Filesystem and Messaging are always available. The remaining plugins can be enabled or disabled via Cargo feature flags when building your host:
+
+```toml
+[dependencies]
+wash-runtime = { version = "0.1", features = ["wasi-http", "wasi-keyvalue", "wasi-config"] }
+```
+
+## Using plugins
+
+Plugins are registered with the host using the `HostBuilder` API. The following example demonstrates how to configure a host with HTTP and configuration plugins:
+
+```rust
+use std::sync::Arc;
+use std::collections::HashMap;
+
+use wash_runtime::{
+    engine::Engine,
+    host::{HostBuilder, HostApi},
+    plugin::wasi_http::HttpServer,
+    plugin::wasi_config::RuntimeConfig,
+    types::{WorkloadStartRequest, Workload},
+};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Create a Wasmtime engine
+    let engine = Engine::builder().build()?;
+
+    // Configure plugins
+    let http_plugin = HttpServer::new("127.0.0.1:8080".parse()?);
+    let config_plugin = RuntimeConfig::default();
+
+    // Build and start the host with plugins
+    let host = HostBuilder::new()
+        .with_engine(engine)
+        .with_plugin(Arc::new(http_plugin))?
+        .with_plugin(Arc::new(config_plugin))?
+        .build()?;
+
+    let host = host.start().await?;
+
+    // Start a workload (components will have access to plugin capabilities)
+    let req = WorkloadStartRequest {
+        workload: Workload {
+            namespace: "example".to_string(),
+            name: "my-workload".to_string(),
+            annotations: HashMap::new(),
+            service: None,
+            components: vec![],
+            host_interfaces: vec![],
+            volumes: vec![],
+        },
+    };
+
+    host.workload_start(req).await?;
+
+    Ok(())
+}
+```
+
+:::info[Default behavior]
+If a handler is not provided for a particular capability, a "deny all" implementation is used. This ensures that components cannot access capabilities unless explicitly configured.
 :::
 
-Plugins provide capabilities at the host level, extending a wasmCloud host with a specific implementation of a given capability according to an interface.
+## Custom plugins
 
-Plugins are built into the host before deployment; you can find a [basic example](https://github.com/wasmCloud/wash/tree/main/crates/wash-runtime#usage) in the `wash-runtime` repository, or see this [discussion of host plugin implementation in a wasmCloud community call](https://www.youtube.com/live/3DlUjl8gQVs?si=MbTz4MohjYDmE8fI&t=731). 
+You can create custom plugins by implementing the `HostPlugin` trait. See [Creating Host Plugins](../../runtime/creating-host-plugins.mdx) for more information.
+
+Custom plugins are useful when you need to:
+
+- **Integrate with proprietary systems**: Connect components to internal APIs, databases, or services that don't have standard WASI interfaces.
+- **Add security layers**: Implement custom authentication, authorization, or audit logging for capability access.
+- **Provide specialized hardware access**: Expose GPUs or other specialized hardware to components.
+
+## Keep reading
+
+- Learn more about the [wasmCloud runtime](../../runtime/index.mdx).
+- See the [wash-runtime source code](https://github.com/wasmCloud/wash/tree/main/crates/wash-runtime) for implementation details.
+- Watch a [discussion of host plugin implementation](https://www.youtube.com/live/3DlUjl8gQVs?si=MbTz4MohjYDmE8fI&t=731) from a wasmCloud community call.

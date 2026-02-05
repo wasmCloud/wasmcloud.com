@@ -1,0 +1,177 @@
+---
+title: "Creating Host Plugins"
+sidebar_position: 2
+toc_max_heading_level: 2
+---
+
+### Extend wasmCloud hosts with additional capabilities.
+
+The `wash-runtime` crate includes [built-in plugins](../overview/hosts/plugins.mdx) for common WASI interfaces like HTTP, key-value, and configuration. When you need to provide capabilities that aren't covered by the built-ins—such as integrating with a proprietary database, exposing specialized hardware, or implementing a custom protocol—you can create a custom plugin.
+
+A host plugin is primarily responsible for implementing a specific WIT world as a collection of imports and exports that will be directly linked to the workload's `wasmtime::component::Linker`.
+
+### The `HostPlugin` trait
+
+```rust
+#[async_trait]
+pub trait HostPlugin: Any + Send + Sync + 'static {
+    /// Returns a unique identifier for the plugin.
+    /// Plugin IDs must be unique across all registered plugins.
+    fn id(&self) -> &'static str;
+
+    /// Returns the WIT world this plugin implements.
+    /// The binding process only occurs if workloads require these interfaces.
+    fn world(&self) -> WitWorld;
+
+    /// Called during host initialization before accepting workloads.
+    /// Use this for setup tasks like establishing connections.
+    async fn start(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Called when a workload begins binding to the plugin.
+    /// Enables pre-binding validation and setup.
+    async fn on_workload_bind(
+        &self,
+        workload: &UnresolvedWorkload,
+        interfaces: HashSet<WitInterface>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Called when configuring a specific component's linker.
+    /// This is where you add your implementations to the linker.
+    async fn on_component_bind(
+        &self,
+        component: &mut WorkloadComponent,
+        interfaces: HashSet<WitInterface>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Called after successful workload binding and resolution.
+    async fn on_workload_resolved(
+        &self,
+        workload: &ResolvedWorkload,
+        component_id: &str,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Called during unbinding or shutdown for cleanup.
+    async fn on_workload_unbind(
+        &self,
+        workload: &ResolvedWorkload,
+        interfaces: HashSet<WitInterface>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Called during host shutdown for final cleanup.
+    async fn stop(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+```
+
+### Plugin lifecycle
+
+Plugins follow a defined lifecycle within the host:
+
+1. **Registration**: Plugins are registered via `HostBuilder::with_plugin()`. Each plugin must have a unique ID.
+2. **Start**: When the host starts, all plugins' `start()` methods are called. If any plugin fails to start, the host startup fails.
+3. **Workload binding**: When a workload starts, the host calls `on_workload_bind()` and `on_component_bind()` for each plugin that provides interfaces the workload requires.
+4. **Resolution**: After successful binding, `on_workload_resolved()` is called.
+5. **Unbinding**: When workloads stop, `on_workload_unbind()` is called for cleanup.
+6. **Stop**: During host shutdown, all plugins' `stop()` methods are called (with a 3-second timeout per plugin).
+
+### Key types
+
+The `HostPlugin` trait uses several types from the `wash_runtime` crate:
+
+- **`WitWorld`** - Contains `imports` and `exports` as `HashSet<WitInterface>`, representing the WIT interfaces the plugin provides.
+- **`WitInterface`** - Describes a specific interface with `namespace`, `package`, `interfaces` (a set of interface names), an optional `version`, and a `config` map.
+- **`UnresolvedWorkload`** - A workload that has been initialized but not yet bound to plugins.
+- **`WorkloadComponent`** - A component within a workload, providing access to its `wasmtime::component::Linker` for binding implementations.
+- **`ResolvedWorkload`** - A fully bound workload ready for execution.
+
+### Example: Custom logging plugin
+
+Here's a simplified example of a custom plugin that implements logging:
+
+```rust
+use std::collections::HashSet;
+use async_trait::async_trait;
+use wash_runtime::{
+    engine::workload::WorkloadComponent,
+    plugin::HostPlugin,
+    wit::{WitInterface, WitWorld},
+};
+
+pub struct CustomLogger {
+    prefix: String,
+}
+
+impl CustomLogger {
+    pub fn new(prefix: impl Into<String>) -> Self {
+        Self { prefix: prefix.into() }
+    }
+}
+
+#[async_trait]
+impl HostPlugin for CustomLogger {
+    fn id(&self) -> &'static str {
+        "custom-logger"
+    }
+
+    fn world(&self) -> WitWorld {
+        WitWorld {
+            imports: HashSet::new(),
+            exports: HashSet::from([WitInterface {
+                namespace: "wasi".to_string(),
+                package: "logging".to_string(),
+                interfaces: HashSet::from(["logging".to_string()]),
+                version: None,
+                config: std::collections::HashMap::new(),
+            }]),
+        }
+    }
+
+    async fn start(&self) -> anyhow::Result<()> {
+        println!("[{}] Logger plugin started", self.prefix);
+        Ok(())
+    }
+
+    async fn on_component_bind(
+        &self,
+        component: &mut WorkloadComponent,
+        interfaces: HashSet<WitInterface>,
+    ) -> anyhow::Result<()> {
+        // Add logging implementation to the component's linker
+        // component.linker_mut().func_wrap(...)?;
+        Ok(())
+    }
+
+    async fn stop(&self) -> anyhow::Result<()> {
+        println!("[{}] Logger plugin stopped", self.prefix);
+        Ok(())
+    }
+}
+```
+
+Register the custom plugin with your host:
+
+```rust
+let logger = CustomLogger::new("my-app");
+
+let host = HostBuilder::new()
+    .with_engine(engine)
+    .with_plugin(Arc::new(logger))?
+    .build()?;
+```
+
+## Keep reading
+
+- [Building Custom Hosts](./building-custom-hosts.mdx) - Embed the wasmCloud runtime in your own application
+- [Host Plugins Overview](../overview/hosts/plugins.mdx) - Built-in plugins and plugin architecture
+- [wash-runtime source code](https://github.com/wasmCloud/wash/tree/main/crates/wash-runtime/src/plugin) - Reference implementations of built-in plugins
