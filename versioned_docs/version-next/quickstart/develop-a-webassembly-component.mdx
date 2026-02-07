@@ -15,7 +15,7 @@ In this step, we'll discuss how to:
 - Add more features to our application by plugging in **key-value** and **logging** capabilities.
 
 :::info[Prerequisites]
-This tutorial assumes you're following directly from the previous tutorial. If you don't have a "Hello world" application running with `wash dev`, complete [**Quickstart**](./index.mdx) first.
+This tutorial assumes you're following directly from the previous tutorial. If you don't have a "Hello world" application running, complete [**Quickstart**](./index.mdx) first.
 :::
 
 ## Add functionality
@@ -25,38 +25,47 @@ This tutorial assumes you're following directly from the previous tutorial. If y
 
 Let's extend this application to do more than just say "Hello!"
 
-Using methods on the incoming [`http::Request`](https://docs.rs/http/1.1.0/http/request/struct.Request.html), we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
+We can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
 
 ```rust
-use wasmcloud_component::http;
+use wstd::http::{Body, Request, Response, StatusCode};
 
-struct Component;
-
-http::export!(Component);
-
-impl http::Server for Component {
-    fn handle(
-        _request: http::IncomingRequest, // [!code --]
-        request: http::IncomingRequest, // [!code ++]
-    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
-        let (parts, _body) = request.into_parts(); // [!code ++:11]
-        let query = parts
-            .uri
-            .query()
-            .map(ToString::to_string)
-            .unwrap_or_default();
-        let name = match query.split("=").collect::<Vec<&str>>()[..] {
-            ["name", name] => name,
-            _ => "World",
-        };
-        Ok(http::Response::new(format!("Hello, {name}!\n")))
-        Ok(http::Response::new("Hello from Wasm!\n")) // [!code --]
+#[wstd::http_server]
+async fn main(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    match req.uri().path_and_query().unwrap().as_str() {
+        "/" => home(req).await,
+        _ => not_found(req).await,
     }
+}
+
+async fn home(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+  // Parse query string for name parameter // [!code ++]
+    let query = req.uri().query().unwrap_or(""); // [!code ++]
+    let name = match query.split("=").collect::<Vec<&str>>()[..] { // [!code ++]
+            ["name", name] => name, // [!code ++]
+            _ => "World", // [!code ++]
+        }; // [!code ++]
+  // Return a simple response with a string body
+    Ok(Response::new("Hello from Wasm!\n".into())) // [!code --]
+    Ok(Response::new(format!("Hello, {name}!\n").into())) // [!code ++]
+}
+
+async fn not_found(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    Ok(Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body("Not found\n".into())
+        .unwrap())
 }
 ```
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
+
+:::note[In progress]
+These instructions are in progress and will be available soon.
+:::
+
+<!-->
 
 Let's extend this application to do more than just say "Hello!"
 
@@ -65,54 +74,30 @@ Using the `pathWithQuery` method on the incoming request, we can check the reque
 To make this code more readable, we'll add a helper function to extract the name from the path.
 
 ```typescript
-import { IncomingRequest, ResponseOutparam, OutgoingBody, OutgoingResponse, Fields } from "wasi:http/types@0.2.0";
-
-// Implementation of wasi-http incoming-handler
-//
-// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
-function handle(req: IncomingRequest, resp: ResponseOutparam) {
-  // Start building an outgoing response
-  const outgoingResponse = new OutgoingResponse(new Fields());
-
-  // Access the outgoing response body
-  let outgoingBody = outgoingResponse.body();
-  {
-    // Create a stream for the response body
-    let outputStream = outgoingBody.write();
-    const name = getNameFromPath(req.pathWithQuery() || "") // [!code ++]
-    // Write "hello [name]" to the response stream // [!code ++]
-    outputStream.blockingWriteAndFlush(
-      new Uint8Array(new TextEncoder().encode("Hello from Wasm!\n")) // [!code --]
-      new Uint8Array(new TextEncoder().encode(`Hello ${name}!\n`)) // [!code ++]
-    );
-    // @ts-ignore: This is required in order to dispose the stream before we return
-    outputStream[Symbol.dispose]();
-  }
-
-  // Set the status code for the response
-  outgoingResponse.setStatusCode(200);
-  // Finish the response body
-  OutgoingBody.finish(outgoingBody, undefined);
-  // Set the created response
-  ResponseOutparam.set(resp, { tag: "ok", val: outgoingResponse });
+interface FetchEvent extends Event {
+  request: Request;
+  respondWith(response: Response | Promise<Response>): void;
 }
 
-function getNameFromPath(path: string): string { // [!code ++:8]
-  const parts = path.split("=");
-  if (parts.length == 2) {
-    return parts[1];
-  }
-  return "world";
-}
-
-export const incomingHandler = {
-  handle,
-};
-
+addEventListener('fetch', (event) => {
+  const fetchEvent = event as FetchEvent;
+  fetchEvent.respondWith(new Response('Hello from TypeScript!\n'));
+  fetchEvent.respondWith(new Response('Hello from Wasm!\n')); // [!code --]
+  const url = new URL(fetchEvent.request.url); // [!code ++]
+  const name = url.searchParams.get('name'); // [!code ++]
+  const greeting = name ? `Hello ${name}` : 'Hello World'; // [!code ++]
+  fetchEvent.respondWith(new Response(`${greeting}\n`)); // [!code ++]
+});
 ```
-
+-->
   </TabItem>
     <TabItem value="tinygo" label="Go">
+
+:::note[In progress]
+These instructions are in progress and will be available soon.
+:::
+
+<!--
 
 Let's extend this application to do more than just say "Hello!"
 
@@ -144,7 +129,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 // we call the `handleRequest` function when an HTTP request is received.
 func main() {}
 ```
-
+-->
   </TabItem>
   <TabItem value="unlisted" label="My language isn't listed">
 
@@ -168,7 +153,7 @@ If you prefer working in a language that isn't listed here, let us know!
   </TabItem>
 </Tabs>
 
-After saving your changes, `wash dev` automatically builds and runs the updated application.
+After saving your changes, your toolchain automatically builds and runs the updated application.
 
 We can `curl` the application again:
 
@@ -194,23 +179,36 @@ Now let's add persistent storage to keep a record of each person that this appli
 
 We'll use the **key-value capability** for this. We don't need to pick a library or a specific vendor implementation&mdash;all we have to do is add the interface to our component.
 
-We can use the `wasi:keyvalue` interface for interacting with a key value store, and the `wasi:logging` interface to log the name of each person we greet. Before we can use those interfaces, we'll need to add them to our `wit/world.wit` file:
+We can use the `wasi:keyvalue` interface for interacting with a key value store. 
 
 <Tabs groupId="lang" queryString>
   <TabItem value="rust" label="Rust">
+
+Before we can use the interface, we'll need to add a `wit/world.wit` file:
+
+```sh
+touch wit/world.wit
+```
+
 ```wit {4-6}
-package wasmcloud:hello;
+package wasmcloud:templates@0.1.0;
 
-world hello {
-  import wasi:keyvalue/atomics@0.2.0-draft; 
-  import wasi:keyvalue/store@0.2.0-draft; 
-  import wasi:logging/logging@0.1.0-draft; 
-
-  export wasi:http/incoming-handler@0.2.0;
+world rust-http-hello-world {
+    import wasi:keyvalue/store@0.2.0-draft;
+    import wasi:keyvalue/atomics@0.2.0-draft;
 }
 ```
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
+
+:::note[In progress]
+These instructions are in progress and will be available soon.
+:::
+
+<!--
+
+Before we can use the interface, we'll need to update the `wit/world.wit` file:
+
 ```wit {4-6}
 package wasmcloud:hello;
 
@@ -222,8 +220,16 @@ world hello {
   export wasi:http/incoming-handler@0.2.0;
 }
 ```
+-->
   </TabItem>
   <TabItem value="tinygo" label="Go">
+:::note[In progress]
+These instructions are in progress and will be available soon.
+:::
+
+<!--
+Before we can use the interface, we'll need to update the `wit/world.wit` file:
+
 ```wit {5-7}
 package wasmcloud:hello;
 
@@ -236,6 +242,7 @@ world hello {
   export wasi:http/incoming-handler@0.2.0;
 }
 ```
+-->
   </TabItem>
   <TabItem value="unlisted" label="My language isn't listed">
 
@@ -263,54 +270,78 @@ If you prefer working in a language that isn't listed here, let us know!
   
     <TabItem value="rust" label="Rust">
 
-We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface and general logging operations via `wasi:logging`.
+We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface.
+
+Now we need to add `wit-bindgen` to our `Cargo.toml` so we can generate Rust bindings from the WIT world:
+
+```toml
+[dependencies]
+wstd = "0.6.3"
+wit-bindgen = "0.46.0" # [!code ++]
+```
 
 Now let's use the atomic increment function to keep track of how many times we've greeted each person.
 
 ```rust
-use wasmcloud_component::http; // [!code --]
-use wasmcloud_component::http::ErrorCode; // [!code ++:3]
-use wasmcloud_component::wasi::keyvalue::*;
-use wasmcloud_component::{http, info};
+use wstd::http::{Body, Request, Response, StatusCode};
 
-struct Component;
+// Generate keyvalue bindings from our WIT world // [!code ++]
+// wstd handles the http export via its macro // [!code ++]
+wit_bindgen::generate!({ // [!code ++]
+    world: "rust-http-hello-world", // [!code ++]
+    path: "wit", // [!code ++]
+    generate_all, // [!code ++]
+}); // [!code ++]
 
-http::export!(Component);
+use wasi::keyvalue::{atomics, store}; // [!code ++]
 
-impl http::Server for Component {
-    fn handle(
-        request: http::IncomingRequest,
-    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
-        let (parts, _body) = request.into_parts();
-        let query = parts
-            .uri
-            .query()
-            .map(ToString::to_string)
-            .unwrap_or_default();
-        let name = match query.split("=").collect::<Vec<&str>>()[..] {
+#[wstd::http_server]
+async fn main(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    match req.uri().path_and_query().unwrap().as_str() {
+        "/" => home(req).await,
+        _ => not_found(req).await,
+    }
+}
+
+async fn home(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    // Parse query string for name parameter
+    let query = req.uri().query().unwrap_or("");
+    let name = match query.split("=").collect::<Vec<&str>>()[..] {
             ["name", name] => name,
             _ => "World",
         };
+    // Open keyvalue bucket and increment counter for this name // [!code ++]
+    // Note: wasmtime's in-memory keyvalue provider requires empty string as identifier // [!code ++]
+    let bucket = store::open("") // [!code ++]
+        .map_err(|e| wstd::http::Error::msg(format!("keyvalue open error: {:?}", e)))?; // [!code ++]
 
-        info!("Greeting {name}"); // [!code ++:10]
+    let count = atomics::increment(&bucket, &name, 1) // [!code ++]
+        .map_err(|e| wstd::http::Error::msg(format!("keyvalue increment error: {:?}", e)))?; // [!code ++]
 
-        let bucket = store::open("default").map_err(|e| {
-            ErrorCode::InternalError(Some(format!("failed to open KV bucket: {e:?}")))
-        })?;
-        let count = atomics::increment(&bucket, &name, 1).map_err(|e| {
-            ErrorCode::InternalError(Some(format!("failed to increment counter: {e:?}")))
-        })?;
+    // Return greeting with count // [!code ++]
+    Ok(Response::new(format!("Hello x{count}, {name}!\n").into())) // [!code ++]
+    // Return a simple response with a string body // [!code --]
+    Ok(Response::new(format!("Hello, {name}!\n").into())) // [!code --]
+}
 
-        Ok(http::Response::new(format!("Hello x{count}, {name}!\n")))
-    }
+async fn not_found(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    Ok(Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body("Not found\n".into())
+        .unwrap())
 }
 ```
 
-We've made changes, so once we save, `wash dev` will once again automatically update the running application.
+We've made changes, so once we save, the toolchain will once again automatically update the running application.
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
 
+:::note[In progress]
+These instructions are in progress and will be available soon.
+:::
+
+<!-->
 We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface and general logging operations via `wasi:logging`.
 
 Now let's use the atomic increment function to keep track of how many times we've greeted each person.
@@ -379,10 +410,14 @@ function handle(req: IncomingRequest, resp: ResponseOutparam) {
 ```
 
 We've made changes, so once we save, `wash dev` will once again automatically update the running application.
-
+-->
   </TabItem>
   <TabItem value="tinygo" label="Go">
+:::note[In progress]
+These instructions are in progress and will be available soon.
+:::
 
+<!--
 :::info
 In addition to using the `wasi:logging` interface, logs printed to STDERR will be output in host logs by default.
 :::
@@ -451,7 +486,7 @@ Now restart the dev loop:
 ```shell
 wash dev
 ```
-
+-->
   </TabItem>
   <TabItem value="unlisted" label="My language isn't listed">
 
@@ -508,4 +543,4 @@ In this tutorial, you added a few more features and persistent storage to a simp
 - Write purely functional code that doesn't require you to pick a library or vendor upfront
 - Change your application _separately_ from its non-functional requirements
 
-So far, the `wash dev` process has satisfied our application's capability requirements automatically, so we can move quickly and focus on code. In the [next tutorial](./deploy-a-webassembly-workload.mdx), we'll deploy WebAssembly workloads to wasmCloud on a local Kubernetes cluster.
+So far, `wash` has satisfied our application's capability requirements automatically, so we can move quickly and focus on code. In the [next tutorial](./deploy-a-webassembly-workload.mdx), we'll deploy WebAssembly workloads to wasmCloud on a local Kubernetes cluster.

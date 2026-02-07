@@ -16,7 +16,7 @@ In this tutorial:
 
 ## Install `wash`
 
-First, we need to install the latest version of `wash` (**`2.0.0-rc.6`**).
+First, we need to install the latest version of `wash` (**`2.0.0-rc.7`**).
 
 <Tabs groupId="os" queryString>
   <TabItem value="macoslinux" label="macOS and Linux" default>
@@ -93,7 +93,7 @@ Pre-built binaries for macOS, Linux, and Windows are [available on GitHub](https
   </TabItem>
 </Tabs>
 
-Verify that `wash` is properly installed and check your version for **`2.0.0-rc.6`** with:
+Verify that `wash` is properly installed and check your version for **`2.0.0-rc.7`** with:
 
 ```bash
 wash -V
@@ -357,19 +357,19 @@ Now that we've installed `wash` and our language toolchain, it's time to create 
 In your terminal, run:
 
 ```shell
-wash new https://github.com/wasmCloud/wash.git --name hello --subfolder examples/quickstart/hello-rust
+wash new https://github.com/wasmCloud/wash.git --name http-hello-world --subfolder templates/http-hello-world
 ```
 
 This command...
 
-* Creates a new project named `hello`...
+* Creates a new project named `http-hello-world`...
 * Based on an example found in the [`wasmCloud/wash`](https://github.com/wasmCloud/wash) Git repository...
-* In the subfolder `examples/quickstart/hello-rust`. 
+* In the subfolder `templates/http-hello-world`. 
 
 Navigate to the `hello` project directory:
 
 ```sh
-cd hello
+cd http-hello-world
 ```
 
 ### Start your developer loop
@@ -410,19 +410,19 @@ Hello from Rust!
 In your terminal, run:
 
 ```shell
-wash new https://github.com/wasmCloud/wash.git --name hello --subfolder examples/quickstart/hello-ts
+wash new https://github.com/wasmCloud/typescript.git --name http-hello-world --subfolder templates/http-hello-world --git-ref v2
 ```
 
 This command...
 
-* Creates a new project named `hello`...
-* Based on a template found in the `wasmCloud/wash` Git repository...
-* In the subfolder `examples/quickstart/hello-ts`.
+* Creates a new project named `http-hello-world`...
+* Based on a template found in the `v2` branch of the `wasmCloud/typescript` Git repository...
+* In the subfolder `templates/http-hello-world`. 
 
 Navigate to the `hello` project directory:
 
 ```sh
-cd hello
+cd http-hello-world
 ```
 
 ### Start your developer loop
@@ -430,22 +430,14 @@ cd hello
 From our project directory, we'll run:
 
 ```shell
-wash dev
+npm run dev
 ```
 
-The `wash dev` command automatically **builds your WebAssembly component** and **deploys it to a local wasmCloud environment**. The terminal output should look like this:
+The `npm run dev` command automatically **builds your WebAssembly component** and **deploys it to a local wasmCloud environment**. The last lines of the terminal output should look like this:
 
 ```text
-INFO starting development session for project path="."
-INFO building component path="."
-INFO running install command package_manager=npm install_args=["install"]
-INFO npm install completed in 1.42s
-INFO npm run build completed in 4.97s
-INFO Generated project configuration at ./.wash/config.json
-INFO HTTP server listening addr=0.0.0.0:8000
-INFO development session started successfully
-INFO listening for HTTP requests address=http://0.0.0.0:8000
-INFO watching for file changes (press Ctrl+c to stop)...
+OK Successfully written dist/http_hello_world.wasm.
+2026-02-06T15:35:03.588693Z  INFO listening for HTTP requests address=http://0.0.0.0:8000
 ```
 
 By default, the application will run on our local port 8000. In a new terminal tab, we can `curl` our application:
@@ -457,13 +449,19 @@ curl localhost:8000
 The application should return:
 
 ```text
-Hello from Typescript!
+Hello from TypeScript!
 ```
 
 You just ran a WebAssembly application in wasmCloud!
 
   </TabItem>
   <TabItem value="tinygo" label="Go">
+
+:::note[In progress]
+Instructions for Go are in progress and will be available soon.
+:::
+
+<!--
 
 In your terminal, run:
 
@@ -518,6 +516,8 @@ Hello from Go!
 
 You just ran a WebAssembly application in wasmCloud!
 
+-->
+
   </TabItem>
   <TabItem value="unlisted" label="My language isn't listed">
 
@@ -551,43 +551,62 @@ Now we'll make a change to our code and see how the running application updates 
 
 The Rust code for our component is found in `src/lib.rs`.
 
-Open the file in your code editor and change the "Hello" message on line 19. You might modify the message to say hello from WebAssembly, your own name, or whatever else you like.
+Open the file in your code editor and change the "Hello" message on line 13. You might modify the message to say hello from WebAssembly, your own name, or whatever else you like.
 
 ```rust
-use wasmcloud_component::http;
+use wstd::http::{Body, Request, Response, StatusCode};
 
-struct Component;
-
-http::export!(Component);
-
-impl http::Server for Component {
-    fn handle(
-        _request: http::IncomingRequest,
-    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
-        Ok(http::Response::new("Hello from Rust!\n")) // [!code --]
-        Ok(http::Response::new("Hello from Wasm!\n")) // [!code ++]
+#[wstd::http_server]
+async fn main(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    match req.uri().path_and_query().unwrap().as_str() {
+        "/" => home(req).await,
+        _ => not_found(req).await,
     }
+}
+
+async fn home(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    // Return a simple response with a string body
+    Ok(Response::new("Hello from Rust!\n".into())) // [!code --]
+    Ok(Response::new("Hello from Wasm!\n".into())) // [!code ++]
+}
+
+async fn not_found(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    Ok(Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body("Not found\n".into())
+        .unwrap())
 }
 ```
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
 
-The TypeScript code for our component is found in `http-hello-world.ts`.
+The TypeScript code for our component is found in `component.ts`.
 
-Open the file in your code editor and change the "Hello" message on line 23. You might modify the message to say hello from WebAssembly, your own name, or whatever else you like.
+Open the file in your code editor and change the "Hello" message on line 8. You might change the message into a greeting from WebAssembly, your own name, or whatever else you like.
 
 ```typescript
-// Write hello world to the response stream
-outputStream.blockingWriteAndFlush(
-  new Uint8Array(new TextEncoder().encode('Hello from Typescript!\n')) // [!code --]
-  new Uint8Array(new TextEncoder().encode('Hello from Wasm!\n')) // [!code ++]
-);
+interface FetchEvent extends Event {
+  request: Request;
+  respondWith(response: Response | Promise<Response>): void;
+}
+
+addEventListener('fetch', (event) => {
+  const fetchEvent = event as FetchEvent;
+  fetchEvent.respondWith(new Response('Hello from TypeScript!\n')); // [!code --]
+  fetchEvent.respondWith(new Response('Hello from Wasm!\n')); // [!code ++]
+});
 ```
 
   </TabItem>
 
 <TabItem value="tinygo" label="Go">
+
+:::note[In progress]
+Instructions for Go are in progress and will be available soon.
+:::
+
+<!--
 
 The Go code for our component is found in `main.go`.
 
@@ -599,7 +618,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "Hello from Wasm!\n") // [!code ++]
 }
 ```
-
+-->
   </TabItem>
 
   <TabItem value="unlisted" label="My language isn't listed">
@@ -624,7 +643,7 @@ If you prefer working in a language that isn't listed here, let us know!
   </TabItem>
 </Tabs>
 
-Save the modified file. The `wash dev` automatically builds and deploys the updated component.
+Save the modified file. Your toolchain automatically builds and deploys the updated component.
 
 In the terminal, `curl` the application again:
 
@@ -638,6 +657,6 @@ Hello from Wasm!
 
 ## Next steps
 
-We installed `wash`, built our first component, and ran our application locally with `wash dev`.
+We installed `wash`, built our first component, and ran our application locally.
 
 In our next tutorial, we'll **add pluggable, reusable capabilities** like key-value storage to our application.
