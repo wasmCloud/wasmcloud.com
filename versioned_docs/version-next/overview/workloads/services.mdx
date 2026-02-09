@@ -38,6 +38,24 @@ However, components **can** connect to TCP ports the service is listening on:
 
 ![component to service flow](../../images/component-to-service-flow.png)
 
+## How services use interfaces
+
+Services are not limited to TCP&mdash;they can use your own [custom interfaces](../interfaces.mdx) defined in WIT. The `wasi:sockets` TCP bind permission is simply a special capability that services receive, enabling them to act as TCP listeners within the workload boundary.
+
+### Export requirement
+
+A service must export `wasi:cli/run` (the standard run function) **or** exactly one [WIT interface](../interfaces.mdx). This is how the runtime identifies the service's entry point. For example, a service could export `wasi:cli/run` to act as a long-running process with a `main` function, or it could export a single custom interface.
+
+### Imports and host plugins
+
+Services can import any host interface that a [plugin](../hosts/plugins.mdx) provides. The `host_interfaces` field on a workload lists WIT interfaces that need to be resolved by host plugins. When the runtime binds plugins, it checks which WIT interfaces the service's world needs and binds matching plugins&mdash;treating services the same as components in this regard.
+
+The special treatment services receive for `wasi:sockets` only affects whether TCP bind is allowed: services can bind to loopback and unspecified addresses for TCP, while regular components cannot. Beyond this, services interact with host plugins in the same way as components.
+
+### Custom interface exports
+
+Services can export arbitrary WIT interfaces. The only constraint is the validation described above: the service must export `wasi:cli/run` or exactly one interface, so that the runtime knows the entry point. This means you can build services that expose domain-specific functionality through a custom WIT interface.
+
 ## Use cases
 
 :::info[Developing services]
@@ -111,6 +129,7 @@ async fn main() -> io::Result<()> {
 When developing applications with services, it is important to consider the following:
 
 - **One service per workload**: Currently, workloads support a single service.
+- **Export constraint**: Services must export `wasi:cli/run` or exactly one WIT interface.
 - **One-way communication**: Components cannot call service exports via WIT (but can use TCP).
 - **Memory usage**: Services maintain state, so they consume memory continuously.
 - **WASI P2**: Services currently compile to WASI P2 (`wasm32-wasip2` target).
