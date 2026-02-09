@@ -2,163 +2,184 @@
 title: "Configuration"
 sidebar_position: 4
 ---
-# Wasm Shell Build Configuration
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-Wasm Shell builds WebAssembly component binaries by wrapping language-specific utilities like `cargo`, `go`, `npm`, etc. Component builds can be configured via a `config.json` file. 
+# Wasm Shell Configuration
 
-* Configuration is optional for Rust and TypeScript builds.
-* At the moment, configuration is required for Go (TinyGo) builds.
+This document describes the configuration options available for the `wash` CLI. Configuration can be specified in YAML, JSON, or TOML format (`.json`, `.yaml`, `.yml`, or `.toml`).
 
-## Configuration for custom builds
+Wasm Shell uses two configuration files: 
 
-Wasm Shell executes the build command for your language toolchain with opinionated defaults. You can override Wasm Shell's default build command by defining a custom build command. For example:
+* [**User configuration**](#user-configuration) that is local to the machine 
+* [**Project configuration**](#project-configuration) in the `.wash` directory at the root of each project
 
-```json
-{
-  "build": {
-    "custom": {
-      "command": ["cargo", "build", "--target=wasm32-wasip2", "--color=always"]
-    }
-  }
-}
-```
+## Configuration hierarchy
 
-## Configuration for TinyGo builds
+Configuration is merged with the following precedence (highest to lowest):
 
-TinyGo builds require a `config.json` configuration file that is stored by default in a `.wash` subfolder of your project directory. This file is required in order to specify the WIT world used by the component.
+1. CLI arguments
+2. Environment variables (`WASH_ prefix`)
+3. Project config (`.wash/config.yaml`)
+4. User config (`$HOME/.config/wash/config.yaml`)
+5. Default values
 
-If you attempt to build without a configuration file, `wash` will generate a `config.json` file at `./.wash/config.json` and return this message:
+## User configuration
 
-```text
-TinyGo builds require wit_world to be specified in the configuration. A config file has been created at ./.wash/config.json with a placeholder. Please update the wit_world field to match your WIT world name.
-```
+By default, user configuration files are found at `$HOME/.config/wash/config.yaml`. 
 
-A simple `config.json` file looks like this:
-
-```json {13}
-{
-  "build": {
-    "tinygo": {
-      "target": "wasip2",
-      "build_flags": [],
-      "disable_go_generate": false,
-      "scheduler": "asyncify",
-      "gc": "conservative",
-      "opt": "z",
-      "panic": "print",
-      "tags": [],
-      "no_debug": true,
-      "wit_world": "PLACEHOLDER_WIT_WORLD"
-    },
-    "artifact_path": "build/output.wasm"
-  }
-}
-```
-
-The `wit_world` field of `config.json` should specify the root WIT world in your `./wit` subfolder, often contained in a `world.wit` file. 
-
-In the example below, the WIT world is `hello`:
-
-```wit {2}
-package wasmcloud:hello;
-world hello {
-  include wasmcloud:component-go/imports@0.1.0;
-  import wasi:logging/logging@0.1.0-draft;
-  import wasi:keyvalue/atomics@0.2.0-draft;
-  import wasi:keyvalue/store@0.2.0-draft;
-  export wasi:http/incoming-handler@0.2.0;
-}
-```
-
-The component should compile after updating `config.json`:
-
-```json
-{
-  "build": {
-    "tinygo": {
-      "target": "wasip2",
-      "build_flags": [],
-      "disable_go_generate": false,
-      "scheduler": "asyncify",
-      "gc": "conservative",
-      "opt": "z",
-      "panic": "print",
-      "tags": [],
-      "no_debug": true,
-      "wit_world": "PLACEHOLDER_WIT_WORLD" // [!code --]
-      "wit_world": "hello" // [!code ++]
-    },
-    "artifact_path": "build/output.wasm"
-  }
-}
-```
-
-TinyGo builds use Go, TinyGo, and `wasm-tools`. Configuration fields for TinyGo builds include:
-
-* `target`: Virtual architecture target for the WebAssembly binary. [default: `wasip2`]
-* `build_flags`: TinyGo build flags
-* `disable_go_generate`: Boolean setting for automatically generating Go bindings from WIT interfaces. [default: `false`]
-* `scheduler`: Scheduler to use for TinyGo builds. **Note:** asyncify is a Wasm-specific scheduler and should be used in most cases. ([See TinyGo options for more details](https://tinygo.org/docs/reference/usage/important-options/).) [default: `asyncify`]
-* `gc`: Memory manager selection. ([See TinyGo options for more details](https://tinygo.org/docs/reference/usage/important-options/).) [default: `conservative`]
-* `opt`: Optimization level. ([See TinyGo options for more details](https://tinygo.org/docs/reference/usage/important-options/).) [default: `z`]
-* `panic`: Panic strategy. ([See TinyGo options for more details](https://tinygo.org/docs/reference/usage/important-options/).) [default: `print`]
-* `tags`: Go build tags
-* `no_debug`: Boolean setting for debug mode [default: `true`]
-* `wit_world`: Target WIT world
-* `artifact_path`: Target path for WebAssembly binary output [default: `build/output.wasm`]
-
-:::warning[Common issues]
-For solutions to common issues with TinyGo builds, see the [Frequently Asked Questions (FAQ)](./faq.mdx).
+:::warning[Under construction]
+This section is under active development&mdash;please check back soon for a more complete reference.
 :::
 
-## Configuration for Rust builds
+## Project configuration
 
-When you build a WebAssembly component from a Rust project, `wash` automatically generates a `config.json` file at `./.wash/config.json`:
+Projects can be configured via a project config file that resides in the `.wash` directory at the project root, and which may be expressed in JSON, YAML, or TOML format.
 
-```json
-{
-  "build": {
-    "rust": {
-      "target": "wasm32-wasip2",
-      "cargo_flags": [],
-      "release": false,
-      "features": [],
-      "no_default_features": false
-    }
-  }
-}
+Top-level project configuration options include:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `version` | string | Configuration schema version |
+| `build` | object | Build configuration options |
+| `dev` | object | Development server configuration options |
+| `wit` | object | WIT dependency management configuration |
+
+### `version` configuration
+
+Specify the `wash` version for this project.
+
+Example:
+
+```yaml
+version: 2.0.0-rc.7
 ```
 
-Configuration fields for Rust builds include:
+### `build` configuration
 
-* `target`: Virtual architecture target for the WebAssembly binary [default: `wasm32-wasip2`]
-* `cargo_flags`: cargo build flags
-* `release`: Boolean setting for building in release mode [default: `false`]
-* `features`: Defined features
-* `no_default_features`: Boolean setting for excluding default features [default: `false`]
+Wasm Shell builds WebAssembly component binaries by wrapping language-specific utilities like `cargo`, `go`, `npm`, etc, and project configuration files are used to define configuration for builds.
 
-## Configuration for TypeScript builds
+Wasm Shell executes the build command for your language toolchain specified in your project configuration file. 
 
-When you build a WebAssembly component from a TypeScript project, `wash` automatically generates a `config.json` file at `./.wash/config.json`:
+#### `build` options
 
-```json
-{
-  "build": {
-    "typescript": {
-      "package_manager": "npm",
-      "build_command": "build",
-      "build_flags": [],
-      "skip_install": false,
-      "source_maps": false
-    }
-  }
-}
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `command` | string | - | Build command to execute |
+| `env` | map | `{}` | Environment variables to set during the build process |
+| `component_path` | string | - | Path to the output Wasm component file |
+
+#### `build` examples
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust" default>
+```yaml
+build:
+  command: cargo build --target wasm32-wasip2 --release
+  component_path: target/wasm32-wasip2/release/project_name.wasm
+```
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo">
+```yaml
+build:
+  command: go generate ./... && tinygo build -target wasip2 -wit-package ./wit -wit-world example -o build/output.wasm ./
+  component_path: build/output.wasm
+```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+```yaml
+build:
+  command: npm run install-and-build
+  component_path: dist/output.wasm
 ```
 
-Configuration fields for TypeScript builds include:
+This build command will execute the `install-and-build` script defined in your TypeScript project's `package.json` file. Make sure the value for `component_path` matches the path defined in your build script. 
+  </TabItem>
+</Tabs>
 
-* `package_manager`: Package manager to use for builds [default: `npm`]
-* `build_command`: Command to use for builds [default: `build`]
-* `build_flags`: TypeScript build flags
-* `skip_install`: Boolean setting for skipping initial install step [default: `false`]
-* `source_maps`: Boolean setting for generating source maps [default: `false`]
+### `dev` configuration
+
+`wash dev` builds a component according to the specified build options (unless otherwise specified in the `dev` options) and then starts a local development server. There are a variety of options available for local development.
+
+#### `dev` options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `command` | string | - | Custom command to run for building during development |
+| `address` | string | - | Address for the development server to listen on |
+| `service` | boolean | `false` | Whether to run as a long-running service with port binding |
+| `service_file` | string | - | Path to a service definition file |
+| `components` | array | `[]` | Additional components to load during development |
+| `volumes` | array | `[]` | Volumes to mount from host to guest |
+| `host_interfaces` | array | `[]` | WIT interfaces to expose from the host |
+| `tls_cert_path` | string | - | Path to TLS certificate file for HTTPS |
+| `tls_key_path` | string | - | Path to TLS private key file for HTTPS |
+| `tls_ca_path` | string | - | Path to TLS CA certificate file |
+| `wasi_webgpu` | boolean | `false` | Enable WASI WebGPU support |
+| `wasi_keyvalue_path` | string | - | Path for WASI key-value store data |
+| `wasi_blobstore_path` | string | - | Path for WASI blob store data |
+
+##### `dev.components[]`
+
+Additional components to load alongside your main component.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Name identifier for the component |
+| `file` | string | Path to the component Wasm file |
+
+##### `dev.volumes[]`
+
+Volume mounts for filesystem access from within the Wasm component.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `host_path` | string | Path on the host filesystem |
+| `guest_path` | string | Path as seen from within the Wasm component |
+
+#### `dev` example
+
+```yaml
+dev:
+  command: cargo build --target wasm32-wasip2 --debug
+  address: 127.0.0.1:8080
+  service: true
+  wasi_webgpu: true
+  tls_cert_path: "./certs/cert.pem"
+  tls_key_path: "./certs/key.pem"
+```
+
+### `wit` configuration
+
+Configuration for WIT (WebAssembly Interface Type) dependency management.
+
+#### `wit` options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `registries` | array | wasm.pkg registry | Registries for WIT package fetching |
+| `skip_fetch` | boolean | `false` | Skip fetching WIT dependencies |
+| `wit_dir` | string | `./wit` | Directory where WIT files are stored |
+| `sources` | map | `{}` | Source overrides for WIT dependencies (target → source mapping) |
+
+#### `wit.registries[]`
+
+Registry configuration for fetching WIT packages.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `url` | string | Registry URL endpoint |
+| `token` | string | Optional authentication token |
+
+#### `wit` example
+
+```yaml
+wit:
+  wit_dir: "./wit"
+  skip_fetch: false
+  registries:
+    - url: "https://private-registry.example.com"
+      token: "${REGISTRY_TOKEN}"
+  sources:
+    "wasi:http": "https://github.com/WebAssembly/wasi-http/archive/refs/tags/v0.2.0.tar.gz"
+```
