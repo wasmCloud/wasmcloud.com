@@ -61,35 +61,31 @@ async fn not_found(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Er
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
 
-:::note[In progress]
-These instructions are in progress and will be available soon.
-:::
-
-<!-->
-
 Let's extend this application to do more than just say "Hello!"
 
-Using the `pathWithQuery` method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "hello world!"
-
-To make this code more readable, we'll add a helper function to extract the name from the path.
+Using Hono's built-in query parameter parsing, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one, we'll default to saying "Hello, World!"
 
 ```typescript
-interface FetchEvent extends Event {
-  request: Request;
-  respondWith(response: Response | Promise<Response>): void;
-}
+import { Hono } from 'hono';
+import { fire } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
 
-addEventListener('fetch', (event) => {
-  const fetchEvent = event as FetchEvent;
-  fetchEvent.respondWith(new Response('Hello from TypeScript!\n'));
-  fetchEvent.respondWith(new Response('Hello from Wasm!\n')); // [!code --]
-  const url = new URL(fetchEvent.request.url); // [!code ++]
-  const name = url.searchParams.get('name'); // [!code ++]
-  const greeting = name ? `Hello ${name}` : 'Hello World'; // [!code ++]
-  fetchEvent.respondWith(new Response(`${greeting}\n`)); // [!code ++]
+const app = new Hono();
+
+app.get('/', (c) => {
+  return c.text('Hello from Wasm!\n'); // [!code --]
+  const name = c.req.query('name') || 'World'; // [!code ++]
+  return c.text(`Hello, ${name}!\n`); // [!code ++]
 });
+
+app.notFound((c) => {
+  return c.text('Not found\n', 404);
+});
+
+fire(app);
+
+export { incomingHandler } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
 ```
--->
+
   </TabItem>
     <TabItem value="tinygo" label="Go">
 
@@ -97,7 +93,7 @@ addEventListener('fetch', (event) => {
 These instructions are in progress and will be available soon.
 :::
 
-<!--
+{/*
 
 Let's extend this application to do more than just say "Hello!"
 
@@ -117,19 +113,19 @@ func init() {
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-  name := "World" // [!code ++]
-  if len(r.FormValue("name")) > 0 { // [!code ++]
-    name = r.FormValue("name") // [!code ++]
-  } // [!code ++]
-  fmt.Fprintf(w, "Hello, %s!\n", name) // [!code ++]
-  fmt.Fprintf(w, "Hello from Wasm!\n") // [!code --]
+  name := "World"
+  if len(r.FormValue("name")) > 0 {
+    name = r.FormValue("name")
+  }
+  fmt.Fprintf(w, "Hello, %s!\n", name)
+  fmt.Fprintf(w, "Hello from Wasm!\n")
 }
 
 // Since we don't run this program like a CLI, the `main` function is empty. Instead,
 // we call the `handleRequest` function when an HTTP request is received.
 func main() {}
 ```
--->
+*/}
   </TabItem>
   <TabItem value="unlisted" label="My language isn't listed">
 
@@ -201,36 +197,29 @@ world rust-http-hello-world {
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
 
-:::note[In progress]
-These instructions are in progress and will be available soon.
-:::
-
-<!--
-
 Before we can use the interface, we'll need to update the `wit/world.wit` file:
 
-```wit {4-6}
-package wasmcloud:hello;
+```wit {4-5}
+package wasmcloud:templates@0.1.0;
 
-world hello {
-  import wasi:keyvalue/atomics@0.2.0-draft; 
-  import wasi:keyvalue/store@0.2.0-draft; 
-  import wasi:logging/logging@0.1.0-draft; 
+world typescript-http-hello-world-hono {
+  import wasi:keyvalue/store@0.2.0-draft;
+  import wasi:keyvalue/atomics@0.2.0-draft;
 
-  export wasi:http/incoming-handler@0.2.0;
+  export wasi:http/incoming-handler@0.2.6;
 }
 ```
--->
+
   </TabItem>
   <TabItem value="tinygo" label="Go">
 :::note[In progress]
 These instructions are in progress and will be available soon.
 :::
 
-<!--
+{/*
 Before we can use the interface, we'll need to update the `wit/world.wit` file:
 
-```wit {5-7}
+```wit
 package wasmcloud:hello;
 
 world hello {
@@ -242,7 +231,7 @@ world hello {
   export wasi:http/incoming-handler@0.2.0;
 }
 ```
--->
+*/}
   </TabItem>
   <TabItem value="unlisted" label="My language isn't listed">
 
@@ -337,90 +326,59 @@ We've made changes, so once we save, the toolchain will once again automatically
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
 
-:::note[In progress]
-These instructions are in progress and will be available soon.
-:::
-
-<!-->
-We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface and general logging operations via `wasi:logging`.
+We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface.
 
 Now let's use the atomic increment function to keep track of how many times we've greeted each person.
 
 :::info[Missing Imports]
 
-At the time of writing, JCO does not generate types for `wasi:logging` or `wasi:keyvalue`. This is
+At the time of writing, JCO does not generate types for `wasi:keyvalue`. This is
 a known issue and will be resolved in a future release. For now, you can tell the TypeScript
 compiler to ignore the missing types by adding `//@ts-expect-error` before each import statement.
-Simply including the import statement will allow the host to provider the functionality at runtime.
+Simply including the import statement will allow the host to provide the functionality at runtime.
 
 :::
 
 ```typescript
-import {
-  IncomingRequest,
-  ResponseOutparam,
-  OutgoingBody,
-  OutgoingResponse,
-  Fields,
-} from 'wasi:http/types@0.2.0';
+import { Hono } from 'hono';
+import { fire } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
 
-//@ts-expect-error -- these types aren't currently generated by JCO // [!code ++:6]
-import { log } from 'wasi:logging/logging@0.1.0-draft';
-//@ts-expect-error -- these types aren't currently generated by JCO
+//@ts-expect-error -- these types aren't currently generated by JCO // [!code ++:4]
 import { increment } from 'wasi:keyvalue/atomics@0.2.0-draft';
-// @ts-expect-error -- these types aren't currently generated by JCO
+//@ts-expect-error -- these types aren't currently generated by JCO
 import { open } from 'wasi:keyvalue/store@0.2.0-draft';
 
-// Implementation of wasi-http incoming-handler
-//
-// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
-function handle(req: IncomingRequest, resp: ResponseOutparam) {
-  // Start building an outgoing response
-  const outgoingResponse = new OutgoingResponse(new Fields());
+const app = new Hono();
 
-  // Access the outgoing response body
-  let outgoingBody = outgoingResponse.body();
-  // Write to the response stream // [!code ++:8]
-  const name = getNameFromPath(req.pathWithQuery() || '');
+app.get('/', (c) => {
+  const name = c.req.query('name') || 'World';
+  return c.text(`Hello, ${name}!\n`); // [!code --]
 
-  log('info', '', `Greeting ${name}`);
-
-  // Increment the bucket's count
-  const bucket = open('default');
+  // Open keyvalue bucket and increment counter for this name // [!code ++:4]
+  const bucket = open('');
   const count = increment(bucket, name, 1);
+  return c.text(`Hello x${count}, ${name}!\n`); // [!code ++]
+});
 
-  {
-    // Create a stream for the response body
-    let outputStream = outgoingBody.write();
-    // Write hello world to the response stream
-    outputStream.blockingWriteAndFlush(
-      new Uint8Array(new TextEncoder().encode(`Hello x${count}, ${name}!\n`)), // [!code ++]
-    );
-    // @ts-ignore: This is required in order to dispose the stream before we return
-    outputStream[Symbol.dispose]();
-  }
+app.notFound((c) => {
+  return c.text('Not found\n', 404);
+});
 
-  // Set the status code for the response
-  outgoingResponse.setStatusCode(200);
-  // Finish the response body
-  OutgoingBody.finish(outgoingBody, undefined);
-  // Set the created response
-  ResponseOutparam.set(resp, { tag: 'ok', val: outgoingResponse });
-}
+fire(app);
+
+export { incomingHandler } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
 ```
 
-We've made changes, so once we save, `wash dev` will once again automatically update the running application.
--->
+We've made changes, so once we save, the toolchain will once again automatically update the running application.
+
   </TabItem>
   <TabItem value="tinygo" label="Go">
 :::note[In progress]
 These instructions are in progress and will be available soon.
 :::
 
-<!--
-:::info
+{/*
 In addition to using the `wasi:logging` interface, logs printed to STDERR will be output in host logs by default.
-:::
 
 We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface.
 
@@ -436,9 +394,9 @@ import (
   "fmt"
   "net/http"
 
-  atomics "hello/gen/wasi/keyvalue/atomics"  // [!code ++]
-  store "hello/gen/wasi/keyvalue/store"  // [!code ++]
-  "go.wasmcloud.dev/component/log/wasilog"  // [!code ++]
+  atomics "hello/gen/wasi/keyvalue/atomics"
+  store "hello/gen/wasi/keyvalue/store"
+  "go.wasmcloud.dev/component/log/wasilog"
   "go.wasmcloud.dev/component/net/wasihttp"
 )
 
@@ -447,15 +405,15 @@ func init() {
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-  logger := wasilog.ContextLogger("handleRequest")  // [!code ++]
+  logger := wasilog.ContextLogger("handleRequest")
 
   name := "World"
   if len(r.FormValue("name")) > 0 {
     name = r.FormValue("name")
   }
-  logger.Info("Greeting", "name", name) // [!code ++]
+  logger.Info("Greeting", "name", name)
 
-  kvStore := store.Open("default") // [!code ++:11]
+  kvStore := store.Open("default")
   if err := kvStore.Err(); err != nil {
     w.Write([]byte("Error: " + err.String()))
     return
@@ -466,16 +424,16 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
     return
   }
 
-  fmt.Fprintf(w, "Hello x%d, %s!\n", *value.OK(), name) // [!code ++]
-  fmt.Fprintf(w, "Hello, %s!\n", name) // [!code --]
+  fmt.Fprintf(w, "Hello x%d, %s!\n", *value.OK(), name)
+  fmt.Fprintf(w, "Hello, %s!\n", name)
 }
 
-// Since we don't run this program like a CLI, the `main` function is empty. Instead,
-// we call the `handleRequest` function when an HTTP request is received.
+// Since we don't run this program like a CLI, the main function is empty. Instead,
+// we call the handleRequest function when an HTTP request is received.
 func main() {}
 ```
 
-Download the `wasilog` module for idiomatic Go logging that compiles to a component:
+Download the wasilog module for idiomatic Go logging that compiles to a component:
 
 ```shell
 go get go.wasmcloud.dev/component/log/wasilog
@@ -486,7 +444,7 @@ Now restart the dev loop:
 ```shell
 wash dev
 ```
--->
+*/}
   </TabItem>
   <TabItem value="unlisted" label="My language isn't listed">
 
