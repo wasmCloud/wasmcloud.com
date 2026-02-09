@@ -1,5 +1,5 @@
 ---
-title: 'Creating services'
+title: 'Creating Services'
 date: 2025-09-15T11:00:00+00:00
 sidebar_position: 2
 draft: false
@@ -9,16 +9,130 @@ draft: false
 
 In this section of the Developer Guide, you'll learn how to:
 
-* Create and iterate on a service
+* Structure a service project
+* Use custom interfaces with services
+* Develop and iterate on a service with `wash dev`
 
 :::info[Prerequisites]
 If you haven't read the [Workload](../../overview/workloads/index.mdx) and [Service Overviews](../../overview/workloads/services.mdx) or completed the [previous section](./index.mdx) on installing `wash`, creating a project, and starting a developer loop, we recommend starting there.
 :::
 
+## How services differ from components
+
+Services and components are both Wasm binaries, but they serve fundamentally different roles:
+
+* **Components** are invocation-based and stateless&mdash;they export interfaces like `wasi:http/incoming-handler` and are called per-request.
+* **Services** are long-running and stateful&mdash;they run continuously for the lifetime of the workload. Services can listen on TCP ports, maintain persistent connections, and call interfaces exported by companion components.
+
+## Service export requirement
+
+The wasmCloud runtime needs to know how to invoke a service. A service must export one of the following:
+
+* **`wasi:cli/run`**&mdash;the standard WASI run function, which gives the service a `main` entry point. This is the most common pattern for services that act as long-running processes.
+* **Exactly one WIT interface**&mdash;a single custom interface export, which the runtime uses as the entry point.
+
+This constraint ensures that the runtime has an unambiguous way to start the service.
+
+### Example: Service with `wasi:cli/run`
+
+Most services export `wasi:cli/run` and use a `main` function as their entry point. This is the pattern used in the [cron service example](https://github.com/wasmCloud/wash/tree/main/examples/cron-service):
+
+```wit
+package wasmcloud:example;
+
+world service {
+  // Importing an interface exported by a companion component
+  import cron;
+
+  // The run export gives this service a main() entry point
+  export wasi:cli/run@0.2.0;
+}
+```
+
+The corresponding Rust code uses `main` as the entry point:
+
+```rust
+wit_bindgen::generate!({
+    world: "service"
+});
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    eprintln!("Starting cron-service with 1 second intervals...");
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        let _ = wasmcloud::example::cron::invoke();
+    }
+}
+```
+
+### Example: Service with a custom interface export
+
+Alternatively, a service can export exactly one custom WIT interface instead of `wasi:cli/run`:
+
+```wit
+package mycompany:cache;
+
+interface store {
+  get: func(key: string) -> option<string>;
+  set: func(key: string, value: string);
+}
+
+world service {
+  export store;
+}
+```
+
+## Using custom interfaces
+
+You can use your own custom [WIT interfaces](../../overview/interfaces.mdx) to define how services interact with companion components.
+
+A service can **import** interfaces exported by components in the same workload to call into component logic (for example, triggering a scheduled task). Conversely, while components cannot call service exports via WIT, they can connect to TCP ports the service is listening on.
+
+For a complete walkthrough of defining custom WIT interfaces, see the [Interfaces overview](../../overview/interfaces.mdx).
+
+## Host plugin interfaces
+
+Services can import any host interface that a [host plugin](../../overview/hosts/plugins.mdx) provides. The workload's `host_interfaces` field lists WIT interfaces that need to be resolved by host plugins. When the runtime binds plugins to a workload, it checks which WIT interfaces the service's world needs and binds matching plugins.
+
+The runtime treats services and components the same when it comes to plugin binding&mdash;the only special treatment services receive is the `wasi:sockets` TCP bind permission, which allows services to bind to loopback and unspecified addresses for TCP listening.
+
 ## Service development
 
-Services are developed using the `wash dev` command with special configuration.
+Services are developed using the `wash dev` command. You can find a complete service example at [`wash/examples/cron-service`](https://github.com/wasmCloud/wash/tree/main/examples/cron-service).
 
-:::warning[Under active development]
-Service development support is actively evolving. Check back soon for more information.
-:::
+### Getting started
+
+Use `wash new` to create a new service project from the cron service example:
+
+```shell
+wash new https://github.com/wasmCloud/wash.git --name my-service --subfolder examples/cron-service
+```
+
+Navigate into the project directory and start a development loop:
+
+```shell
+cd my-service
+```
+```shell
+wash dev
+```
+
+The `wash dev` command will compile your service, start the runtime, and watch for changes.
+
+## Considerations
+
+When developing services, keep the following in mind:
+
+- **Export constraint**: Services must export `wasi:cli/run` or exactly one WIT interface.
+- **One service per workload**: Currently, workloads support a single service.
+- **TCP capabilities**: Services can bind to loopback/unspecified TCP addresses; regular components cannot.
+- **WASI P2**: Services compile to WASI P2 (`wasm32-wasip2` target).
+- **Async runtime**: Services can use single-threaded async runtimes (e.g., Tokio with `current_thread`).
+- **Restarts**: Services are automatically restarted if they crash.
+
+## Keep reading
+
+- Learn more about services in the [Services overview](../../overview/workloads/services.mdx).
+- Learn more about [interfaces](../../overview/interfaces.mdx) and how to define custom WIT interfaces.
+- Learn more about [host plugins](../../overview/hosts/plugins.mdx) and the interfaces they provide.
