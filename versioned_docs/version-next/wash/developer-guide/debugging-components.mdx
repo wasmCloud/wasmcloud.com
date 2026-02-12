@@ -1,0 +1,301 @@
+---
+title: "Debugging Components"
+sidebar_position: 4
+---
+
+Debugging WebAssembly components is different from debugging native applications. You can't attach a traditional debugger to a Wasm component, and error messages from the build toolchain can be cryptic if you're not familiar with the Component Model. This page covers the diagnostic tools available to you, common errors you'll encounter, and how to resolve them.
+
+:::info[AI-assisted debugging]
+
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) users can install skills that give Claude specialized information on WebAssembly component debugging. See the [Useful WebAssembly Tools](./useful-webassembly-tools.mdx#claude-code-skills-for-webassembly-development) page for installation instructions for the `webassembly-component-development` and `wash` skills.
+
+:::
+
+## Diagnostic tools
+
+### `wash inspect`
+
+Use `wash inspect` to view a compiled component's WIT world — its imports and exports:
+
+```shell
+wash inspect my_component.wasm
+```
+
+This shows you exactly which interfaces the component declares. If a component isn't behaving as expected at runtime, you can use `wash inspect` to confirm whether the component was built with the right interfaces.
+
+You can also use `wasm-tools component wit` for the same purpose:
+
+```shell
+wasm-tools component wit ./build/output.wasm
+```
+
+### `wasm-tools validate`
+
+Validate that a `.wasm` binary is a well-formed component:
+
+```shell
+wasm-tools validate ./build/output.wasm
+```
+
+If this fails, the binary isn't a valid Component Model component. This can happen when your build produces a core Wasm module instead of a component (for example, using a wrong compiler target).
+
+### Verbose build output
+
+When `wash build` or `wash dev` fails with an unclear error, add `--verbose` or `--log-level debug` for detailed output:
+
+```shell
+wash build --verbose
+wash build --log-level debug
+```
+
+The verbose output shows each step of the build pipeline — WIT dependency fetching, binding generation, compilation, and component encoding — so you can identify where the failure occurs.
+
+## Common build errors
+
+### WIT dependency errors
+
+**Symptom:**
+
+```
+error: failed to read path for WIT [./wit]
+Caused by:
+    No such file or directory (os error 2)
+```
+
+**Cause:** Your WIT files aren't at the expected path.
+
+**Fix:** Ensure your `wit/` directory exists and contains a `world.wit` file. If you're starting a new project, run `wkg wit fetch` (or `wash wit fetch`) to populate `wit/deps/` with your interface dependencies.
+
+### Version mismatches
+
+**Symptom (Rust):**
+
+```
+failed to find export of interface `wasi:http/incoming-handler@0.2.2` function `handle`
+```
+
+**Symptom (TinyGo / TypeScript):** Build errors mentioning a WASI interface version that doesn't match your WIT world.
+
+**Cause:** The `wasi:http/incoming-handler` version in your `wit/world.wit` doesn't match the version your toolchain provides.
+
+**Fix:** Check the version alignment for your language:
+
+- **Rust:** Run `cargo tree -p wasip2` and match the WASI HTTP version in your WIT world. See the [Rust Language Guide: Version alignment](./language-support/rust/index.mdx#version-alignment) for the version table.
+- **TinyGo:** Ensure the `wasi:http` version in your WIT world matches what `wit-bindgen-go` and TinyGo expect. See the [Go Language Guide](./language-support/go/index.mdx).
+- **TypeScript:** Match the version to your `jco` / `componentize-js` version. See the [TypeScript Language Guide](./language-support/typescript/index.mdx).
+
+After updating your WIT world, re-fetch dependencies:
+
+```shell
+rm -rf wit/deps wkg.lock && wkg wit fetch
+```
+
+### Missing function exports
+
+**Symptom:**
+
+```
+error: failed to encode a component from module
+Caused by:
+    0: failed to decode world from module
+    1: module was not valid
+    2: failed to find export of interface `wasmcloud:wash/plugin@0.0.1` function `info`
+```
+
+**Cause:** Your code doesn't export all functions required by your WIT world.
+
+**Fix:** Check your WIT world definition and ensure your code implements every exported interface. For example, if your world exports `wasi:http/incoming-handler`, your code must provide a handler function for incoming HTTP requests.
+
+### Missing import resolution
+
+**Symptom:**
+
+```
+error: failed to encode a component from module
+Caused by:
+    0: failed to decode world from module
+    1: module was not valid
+    2: failed to resolve import `wasi:http/outgoing-handler@0.2.0::handle`
+    3: module requires an import interface named `wasi:http/outgoing-handler@0.2.0`
+```
+
+**Cause:** Your code uses an import that isn't declared in your WIT world, or bindings weren't generated correctly.
+
+**Fix:**
+1. Add the import to your `wit/world.wit`.
+2. Re-fetch dependencies: `wkg wit fetch`
+3. Regenerate bindings (for Go: `go generate ./...`; for TypeScript: `jco types wit/ -o generated/types`)
+4. Rebuild.
+
+### Target and toolchain errors
+
+**Symptom (Rust):**
+
+```
+error[E0463]: can't find crate for `std`
+```
+
+**Cause:** Building without the Wasm target.
+
+**Fix:** Install and specify the target:
+
+```shell
+rustup target add wasm32-wasip2
+cargo build --target wasm32-wasip2
+```
+
+**Symptom (TinyGo):** Build errors referencing WIT world or package names.
+
+**Cause:** The `-wit-package` or `-wit-world` flags in your Makefile don't match your `wit/world.wit`.
+
+**Fix:** Ensure the `-wit-world` flag in your Makefile matches the world name in `wit/world.wit`, and `-wit-package` points to the correct WIT directory. See the [Go Language Guide](./language-support/go/index.mdx) for the recommended Makefile setup.
+
+## Runtime errors
+
+### "Unknown import" errors
+
+**Symptom:**
+
+```
+component imports instance `wasi:http/types@0.2.0`, but a matching implementation was not found in the linker
+```
+
+**Cause:** The runtime doesn't implement an interface your component imports. This happens when you use an import that the host runtime hasn't wired up.
+
+**Fix:**
+- Check that the runtime you're using supports the interface. For `wash dev`, supported interfaces include `wasi:http`, `wasi:cli`, `wasi:io`, `wasi:clocks`, `wasi:random`, and others.
+- If you're using a draft or experimental interface (like `wasi:keyvalue` or `wasi:config`), ensure your runtime is configured to provide it.
+- Use `wash inspect` to verify which interfaces your component imports, then check your runtime's documentation for supported interfaces.
+
+### Threading errors
+
+**Symptom:**
+
+```
+operation not supported on this platform
+```
+
+Or panics related to `std::thread`, `std::sync::Mutex`, or similar concurrency primitives.
+
+**Cause:** WASI 0.2 does not support threads. Standard library threading APIs (`std::thread` in Rust, goroutines with shared state in Go) may compile but fail at runtime.
+
+**Fix:**
+- **Rust:** Use `wstd`'s async runtime instead of `std::thread`. Mainstream async runtimes (`tokio`, `async-std`) don't support WASI 0.2 yet.
+- **Go:** TinyGo supports goroutines via the `asyncify` scheduler, but some synchronization patterns may not work. Test concurrent code in the Wasm target specifically.
+- **TypeScript:** JavaScript is single-threaded by nature, so this is less likely to be an issue.
+
+### Unexpected behavior from stdlib modules
+
+Some standard library modules compile to the `wasip2` target but don't behave as expected:
+
+- **`net/http` in Go** — does not work directly. Use `wasihttp.HandleFunc` and `wasihttp.Transport` from `go.wasmcloud.dev/component`.
+- **`os` in Go** — limited; filesystem and process operations require WASI filesystem configuration.
+- **`std::net` and `std::fs` in Rust** — require OS-level syscalls not available in the Wasm sandbox. Use `wstd::net` and WASI filesystem interfaces.
+- **Node.js APIs in TypeScript** — `fs`, `path`, `os`, `child_process`, `Buffer`, `process.env`, `require()` are not available. Use Web Standards APIs and WASI interfaces instead.
+
+For a complete list of what works and what doesn't, see the compatibility sections of each language guide:
+- [Rust: Crate compatibility](./language-support/rust/index.mdx#crate-compatibility)
+- [Go: Standard library compatibility](./language-support/go/index.mdx#standard-library-compatibility)
+- [TypeScript: Library compatibility](./language-support/typescript/index.mdx#library-compatibility)
+
+## Language-specific debugging
+
+### Rust
+
+**Check compilation before building:**
+
+```shell
+cargo check --target wasm32-wasip2
+```
+
+This is faster than a full build and catches most type errors and missing imports.
+
+**Type conflicts with `wit-bindgen`:**
+
+If you use both `wstd` and `wit-bindgen` for custom WASI interfaces, you may get type conflicts when an interface shares types with `wasi:io` or other standard interfaces. Use `wit-bindgen`'s `with` option to point to `wasip2`'s types:
+
+```rust
+wit_bindgen::generate!({
+    world: "my-world",
+    path: "wit",
+    with: {
+        "wasi:io/streams@0.2.9": wasip2::wasi::io::streams,
+        "wasi:io/poll@0.2.9": wasip2::wasi::io::poll,
+    },
+    generate_all,
+});
+```
+
+See the [Rust Language Guide: Handling type conflicts](./language-support/rust/index.mdx#handling-type-conflicts) for details.
+
+### Go (TinyGo)
+
+**World not found — defaults to CLI.** If TinyGo can't find the specified world, it silently targets `wasi:cli/run` instead of your intended world. Use `wash inspect` to check:
+
+```shell
+wash inspect ./build/output.wasm
+```
+
+If you see `wasi:cli` imports and `export wasi:cli/run@0.2.0` instead of your expected world, verify:
+1. The `-wit-world` flag in your Makefile matches the world name in `wit/world.wit`.
+2. The `-wit-package` flag points to the correct WIT directory (typically `./wit`).
+3. Your WIT files are at the expected path.
+
+**Common TinyGo build errors** are cataloged in the [FAQ: Common issues with TinyGo builds](../faq.mdx#common-issues-with-tinygo-builds).
+
+### TypeScript
+
+**`@ts-expect-error` for WASI imports.** When importing WASI interfaces directly (rather than using the fetch event pattern), TypeScript may not resolve the import specifiers. Use `@ts-expect-error` or configure `paths` in your `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "wasi:http/types@0.2.3": ["./generated/types/interfaces/wasi-http-types.d.ts"]
+    }
+  }
+}
+```
+
+**`bigint` pitfalls.** WASI interfaces use 64-bit integers, which map to JavaScript's `bigint` type. Watch for implicit `number`-to-`bigint` conversion issues and use `BigInt()` explicitly when needed.
+
+**StarlingMonkey limitations.** TypeScript components run inside the [StarlingMonkey](https://github.com/bytecodealliance/StarlingMonkey) engine (SpiderMonkey compiled to Wasm). Not all JavaScript APIs are available — notably, WebSocket support is missing, `require()` doesn't work (ESM only), and `Buffer` should be replaced with `Uint8Array`. See the [TypeScript Language Guide: Library compatibility](./language-support/typescript/index.mdx#library-compatibility) for details.
+
+## Logging
+
+Adding log output to your component is one of the most effective debugging techniques.
+
+### Rust
+
+Use the [`wasi:logging`](https://github.com/WebAssembly/wasi-logging) interface. The `wstd` crate doesn't include logging directly, but you can add it via `wit-bindgen`. For simple debugging, `eprintln!` writes to stderr and is visible in `wash dev` output.
+
+### Go (TinyGo)
+
+Use the `wasilog` package from the wasmCloud Go component library:
+
+```go
+import "go.wasmcloud.dev/component/log/wasilog"
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+    logger := wasilog.ContextLogger("handler")
+    logger.Info("request received", "path", r.URL.Path)
+}
+```
+
+### TypeScript
+
+Use `console.log` and `console.error` — StarlingMonkey routes these to WASI stderr:
+
+```typescript
+console.log('Request received:', req.url);
+console.error('Something went wrong:', error);
+```
+
+## Further reading
+
+- [FAQ](../faq.mdx) — common errors and troubleshooting, including a detailed [TinyGo error catalog](../faq.mdx#common-issues-with-tinygo-builds)
+- [Rust Language Guide](./language-support/rust/index.mdx) — crate compatibility, version alignment, type conflict resolution
+- [Go (TinyGo) Language Guide](./language-support/go/index.mdx) — stdlib compatibility, `wasm-tools` pinning, project configuration
+- [TypeScript Language Guide](./language-support/typescript/index.mdx) — library compatibility, StarlingMonkey APIs, build pipeline
+- [Useful WebAssembly Tools](./useful-webassembly-tools.mdx) — `wasm-tools`, Wasmtime, WASI Virt, and other ecosystem tools
+- [Command Reference](../commands.mdx) — full `wash` CLI reference including `--verbose` and `--log-level` flags

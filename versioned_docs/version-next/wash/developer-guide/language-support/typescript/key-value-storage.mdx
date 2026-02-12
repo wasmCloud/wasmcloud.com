@@ -1,0 +1,343 @@
+---
+title: "Key-Value Storage"
+sidebar_position: 0
+---
+
+You can add key-value capabilities to a component with the [`wasi:keyvalue`](https://github.com/WebAssembly/wasi-keyvalue/) interface.
+
+This guide walks through replacing the in-memory mock data store in the wasmCloud [`http-service-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-service-hono) template with the `wasi:keyvalue` interface. You can use this guide as a model for implementing `wasi:keyvalue` in your own components or adding any new WIT interface to an existing component.
+
+## Overview
+
+The wasmCloud [`http-service-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-service-hono) template includes an in-memory `Map<string, Item>` that acts as a simulated database. This means all data is lost whenever the component restarts. In this guide, we'll replace it with `wasi:keyvalue`, which gives the component persistent storage backed by a real key-value store. 
+
+:::info[]
+By default, a wasmCloud deployment uses NATS JetStream for storage via the built-in [WASI Key-Value NATS plugin](https://github.com/wasmCloud/wash/blob/main/crates/wash-runtime/src/plugin/wasi_keyvalue/nats.rs). You can use [host plugins](../../../../runtime/index.mdx) to back `wasi:keyvalue` with a different storage solution.
+:::
+
+Our changes will focus on two files:
+
+* `wit/world.wit` - Declare the new WIT imports 
+* `src/routes/items.ts` - Use the imported interfaces in application code
+
+No changes are needed to `rolldown.config.mjs`, `tsconfig.json`, `package.json`, or any other file.
+
+:::tip[Complete example]
+A full working example is available as a template:
+```bash
+wash new https://github.com/wasmCloud/typescript.git \
+  --name http-kv-service-hono \
+  --subfolder templates/http-kv-service-hono \
+  --git-ref v2
+```
+:::
+
+## Step 1: Declare the WIT imports in `wit/world.wit`
+
+Every capability your component uses must be declared in its WIT world. Open `wit/world.wit` and add `import` lines for the interfaces you need.
+
+```wit {4-5}
+package wasmcloud:templates@0.1.0;
+
+world typescript-http-service-hono {
+  import wasi:keyvalue/store@0.2.0-draft;
+  import wasi:keyvalue/atomics@0.2.0-draft;
+
+  export wasi:http/incoming-handler@0.2.6;
+}
+```
+
+### What these interfaces provide
+
+- **`wasi:keyvalue/store`** -- Bucket-based key-value storage with `open`, `get`, `set`, `delete`, `exists`, and `list-keys` operations.
+- **`wasi:keyvalue/atomics`** -- Atomic operations like `increment` on numeric values in a bucket.
+
+### How dependency resolution works
+
+When you run `npm run build`, the build pipeline calls `wkg wit fetch` as a setup step. This resolves the WIT package references (like `wasi:keyvalue`) and downloads their definitions into the `wit/deps/` directory automatically. You don't need to manually download any WIT files.
+
+The bundler (`rolldown`) is already configured with `external: /wasi:.*/` in `rolldown.config.mjs`, which tells it to leave all `wasi:*` imports as external -- they'll be resolved at component instantiation time, not at bundle time. This covers any new `wasi:` interface you add.
+
+## Step 2: Import and use the interface in TypeScript
+
+With the WIT world updated, you can now import functions from the new interfaces in your TypeScript code. The import paths match the WIT interface names exactly.
+
+### Importing WIT interfaces
+
+Add these imports at the top of `src/routes/items.ts`:
+
+```typescript
+// @ts-expect-error - JCO doesn't generate types for wasi:keyvalue yet
+import { open } from 'wasi:keyvalue/store@0.2.0-draft';
+// @ts-expect-error - JCO doesn't generate types for wasi:keyvalue yet
+import { increment } from 'wasi:keyvalue/atomics@0.2.0-draft';
+```
+
+**Why `@ts-expect-error`?** The `jco types` command generates `.d.ts` files for your WIT interfaces into `generated/types/`, but TypeScript can't resolve bare `wasi:` specifier imports against those files. The `@ts-expect-error` directive suppresses the resulting type error. The imports work correctly at runtime because `rolldown` marks them as external and `jco componentize` wires them up during Wasm component creation.
+
+### Key pattern: import path = WIT interface name
+
+The import path always matches the fully-qualified WIT interface name:
+
+```
+wasi:keyvalue/store@0.2.0-draft    -->  import { open } from 'wasi:keyvalue/store@0.2.0-draft'
+wasi:keyvalue/atomics@0.2.0-draft  -->  import { increment } from 'wasi:keyvalue/atomics@0.2.0-draft'
+```
+
+To discover which functions are available on an interface, look at the generated type file (e.g. `generated/types/interfaces/wasi-keyvalue-store.d.ts`) after running `npm run build` once, or read the WIT definition in `wit/deps/`.
+
+### Serialization: values are `Uint8Array`
+
+The `wasi:keyvalue/store` interface uses `list<u8>` (mapped to `Uint8Array` in JS) for values. To store structured data, you need to serialize and deserialize:
+
+```typescript
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+function serializeItem(item: Item): Uint8Array {
+  return encoder.encode(JSON.stringify(item));
+}
+
+function deserializeItem(bytes: Uint8Array): Item {
+  return JSON.parse(decoder.decode(bytes));
+}
+```
+
+### Opening a bucket
+
+All key-value operations happen on a **bucket**. Open one with:
+
+```typescript
+function getBucket() {
+  return open('default');
+}
+```
+
+The `'default'` bucket is automatically provisioned by the wasmCloud runtime. Call `getBucket()` inside each route handler rather than at module scope -- the bucket handle should be obtained per-request.
+
+### Key namespacing
+
+Use a prefix to separate different kinds of data in the same bucket:
+
+```typescript
+const ITEM_PREFIX = 'item:';
+// Item keys: "item:1", "item:2", ...
+// Metadata keys: "next_id"
+```
+
+This prevents collisions between item data and metadata (like the ID counter).
+
+### Synchronous API
+
+All bucket operations (`get`, `set`, `delete`, `exists`, `listKeys`) and `increment` are **synchronous** in the JCO bindings. The WebAssembly component model uses blocking calls, so these don't return Promises. Your existing synchronous Hono route handlers work without modification.
+
+---
+
+## Step 3: Route-by-route changes
+
+Here is exactly what changed in each CRUD route handler, showing the before (in-memory `Map`) and after (`wasi:keyvalue` bucket).
+
+### Removed code
+
+The entire mock data store and its initialization were removed:
+
+```typescript
+// REMOVED: Simulated database
+const items = new Map<string, Item>();
+let nextId = 1;
+
+// REMOVED: Sample data initialization
+items.set('1', {
+  id: '1',
+  name: 'Sample Item',
+  description: 'This is a sample item',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+nextId = 2;
+```
+
+With persistent storage, the store starts empty and users create items via the API. Data survives component restarts.
+
+### GET `/` -- List all items
+
+**Before:**
+```typescript
+itemsRouter.get('/', (c) => {
+  const itemList = Array.from(items.values());
+  // ... filtering and pagination ...
+});
+```
+
+**After:**
+```typescript
+itemsRouter.get('/', (c) => {
+  const bucket = getBucket();
+  const keys = bucket.listKeys(undefined) as { keys: string[] };
+  const itemKeys = keys.keys.filter((k: string) => k.startsWith(ITEM_PREFIX));
+
+  const itemList: Item[] = [];
+  for (const key of itemKeys) {
+    const bytes = bucket.get(key);
+    if (bytes) {
+      itemList.push(deserializeItem(bytes));
+    }
+  }
+  // ... filtering and pagination unchanged ...
+});
+```
+
+`listKeys(undefined)` returns all keys in the bucket. We filter for the `item:` prefix, then fetch and deserialize each item.
+
+### GET `/:id` -- Get single item
+
+**Before:**
+```typescript
+const item = items.get(id);
+if (!item) { /* 404 */ }
+return c.json(item);
+```
+
+**After:**
+```typescript
+const bucket = getBucket();
+const bytes = bucket.get(`${ITEM_PREFIX}${id}`);
+if (!bytes) { /* 404 */ }
+return c.json(deserializeItem(bytes));
+```
+
+`bucket.get()` returns `Uint8Array | undefined`. If the key doesn't exist, it returns `undefined`.
+
+### POST `/` -- Create new item
+
+**Before:**
+```typescript
+const id = String(nextId++);
+// ... build newItem ...
+items.set(id, newItem);
+```
+
+**After:**
+```typescript
+const bucket = getBucket();
+const id = String(increment(bucket, 'next_id', 1n));
+// ... build newItem ...
+bucket.set(`${ITEM_PREFIX}${id}`, serializeItem(newItem));
+```
+
+`increment(bucket, 'next_id', 1n)` atomically increments the `next_id` key by 1 and returns the new value (as a `bigint`). On first call the key is created starting at 0, so the first returned ID is `1`. This is persistent and atomic -- safe even if multiple instances of the component are running.
+
+### PUT `/:id` -- Update item
+
+**Before:**
+```typescript
+const existing = items.get(id);
+if (!existing) { /* 404 */ }
+// ... build updated ...
+items.set(id, updated);
+```
+
+**After:**
+```typescript
+const bucket = getBucket();
+const bytes = bucket.get(`${ITEM_PREFIX}${id}`);
+if (!bytes) { /* 404 */ }
+const existing = deserializeItem(bytes);
+// ... build updated ...
+bucket.set(`${ITEM_PREFIX}${id}`, serializeItem(updated));
+```
+
+### DELETE `/:id` -- Delete item
+
+**Before:**
+```typescript
+if (!items.has(id)) { /* 404 */ }
+items.delete(id);
+```
+
+**After:**
+```typescript
+const bucket = getBucket();
+if (!bucket.exists(`${ITEM_PREFIX}${id}`)) { /* 404 */ }
+bucket.delete(`${ITEM_PREFIX}${id}`);
+```
+
+`bucket.exists()` returns a boolean. `bucket.delete()` removes the key.
+
+## Build and verify
+
+### Build
+
+```bash
+npm run build
+```
+
+This runs the full pipeline:
+1. `wash wit fetch` -- downloads `wasi:keyvalue` WIT definitions into `wit/deps/`
+2. `jco types` -- generates TypeScript type definitions in `generated/types/`
+3. `rolldown` -- bundles TypeScript into `dist/component.js` (leaving `wasi:` imports external)
+4. `jco componentize` -- compiles `dist/component.js` into `dist/http_service_hono.wasm`
+
+### Run
+
+```bash
+npm run dev
+```
+
+This starts `wash dev`, which automatically provisions a NATS-KV keyvalue provider to satisfy the `wasi:keyvalue` imports.
+
+### Test
+
+```bash
+# Create an item
+curl -X POST http://localhost:8000/api/items \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test Item","description":"Testing keyvalue"}'
+
+# List items
+curl http://localhost:8000/api/items
+
+# Get by ID
+curl http://localhost:8000/api/items/1
+
+# Update
+curl -X PUT http://localhost:8000/api/items/1 \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Updated Item"}'
+
+# Delete
+curl -X DELETE http://localhost:8000/api/items/1
+```
+
+To verify persistence, restart the component and confirm previously created items are still returned by `GET /api/items`.
+
+## Summary: checklist for adding any WIT interface
+
+1. **Add `import` lines to `wit/world.wit`** for the interfaces you need.
+2. **Run `npm run build` once** so `wash wit fetch` downloads the WIT definitions and `jco types` generates TypeScript types you can reference.
+3. **Import functions in TypeScript** using the exact WIT interface name as the import path, with `@ts-expect-error` to suppress the type error.
+4. **Use the imported functions** in your route handlers. Remember that WASM component model calls are synchronous.
+5. **Handle serialization** -- most WIT interfaces use `Uint8Array` for binary data; use `TextEncoder`/`TextDecoder` and `JSON.stringify`/`JSON.parse` for structured data.
+6. **No bundler changes needed** -- `rolldown.config.mjs` already externalizes all `wasi:*` imports.
+7. **No new npm dependencies needed** -- WIT interfaces are provided by the runtime, not by npm packages.
+8. **Update documentation** to reflect the new capability.
+
+---
+
+## API reference: `wasi:keyvalue` operations used
+
+| Operation | Signature | Description |
+|-----------|-----------|-------------|
+| `open(name)` | `(string) => Bucket` | Open a named bucket |
+| `bucket.get(key)` | `(string) => Uint8Array \| undefined` | Get a value by key |
+| `bucket.set(key, value)` | `(string, Uint8Array) => void` | Set a key to a value |
+| `bucket.delete(key)` | `(string) => void` | Delete a key |
+| `bucket.exists(key)` | `(string) => boolean` | Check if a key exists |
+| `bucket.listKeys(cursor)` | `(bigint \| undefined) => { keys: string[] }` | List all keys in the bucket |
+| `increment(bucket, key, delta)` | `(Bucket, string, bigint) => bigint` | Atomically increment a numeric key |
+
+## Further reading
+
+- [TypeScript Language Guide](../index.mdx) — toolchain overview, HTTP patterns, framework integration, and library compatibility
+- [Blob Storage](./blob-storage.mdx) — Add streaming blob storage for larger objects
+- [Language Support overview](../../index.mdx) — summary of all supported languages and toolchains
