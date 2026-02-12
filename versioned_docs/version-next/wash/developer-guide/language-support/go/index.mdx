@@ -1,0 +1,430 @@
+---
+title: "Go (TinyGo) Language Guide"
+sidebar_position: 2
+---
+
+wasmCloud uses [TinyGo](https://tinygo.org/) to build WebAssembly components from Go source code. TinyGo compiles a large subset of Go to the `wasip2` target, producing Wasm components that work with the Component Model and WASI 0.2.
+
+This guide covers the toolchain, the wasmCloud Go component library, bindings generation, and practical guidance for building Go components on wasmCloud.
+
+If you're looking for a quick walkthrough of creating, building, and running a Go component, see the [Developer Guide](../../index.mdx?lang=tinygo).
+
+## Why TinyGo?
+
+The standard Go compiler does not yet support the WebAssembly Component Model or WASI P2. TinyGo targets `wasip2` directly using LLVM, producing much smaller Wasm binaries. TinyGo supports a large subset of Go — including goroutines, interfaces, closures, and most of the standard library — making it the current path for Go developers building Wasm components.
+
+Since the TinyGo project moves quickly, we recommend using the latest version.
+
+## Toolchain overview
+
+### Build pipeline
+
+![Go build pipeline](../../../images/build-pipeline-go.svg)
+
+Building a Go component has two steps: generating Go bindings from WIT interfaces, then compiling to a Wasm component with TinyGo. We recommend using a `Makefile` to wrap these steps. When you run `wash build`, it executes the build command from your `.wash/config.yaml`, which calls the Makefile targets.
+
+### TinyGo
+
+[TinyGo](https://tinygo.org/) is a Go compiler for microcontrollers, WebAssembly, and other constrained environments. For wasmCloud, the key feature is native Component Model support via the `-target wasip2` flag.
+
+Install TinyGo following the [official installation guide](https://tinygo.org/getting-started/install/).
+
+Key compiler flags for Wasm components:
+
+| Flag | Value | Description |
+|---|---|---|
+| `-target` | `wasip2` | Compile to a WASI P2 component |
+| `-wit-package` | `./wit` | Path to the WIT package directory |
+| `-wit-world` | `<world>` | Name of the WIT world to target |
+| `-o` | `<name>.wasm` | Output file path |
+
+Optional optimization flags:
+
+| Flag | Value | Description |
+|---|---|---|
+| `-scheduler` | `asyncify` | Enable goroutine support via Binaryen's Asyncify |
+| `-gc` | `conservative` | Mark/sweep garbage collector suitable for Wasm |
+| `-opt` | `z` | Aggressive code size optimization |
+| `-no-debug` | | Remove debug info (reduces binary size significantly) |
+
+### `wit-bindgen-go`
+
+[`wit-bindgen-go`](https://github.com/bytecodealliance/go-modules) generates Go code from WIT interface definitions. It produces typed Go packages that map to your component's imports and exports.
+
+`wit-bindgen-go` is invoked via a `//go:generate` directive at the top of your `main.go`:
+
+```go
+//go:generate go tool wit-bindgen-go generate --world wasmcloud:hello/hello --out gen ./wit
+```
+
+This reads the WIT files in `./wit`, generates Go packages for the `hello` world in the `wasmcloud:hello` package, and writes them to the `gen/` directory. The `--world` flag uses the fully-qualified world name in the format `<package>/<world>`. The generated packages depend on the [`cm`](https://pkg.go.dev/go.bytecodealliance.org/cm) package for Component Model types like `option`, `result`, `list`, and `resource`.
+
+Declare `wit-bindgen-go` as a tool dependency in your `go.mod` using the Go 1.24+ `tool` directive:
+
+```go title="go.mod"
+tool go.bytecodealliance.org/cmd/wit-bindgen-go
+```
+
+Then run `go mod tidy` to resolve the dependency.
+
+## Handling HTTP requests
+
+The [`go.wasmcloud.dev/component`](https://github.com/wasmCloud/go) package provides idiomatic Go adapters for WASI interfaces. The `wasihttp` package bridges Go's standard `net/http` library with WASI HTTP, so you can write familiar Go HTTP handlers.
+
+### Basic HTTP server
+
+```go
+//go:generate go tool wit-bindgen-go generate --world wasmcloud:hello/hello --out gen ./wit
+
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"go.wasmcloud.dev/component/net/wasihttp"
+)
+
+func init() {
+	wasihttp.HandleFunc(handleRequest)
+}
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Hello from Go!\n")
+}
+
+func main() {}
+```
+
+Key points:
+
+- **`wasihttp.HandleFunc`** accepts a standard `http.HandlerFunc` and registers it as the WASI HTTP incoming handler. All conversion between WASI HTTP types and Go's `net/http` types happens behind the scenes.
+- **Handlers are registered in `init()`**, not `main()`. The component doesn't run like a CLI — it responds to incoming HTTP requests.
+- **`main()` is empty.** This is required but does nothing for component-based programs.
+- You can use Go's standard `http.ResponseWriter` and `*http.Request` types exactly as you would in a normal Go HTTP server.
+
+### Routing
+
+`wasihttp.Handle` accepts any `http.Handler`, so Go's standard `http.ServeMux`, third-party routers, and middleware chains all work.
+
+With Go's standard library:
+
+```go
+func init() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", handleHome)
+	mux.HandleFunc("/api/data", handleData)
+	wasihttp.Handle(mux)
+}
+```
+
+With [`httprouter`](https://github.com/julienschmidt/httprouter) (used in the [wasmCloud Go example](https://github.com/wasmCloud/wash/tree/main/examples/go-hello-world)):
+
+```go
+import "github.com/julienschmidt/httprouter"
+
+func init() {
+	router := httprouter.New()
+	router.HandlerFunc(http.MethodGet, "/", indexHandler)
+	router.HandlerFunc(http.MethodGet, "/headers", headersHandler)
+	router.HandlerFunc(http.MethodPost, "/post", postHandler)
+	wasihttp.Handle(router)
+}
+```
+
+### Outgoing HTTP requests
+
+The `wasihttp` package provides a `Transport` that implements `http.RoundTripper`, enabling outgoing HTTP requests via WASI:
+
+```go
+import (
+	"io"
+	"net/http"
+
+	"go.wasmcloud.dev/component/net/wasihttp"
+)
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	client := http.Client{Transport: &wasihttp.Transport{}}
+	resp, err := client.Get("https://api.example.com/data")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+	io.Copy(w, resp.Body)
+}
+```
+
+To make outgoing requests, your WIT world must import `wasi:http/outgoing-handler`.
+
+### Logging
+
+The `wasilog` package provides structured logging backed by WASI interfaces:
+
+```go
+import "go.wasmcloud.dev/component/log/wasilog"
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	logger := wasilog.ContextLogger("handler")
+	logger.Info("request received", "path", r.URL.Path, "method", r.Method)
+	fmt.Fprintf(w, "Hello from Go!\n")
+}
+```
+
+## Adding custom WASI interfaces
+
+The `wasmcloud:component-go/imports` include pulls in standard imports for the wasmCloud Go component library (logging, config, etc.). For additional interfaces like `wasi:keyvalue`, `wasi:config`, or custom interfaces, add them to your WIT world and regenerate bindings.
+
+### Example: Adding `wasi:keyvalue`
+
+**1. Declare the imports in your WIT world:**
+
+```wit title="wit/world.wit"
+package wasmcloud:hello;
+
+world hello {
+    include wasmcloud:component-go/imports@0.1.0;
+    import wasi:keyvalue/store@0.2.0-draft;
+    import wasi:keyvalue/atomics@0.2.0-draft;
+    export wasi:http/incoming-handler@0.2.0;
+}
+```
+
+**2. Fetch dependencies and regenerate bindings:**
+
+```shell
+wkg wit fetch
+go generate ./...
+```
+
+This downloads the WIT definitions for `wasi:keyvalue` into `wit/deps/` and generates Go packages in `gen/`.
+
+**3. Use the generated bindings:**
+
+```go
+import (
+	"fmt"
+	"net/http"
+
+	"go.wasmcloud.dev/component/net/wasihttp"
+	"<your-module>/gen/wasi/keyvalue/store"
+	"<your-module>/gen/wasi/keyvalue/atomics"
+)
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	bucket := store.Open("")
+	count := atomics.Increment(bucket, "visitor-count", 1)
+	fmt.Fprintf(w, "Visit count: %d\n", count)
+}
+```
+
+Generated bindings follow Go naming conventions — WIT function names are converted to PascalCase. The generated packages are in `gen/` under the WIT namespace path (e.g., `gen/wasi/keyvalue/store`).
+
+Replace `<your-module>` with your Go module path from `go.mod`.
+
+### WIT dependency management with `wkg`
+
+[`wkg`](https://github.com/bytecodealliance/wasm-pkg-tools) is the WebAssembly package manager. It reads your WIT world and fetches the interface definitions your component needs:
+
+```shell
+wkg wit fetch
+```
+
+This populates `wit/deps/` with downloaded interface definitions and creates a `wkg.lock` file. You should:
+
+- Add `wit/deps/` to `.gitignore` — these are fetched dependencies
+- Commit `wkg.lock` — this ensures reproducible builds
+
+When you run `wash build`, it calls `wkg wit fetch` automatically, so you typically don't need to run it manually.
+
+For a detailed explanation of `wkg` and auto-resolved namespaces, see the [Rust Language Guide's WIT dependency management section](../rust/index.mdx#wit-dependency-management-with-wkg).
+
+## Project structure
+
+A typical Go component project:
+
+```
+my-component/
+├── main.go              # Application code
+├── Makefile             # Build recipes (bindgen, build)
+├── go.mod               # Go module definition
+├── go.sum               # Go dependency checksums
+├── gen/                 # Generated bindings (gitignored)
+├── wit/
+│   ├── world.wit        # WIT world definition
+│   └── deps/            # Fetched WIT dependencies (gitignored)
+├── wkg.lock             # WIT dependency lock file
+└── .wash/
+    └── config.yaml      # wash project configuration
+```
+
+### `Makefile`
+
+A `Makefile` wraps the two-step build process (bindings generation + TinyGo compilation) so that `wash build` and `wash dev` can invoke them with simple commands:
+
+```makefile title="Makefile"
+all: build
+
+.PHONY: build
+build:
+	tinygo build -target wasip2 -wit-package ./wit -wit-world hello -o my-component.wasm ./
+
+.PHONY: bindgen
+bindgen:
+	go generate ./...
+```
+
+The `build` target invokes TinyGo with:
+- `-target wasip2` — compile to a WASI P2 component
+- `-wit-package ./wit` — path to the WIT package directory
+- `-wit-world hello` — name of the WIT world to target
+- `-o my-component.wasm` — output file path
+
+The `bindgen` target runs `go generate`, which invokes `wit-bindgen-go` via the directive in `main.go`.
+
+### `go.mod`
+
+```go title="go.mod"
+module github.com/myorg/my-component
+
+go 1.24
+
+require (
+	go.bytecodealliance.org/cm v0.3.0
+	go.wasmcloud.dev/component v0.0.10
+)
+
+tool go.bytecodealliance.org/cmd/wit-bindgen-go
+```
+
+The `tool` directive (Go 1.24+) declares `wit-bindgen-go` as a build tool dependency. This replaces the older `tools.go` file pattern.
+
+You should add both `gen/` and `wit/deps/` to your `.gitignore` — these are generated or fetched during the build and should not be committed.
+
+### WIT world
+
+```wit title="wit/world.wit"
+package wasmcloud:hello;
+
+world hello {
+    include wasmcloud:component-go/imports@0.1.0;
+    export wasi:http/incoming-handler@0.2.0;
+}
+```
+
+The `include wasmcloud:component-go/imports` line pulls in standard imports used by the wasmCloud Go component library (logging, config, etc.). You can also declare imports individually if you prefer.
+
+:::info[WASI HTTP version]
+The `wasi:http/incoming-handler` version in your WIT world (here `@0.2.0`) must match the version supported by your TinyGo and `wit-bindgen-go` toolchain. The version shown here matches the wasmCloud Go project template. If you see build errors about missing exports, check that the version in your `world.wit` aligns with your installed toolchain versions.
+:::
+
+### `.wash/config.yaml`
+
+The [project configuration file](../../../config.mdx) at `.wash/config.yaml` tells `wash` how to build the component:
+
+```yaml title=".wash/config.yaml"
+build:
+  command: make bindgen build
+```
+
+The `build.command` is a shell command that `wash build` executes. Here it runs the Makefile's `bindgen` and `build` targets in sequence — first generating Go bindings from WIT, then compiling with TinyGo.
+
+You can also specify a separate command for `wash dev` that skips binding generation for faster iteration:
+
+```yaml title=".wash/config.yaml"
+dev:
+  command: make build
+
+build:
+  command: make bindgen build
+```
+
+With this configuration, `wash dev` runs only `make build` (recompiling Go code), while `wash build` runs `make bindgen build` (regenerating bindings and recompiling). This speeds up the development loop when you're only changing Go code, not WIT interfaces.
+
+For a full reference of configuration options, see the [Configuration](../../../config.mdx) page.
+
+## Standard library compatibility
+
+TinyGo supports most of the Go standard library, but some packages have limitations in the `wasip2` target.
+
+### What works
+
+- **`fmt`** — formatted I/O (adds ~100 KB to binary size)
+- **`io`** — I/O primitives
+- **`strings`**, **`bytes`** — string and byte manipulation
+- **`strconv`** — string conversions
+- **`encoding/json`** — JSON encoding/decoding (may have edge-case panics — test thoroughly)
+- **`encoding/base64`** — base64 encoding
+- **`math`** — mathematical functions
+- **`sort`** — sorting
+- **`sync`** — synchronization primitives
+- **`time`** — time operations
+- **`net/http`** — via `wasihttp` adapter (not directly — see below)
+
+### What does not work
+
+- **`net/http` directly** — Go's standard HTTP server/client does not work in `wasip2`. Use `wasihttp.HandleFunc` for incoming requests and `wasihttp.Transport` for outgoing requests.
+- **`os`** — limited; filesystem and process operations are not available unless WASI filesystem is configured
+- **`net`** — raw networking is not available; use WASI HTTP interfaces
+- **Packages requiring cgo** — TinyGo does not support cgo in the `wasip2` target
+- **`plugin`**, **`net/smtp`**, **`debug/buildinfo`** — cannot be imported
+
+### Practical guidance
+
+- Use the `wasihttp` package instead of `net/http` directly — it provides `http.Handler` and `http.RoundTripper` implementations backed by WASI
+- Prefer pure Go libraries; anything requiring cgo will not compile
+- Test your dependencies against the `wasip2` target early — some packages compile but have runtime issues
+- Be mindful of binary size: packages like `fmt` add meaningful overhead to Wasm components
+
+## Building and running
+
+### Create a new project
+
+Use `wash new` to scaffold a Go component project:
+
+```shell
+wash new https://github.com/wasmCloud/wash.git --name hello --subfolder examples/go-hello-world
+```
+
+### Development loop
+
+Start a development loop that builds, runs, and watches for changes:
+
+```shell
+wash dev
+```
+
+Send a request to test:
+
+```shell
+curl localhost:8000
+```
+
+### Build a component
+
+Compile your project to a `.wasm` binary:
+
+```shell
+wash build
+```
+
+`wash build` executes the `build.command` from your `.wash/config.yaml`. With the recommended Makefile setup, this runs `make bindgen build` — generating bindings from WIT, then compiling with TinyGo. The compiled component is output to the path specified by `-o` in your Makefile (e.g., `my-component.wasm`).
+
+You can also run the Makefile targets directly:
+
+```shell
+make bindgen  # Regenerate Go bindings from WIT
+make build    # Compile to .wasm with TinyGo
+```
+
+## Further reading
+
+- [Developer Guide](../../index.mdx?lang=tinygo) — quickstart tutorial for creating, building, and running a Go component
+- [wasmCloud Go examples](https://github.com/wasmCloud/wash/tree/main/examples/go-hello-world) — reference example project in the `wash` repository
+- [wasmCloud Go component library](https://github.com/wasmCloud/go) — `wasihttp`, `wasilog`, and other Go adapters for WASI interfaces
+- [TinyGo documentation](https://tinygo.org/docs/) — compiler reference and standard library support
+- [TinyGo package support](https://tinygo.org/docs/reference/lang-support/stdlib/) — standard library compatibility matrix
+- [`wit-bindgen-go`](https://github.com/bytecodealliance/go-modules) — Bytecode Alliance Go modules for WIT bindings
+- [Component Model: Go](https://component-model.bytecodealliance.org/language-support/go.html) — Component Model documentation for Go
+- [Language Support overview](../index.mdx) — summary of all supported languages and toolchains
