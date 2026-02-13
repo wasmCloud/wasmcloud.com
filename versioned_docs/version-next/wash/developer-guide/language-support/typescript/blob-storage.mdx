@@ -1,0 +1,432 @@
+---
+title: "Blob Storage"
+sidebar_position: 1
+---
+
+You can add blob storage capabilities to a component with the [`wasi:blobstore`](https://github.com/WebAssembly/wasi-blobstore/) interface.
+
+This guide walks through replacing the in-memory mock data store in the wasmCloud [`http-service-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-service-hono) template with the `wasi:blobstore` interface. You can use this guide as a model for implementing `wasi:blobstore` in your own components or adding any new WIT interface to an existing component.
+
+## Overview
+
+The wasmCloud [`http-service-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-service-hono) template includes an in-memory `Map<string, Item>` that acts as a simulated database. This means all data is lost whenever the component restarts. In this guide, we'll replace it with `wasi:blobstore`, which gives the component persistent object storage backed by a real blob store. 
+
+:::info[]
+By default, a wasmCloud deployment uses NATS JetStream for storage via the built-in [WASI Blobstore NATS plugin](https://github.com/wasmCloud/wash/blob/main/crates/wash-runtime/src/plugin/wasi_blobstore/nats.rs). You can use [host plugins](../../../../runtime/index.mdx) to back `wasi:blobstore` with a different storage solution.
+:::
+
+`wasi:blobstore` models storage as **containers** (analogous to S3 buckets) that hold named **objects** (blobs of bytes). Unlike a simple key-value store, blobstore uses a streaming I/O model with `OutgoingValue`/`IncomingValue` resources, designed to handle potentially large objects.
+
+Our changes will focus on two files:
+
+* `wit/world.wit` - Declare the new WIT imports
+* `src/routes/items.ts` - Use the imported interfaces in application code
+
+No changes are needed to `rolldown.config.mjs`, `tsconfig.json`, `package.json`, or any other file.
+
+:::tip[Complete example]
+A full working example is available as a template:
+```bash
+wash new https://github.com/wasmCloud/typescript.git \
+  --name http-blobstore-service-hono \
+  --subfolder templates/http-blobstore-service-hono \
+  --git-ref v2
+```
+:::
+
+## Step 1: Declare the WIT imports in `wit/world.wit`
+
+Every capability your component uses must be declared in its WIT world. Open `wit/world.wit` and add an `import` line for the blobstore interface.
+
+```wit {4}
+package wasmcloud:templates@0.1.0;
+
+world typescript-http-blobstore-service-hono {
+  import wasi:blobstore/blobstore@0.2.0-draft;
+
+  export wasi:http/incoming-handler@0.2.6;
+}
+```
+
+### What these interfaces provide
+
+- **`wasi:blobstore/blobstore`** -- Top-level container management: `createContainer`, `getContainer`, `containerExists`, `deleteContainer`.
+- **`wasi:blobstore/container`** -- Object operations within a container: `getData`, `writeData`, `listObjects`, `deleteObject`, `hasObject`, `objectInfo`. Pulled in transitively by `blobstore`.
+- **`wasi:blobstore/types`** -- Streaming resource types: `OutgoingValue` (for writes), `IncomingValue` (for reads), and `ObjectMetadata`. Pulled in transitively by `blobstore`.
+
+Unlike interfaces with multiple sub-imports (e.g. `wasi:keyvalue/store` and `wasi:keyvalue/atomics`), blobstore only needs the single `wasi:blobstore/blobstore` import — `container` and `types` are available automatically.
+
+### How dependency resolution works
+
+When you run `npm run build`, the build pipeline calls `wkg wit fetch` as a setup step. This resolves the WIT package references (like `wasi:blobstore`) and downloads their definitions into the `wit/deps/` directory automatically. You don't need to manually download any WIT files.
+
+The bundler (`rolldown`) is already configured with `external: /wasi:.*/` in `rolldown.config.mjs`, which tells it to leave all `wasi:*` imports as external -- they'll be resolved at component instantiation time, not at bundle time. This covers any new `wasi:` interface you add.
+
+## Step 2: Import and use the interface in TypeScript
+
+With the WIT world updated, you can now import functions from the new interfaces in your TypeScript code. The import paths match the WIT interface names exactly.
+
+### Importing WIT interfaces
+
+Add these imports at the top of `src/routes/items.ts`:
+
+```typescript
+// @ts-expect-error - JCO doesn't generate types for wasi:blobstore yet
+import { getContainer, createContainer, containerExists } from 'wasi:blobstore/blobstore@0.2.0-draft';
+// @ts-expect-error - JCO doesn't generate types for wasi:blobstore yet
+import { OutgoingValue, IncomingValue } from 'wasi:blobstore/types@0.2.0-draft';
+```
+
+**Why `@ts-expect-error`?** The `jco types` command generates `.d.ts` files for your WIT interfaces into `generated/types/`, but TypeScript can't resolve bare `wasi:` specifier imports against those files. The `@ts-expect-error` directive suppresses the resulting type error. The imports work correctly at runtime because `rolldown` marks them as external and `jco componentize` wires them up during Wasm component creation.
+
+### Key pattern: import path = WIT interface name
+
+The import path always matches the fully-qualified WIT interface name:
+
+```
+wasi:blobstore/blobstore@0.2.0-draft  -->  import { getContainer, ... } from 'wasi:blobstore/blobstore@0.2.0-draft'
+wasi:blobstore/types@0.2.0-draft      -->  import { OutgoingValue, ... } from 'wasi:blobstore/types@0.2.0-draft'
+```
+
+To discover which functions are available on an interface, look at the generated type file (e.g. `generated/types/interfaces/wasi-blobstore-blobstore.d.ts`) after running `npm run build` once, or read the WIT definition in `wit/deps/`.
+
+### Serialization: values are `Uint8Array`
+
+Blobstore reads and writes blobs as bytes. To store structured data, you need to serialize and deserialize:
+
+```typescript
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+function serializeItem(item: Item): Uint8Array {
+  return encoder.encode(JSON.stringify(item));
+}
+
+function deserializeItem(bytes: Uint8Array): Item {
+  return JSON.parse(decoder.decode(bytes));
+}
+```
+
+### Ensuring a container exists
+
+All blobstore operations happen on a **container**. Unlike a simple key-value bucket, you must ensure the container exists before using it:
+
+```typescript
+const CONTAINER_NAME = 'default';
+
+function ensureContainer() {
+  if (!containerExists(CONTAINER_NAME)) {
+    createContainer(CONTAINER_NAME);
+  }
+  return getContainer(CONTAINER_NAME);
+}
+```
+
+Call `ensureContainer()` inside each route handler rather than at module scope -- the container handle should be obtained per-request.
+
+### Key namespacing
+
+Use a prefix to separate different kinds of data in the same container:
+
+```typescript
+const ITEM_PREFIX = 'item:';
+// Item keys: "item:<uuid>", "item:<uuid>", ...
+```
+
+This prevents collisions if you store other kinds of objects in the same container.
+
+### Writing blobs
+
+Writing to blobstore uses a streaming pattern with `OutgoingValue`. This is more involved than a simple `set(key, bytes)` call:
+
+```typescript
+function writeBlob(container: any, name: string, bytes: Uint8Array): void {
+  const ov = OutgoingValue.newOutgoingValue();
+  const stream = ov.outgoingValueWriteBody();
+  stream.blockingWriteAndFlush(bytes);
+  container.writeData(name, ov);
+  OutgoingValue.finish(ov);
+}
+```
+
+:::warning[Operation ordering]
+You must write bytes to the stream **before** calling `writeData`. Calling `writeData` first commits an empty value — subsequent writes to the stream won't be associated with the object. This produces no error; the object simply has no data.
+
+You must also call `OutgoingValue.finish(ov)` **after** `writeData`. Dropping an `OutgoingValue` without finishing it signals corruption to the runtime.
+:::
+
+### Reading blobs
+
+Reading uses `IncomingValue` with inclusive byte offsets:
+
+```typescript
+function readBlob(container: any, name: string): Uint8Array {
+  const metadata = container.objectInfo(name);
+  const iv = container.getData(name, 0n, metadata.size - 1n);
+  return IncomingValue.incomingValueConsumeSync(iv);
+}
+```
+
+:::warning[Inclusive offsets]
+`getData` uses **inclusive** start and end offsets as **`bigint`** values. For a 100-byte object, the valid range is `(0n, 99n)`, which is `(0n, metadata.size - 1n)`. Using `metadata.size` as the end offset reads one byte past the object.
+:::
+
+### Listing objects
+
+Listing returns a paginated stream that you read in batches:
+
+```typescript
+function listObjectNames(container: any): string[] {
+  const stream = container.listObjects();
+  const names: string[] = [];
+  while (true) {
+    const [batch, done] = stream.readStreamObjectNames(100n);
+    names.push(...batch);
+    if (done) break;
+  }
+  return names;
+}
+```
+
+:::warning[`bigint` and tuple return type]
+`readStreamObjectNames` takes a **`bigint`**, not a `number`. Passing `100` instead of `100n` causes a runtime type error.
+
+The method returns `[string[], boolean]` — a tuple of names and a done flag. Always destructure it: `const [batch, done] = ...`. If you assign the return value to a single variable, `batch.length` will always be `2` (the tuple length).
+:::
+
+### ID generation
+
+Blobstore has no atomic increment operation. Use `crypto.randomUUID()` to generate unique IDs:
+
+```typescript
+const id = crypto.randomUUID();
+```
+
+This means IDs are UUIDs rather than sequential integers.
+
+### Synchronous API
+
+All blobstore operations (`getData`, `writeData`, `deleteObject`, `hasObject`, `listObjects`) are **synchronous** in the JCO bindings. The WebAssembly component model uses blocking calls, so these don't return Promises. Your existing synchronous Hono route handlers work without modification.
+
+## Step 3: Route-by-route changes
+
+Here is exactly what changed in each CRUD route handler, showing the before (in-memory `Map`) and after (`wasi:blobstore` container).
+
+### Removed code
+
+The entire mock data store and its initialization were removed:
+
+```typescript
+// REMOVED: Simulated database
+const items = new Map<string, Item>();
+let nextId = 1;
+
+// REMOVED: Sample data initialization
+items.set('1', {
+  id: '1',
+  name: 'Sample Item',
+  description: 'This is a sample item',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+nextId = 2;
+```
+
+With persistent storage, the store starts empty and users create items via the API. Data survives component restarts.
+
+### GET `/` -- List all items
+
+**Before:**
+```typescript
+itemsRouter.get('/', (c) => {
+  const itemList = Array.from(items.values());
+  // ... filtering and pagination ...
+});
+```
+
+**After:**
+```typescript
+itemsRouter.get('/', (c) => {
+  const container = ensureContainer();
+  const allNames = listObjectNames(container);
+  const itemNames = allNames.filter((n: string) => n.startsWith(ITEM_PREFIX));
+
+  const itemList: Item[] = [];
+  for (const name of itemNames) {
+    const bytes = readBlob(container, name);
+    itemList.push(deserializeItem(bytes));
+  }
+  // ... filtering and pagination unchanged ...
+});
+```
+
+`listObjectNames` reads the paginated stream and returns all object names. We filter for the `item:` prefix, then fetch and deserialize each item.
+
+### GET `/:id` -- Get single item
+
+**Before:**
+```typescript
+const item = items.get(id);
+if (!item) { /* 404 */ }
+return c.json(item);
+```
+
+**After:**
+```typescript
+const container = ensureContainer();
+if (!container.hasObject(`${ITEM_PREFIX}${id}`)) { /* 404 */ }
+const bytes = readBlob(container, `${ITEM_PREFIX}${id}`);
+return c.json(deserializeItem(bytes));
+```
+
+`container.hasObject()` returns a boolean. `readBlob` handles the streaming read and inclusive offset calculation.
+
+### POST `/` -- Create new item
+
+**Before:**
+```typescript
+const id = String(nextId++);
+// ... build newItem ...
+items.set(id, newItem);
+```
+
+**After:**
+```typescript
+const container = ensureContainer();
+const id = crypto.randomUUID();
+// ... build newItem ...
+writeBlob(container, `${ITEM_PREFIX}${id}`, serializeItem(newItem));
+```
+
+`crypto.randomUUID()` generates a unique ID. `writeBlob` handles the `OutgoingValue` lifecycle (create, write to stream, commit, finish).
+
+### PUT `/:id` -- Update item
+
+**Before:**
+```typescript
+const existing = items.get(id);
+if (!existing) { /* 404 */ }
+// ... build updated ...
+items.set(id, updated);
+```
+
+**After:**
+```typescript
+const container = ensureContainer();
+if (!container.hasObject(`${ITEM_PREFIX}${id}`)) { /* 404 */ }
+const bytes = readBlob(container, `${ITEM_PREFIX}${id}`);
+const existing = deserializeItem(bytes);
+// ... build updated ...
+writeBlob(container, `${ITEM_PREFIX}${id}`, serializeItem(updated));
+```
+
+### DELETE `/:id` -- Delete item
+
+**Before:**
+```typescript
+if (!items.has(id)) { /* 404 */ }
+items.delete(id);
+```
+
+**After:**
+```typescript
+const container = ensureContainer();
+if (!container.hasObject(`${ITEM_PREFIX}${id}`)) { /* 404 */ }
+container.deleteObject(`${ITEM_PREFIX}${id}`);
+```
+
+## Build and verify
+
+### Build
+
+```bash
+npm run build
+```
+
+This runs the full pipeline:
+1. `wash wit fetch` -- downloads `wasi:blobstore` WIT definitions into `wit/deps/`
+2. `jco types` -- generates TypeScript type definitions in `generated/types/`
+3. `rolldown` -- bundles TypeScript into `dist/component.js` (leaving `wasi:` imports external)
+4. `jco componentize` -- compiles `dist/component.js` into a `.wasm` component
+
+### Configure `wash dev`
+
+To get persistent blob storage during development, add `wasi_blobstore_path` to your `.wash/config.yaml`:
+
+```yaml
+dev:
+  wasi_blobstore_path: tmp/blobstore
+```
+
+- **Without `wasi_blobstore_path`**: `wash dev` uses an in-memory provider. State is lost when the dev session ends.
+- **With `wasi_blobstore_path`**: `wash dev` uses a filesystem provider. Blobs persist as files in the specified directory across restarts. Container names map to subdirectories, and object names map to files within them.
+
+### Run
+
+```bash
+npm run dev
+```
+
+This starts `wash dev`, which automatically provisions a blobstore provider to satisfy the `wasi:blobstore` imports.
+
+### Test
+
+```bash
+# Create an item
+curl -X POST http://localhost:8000/api/items \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test Item","description":"Testing blobstore"}'
+
+# List items
+curl http://localhost:8000/api/items
+
+# Get by ID (replace <uuid> with a real ID from the create response)
+curl http://localhost:8000/api/items/<uuid>
+
+# Update
+curl -X PUT http://localhost:8000/api/items/<uuid> \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Updated Item"}'
+
+# Delete
+curl -X DELETE http://localhost:8000/api/items/<uuid>
+```
+
+To verify persistence, restart the component and confirm previously created items are still returned by `GET /api/items`.
+
+## Summary: checklist for adding any WIT interface
+
+1. **Add `import` lines to `wit/world.wit`** for the interfaces you need.
+2. **Run `npm run build` once** so `wash wit fetch` downloads the WIT definitions and `jco types` generates TypeScript types you can reference.
+3. **Import functions in TypeScript** using the exact WIT interface name as the import path, with `@ts-expect-error` to suppress the type error.
+4. **Use the imported functions** in your route handlers. Remember that Wasm component model calls are synchronous.
+5. **Handle serialization** -- most WIT interfaces use `Uint8Array` for binary data; use `TextEncoder`/`TextDecoder` and `JSON.stringify`/`JSON.parse` for structured data.
+6. **No bundler changes needed** -- `rolldown.config.mjs` already externalizes all `wasi:*` imports.
+7. **No new npm dependencies needed** -- WIT interfaces are provided by the runtime, not by npm packages.
+
+---
+
+## API reference: `wasi:blobstore` operations used
+
+| Operation | Signature | Description |
+|-----------|-----------|-------------|
+| `createContainer(name)` | `(string) => Container` | Create a named container |
+| `getContainer(name)` | `(string) => Container` | Get an existing container by name |
+| `containerExists(name)` | `(string) => boolean` | Check if a container exists |
+| `container.writeData(name, ov)` | `(string, OutgoingValue) => void` | Write an object to the container |
+| `container.getData(name, start, end)` | `(string, bigint, bigint) => IncomingValue` | Read an object (inclusive offsets) |
+| `container.deleteObject(name)` | `(string) => void` | Delete an object |
+| `container.hasObject(name)` | `(string) => boolean` | Check if an object exists |
+| `container.objectInfo(name)` | `(string) => ObjectMetadata` | Get object metadata (name, size, timestamps) |
+| `container.listObjects()` | `() => StreamObjectNames` | Get a paginated stream of object names |
+| `stream.readStreamObjectNames(len)` | `(bigint) => [string[], boolean]` | Read a batch of names; returns `[names, done]` |
+| `OutgoingValue.newOutgoingValue()` | `() => OutgoingValue` | Create a new outgoing value for writing |
+| `ov.outgoingValueWriteBody()` | `() => OutputStream` | Get the write stream for an outgoing value |
+| `OutgoingValue.finish(ov)` | `(OutgoingValue) => void` | Finalize the outgoing value (required after write) |
+| `IncomingValue.incomingValueConsumeSync(iv)` | `(IncomingValue) => Uint8Array` | Read all bytes from an incoming value |
+
+## Further reading
+
+- [TypeScript Language Guide](../index.mdx) — toolchain overview, HTTP patterns, framework integration, and library compatibility
+- [Key-Value Storage](./key-value-storage.mdx) — simpler key-value storage for small values and counters
+- [Language Support overview](../../index.mdx) — summary of all supported languages and toolchains
