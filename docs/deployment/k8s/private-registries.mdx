@@ -1,0 +1,264 @@
+---
+title: 'Private Registries and Air-Gapped Deployments'
+description: 'Mirror wasmCloud container images to a private registry for air-gapped or restricted environments'
+sidebar_position: 5
+---
+
+Some environments restrict access to public container registries like `ghcr.io` and `docker.io`. In these cases, you need to mirror the required container images to your private registry before deploying.
+
+This guide covers how to mirror the images required by the wasmCloud Helm chart and configure the deployment to use your private registry.
+
+## Required images
+
+The wasmCloud `runtime-operator` Helm chart uses the following container images:
+
+| Image | Component |
+|---|---|
+| `ghcr.io/wasmcloud/runtime-operator:<version>` | Operator |
+| `ghcr.io/wasmcloud/runtime-gateway:<version>` | Gateway |
+| `ghcr.io/wasmcloud/wash:<version>` | Runtime host |
+| `docker.io/nats:<nats-version>` | NATS server (optional) |
+
+:::tip
+To find the exact image tags for a given chart version, run:
+
+```shell
+helm show values oci://ghcr.io/wasmcloud/charts/runtime-operator --version <version>
+```
+:::
+
+For example, with version `2.0.0-rc.7`, the images are:
+
+- `ghcr.io/wasmcloud/runtime-operator:2.0.0-rc.7`
+- `ghcr.io/wasmcloud/runtime-gateway:2.0.0-rc.7`
+- `ghcr.io/wasmcloud/wash:2.0.0-rc.7`
+- `docker.io/nats:2.11.3-alpine`
+
+If you disable the built-in NATS server (`--set nats.enabled=false`), you do not need to mirror the NATS image.
+
+## Mirror images to your registry
+
+### Prerequisites
+
+- [oras](https://oras.land) CLI
+- [yq](https://github.com/mikefarah/yq) and [jq](https://jqlang.github.io/jq/)
+- Authenticated to both the source registries (`ghcr.io`, `docker.io`) and your destination registry
+
+### Create an image manifest
+
+Create a `mirror.yaml` file listing the source and destination for each image. Replace `myregistry` with your private registry:
+
+```yaml
+images:
+  # wasmCloud runtime images
+  - source: ghcr.io/wasmcloud/runtime-operator:2.0.0-rc.7
+    destination: myregistry/wasmcloud/runtime-operator:2.0.0-rc.7
+  - source: ghcr.io/wasmcloud/runtime-gateway:2.0.0-rc.7
+    destination: myregistry/wasmcloud/runtime-gateway:2.0.0-rc.7
+  - source: ghcr.io/wasmcloud/wash:2.0.0-rc.7
+    destination: myregistry/wasmcloud/wash:2.0.0-rc.7
+
+  # Third-party images
+  - source: docker.io/nats:2.11.3-alpine
+    destination: myregistry/nats:2.11.3-alpine
+```
+
+### Run the mirror script
+
+Create and run `mirror.sh`:
+
+```bash
+#!/bin/bash
+CONFIG_FILE="mirror.yaml"
+
+if ! command -v oras >/dev/null 2>&1; then
+  echo "oras not found. Please install: https://oras.land"
+  exit 1
+fi
+
+echo "Mirroring images from $CONFIG_FILE..."
+yq -o=json e '.images[]' "$CONFIG_FILE" | jq -c '.' | while read -r line; do
+    src=$(echo "$line" | jq -r '.source')
+    dst=$(echo "$line" | jq -r '.destination')
+    if [[ -n "$src" && -n "$dst" && "$dst" != "null" ]]; then
+      echo "Copying $src -> $dst"
+      oras copy "$src" "$dst"
+    fi
+done
+```
+
+```shell
+chmod +x ./mirror.sh
+./mirror.sh
+```
+
+## Deploy with your private registry
+
+The Helm chart provides a `global.image.registry` value that overrides the registry for all component images at once.
+
+### Basic install with global registry override
+
+```shell
+helm install wasmcloud-runtime oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  --version 2.0.0-rc.7 \
+  --namespace wasmcloud \
+  --create-namespace \
+  --set global.image.registry="myregistry"
+```
+
+### With an image pull secret
+
+If your private registry requires authentication, create a Kubernetes pull secret and reference it in the Helm install:
+
+```shell
+kubectl create namespace wasmcloud
+
+kubectl create secret docker-registry my-registry-secret \
+  --namespace wasmcloud \
+  --docker-server=myregistry \
+  --docker-username=<username> \
+  --docker-password=<password>
+```
+
+Then install with the pull secret:
+
+```shell
+helm install wasmcloud-runtime oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  --version 2.0.0-rc.7 \
+  --namespace wasmcloud \
+  --create-namespace \
+  --set global.image.registry="myregistry" \
+  --set global.image.pullSecrets[0].name="my-registry-secret"
+```
+
+### Per-component registry overrides
+
+If you need to mirror images to different registry paths, you can override each component individually:
+
+```shell
+helm install wasmcloud-runtime oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  --version 2.0.0-rc.7 \
+  --namespace wasmcloud \
+  --create-namespace \
+  --set operator.image.registry="myregistry" \
+  --set gateway.image.registry="myregistry" \
+  --set runtime.image.registry="myregistry" \
+  --set nats.image.registry="myregistry"
+```
+
+## Rendering manifests with `helm template`
+
+If your organization uses a GitOps workflow or requires manifests to be reviewed before applying, you can use `helm template` to render the Kubernetes manifests locally without installing anything to the cluster.
+
+### Render to stdout
+
+```shell
+helm template wasmcloud-runtime oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  --version 2.0.0-rc.7 \
+  --namespace wasmcloud \
+  --set global.image.registry="myregistry" \
+  --set global.image.pullSecrets[0].name="my-registry-secret"
+```
+
+### Render to a directory
+
+Write the rendered manifests to a directory for review or to check into version control:
+
+```shell
+helm template wasmcloud-runtime oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  --version 2.0.0-rc.7 \
+  --namespace wasmcloud \
+  --set global.image.registry="myregistry" \
+  --set global.image.pullSecrets[0].name="my-registry-secret" \
+  --output-dir ./wasmcloud-manifests
+```
+
+This creates a `wasmcloud-manifests/` directory with one file per Kubernetes resource. You can then apply them with:
+
+```shell
+kubectl apply --recursive -f ./wasmcloud-manifests
+```
+
+### Verify image references
+
+After rendering, you can verify that all image references point to your private registry:
+
+```shell
+helm template wasmcloud-runtime oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  --version 2.0.0-rc.7 \
+  --namespace wasmcloud \
+  --set global.image.registry="myregistry" \
+  | grep "image:"
+```
+
+You should see all images prefixed with your registry and no references to `ghcr.io` or `docker.io`.
+
+### Use a values file
+
+For repeatable deployments, store your overrides in a values file rather than passing `--set` flags:
+
+```yaml title="my-values.yaml"
+global:
+  image:
+    registry: myregistry
+    pullSecrets:
+      - name: my-registry-secret
+```
+
+Then reference it with `-f`:
+
+```shell
+helm template wasmcloud-runtime oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  --version 2.0.0-rc.7 \
+  --namespace wasmcloud \
+  -f my-values.yaml
+```
+
+This same values file works with `helm install` and `helm upgrade`.
+
+:::note[Using Kustomize?]
+If your team uses [Kustomize](https://kustomize.io/) to manage Kubernetes manifests, you can combine it with `helm template`. Render the chart to a directory as shown above, then use Kustomize to apply additional patches, labels, or transformations on top of the rendered output. For example, you can use a Kustomize [`images` transformer](https://kubectl.docs.kubernetes.io/references/kustomize/builtins/#_imagetagtransformer_) to rewrite image references, or layer environment-specific overlays on top of a shared base.
+
+A minimal setup looks like:
+
+```yaml title="kustomization.yaml"
+resources:
+  - ./wasmcloud-manifests/runtime-operator/templates
+
+images:
+  - name: ghcr.io/wasmcloud/runtime-operator
+    newName: myregistry/wasmcloud/runtime-operator
+  - name: ghcr.io/wasmcloud/runtime-gateway
+    newName: myregistry/wasmcloud/runtime-gateway
+  - name: ghcr.io/wasmcloud/wash
+    newName: myregistry/wasmcloud/wash
+  - name: docker.io/nats
+    newName: myregistry/nats
+```
+
+```shell
+kubectl apply -k .
+```
+
+This approach is particularly useful when you need to manage multiple environments (staging, production) with different registries or configurations.
+:::
+
+## Helm values reference
+
+These are the image-related values you can configure:
+
+| Value | Default | Description |
+|---|---|---|
+| `global.image.registry` | `""` | Override registry for all images |
+| `global.image.pullSecrets` | `[]` | Global image pull secrets |
+| `operator.image.registry` | `ghcr.io` | Operator image registry |
+| `operator.image.repository` | `wasmcloud/runtime-operator` | Operator image repository |
+| `operator.image.tag` | Chart `appVersion` | Operator image tag |
+| `gateway.image.registry` | `ghcr.io` | Gateway image registry |
+| `gateway.image.repository` | `wasmcloud/runtime-gateway` | Gateway image repository |
+| `runtime.image.registry` | `ghcr.io` | Runtime host image registry |
+| `runtime.image.repository` | `wasmcloud/wash` | Runtime host image repository |
+| `runtime.image.tag` | `2.0.0-rc.7` | Runtime host image tag |
+| `nats.image.registry` | `docker.io` | NATS image registry |
+| `nats.image.repository` | `nats` | NATS image repository |
+| `nats.image.tag` | `2.11.3-alpine` | NATS image tag |
