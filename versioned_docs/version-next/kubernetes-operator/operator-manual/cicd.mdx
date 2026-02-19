@@ -9,6 +9,8 @@ wasmCloud components are distributed as [OCI artifacts](https://opencontainers.o
 
 The wasmCloud project provides a set of official [GitHub Actions](#wasmcloud-github-actions) that handle building components, publishing to OCI registries, and generating supply-chain attestations. For teams using GitOps, [Argo CD](#gitops-with-argo-cd) or Flux can close the loop by reconciling Kubernetes state with a Git repository.
 
+![Deployment pipeline from developer push through CI, OCI registry, GitOps, and Kubernetes](../../images/deployment-pipeline.png)
+
 ## wasmCloud GitHub Actions
 
 wasmCloud provides four GitHub Actions for CI pipelines:
@@ -16,24 +18,28 @@ wasmCloud provides four GitHub Actions for CI pipelines:
 | Action | Description |
 |--------|-------------|
 | [`wasmCloud/setup-wash-action`](https://github.com/wasmCloud/setup-wash-action) | Installs the `wash` CLI (and optional plugins) on the runner |
-| [`wasmcloud/actions/setup-wash-cargo-auditable`](https://github.com/wasmcloud/actions) | Configures `cargo-auditable` to embed SBOM data in Rust builds |
-| [`wasmcloud/actions/wash-build`](https://github.com/wasmcloud/actions) | Builds a Wasm component, outputs the path to the built artifact |
-| [`wasmcloud/actions/wash-oci-publish`](https://github.com/wasmcloud/actions) | Publishes a component to an OCI registry with optional attestation and SBOM |
+| [`wasmcloud/actions/setup-wash-cargo-auditable`](https://github.com/wasmCloud/actions/tree/main/setup-wash-cargo-auditable) | Configures `cargo-auditable` to embed SBOM data in Rust builds |
+| [`wasmcloud/actions/wash-build`](https://github.com/wasmCloud/actions/tree/main/wash-build) | Builds a Wasm component, outputs the path to the built artifact |
+| [`wasmcloud/actions/wash-oci-publish`](https://github.com/wasmCloud/actions/tree/main/wash-oci-publish) | Publishes a component to an OCI registry with optional attestation and SBOM |
 
 ### setup-wash-action
 
-Installs `wash`, adds it to `PATH`, caches the binary, and installs the `wasm32-wasip2` Rust target. Optionally installs wash plugins (also cached).
+The [`setup-wash-action`](https://github.com/wasmCloud/setup-wash-action) installs `wash`, adds it to `PATH`, caches the binary, and installs the `wasm32-wasip2` Rust target. Optionally installs wash plugins (also cached).
 
 ```yaml
 - uses: wasmCloud/setup-wash-action@main
   with:
-    wash-version: "1.0.0"               # version to install (default: latest RC)
+    wash-version: "wash-v2.0.0-rc.7"    # version to install (default: wash-v2.0.0-rc.7)
     plugins: "ghcr.io/wasmcloud/plugin"  # optional comma-separated plugin URIs
 ```
 
 ### setup-wash-cargo-auditable
 
-Installs `cargo-auditable` and `cargo-audit`, then configures `.wash/config.json` so that `wash build` uses `cargo auditable build` under the hood. This embeds dependency metadata in the compiled binary for later SBOM extraction.
+The [`setup-wash-cargo-auditable`](https://github.com/wasmCloud/actions/tree/main/setup-wash-cargo-auditable) action installs `cargo-auditable` and `cargo-audit`, then configures `.wash/config.yaml` so that `wash build` uses `cargo auditable build` under the hood. This embeds dependency metadata in the compiled binary for later SBOM extraction.
+
+:::note[]
+A Cargo project (`Cargo.toml`) must already exist in the working directory before calling this action, as it reads the package name to determine the component output path.
+:::
 
 ```yaml
 - uses: wasmcloud/actions/setup-wash-cargo-auditable@main
@@ -43,7 +49,7 @@ Installs `cargo-auditable` and `cargo-audit`, then configures `.wash/config.json
 
 ### wash-build
 
-Runs `wash build --output json` and exposes the path to the built component as a step output.
+The [`wash-build`](https://github.com/wasmCloud/actions/tree/main/wash-build) action runs `wash build --output json` and exposes the path to the built component as a step output.
 
 ```yaml
 - id: build
@@ -56,7 +62,7 @@ Runs `wash build --output json` and exposes the path to the built component as a
 
 ### wash-oci-publish
 
-Pushes the built component to an OCI registry. When attestation is enabled, the action generates build provenance and an SBOM (converted from CycloneDX to SPDX format).
+The [`wash-oci-publish`](https://github.com/wasmCloud/actions/tree/main/wash-oci-publish) action pushes the built component to an OCI registry. When attestation is enabled, the action generates build provenance and an SBOM (converted from CycloneDX to SPDX format).
 
 ```yaml
 - uses: wasmcloud/actions/wash-oci-publish@main
@@ -99,12 +105,10 @@ jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup wash CLI
         uses: wasmCloud/setup-wash-action@main
-        with:
-          wash-version: "1.0.0"
 
       - name: Setup cargo-auditable
         uses: wasmcloud/actions/setup-wash-cargo-auditable@main
@@ -196,7 +200,7 @@ After the CI pipeline publishes a new component image, a second workflow job can
     needs: build-and-publish
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: <org>/wasmcloud-workloads
           token: ${{ secrets.WORKLOADS_REPO_TOKEN }}
@@ -226,7 +230,7 @@ The wasmCloud GitHub Actions support a full supply-chain security pipeline using
 
 The attestation flow works as follows:
 
-1. **`setup-wash-cargo-auditable`** configures `cargo-auditable` so that dependency metadata is embedded in the compiled binary during `wash build`.
+1. **`setup-wash-cargo-auditable`** configures `cargo-auditable` via `.wash/config.yaml` so that dependency metadata is embedded in the compiled binary during `wash build`.
 2. **`wash-oci-publish`** (with `attestation: "true"`) extracts the embedded metadata and generates attestations:
    - Extracts a CycloneDX SBOM from the binary using `auditable2cdx`
    - Converts the SBOM to SPDX format using `cyclonedx-cli`
