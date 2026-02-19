@@ -1,0 +1,369 @@
+---
+title: "Building Custom Hosts"
+sidebar_position: 3
+toc_max_heading_level: 2
+---
+
+### Build custom wasmCloud hosts for specialized deployment scenarios.
+
+The `wash-runtime` crate provides a Rust library for embedding wasmCloud host functionality in your own applications. This enables you to create custom hosts tailored to specific requirements—whether for edge deployments, specialized hardware, or integration with existing systems.
+
+## When to build a custom host
+
+Custom hosts are useful when you need to:
+
+- **Embed WebAssembly execution** in an existing Rust application
+- **Deploy to constrained environments** where the full wasmCloud stack is too heavy
+- **Integrate with proprietary systems** that require custom plugins or configurations
+- **Build specialized tooling** around WebAssembly workloads
+
+For most production deployments, the standard wasmCloud host managed by the [Kubernetes operator](../kubernetes-operator/index.mdx) is recommended. Build a custom host only when you have specific requirements that can't be met by the standard deployment model.
+
+## Prerequisites
+
+Add `wash-runtime` to your `Cargo.toml`:
+
+```toml
+[dependencies]
+wash-runtime = "0.1"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+tracing-subscriber = "0.3"
+```
+
+Enable only the features you need to minimize binary size:
+
+```toml
+[dependencies]
+wash-runtime = { version = "0.1", default-features = false, features = [
+    "wasi-http",
+    "wasi-keyvalue",
+    "wasi-config",
+] }
+```
+
+### Available features
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `wasi-http` | Yes | HTTP client and server support via `wasmtime-wasi-http` |
+| `wasi-config` | Yes | Runtime configuration interface |
+| `wasi-logging` | Yes | Logging interface |
+| `wasi-blobstore` | Yes | Blob storage interface |
+| `wasi-keyvalue` | Yes | Key-value storage interface |
+| `oci` | No | OCI registry integration for pulling components |
+
+## Architecture overview
+
+A typical custom host architecture includes:
+
+1. **Engine**: Configures and manages the underlying Wasmtime runtime
+2. **Plugins**: The host is built with plugins to enable capabilities
+3. **Workloads**: Units of execution containing components and optional services
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Custom Host                    │
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐    │
+│  │  Engine   │  │  Plugins  │  │ Workloads │    │
+│  │           │  │           │  │           │    │
+│  │ Wasmtime  │  │ HTTP      │  │ Component │    │
+│  │ Config    │  │ KeyValue  │  │ Component │    │
+│  │ Pooling   │  │ Config    │  │ Service   │    │
+│  └───────────┘  └───────────┘  └───────────┘    │
+└─────────────────────────────────────────────────┘
+```
+
+## Creating an Engine
+
+The `Engine` wraps Wasmtime and handles WebAssembly compilation. Use `Engine::builder()` to configure it:
+
+```rust
+use wash_runtime::engine::Engine;
+
+// Default configuration
+let engine = Engine::builder().build()?;
+
+// With pooling allocator enabled
+let engine = Engine::builder()
+    .with_pooling_allocator(true)
+    .build()?;
+
+// With a fully custom wasmtime configuration
+// (wasmtime is re-exported by wash-runtime)
+let mut config = wash_runtime::wasmtime::Config::new();
+config.cranelift_opt_level(wash_runtime::wasmtime::OptLevel::Speed);
+let engine = Engine::builder()
+    .with_config(config)
+    .build()?;
+```
+
+### Engine configuration options
+
+| Method | Description |
+|--------|-------------|
+| `with_pooling_allocator(bool)` | Enable/disable instance pooling for better performance with many short-lived instances |
+| `with_config(wasmtime::Config)` | Provide a fully custom Wasmtime configuration for advanced use cases |
+
+:::info[Pooling allocator]
+The pooling allocator is automatically enabled on machines with sufficient virtual memory. You can override this behavior with the `with_pooling_allocator()` method.
+:::
+
+## Building the Host
+
+Use `HostBuilder` to construct a host with your desired configuration. All capabilities (HTTP, key-value, configuration, etc.) are provided as plugins:
+
+```rust
+use std::sync::Arc;
+use wash_runtime::{
+    engine::Engine,
+    host::{HostBuilder, HostApi},
+    plugin::wasi_http::HttpServer,
+    plugin::wasi_config::RuntimeConfig,
+};
+
+let engine = Engine::builder().build()?;
+
+// Configure plugins
+let http_plugin = HttpServer::new("127.0.0.1:8080".parse()?);
+// For HTTPS, use HttpServer::new_with_tls() with cert, key, and optional CA paths
+let config_plugin = RuntimeConfig::default();
+
+// Build the host
+let host = HostBuilder::new()
+    .with_engine(engine)
+    .with_hostname("my-custom-host")
+    .with_friendly_name("My Custom Host")
+    .with_label("environment", "production")
+    .with_label("region", "us-west-2")
+    .with_plugin(Arc::new(http_plugin))?
+    .with_plugin(Arc::new(config_plugin))?
+    .build()?;
+
+// Start the host (initializes all plugins)
+let host = host.start().await?;
+```
+
+### HostBuilder methods
+
+| Method | Description |
+|--------|-------------|
+| `with_engine(Engine)` | Set the WebAssembly engine (creates default if not set) |
+| `with_hostname(str)` | Set the system hostname (defaults to OS hostname) |
+| `with_friendly_name(str)` | Set a human-readable name (auto-generated if not set) |
+| `with_label(key, value)` | Add metadata labels for identification |
+| `with_plugin(Arc<dyn HostPlugin>)` | Register a plugin (can be called multiple times; IDs must be unique) |
+
+## Managing workloads
+
+Once the host is running, use the `HostApi` trait to manage workloads. The host generates unique IDs for each workload automatically.
+
+### Starting a workload
+
+```rust
+use std::collections::HashMap;
+use wash_runtime::types::{Workload, WorkloadStartRequest, Component, LocalResources};
+
+let component_bytes = std::fs::read("./my-component.wasm")?;
+
+let request = WorkloadStartRequest {
+    workload: Workload {
+        namespace: "my-app".to_string(),
+        name: "http-handler".to_string(),
+        annotations: HashMap::from([
+            ("version".to_string(), "1.0.0".to_string()),
+        ]),
+        service: None,
+        components: vec![
+            Component {
+                bytes: component_bytes.into(),
+                local_resources: LocalResources {
+                    memory_limit_mb: 64,  // In megabytes; -1 = unlimited
+                    cpu_limit: -1,        // In millicores; -1 = unlimited
+                    config: HashMap::new(),
+                    environment: HashMap::from([
+                        ("LOG_LEVEL".to_string(), "info".to_string()),
+                    ]),
+                    volume_mounts: vec![],
+                    allowed_hosts: vec!["api.example.com".to_string()],
+                },
+                pool_size: 10,
+                max_invocations: 0,  // 0 = unlimited
+            },
+        ],
+        host_interfaces: vec![],
+        volumes: vec![],
+    },
+};
+
+let response = host.workload_start(request).await?;
+let workload_id = response.workload_status.workload_id;
+println!("Workload started with ID: {}", workload_id);
+```
+
+### Checking workload status
+
+```rust
+use wash_runtime::types::{WorkloadStatusRequest, WorkloadState};
+
+let status = host.workload_status(WorkloadStatusRequest {
+    workload_id: workload_id.clone(),
+}).await?;
+
+match status.workload_status.workload_state {
+    WorkloadState::Running => println!("Workload is running"),
+    WorkloadState::Error => println!("Workload encountered an error"),
+    WorkloadState::Completed => println!("Workload completed"),
+    state => println!("Workload state: {:?}", state),
+}
+```
+
+### Stopping a workload
+
+```rust
+use wash_runtime::types::WorkloadStopRequest;
+
+host.workload_stop(WorkloadStopRequest {
+    workload_id: workload_id.clone(),
+}).await?;
+```
+
+### Host heartbeat
+
+You can query the host for system information and current workload counts:
+
+```rust
+let heartbeat = host.heartbeat().await?;
+println!("Host: {} ({})", heartbeat.friendly_name, heartbeat.id);
+println!("CPU: {:.1}%, Memory: {} MB free / {} MB total",
+    heartbeat.system_cpu_usage,
+    heartbeat.system_memory_free / 1024 / 1024,
+    heartbeat.system_memory_total / 1024 / 1024,
+);
+println!("Workloads: {}, Components: {}",
+    heartbeat.workload_count, heartbeat.component_count);
+```
+
+## Complete example
+
+Here's a complete example that creates a custom host with HTTP and config plugins:
+
+```rust
+use std::sync::Arc;
+use std::collections::HashMap;
+use wash_runtime::{
+    engine::Engine,
+    host::{HostBuilder, HostApi},
+    plugin::wasi_http::HttpServer,
+    plugin::wasi_config::RuntimeConfig,
+    types::{Workload, WorkloadStartRequest, Component, LocalResources},
+};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Initialize tracing for observability
+    tracing_subscriber::fmt::init();
+
+    // Create the engine with pooling enabled
+    let engine = Engine::builder()
+        .with_pooling_allocator(true)
+        .build()?;
+
+    // Configure plugins
+    let http_plugin = HttpServer::new("0.0.0.0:8080".parse()?);
+    let config_plugin = RuntimeConfig::default();
+
+    // Build and start the host
+    let host = HostBuilder::new()
+        .with_engine(engine)
+        .with_friendly_name("my-custom-host")
+        .with_plugin(Arc::new(http_plugin))?
+        .with_plugin(Arc::new(config_plugin))?
+        .build()?;
+
+    let host = host.start().await?;
+    println!("Host started: {}", host.friendly_name());
+
+    // Load a component from disk
+    let component_bytes = std::fs::read("./my-component.wasm")?;
+
+    // Create and start a workload
+    let request = WorkloadStartRequest {
+        workload: Workload {
+            namespace: "default".to_string(),
+            name: "my-component".to_string(),
+            annotations: HashMap::new(),
+            service: None,
+            components: vec![Component {
+                bytes: component_bytes.into(),
+                local_resources: LocalResources::default(),
+                pool_size: 5,
+                max_invocations: 0,
+            }],
+            host_interfaces: vec![],
+            volumes: vec![],
+        },
+    };
+
+    let response = host.workload_start(request).await?;
+    let workload_id = response.workload_status.workload_id.clone();
+    println!("Workload started: {}", workload_id);
+
+    // Keep the host running
+    println!("Host listening on http://0.0.0.0:8080");
+    tokio::signal::ctrl_c().await?;
+
+    // Clean shutdown
+    host.workload_stop(wash_runtime::types::WorkloadStopRequest {
+        workload_id,
+    }).await?;
+
+    host.stop().await?;
+    println!("Host shutdown complete");
+    Ok(())
+}
+```
+
+## Adding custom plugins
+
+For specialized requirements, you can create custom plugins that implement the `HostPlugin` trait. See [Creating Host Plugins](./creating-host-plugins.mdx) for detailed instructions.
+
+```rust
+use std::sync::Arc;
+use wash_runtime::host::HostBuilder;
+
+// Create your custom plugin
+let my_plugin = MyCustomPlugin::new();
+
+// Register it with the host
+let host = HostBuilder::new()
+    .with_engine(engine)
+    .with_plugin(Arc::new(my_plugin))?
+    .build()?;
+```
+
+## Error handling
+
+The `wash-runtime` APIs return `anyhow::Result` for flexible error handling. Common error scenarios include:
+
+- **Engine build failures**: Invalid Wasmtime configuration
+- **Plugin registration**: Duplicate plugin IDs
+- **Workload start**: Invalid component bytes or missing interface dependencies
+- **Resource limits**: Exceeded memory or instance limits
+
+```rust
+match host.workload_start(request).await {
+    Ok(response) => {
+        println!("Started workload: {}", response.workload_status.workload_id);
+    }
+    Err(e) => {
+        eprintln!("Failed to start workload: {}", e);
+    }
+}
+```
+
+## Keep reading
+
+- [Creating Host Plugins](./creating-host-plugins.mdx) - Build custom plugins for your host
+- [Host Plugins Overview](../overview/hosts/plugins.mdx) - Understand the plugin architecture
+- [wash-runtime source code](https://github.com/wasmCloud/wash/tree/main/crates/wash-runtime) - Explore the implementation
