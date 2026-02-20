@@ -84,6 +84,23 @@ permissions:
 ```
 :::
 
+## Attestation
+
+When attestation is enabled, the `wash-oci-publish` action generates cryptographically signed metadata that links a published artifact back to the source code, build environment, and dependency tree that produced it. This enables consumers to verify that an artifact was built from a specific commit in a trusted CI pipeline.
+
+![Attestation flow](../../images/attestation.png)
+
+The attestation flow works as follows:
+
+- A **developer pushes** code to a GitHub repository, triggering a GitHub Actions workflow.
+- The workflow runs **`wash build`** (with `cargo-auditable`) to compile the component, embedding dependency metadata in the binary.
+- Two attestations are generated in parallel:
+  - **`attest-sbom`** extracts a CycloneDX SBOM from the binary, converts it to SPDX format, and creates an SBOM attestation.
+  - **`attest-build-provenance`** generates [SLSA](https://slsa.dev/) build provenance, recording *where*, *how*, and *from what source* the artifact was built.
+- Both attestations are signed via **Sigstore** using keyless OIDC signing&mdash;no manual key management required.
+- The signed attestations are stored in the **GitHub Attestation Store** and associated with the published artifact in the **container registry** (e.g., GHCR).
+- Consumers can run **`gh attestation verify`** to confirm the artifact's integrity and provenance before deploying it.
+
 ## Example: Build and publish pipeline
 
 The following GitHub Actions workflow builds a Rust-based Wasm component with auditable dependency metadata, publishes it to GitHub Container Registry, and generates supply-chain attestations:
