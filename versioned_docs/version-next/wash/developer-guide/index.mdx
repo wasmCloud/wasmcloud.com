@@ -25,7 +25,6 @@ This guide requires Wasm Shell (`wash`) and the language toolchain for your lang
 To get started:
 
 * [Install Wasm Shell (`wash`)](../index.mdx).
-* Run `wash doctor` to check your system for development dependencies.
 
 ## Create a new component project
 
@@ -65,19 +64,19 @@ This command...
 </TabItem>
 
 <TabItem value="typescript" label="TypeScript">
-Let's create a component that accepts an HTTP request and responds with "Hello from TypeScript!"  
+Let's create a component that accepts an HTTP request and responds with "Hello from TypeScript!"
 
-Use `wash new` to create a new component project from a template: 
+Use `wash new` to create a new component project from a template:
 
 ```shell
-wash new https://github.com/wasmCloud/typescript.git --name hello --subfolder examples/components/http-hello-world
+wash new https://github.com/wasmCloud/typescript.git --name hello --subfolder templates/http-hello-world-hono --git-ref v2
 ```
 
 This command...
 
 * Creates a new project named `hello`...
 * Based on a template found in the `wasmCloud/typescript` Git repository...
-* In the subfolder `examples/components/http-hello-world`
+* In the subfolder `templates/http-hello-world-hono` on the `v2` branch
 </TabItem>
 
 <TabItem value="other" label="Other">
@@ -250,100 +249,75 @@ func main() {}
 * **In the `handleRequest` function**, we respond to an HTTP request by printing `Hello from Go!`
 * **The main function is empty**, since the component doesn't run like a CLI, but instead runs the `handleRequest` function when triggered by an HTTP request.
 
-## Add a configuration file
+## Add a configuration file and Makefile
 
-To start a developer loop or build a component binary from a Go project, `wash` requires the project's WIT world to be specified in a [configuration file](../config.mdx) called `config.json` at `/.wash`. (When you try to build without a config file, `wash` will prompt you, but we'll go ahead and get it out of the way.)
+Go projects use a `Makefile` to wrap the build steps and a [configuration file](../config.mdx) at `.wash/config.yaml` to tell `wash` how to invoke the build.
 
 Create the config file:
 
 ```shell
-mkdir .wash && touch ./.wash/config.json
+mkdir .wash && touch ./.wash/config.yaml
 ```
 
-Add the contents below to `config.json`, specifying your WIT world as `hello`:
+Add the contents below to `config.yaml`:
 
-```json
-{
-  "build": {
-    "tinygo": {
-      "target": "wasip2",
-      "build_flags": [],
-      "disable_go_generate": false,
-      "scheduler": "asyncify",
-      "gc": "conservative",
-      "opt": "z",
-      "panic": "print",
-      "tags": [],
-      "no_debug": true,
-      "wit_world": "hello"
-    },
-    "component_path": "build/output.wasm"
-  },
-  "wit": {
-    "registries": [],
-    "skip_fetch": true,
-    "wit_dir": null,
-    "sources": {}
-  }
-}
+```yaml
+dev:
+  command: make build
+
+build:
+  command: make bindgen build
 ```
+
+Create a `Makefile` at the project root:
+
+```makefile
+all: build
+
+.PHONY: build
+build:
+	tinygo build -target wasip2 -wit-package ./wit -wit-world hello -o hello.wasm ./
+
+.PHONY: bindgen
+bindgen:
+	go generate ./...
+```
+
+For more on the Makefile-based build workflow, see the [Go Language Guide](./language-support/go/index.mdx).
 
 </TabItem>
 
 <TabItem value="typescript" label="TypeScript">
-The file `http-hello-world.ts` will include imports and a `handle` function exported under `incomingHandler`. Let's walk through these pieces in depth.
+The file `src/component.ts` uses [Hono](https://hono.dev/), a lightweight web framework built on Web Standards. Let's walk through the pieces in depth.
 
 ```typescript
-import {
-  IncomingRequest,
-  ResponseOutparam,
-  OutgoingBody,
-  OutgoingResponse,
-  Fields,
-} from 'wasi:http/types@0.2.0';
+import { Hono } from 'hono';
+import { fire } from '@bytecodealliance/jco-std/wasi/0.2.6/http/adapters/hono/server';
 ```
 
-The import section of this file imports our generated types (from `jco`) for the WASI HTTP interface.
+The import section brings in the Hono framework and `fire` from [`@bytecodealliance/jco-std`](https://www.npmjs.com/package/@bytecodealliance/jco-std), a Bytecode Alliance library that adapts Hono to the WASI HTTP incoming handler interface.
 
 ```typescript
-// Implementation of wasi-http incoming-handler
-//
-// NOTE: To understand the types involved, take a look at wit/deps/http/types.wit
-function handle(req: IncomingRequest, resp: ResponseOutparam) {
-  // Start building an outgoing response
-  const outgoingResponse = new OutgoingResponse(new Fields());
+const app = new Hono();
 
-  // Access the outgoing response body
-  let outgoingBody = outgoingResponse.body();
-  {
-    // Create a stream for the response body
-    let outputStream = outgoingBody.write();
-    // Write hello world to the response stream
-    outputStream.blockingWriteAndFlush(
-      new Uint8Array(new TextEncoder().encode('Hello from Typescript!\n')),
-    );
-    // @ts-ignore: This is required in order to dispose the stream before we return
-    outputStream[Symbol.dispose]();
-  }
+app.get('/', (c) => {
+  return c.text('Hello from TypeScript!\n');
+});
 
-  // Set the status code for the response
-  outgoingResponse.setStatusCode(200);
-  // Finish the response body
-  OutgoingBody.finish(outgoingBody, undefined);
-  // Set the created response
-  ResponseOutparam.set(resp, { tag: 'ok', val: outgoingResponse });
-}
+app.notFound((c) => {
+  return c.text('Not found\n', 404);
+});
+
+fire(app);
 ```
 
-The core logic is contained within the `handle` function, where the component receives the HTTP request, creates an `OutgoingResponse` and writes that response back out to the requesting HTTP client (such as a `curl` command or a web browser).
+We create a Hono app with a route for `/` and a fallback for unmatched routes. The `fire()` function wires the Hono app to the Service Worker `fetch` event listener, which StarlingMonkey (the embedded JavaScript engine) maps to `wasi:http/incoming-handler`. When a request arrives, Hono routes it and returns the appropriate response.
 
 ```typescript
-export const incomingHandler = {
-  handle,
-};
+export { incomingHandler } from '@bytecodealliance/jco-std/wasi/0.2.6/http/adapters/hono/server';
 ```
 
-Lastly, this export statement includes the `handle` function under the `incomingHandler` interface, which matches the `wasi:http/incoming-handler` interface declared in the application's [WIT file](https://github.com/wasmCloud/typescript/blob/main/examples/components/http-hello-world/wit/world.wit).
+This re-export provides the `incomingHandler` that the Wasm component must export to satisfy the `wasi:http/incoming-handler` interface declared in the WIT world. The `jco-std` adapter handles all the conversion between WASI HTTP types and the Web Standard `Request`/`Response` objects that Hono uses.
 
 </TabItem>
 
@@ -369,15 +343,6 @@ We're looking to add more examples in languages that support Wasm components. If
 </TabItem>
 </Tabs>
 
-:::info[Something's missing]
-Note what's _not_ included in this code: 
-
-* The code is _not_ tightly coupled to any particular HTTP server. It returns an abstraction of an HTTP response. 
-* You don't see the port number or server configuration options anywhere in the code. 
-
-This style of **interface driven development** enables you to write application logic in the language of your choice without having to worry about the non-functional requirements of your application. 
-:::
-
 ## Start a development loop
 
 Now we'll start a development loop that runs the component, watches for modifications to the code, and refreshes when we make changes. 
@@ -396,11 +361,28 @@ Now we can send a request to `localhost:8000` with `curl` (in a new tab), or by 
 curl localhost:8000
 ```
 
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust" default>
+
 You should see:
 
 ```text
-Hello from <your language>
+Hello from wasmCloud!
 ```
+
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo">
+```text
+Hello from Go!
+```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+```text
+Hello from TypeScript!
+```
+  </TabItem>
+</Tabs>
+
 
 You can stop the development loop with CTRL+C.
 
