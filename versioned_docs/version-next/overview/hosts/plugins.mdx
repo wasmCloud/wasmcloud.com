@@ -15,24 +15,26 @@ The [`wash-runtime`](https://github.com/wasmCloud/wash/tree/main/crates/wash-run
 
 | Plugin | Interface | Description |
 |--------|-----------|-------------|
-| **HTTP** | `wasi:http` | HTTP client and server capabilities |
 | **Key-Value** | `wasi:keyvalue` | Key-value storage operations |
 | **Blobstore** | `wasi:blobstore` | Blob/object storage operations |
 | **Config** | `wasi:config` | Runtime configuration access |
 | **Logging** | `wasi:logging` | Structured logging output |
-| **Filesystem** | `wasi:filesystem` | File system access within workload boundaries |
 | **Messaging** | `wasmcloud:messaging` | Message passing and pub/sub communication |
 
-Filesystem and Messaging are always available. The remaining plugins can be enabled or disabled via Cargo feature flags when building your host:
+:::note
+HTTP is handled by `HttpServer`, which implements the `HostHandler` trait and is registered separately via `with_http_handler()` rather than `with_plugin()`. Filesystem support is built into the host core via `wasmtime-wasi` and is always available without registration.
+:::
+
+Messaging is always available. The remaining plugins can be enabled or disabled via Cargo feature flags when building your host:
 
 ```toml
 [dependencies]
-wash-runtime = { version = "0.1", features = ["wasi-http", "wasi-keyvalue", "wasi-config"] }
+wash-runtime = { version = "0.1", features = ["wasi-keyvalue", "wasi-config", "wasi-logging", "wasi-blobstore"] }
 ```
 
 ## Using plugins
 
-Plugins are registered with the host using the `HostBuilder` API. The following example demonstrates how to configure a host with HTTP and configuration plugins:
+Plugins are registered with the host using the `HostBuilder` API. HTTP is handled separately via `with_http_handler()` because `HttpServer` implements the `HostHandler` trait rather than `HostPlugin`. The following example demonstrates how to configure a host with an HTTP handler and a configuration plugin:
 
 ```rust
 use std::sync::Arc;
@@ -40,9 +42,8 @@ use std::collections::HashMap;
 
 use wash_runtime::{
     engine::Engine,
-    host::{HostBuilder, HostApi},
-    plugin::wasi_http::HttpServer,
-    plugin::wasi_config::RuntimeConfig,
+    host::{HostBuilder, HostApi, http::{HttpServer, DevRouter}},
+    plugin::wasi_config::DynamicConfig,
     types::{WorkloadStartRequest, Workload},
 };
 
@@ -51,14 +52,15 @@ async fn main() -> anyhow::Result<()> {
     // Create a Wasmtime engine
     let engine = Engine::builder().build()?;
 
-    // Configure plugins
-    let http_plugin = HttpServer::new("127.0.0.1:8080".parse()?);
-    let config_plugin = RuntimeConfig::default();
+    // Configure HTTP handler and plugins
+    // DevRouter routes all requests to the most recently resolved workload
+    let http_handler = HttpServer::new(DevRouter::default(), "127.0.0.1:8080".parse()?).await?;
+    let config_plugin = DynamicConfig::new(false);
 
-    // Build and start the host with plugins
+    // Build and start the host
     let host = HostBuilder::new()
         .with_engine(engine)
-        .with_plugin(Arc::new(http_plugin))?
+        .with_http_handler(Arc::new(http_handler))
         .with_plugin(Arc::new(config_plugin))?
         .build()?;
 
@@ -66,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Start a workload (components will have access to plugin capabilities)
     let req = WorkloadStartRequest {
+        workload_id: uuid::Uuid::new_v4().to_string(),
         workload: Workload {
             namespace: "example".to_string(),
             name: "my-workload".to_string(),
