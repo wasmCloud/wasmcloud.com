@@ -1,0 +1,154 @@
+---
+title: "Cluster Hosts (Washlet)"
+sidebar_position: 4
+toc_max_heading_level: 2
+---
+
+### Run a wasmCloud host as a cluster node connected to the operator mesh.
+
+A **washlet** is a cluster-connected host: a `ClusterHost` from the `wash_runtime::washlet` module. Unlike a standalone `Host` (covered in [Building Custom Hosts](./building-custom-hosts.mdx)), a washlet connects to the wasmCloud operator mesh via NATS and receives workload commands from the scheduler. This is how the [Kubernetes Operator](../kubernetes-operator/index.mdx) deploys and manages workloads across a fleet of hosts.
+
+## Standalone host vs. cluster host
+
+| | Standalone `Host` | `ClusterHost` (washlet) |
+|---|---|---|
+| Managed by | Your application code | wasmCloud operator via NATS |
+| Workload commands | Programmatic API (`HostApi`) | NATS subjects |
+| Plugins | In-memory (dev) or custom | NATS-backed for production |
+| Entry point | `HostBuilder` | `ClusterHostBuilder` |
+| Use case | Embedding, custom integration | Operator-managed fleet |
+
+## Running with `wash host`
+
+The simplest way to run a washlet is the `wash host` CLI command. It connects to NATS and joins a host group, ready to receive workload commands from the operator.
+
+```shell
+wash host --host-group my-cluster --scheduler-nats-url nats://nats:4222
+```
+
+### `wash host` flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--host-group` | `default` | Host group label used for workload scheduling |
+| `--host-name` | (auto-generated) | Human-readable name for this host |
+| `--scheduler-nats-url` | `nats://localhost:4222` | NATS URL for the control plane (workload commands) |
+| `--data-nats-url` | `nats://localhost:4222` | NATS URL for the data plane (plugin backends) |
+| `--http-addr` | (disabled) | If set, enables the HTTP handler on this address |
+| `--postgres-url` | (disabled) | If set, enables PostgreSQL-backed keyvalue and blobstore |
+| `--wasi-webgpu` | false | Enable the WebGPU interface |
+| `--allow-insecure-registries` | false | Allow pulling from insecure OCI registries |
+| `--registry-pull-timeout` | `30s` | Timeout for OCI pulls |
+| `--scheduler-tls-ca` | — | TLS CA for scheduler NATS |
+| `--data-tls-ca` | — | TLS CA for data plane NATS |
+
+### Environment variables
+
+`WASH_POSTGRES_URL` can be used in place of `--postgres-url`.
+
+## Embedding programmatically
+
+Use `ClusterHostBuilder` to embed a washlet in your own application. The builder mirrors `HostBuilder` but adds NATS-specific configuration:
+
+```rust
+use std::sync::Arc;
+use wash_runtime::{
+    host::http::{HttpServer, DynamicRouter},
+    plugin::{
+        wasi_blobstore::NatsBlobstore,
+        wasi_config::DynamicConfig,
+        wasi_keyvalue::NatsKeyValue,
+        wasi_logging::TracingLogger,
+        wasmcloud_messaging::NatsMessaging,
+    },
+    washlet::{ClusterHostBuilder, run_cluster_host},
+};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
+
+    // Connect to NATS (scheduler and data plane can be separate connections)
+    let scheduler_nats = async_nats::connect("nats://localhost:4222").await?;
+    let data_nats = async_nats::connect("nats://localhost:4222").await?;
+
+    // Build the cluster host with NATS-backed plugins
+    let mut builder = ClusterHostBuilder::default()
+        .with_host_group("my-cluster")
+        .with_nats_client(Arc::new(scheduler_nats))
+        .with_plugin(Arc::new(DynamicConfig::new(true)))?   // true = NATS-backed
+        .with_plugin(Arc::new(TracingLogger::default()))?
+        .with_plugin(Arc::new(NatsBlobstore::new(&data_nats)))?
+        .with_plugin(Arc::new(NatsMessaging::new(data_nats.clone())))?
+        .with_plugin(Arc::new(NatsKeyValue::new(&data_nats)))?;
+
+    // Optionally enable HTTP
+    let http_router = DynamicRouter::default();
+    let http_server = HttpServer::new(http_router, "0.0.0.0:8080".parse()?).await?;
+    builder = builder.with_http_handler(Arc::new(http_server));
+
+    let cluster_host = builder.build()?;
+
+    // Start the host and run until shutdown
+    let shutdown = run_cluster_host(cluster_host).await?;
+
+    println!("Cluster host running. Press Ctrl+C to stop.");
+    tokio::signal::ctrl_c().await?;
+
+    // Graceful shutdown
+    shutdown.await?;
+    println!("Host stopped.");
+    Ok(())
+}
+```
+
+### `ClusterHostBuilder` methods
+
+| Method | Description |
+|--------|-------------|
+| `with_host_group(str)` | Host group label for workload scheduling |
+| `with_host_name(str)` | Human-readable name (auto-generated if not set) |
+| `with_nats_client(Arc<Client>)` | NATS client for the control plane |
+| `with_plugin(Arc<dyn HostPlugin>)` | Register a plugin (IDs must be unique) |
+| `with_http_handler(Arc<dyn HostHandler>)` | Register the HTTP handler |
+| `with_host_builder(HostBuilder)` | Provide a pre-configured `HostBuilder` for advanced use |
+| `with_artifact_cleaner(frequency, max_age)` | Clean up stale cached artifacts on a schedule |
+| `build()` | Construct the `ClusterHost` |
+
+### NATS-backed plugins
+
+In cluster mode, use NATS-backed plugin implementations so that workloads can access shared state across hosts:
+
+| Plugin | Type | Description |
+|--------|------|-------------|
+| Config | `DynamicConfig::new(true)` | NATS-backed runtime config (pass `false` for dev/in-memory) |
+| Logging | `TracingLogger::default()` | Structured logging via `tracing` |
+| Key-value | `NatsKeyValue::new(&nats_client)` | NATS-backed key-value store |
+| Blobstore | `NatsBlobstore::new(&nats_client)` | NATS-backed blob storage |
+| Messaging | `NatsMessaging::new(nats_client)` | NATS pub/sub messaging |
+
+## How the operator communicates with washlets
+
+The operator sends commands to washlets by publishing to NATS subjects:
+
+```
+runtime.host.<host_id>.workload.start
+runtime.host.<host_id>.workload.stop
+runtime.host.<host_id>.workload.status
+runtime.host.<host_id>.heartbeat
+```
+
+Washlets publish heartbeats to:
+
+```
+runtime.operator.heartbeat.<host_id>
+```
+
+Messages are JSON-encoded. You typically don't interact with these subjects directly—the operator handles scheduling and the washlet handles command processing.
+
+## Keep reading
+
+- [Building Custom Hosts](./building-custom-hosts.mdx) - Embed a standalone host without NATS
+- [Creating Host Plugins](./creating-host-plugins.mdx) - Build custom plugins for your host
+- [Kubernetes Operator](../kubernetes-operator/index.mdx) - Deploy washlets managed by the operator
+- [wash-runtime source code](https://github.com/wasmCloud/wash/tree/main/crates/wash-runtime/src/washlet) - `ClusterHost` implementation
