@@ -26,17 +26,21 @@ The runtime provides three primary abstractions:
 
 ## WASI Interface Support
 
-The crate includes two sets of built-in plugins, one working in-memory for development with `wash dev`, and the other backed by NATS for production deployment. Some plugins can be enabled or disabled via Cargo feature flags. Both sets of plugins support the following interfaces:
+The runtime provides WASI interface support through three distinct mechanisms:
 
-- `wasi:http`
+**Built-in via `wasmtime-wasi`** (always available, no registration needed): all [WASI P2 interfaces](https://docs.wasmtime.dev/api/wasmtime_wasi/p2/index.html#wasip2-interfaces) including `wasi:filesystem`, `wasi:clocks`, `wasi:random`, `wasi:io`, `wasi:sockets`, and the `wasi:cli` suite.
+
+**HTTP handler** (`HttpServer`, registered via `with_http_handler()`): `wasi:http` — HTTP client and server. Uses the `HostHandler` trait, not `HostPlugin`.
+
+**Host plugins** (registered via `with_plugin()`, feature-flag controlled): two sets are included — in-memory implementations for development with `wash dev`, and NATS-backed implementations for production. Supported interfaces:
+
 - `wasi:keyvalue`
 - `wasi:blobstore`
 - `wasi:config`
 - `wasi:logging`
-- `wasi:filesystem`
 - `wasmcloud:messaging`
 
-Hosts can be extended with additional host plugins at build-time.
+Hosts can be extended with additional custom plugins at build-time.
 
 ## Usage
 
@@ -46,9 +50,8 @@ use std::collections::HashMap;
 
 use wash_runtime::{
     engine::Engine,
-    host::{HostBuilder, HostApi},
-    plugin::wasi_http::HttpServer,
-    plugin::wasi_config::RuntimeConfig,
+    host::{HostBuilder, HostApi, http::{HttpServer, DevRouter}},
+    plugin::wasi_config::DynamicConfig,
     types::{WorkloadStartRequest, Workload},
 };
 
@@ -57,14 +60,14 @@ async fn main() -> anyhow::Result<()> {
     // Create a Wasmtime engine
     let engine = Engine::builder().build()?;
 
-    // Configure plugins
-    let http_plugin = HttpServer::new("127.0.0.1:8080".parse()?);
-    let config_plugin = RuntimeConfig::default();
+    // Configure HTTP handler and plugins
+    let http_handler = HttpServer::new(DevRouter::default(), "127.0.0.1:8080".parse()?).await?;
+    let config_plugin = DynamicConfig::new(false);
 
     // Build and start the host
     let host = HostBuilder::new()
         .with_engine(engine)
-        .with_plugin(Arc::new(http_plugin))?
+        .with_http_handler(Arc::new(http_handler))
         .with_plugin(Arc::new(config_plugin))?
         .build()?;
 
@@ -72,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Start a workload
     let req = WorkloadStartRequest {
+        workload_id: uuid::Uuid::new_v4().to_string(),
         workload: Workload {
             namespace: "test".to_string(),
             name: "test-workload".to_string(),
@@ -93,10 +97,12 @@ async fn main() -> anyhow::Result<()> {
 
 The crate supports the following `cargo` features:
 
-- `wasi-http` (default): HTTP client and server support via `wasmtime-wasi-http`
 - `wasi-config` (default): Runtime configuration interface
 - `wasi-logging` (default): Logging interface
-- `wasi-blobstore` (default): Blob storage interface
+- `wasi-blobstore` (default): Blob/object storage interface
 - `wasi-keyvalue` (default): Key-value storage interface
+- `wasmcloud-postgres` (default): PostgreSQL-backed implementations for keyvalue and blobstore
+- `washlet` (default): Washlet support (depends on `oci`)
+- `wasi-webgpu`: WebGPU interface
 - `oci`: OCI registry integration for pulling components
 
