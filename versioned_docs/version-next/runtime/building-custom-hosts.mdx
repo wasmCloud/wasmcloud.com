@@ -25,7 +25,7 @@ Add `wash-runtime` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-wash-runtime = "0.1"
+wash-runtime = "*"
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 tracing-subscriber = "0.3"
@@ -35,8 +35,7 @@ Enable only the features you need to minimize binary size:
 
 ```toml
 [dependencies]
-wash-runtime = { version = "0.1", default-features = false, features = [
-    "wasi-http",
+wash-runtime = { version = "*", default-features = false, features = [
     "wasi-keyvalue",
     "wasi-config",
 ] }
@@ -46,11 +45,13 @@ wash-runtime = { version = "0.1", default-features = false, features = [
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `wasi-http` | Yes | HTTP client and server support via `wasmtime-wasi-http` |
 | `wasi-config` | Yes | Runtime configuration interface |
 | `wasi-logging` | Yes | Logging interface |
 | `wasi-blobstore` | Yes | Blob storage interface |
 | `wasi-keyvalue` | Yes | Key-value storage interface |
+| `wasmcloud-postgres` | Yes | PostgreSQL-backed implementations for keyvalue and blobstore |
+| `washlet` | Yes | Washlet support (depends on `oci`) |
+| `wasi-webgpu` | No | WebGPU interface |
 | `oci` | No | OCI registry integration for pulling components |
 
 ## Architecture overview
@@ -117,17 +118,16 @@ Use `HostBuilder` to construct a host with your desired configuration. All capab
 use std::sync::Arc;
 use wash_runtime::{
     engine::Engine,
-    host::{HostBuilder, HostApi},
-    plugin::wasi_http::HttpServer,
-    plugin::wasi_config::RuntimeConfig,
+    host::{HostBuilder, HostApi, http::{HttpServer, DevRouter}},
+    plugin::wasi_config::DynamicConfig,
 };
 
 let engine = Engine::builder().build()?;
 
-// Configure plugins
-let http_plugin = HttpServer::new("127.0.0.1:8080".parse()?);
+// Configure HTTP handler and plugins
+let http_handler = HttpServer::new(DevRouter::default(), "127.0.0.1:8080".parse()?).await?;
 // For HTTPS, use HttpServer::new_with_tls() with cert, key, and optional CA paths
-let config_plugin = RuntimeConfig::default();
+let config_plugin = DynamicConfig::new(false);
 
 // Build the host
 let host = HostBuilder::new()
@@ -136,7 +136,7 @@ let host = HostBuilder::new()
     .with_friendly_name("My Custom Host")
     .with_label("environment", "production")
     .with_label("region", "us-west-2")
-    .with_plugin(Arc::new(http_plugin))?
+    .with_http_handler(Arc::new(http_handler))
     .with_plugin(Arc::new(config_plugin))?
     .build()?;
 
@@ -152,11 +152,12 @@ let host = host.start().await?;
 | `with_hostname(str)` | Set the system hostname (defaults to OS hostname) |
 | `with_friendly_name(str)` | Set a human-readable name (auto-generated if not set) |
 | `with_label(key, value)` | Add metadata labels for identification |
+| `with_http_handler(Arc<dyn HostHandler>)` | Register the HTTP handler (`HttpServer` implements `HostHandler`, not `HostPlugin`) |
 | `with_plugin(Arc<dyn HostPlugin>)` | Register a plugin (can be called multiple times; IDs must be unique) |
 
 ## Managing workloads
 
-Once the host is running, use the `HostApi` trait to manage workloads. The host generates unique IDs for each workload automatically.
+Once the host is running, use the `HostApi` trait to manage workloads. Each `WorkloadStartRequest` requires a caller-supplied `workload_id` string.
 
 ### Starting a workload
 
@@ -167,6 +168,7 @@ use wash_runtime::types::{Workload, WorkloadStartRequest, Component, LocalResour
 let component_bytes = std::fs::read("./my-component.wasm")?;
 
 let request = WorkloadStartRequest {
+    workload_id: uuid::Uuid::new_v4().to_string(),
     workload: Workload {
         namespace: "my-app".to_string(),
         name: "http-handler".to_string(),
@@ -176,7 +178,9 @@ let request = WorkloadStartRequest {
         service: None,
         components: vec![
             Component {
+                name: "my-handler".to_string(),
                 bytes: component_bytes.into(),
+                digest: None,
                 local_resources: LocalResources {
                     memory_limit_mb: 64,  // In megabytes; -1 = unlimited
                     cpu_limit: -1,        // In millicores; -1 = unlimited
@@ -253,9 +257,8 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use wash_runtime::{
     engine::Engine,
-    host::{HostBuilder, HostApi},
-    plugin::wasi_http::HttpServer,
-    plugin::wasi_config::RuntimeConfig,
+    host::{HostBuilder, HostApi, http::{HttpServer, DevRouter}},
+    plugin::wasi_config::DynamicConfig,
     types::{Workload, WorkloadStartRequest, Component, LocalResources},
 };
 
@@ -269,15 +272,15 @@ async fn main() -> anyhow::Result<()> {
         .with_pooling_allocator(true)
         .build()?;
 
-    // Configure plugins
-    let http_plugin = HttpServer::new("0.0.0.0:8080".parse()?);
-    let config_plugin = RuntimeConfig::default();
+    // Configure HTTP handler and plugins
+    let http_handler = HttpServer::new(DevRouter::default(), "0.0.0.0:8080".parse()?).await?;
+    let config_plugin = DynamicConfig::new(false);
 
     // Build and start the host
     let host = HostBuilder::new()
         .with_engine(engine)
         .with_friendly_name("my-custom-host")
-        .with_plugin(Arc::new(http_plugin))?
+        .with_http_handler(Arc::new(http_handler))
         .with_plugin(Arc::new(config_plugin))?
         .build()?;
 
@@ -289,13 +292,16 @@ async fn main() -> anyhow::Result<()> {
 
     // Create and start a workload
     let request = WorkloadStartRequest {
+        workload_id: uuid::Uuid::new_v4().to_string(),
         workload: Workload {
             namespace: "default".to_string(),
             name: "my-component".to_string(),
             annotations: HashMap::new(),
             service: None,
             components: vec![Component {
+                name: "my-component".to_string(),
                 bytes: component_bytes.into(),
+                digest: None,
                 local_resources: LocalResources::default(),
                 pool_size: 5,
                 max_invocations: 0,

@@ -81,7 +81,7 @@ Plugins follow a defined lifecycle within the host:
 
 1. **Registration**: Plugins are registered via `HostBuilder::with_plugin()`. Each plugin must have a unique ID.
 2. **Start**: When the host starts, all plugins' `start()` methods are called. If any plugin fails to start, the host startup fails.
-3. **Workload binding**: When a workload starts, the host calls `on_workload_bind()` and `on_workload_item_bind()` for each plugin that provides interfaces the workload requires.
+3. **Workload binding**: When a workload starts, the host calls `on_workload_bind()` once per plugin, then calls `on_workload_item_bind()` for each component and service in that workload.
 4. **Resolution**: After successful binding, `on_workload_resolved()` is called.
 5. **Unbinding**: When workloads stop, `on_workload_unbind()` is called for cleanup.
 6. **Stop**: During host shutdown, all plugins' `stop()` methods are called (with a 3-second timeout per plugin).
@@ -93,7 +93,7 @@ The `HostPlugin` trait uses several types from the `wash_runtime` crate:
 - **`WitWorld`** - Contains `imports` and `exports` as `HashSet<WitInterface>`, representing the WIT interfaces the plugin provides.
 - **`WitInterface`** - Describes a specific interface with `namespace`, `package`, `interfaces` (a set of interface names), an optional `version`, and a `config` map.
 - **`UnresolvedWorkload`** - A workload that has been initialized but not yet bound to plugins.
-- **`WorkloadItem<'a>`** - An enum passed to `on_workload_item_bind`. Variants are `WorkloadItem::Component(&mut WorkloadComponent)` and `WorkloadItem::Service(&mut WorkloadService)`. Match on the variant to access the linker.
+- **`WorkloadItem<'a>`** - An enum passed to `on_workload_item_bind`. Variants are `WorkloadItem::Component(&mut WorkloadComponent)` and `WorkloadItem::Service(&mut WorkloadService)`. Implements `Deref<Target = WorkloadMetadata>`, so `item.linker()` is accessible directly without pattern matching. Use `item.is_component()` / `item.is_service()` when you need to handle the two variants differently.
 - **`ResolvedWorkload`** - A fully bound workload ready for execution.
 
 ### Example: Custom logging plugin
@@ -148,10 +148,12 @@ impl HostPlugin for CustomLogger {
         item: &mut WorkloadItem<'a>,
         interfaces: HashSet<WitInterface>,
     ) -> anyhow::Result<()> {
-        // Match on the variant to access the linker
-        // if let WorkloadItem::Component(component) = item {
-        //     component.linker_mut().func_wrap(...)?;
-        // }
+        // WorkloadItem implements Deref<Target = WorkloadMetadata>, so linker()
+        // is accessible directly without pattern matching:
+        // item.linker().func_wrap(...)?;
+        //
+        // Use item.is_component() / item.is_service() if you need to
+        // handle components and services differently.
         Ok(())
     }
 
