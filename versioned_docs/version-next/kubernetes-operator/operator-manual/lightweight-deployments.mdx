@@ -1,0 +1,182 @@
+---
+title: "Lightweight Deployment"
+sidebar_position: 1
+toc_max_heading_level: 2
+---
+
+### Run a complete, lightweight wasmCloud stack using K3s and Docker Compose.
+
+[K3s](https://k3s.io/) is a lightweight, CNCF-certified Kubernetes distribution from Rancher/SUSE that packages the entire control plane into a single ~60MB binary. It starts in seconds, requires around 512MB of RAM, and runs on Linux, macOS, and Windows via Docker, making it practical for development, edge deployments, and CI/CD pipelines where a full Kubernetes cluster would be excessive.
+
+The wasmCloud repository includes a ready-to-use K3s setup that spins up the entire wasmCloud platform—Kubernetes, NATS, the operator, gateway, and a host—with a single `docker compose up`.
+
+## When to use K3s
+
+| Use case | Why K3s works well |
+|----------|-------------------|
+| **Local development** | Run a production-equivalent stack on your laptop without cloud resources |
+| **Integration testing** | Spin up and tear down a real Kubernetes cluster in CI/CD pipelines |
+| **Edge deployments** | Deploy full Kubernetes on resource-constrained hardware at the edge |
+| **Learning** | Experiment with the wasmCloud operator without provisioning cloud infrastructure |
+
+For production clusters at scale, we typically recommend using a managed Kubernetes service or a full k8s distribution and deploying via the [Helm chart](https://github.com/wasmCloud/wash/tree/main/charts/runtime-operator).
+
+## What the example runs
+
+The K3s setup (`deploy/k3s` in the `wash` repository) runs five containers via Docker Compose:
+
+| Service | Image | Description |
+|---------|-------|-------------|
+| `kubernetes` | `rancher/k3s` | K3s Kubernetes control plane |
+| `nats` | `nats:2-alpine` | NATS with JetStream (messaging backbone and object storage) |
+| `operator` | `ghcr.io/wasmcloud/runtime-operator:canary` | wasmCloud operator (watches CRDs, schedules workloads) |
+| `gateway` | `ghcr.io/wasmcloud/runtime-gateway:canary` | HTTP ingress — routes requests to workloads (port 80) |
+| `wash-host` | `ghcr.io/wasmcloud/wash:canary-v2` | A washlet — the cluster-connected runtime host |
+
+The `kubernetes` container automatically loads wasmCloud CRDs from the operator chart on first start, and writes a kubeconfig to `tmp/kubeconfig.yaml` for local use.
+
+:::note[Pre-release images]
+The example uses `canary`/`canary-v2` image tags, which track the latest pre-release builds of wasmCloud v2. These are suitable for development and testing. On the v2.0.0 release, stable tags will be available.
+:::
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose v2
+- [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl)
+- [`wash` CLI](../../wash/index.mdx)
+
+## Setup
+
+**1. Clone the repository and navigate to the k3s directory:**
+
+```shell
+git clone https://github.com/wasmCloud/wash.git
+cd wash/deploy/k3s
+```
+
+**2. Start the stack:**
+
+```shell
+docker compose up
+```
+
+This starts K3s, NATS, the operator, gateway, and a host. The first run takes a moment as the K3s node initializes and CRDs are applied. When ready, you'll see the operator and wash-host connect to NATS.
+
+**3. Export the kubeconfig:**
+
+```shell
+export KUBECONFIG=$PWD/tmp/kubeconfig.yaml
+```
+
+**4. Verify the stack:**
+
+```shell
+kubectl get host
+```
+
+```
+NAME                   HOSTID                                 HOSTGROUP   READY   AGE
+forgetful-wound-2971   cf1ee307-cf74-4f69-b92f-a9eb593e478b   default     True    3m16s
+```
+
+A host in the `default` host group with `READY: True` means the washlet registered successfully with the operator.
+
+## Deploying a workload
+
+With the stack running, deploy a Wasm workload using a `WorkloadDeployment` manifest:
+
+```yaml
+# workload.yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: hello-world
+  namespace: default
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      components:
+        - name: hello-world
+          image: ghcr.io/wasmcloud/components/hello-world:0.1.0
+          poolSize: 5
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: localhost
+```
+
+```shell
+kubectl apply -f workload.yaml
+```
+
+Check that the workload reaches `READY: True`:
+
+```shell
+kubectl get workloaddeployment
+kubectl get workload
+```
+
+```
+NAME          REPLICAS   READY
+hello-world   1          True
+```
+
+**Access the workload via the gateway:**
+
+```shell
+curl http://localhost
+```
+
+The gateway routes all incoming HTTP on port 80 to workloads running on the host.
+
+## Practical considerations
+
+### Port mappings
+
+The Docker Compose setup exposes three ports to your local machine:
+
+| Port | Service | Use |
+|------|---------|-----|
+| `6443` | K3s API server | `kubectl` access |
+| `4222` | NATS | Direct NATS access (for debugging) |
+| `80` | Gateway | HTTP requests to workloads |
+
+The `wash-host` container's internal HTTP port (8080) is not exposed to the host machine: all external HTTP traffic flows through the gateway on port 80.
+
+### Adding more hosts
+
+To scale out, add additional `wash-host` entries to `docker-compose.yml`:
+
+```yaml
+  wash-host-2:
+    image: ghcr.io/wasmcloud/wash:canary-v2
+    command: host --scheduler-nats-url nats://nats:4222 --data-nats-url nats://nats:4222 --http-addr 0.0.0.0:8080 --host-group default --host-name wash-host-2
+    depends_on:
+      nats:
+        condition: service_healthy
+```
+
+Each host registers separately with the operator and is available for workload scheduling.
+
+### Host groups
+
+The example assigns all hosts to the `default` host group. WorkloadDeployments target a host group via `spec.template.spec.hostSelector.hostgroup`. To run workloads on specific hosts, create multiple host groups and configure your workloads accordingly.
+
+### Teardown
+
+```shell
+docker compose down -v
+```
+
+The `-v` flag removes the persistent volumes for K3s and NATS state, giving you a clean slate on the next `docker compose up`.
+
+## Keep reading
+
+- [CRDs](../crds.mdx) - Full reference for wasmCloud custom resources
+- [deploy/k3s source](https://github.com/wasmCloud/wash/tree/main/deploy/k3s) - The example files in the wash repository
