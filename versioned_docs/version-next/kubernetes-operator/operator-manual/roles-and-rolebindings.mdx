@@ -1,0 +1,281 @@
+---
+title: "Roles and Role Bindings"
+sidebar_position: 3
+---
+
+## Overview
+
+The wasmCloud Operator manages Workload Deployments by interacting with the [CRDs](../crds.mdx) inside the Kubernetes cluster.
+
+With WorkloadDeployments being created in various Namespaces, the Operator needs to have permission to update CRDs, as well as permission for interacting with the Kubernetes API. This is accomplished by creating Roles and Role Bindings (for Namespace level permissions), and Cluster Roles and Cluster Role Bindings (for Cluster-wide permissions).
+
+WasmCloud is deployed with two Service Accounts:
+1. wasmcloud-runtime-operator: Used by the runtime-operator
+2. wasmcloud-runtime-operator-gateway: Used by the Gateway deployment that manages ingress traffic to the Wasm Workloads
+
+Each Service Account has a set of Roles and Role Bindings defined.
+
+For the wasmcloud-runtime-operator Service Account:
+
+### 1. ClusterRole: `wasmcloud-runtime-operator`
+
+The main operator role. Full CRUD on wasmCloud CRDs and read access to core resources.
+
+| API Group | Resources | Verbs |
+|---|---|---|
+| `runtime.wasmcloud.dev` | `artifacts`, `hosts`, `workloads`, `workloadreplicasets`, `workloaddeployments` | create, delete, get, list, patch, update, watch |
+| `runtime.wasmcloud.dev` | `artifacts/status`, `hosts/status`, `workloads/status`, `workloadreplicasets/status`, `workloaddeployments/status` | get, update, patch |
+| `""` (core) | `configmaps`, `secrets`, `namespaces` | get, list, watch |
+| `""` (core) | `events` | create, get, list, patch, update, watch |
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wasmcloud-runtime-operator
+rules:
+  - apiGroups: ["runtime.wasmcloud.dev"]
+    resources: ["artifacts", "hosts", "workloads", "workloadreplicasets", "workloaddeployments"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["runtime.wasmcloud.dev"]
+    resources: ["artifacts/status", "hosts/status", "workloads/status", "workloadreplicasets/status", "workloaddeployments/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "get", "list", "patch", "update", "watch"]
+```
+
+### 2. ClusterRole: `wasmcloud-runtime-operator-metrics-auth` — Cluster-wide
+
+Allows the operator to perform authentication/authorization checks (used to protect the metrics endpoint).
+
+| API Group | Resources | Verbs |
+|---|---|---|
+| `authentication.k8s.io` | `tokenreviews` | create |
+| `authorization.k8s.io` | `subjectaccessreviews` | create |
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wasmcloud-runtime-operator-metrics-auth
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews"]
+    verbs: ["create"]
+```
+
+### 3. ClusterRole: `wasmcloud-runtime-operator-metrics-reader` — Cluster-wide
+
+**Note:** This ClusterRole exists but has **no ClusterRoleBinding** to any ServiceAccount. It grants:
+
+| Resource | Verbs |
+|---|---|
+| Non-resource URL `/metrics` | get |
+
+This is likely intended to be bound to monitoring tools (e.g., Prometheus) separately.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wasmcloud-runtime-operator-metrics-reader
+rules:
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+```
+
+### 4. Role: `wasmcloud-runtime-operator-leader-election` — Namespace-scoped (`default` only)
+
+Manages leader election leases so only one operator replica is active at a time.
+
+| API Group | Resources | Verbs |
+|---|---|---|
+| `coordination.k8s.io` | `leases` | get, list, watch, create, update, patch, delete |
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wasmcloud-runtime-operator-leader-election
+  namespace: default
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+```
+
+---
+
+For the wasmcloud-runtime-operator-gateway Service Account:
+
+### 1. ClusterRole: `wasmcloud-runtime-operator-gateway` — Cluster-wide
+
+Read-only access to wasmCloud hosts and workloads. This is the gateway/API component — it can observe state but cannot modify it.
+
+| API Group | Resources | Verbs |
+|---|---|---|
+| `runtime.wasmcloud.dev` | `hosts`, `workloads` | get, list, watch |
+| `runtime.wasmcloud.dev` | `hosts/status`, `workloads/status` | get |
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wasmcloud-runtime-operator-gateway
+rules:
+  - apiGroups: ["runtime.wasmcloud.dev"]
+    resources: ["hosts", "workloads"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["runtime.wasmcloud.dev"]
+    resources: ["hosts/status", "workloads/status"]
+    verbs: ["get"]
+```
+
+## Restricting access of the Operator to Namespaces
+
+In some cases, it may be desired to restrict the Operator to only processing Workloads deployed in certain namespaces. This can be achieved by modifying the ClusterRole `wasmcloud-runtime-operator` to only have the following permissions:
+
+### ClusterRole: `wasmcloud-runtime-operator`
+| API Group | Resources | Verbs | Reason |
+|---|---|---|---|
+| `""` (core) | `namespaces` | get, list, watch | Required to monitor and schedule Workloads |
+| `""` (core) | `events` | create, get, list, patch, update, watch | Used to notify of progress |
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wasmcloud-runtime-operator
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "get", "list", "patch", "update", "watch"]
+```
+
+### Namespace Role: `wasmcloud-runtime-operator`
+Note: Add this to each namespace a Workload is deployed
+
+Next, create a role in each Namespace that has the Workloads deployed, and grant the permissions to the runtime-operator:
+| API Group | Resources | Verbs | Reason |
+|---|---|---|---|
+| `runtime.wasmcloud.dev` | `artifacts`, `hosts`, `workloads`, `workloadreplicasets`, `workloaddeployments` | create, delete, get, list, patch, update, watch | Full life-cycle control of Wasm Workloads |
+| `runtime.wasmcloud.dev` | `artifacts/status`, `hosts/status`, `workloads/status`, `workloadreplicasets/status`, `workloaddeployments/status` | get, update, patch | Status updates for both Workloads and Hosts |
+| `""` (core) | `configmaps`, `secrets` | get, list, watch | Needed if Configmaps or Secrets are mounted for a Workload |
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wasmcloud-runtime-operator
+  namespace: <workload-namespace>
+rules:
+  - apiGroups: ["runtime.wasmcloud.dev"]
+    resources: ["artifacts", "hosts", "workloads", "workloadreplicasets", "workloaddeployments"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["runtime.wasmcloud.dev"]
+    resources: ["artifacts/status", "hosts/status", "workloads/status", "workloadreplicasets/status", "workloaddeployments/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+```
+
+### Namespace Role: `wasmcloud-runtime-operator-hosts`
+Note: Add this to the Namespace where the Wasmcloud Hosts are deployed
+Finally, a role needs to be created for the namespace that has WasmCloud hosts installed:
+| API Group | Resources | Verbs |
+|---|---|---|
+| `runtime.wasmcloud.dev` | `artifacts`, `hosts`, `workloads`, `workloadreplicasets`, `workloaddeployments` | create, delete, get, list, patch, update, watch |
+| `runtime.wasmcloud.dev` | `artifacts/status`, `hosts/status`, `workloads/status`, `workloadreplicasets/status`, `workloaddeployments/status` | get, update, patch |
+| `""` (core) | `configmaps`, `secrets` | get, list, watch |
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wasmcloud-runtime-operator-hosts
+  namespace: <hosts-namespace>
+rules:
+  - apiGroups: ["runtime.wasmcloud.dev"]
+    resources: ["artifacts", "hosts", "workloads", "workloadreplicasets", "workloaddeployments"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["runtime.wasmcloud.dev"]
+    resources: ["artifacts/status", "hosts/status", "workloads/status", "workloadreplicasets/status", "workloaddeployments/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+```
+
+## Binding the Restricted Roles to the Operator ServiceAccount
+
+Once the roles above are created, they must be bound to the `runtime-operator` ServiceAccount. The examples below assume the ServiceAccount lives in the `wasmcloud` namespace.
+
+### ClusterRoleBinding: `wasmcloud-runtime-operator`
+
+Grants the operator cluster-wide access to namespaces and events (as defined in the restricted ClusterRole above):
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wasmcloud-runtime-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: wasmcloud-runtime-operator
+subjects:
+  - kind: ServiceAccount
+    name: runtime-operator
+    namespace: wasmcloud
+```
+
+### RoleBinding: `wasmcloud-runtime-operator` (per workload namespace)
+
+Repeat this for each namespace where Workloads are deployed, substituting `<workload-namespace>` with the target namespace:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wasmcloud-runtime-operator
+  namespace: <workload-namespace>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wasmcloud-runtime-operator
+subjects:
+  - kind: ServiceAccount
+    name: runtime-operator
+    namespace: wasmcloud
+```
+
+### RoleBinding: `wasmcloud-runtime-operator-hosts` (hosts namespace)
+
+Apply this once in the namespace where WasmCloud Hosts are deployed, substituting `<hosts-namespace>` with the appropriate namespace:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wasmcloud-runtime-operator-hosts
+  namespace: <hosts-namespace>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wasmcloud-runtime-operator-hosts
+subjects:
+  - kind: ServiceAccount
+    name: runtime-operator
+    namespace: wasmcloud
+```
