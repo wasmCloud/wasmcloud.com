@@ -150,6 +150,7 @@ _Appears in:_
 | `configFrom` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core) array_ | ConfigFrom is a list of references to ConfigMaps that will be provided to the workload.<br />The keys and values of all referenced ConfigMaps will be merged. In case of key conflicts,<br />the last ConfigMap in the list wins. |  | Optional: \{\} <br /> |
 | `secretFrom` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core) array_ | The keys and values of all referenced Secrets will be merged. In case of key conflicts,<br />the last Secret in the list wins.<br />The values of the Secrets will be base64-decoded, utf-8 decoded before being provided to the workload. |  | Optional: \{\} <br /> |
 | `config` _object (keys:string, values:string)_ |  |  | Optional: \{\} <br /> |
+| `name` _string_ | Optional instance name for multi-backend binding. When present, allows multiple entries with the same `namespace`+`package`. The name maps to the `identifier` argument in resource-opening functions (e.g., `store::open("cache")`). Must match `[a-z0-9][a-z0-9-]*`. |  | Optional: \{\} <br />Pattern: `^[a-z0-9][a-z0-9-]*$` <br /> |
 | `namespace` _string_ |  |  | Required: \{\} <br /> |
 | `package` _string_ |  |  | Required: \{\} <br /> |
 | `interfaces` _string array_ |  |  | MinItems: 1 <br />Required: \{\} <br /> |
