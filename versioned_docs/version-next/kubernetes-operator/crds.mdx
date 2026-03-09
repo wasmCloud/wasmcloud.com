@@ -140,7 +140,41 @@ spec:
 
 ### Host Interfaces
 
-Use the `hostInterfaces` field to define host interfaces used by the workload. This field requires the `namespace`, `package`, and `interfaces` fields, and may optionally take a `config`.
+Use the `hostInterfaces` field to define host interfaces used by the workload. Each entry requires `namespace`, `package`, and `interfaces`, and may optionally include `config` and `name`.
+
+The optional `name` field enables **multi-backend binding**: when a component needs multiple implementations of the same interface type (e.g., two `wasi:keyvalue` backends), each entry can be given a unique name. The name maps directly to the `identifier` argument in resource-opening functions such as `store::open("cache")`.
+
+```yaml
+hostInterfaces:
+  # Named: NATS-backed keyvalue for caching
+  - name: cache
+    namespace: wasi
+    package: keyvalue
+    interfaces: [store, atomics, batch]
+    config:
+      backend: nats
+      bucket: cache-kv
+  # Named: Redis-backed keyvalue for sessions
+  - name: sessions
+    namespace: wasi
+    package: keyvalue
+    interfaces: [store]
+    config:
+      backend: redis
+      url: redis://redis:6379
+  # Unnamed: single HTTP interface (name not required)
+  - namespace: wasi
+    package: http
+    interfaces: [incoming-handler]
+    config:
+      address: '0.0.0.0:8080'
+```
+
+Naming rules:
+- `name` is optional. Omitting it preserves existing single-backend behavior.
+- When two or more entries share the same `namespace`+`package`, **all** of them must have a non-empty `name`.
+- Names must be unique within a workload's `hostInterfaces` for the same `namespace`+`package`.
+- Names must match `[a-z0-9][a-z0-9-]*` (DNS label style).
 
 ### Runtime Configuration
 
