@@ -4,6 +4,9 @@ sidebar_position: 1
 toc_max_heading_level: 2
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Kubernetes Operator
 
 ### The wasmCloud operator makes it easy to run wasmCloud and WebAssembly workloads on Kubernetes. 
@@ -36,43 +39,110 @@ Installation requires the following tools:
 - [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl)
 - [Helm](https://helm.sh/docs) v3.8.0+
 
-You'll also need a Kubernetes environment. We recommend [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) for the best local Kubernetes experience. For a fully self-contained alternative that includes NATS and the gateway in a single `docker compose up`, see [Lightweight Deployments](./operator-manual/lightweight-deployments.mdx).
+Select your Kubernetes environment:
 
-### Local Kubernetes environment
+<Tabs groupId="k8s-env" queryString>
+  <TabItem value="existing" label="Existing cluster" default>
 
-You can use the one-liner below to... 
+If you already have a Kubernetes cluster, skip cluster creation. Verify your `kubectl` context is pointing to the right cluster:
 
-* Download a `kind` configuration from the [`wasmCloud/wasmCloud`](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/kind-config.yaml) repository
-* Start a cluster 
-* Delete the configuration file upon completion
+```shell
+kubectl cluster-info
+```
+
+  </TabItem>
+  <TabItem value="kind" label="kind">
+
+[kind](https://kind.sigs.k8s.io/) runs Kubernetes nodes as Docker containers.
+
+**Requirements:** [Docker](https://docs.docker.com/get-started/get-docker/) · [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
+
+The following command downloads a `kind-config.yaml` from the [`wasmCloud/wasmCloud`](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/kind-config.yaml) repository, starts a cluster with port 80 mapped for ingress, and deletes the config upon completion:
 
 ```shell
 curl -fLO https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/kind-config.yaml && kind create cluster --config=kind-config.yaml && rm kind-config.yaml
 ```
 
-If you'd rather start your cluster manually, copy the configuration below into a file called `kind-config.yaml`:
+  </TabItem>
+  <TabItem value="k3d" label="k3d">
 
-```yaml
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-  - role: control-plane
-    extraPortMappings:
-      - containerPort: 30950
-        hostPort: 80
-        protocol: TCP
-```
+[k3d](https://k3d.io/) runs a lightweight [k3s](https://k3s.io/) cluster inside Docker. It starts quickly and supports `LoadBalancer` services natively.
+
+**Requirements:** [Docker](https://docs.docker.com/get-started/get-docker/) · [k3d](https://k3d.io/#installation)
+
 ```shell
-kind create cluster --config=kind-config.yaml
+k3d cluster create wasmcloud --port "80:80@loadbalancer"
 ```
+
+  </TabItem>
+  <TabItem value="k3s" label="k3s">
+
+[k3s](https://k3s.io/) is a lightweight Kubernetes distribution. **Linux only.**
+
+Install k3s:
+
+```shell
+curl -sfL https://get.k3s.io | sh -
+```
+
+Configure `kubectl` to use the k3s cluster:
+
+```shell
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $USER ~/.kube/config
+```
+
+  </TabItem>
+</Tabs>
 
 ### Install the wasmCloud operator
 
-Use Helm to install the wasmCloud operator from an OCI chart image, using the [values for local installation](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml):
+Use Helm to install the wasmCloud operator from an OCI chart image:
+
+<Tabs groupId="k8s-env" queryString>
+  <TabItem value="existing" label="Existing cluster" default>
 
 ```shell
-helm install wasmcloud --version v2-canary oci://ghcr.io/wasmcloud/charts/runtime-operator -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml
+helm install wasmcloud --version v2-canary oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml \
+  --set gateway.service.type=LoadBalancer
 ```
+
+  </TabItem>
+  <TabItem value="kind" label="kind">
+
+The [`values.local.yaml`](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml) file configures the Runtime Gateway as a NodePort service on port 30950, which the kind cluster config maps to host port 80:
+
+```shell
+helm install wasmcloud --version v2-canary oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml
+```
+
+  </TabItem>
+  <TabItem value="k3d" label="k3d">
+
+k3d supports `LoadBalancer` services natively, so we override the gateway service type:
+
+```shell
+helm install wasmcloud --version v2-canary oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml \
+  --set gateway.service.type=LoadBalancer
+```
+
+  </TabItem>
+  <TabItem value="k3s" label="k3s">
+
+k3s includes a built-in load balancer (Klipper), so we override the gateway service type:
+
+```shell
+helm install wasmcloud --version v2-canary oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml \
+  --set gateway.service.type=LoadBalancer
+```
+
+  </TabItem>
+</Tabs>
 
 Along with the wasmCloud operator, Runtime Gateway, wasmCloud CRDs, and NATS, the Helm chart will deploy **three wasmCloud hosts** using the [`wasmcloud/wash`](https://github.com/wasmCloud/wasmCloud/pkgs/container/wash) container image.
 
@@ -154,9 +224,34 @@ helm uninstall wasmcloud
 
 Delete the local Kubernetes environment:
 
+<Tabs groupId="k8s-env" queryString>
+  <TabItem value="existing" label="Existing cluster" default>
+
+No action needed — your cluster remains running.
+
+  </TabItem>
+  <TabItem value="kind" label="kind">
+
 ```shell
 kind delete cluster
 ```
+
+  </TabItem>
+  <TabItem value="k3d" label="k3d">
+
+```shell
+k3d cluster delete wasmcloud
+```
+
+  </TabItem>
+  <TabItem value="k3s" label="k3s">
+
+```shell
+/usr/local/bin/k3s-uninstall.sh
+```
+
+  </TabItem>
+</Tabs>
 
 ## Next steps
 
