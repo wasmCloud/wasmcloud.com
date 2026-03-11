@@ -31,6 +31,7 @@ This tutorial assumes you're following directly from the previous steps. Make su
 
   By default, the compiled `.wasm` binary for a Rust project is generated at `/target/wasm32-wasip2/debug/`. The output path for the compiled `.wasm` binary [can be configured via `wash`'s `config.json` file](../wash/config.mdx).
   </TabItem>
+  {/*
   <TabItem value="tinygo" label="TinyGo">
   Use the `wash build` command from the root of a project directory to compile the component into a `.wasm` binary:
 
@@ -40,6 +41,7 @@ This tutorial assumes you're following directly from the previous steps. Make su
 
   By default, the compiled `.wasm` binary for a TinyGo project is generated at `/build/`. The output path for the compiled `.wasm` binary [can be configured via `wash`'s `config.json` file](../wash/config.mdx).
   </TabItem>
+  */}
   <TabItem value="typescript" label="TypeScript">
   Use the `wash build` command from the root of a project directory to compile the component into a `.wasm` binary:
 
@@ -107,17 +109,39 @@ If you're following along using GitHub Packages, make sure to replace `<namespac
 wash oci push ghcr.io/<namespace>/http-hello-world:0.1.0 ./target/wasm32-wasip2/debug/http_hello_world.wasm
 ```
   </TabItem>
+{/*
   <TabItem value="tinygo" label="TinyGo">
 
 ```shell
 wash oci push ghcr.io/<namespace>/http-hello-world:0.1.0 ./build/http_hello_world.wasm
 ```
   </TabItem>
+*/}
   <TabItem value="typescript" label="TypeScript">
 
 ```shell
 wash oci push ghcr.io/<namespace>/http-hello-world:0.1.0 ./dist/http_hello_world_hono.wasm
 ```
+  </TabItem>
+    <TabItem value="unlisted" label="My language isn't listed">
+
+If you prefer working in a language that isn't listed here, let us know!
+
+{' '}
+
+<div style={{ display: 'flex', flexDirection: 'row' }}>
+  <div style={{ width: '100%' }}>
+    <HubspotForm
+      portalId="20760433"
+      formId="71e74f55-cc30-41de-9d41-e3d9dc159c71"
+      onSubmit={() => console.log('Submitted form')}
+      onReady={(form) => console.log('Form ready for submit')}
+      region="na1"
+      loading={<div>Loading...</div>}
+    />
+  </div>
+</div>
+
   </TabItem>
 </Tabs>
 
@@ -252,7 +276,11 @@ helm install wasmcloud --version v2-canary oci://ghcr.io/wasmcloud/charts/runtim
 
 Now we'll deploy our Wasm application using a [`WorkloadDeploment`](../kubernetes-operator/crds.mdx#workloaddeployment) manifest.
 
-Run the following script in your terminal to create a file called `deployment.yaml` containing a manifest. 
+:::info[wasmCloud security model]
+wasmCloud components are **deny-by-default**: a component cannot use any capability—HTTP, key-value storage, logging, or any other—unless the host is explicitly told to allow it. The `hostInterfaces` field in a workload manifest is the allowlist. Each entry names an interface package that the host will make available to the component. Any interface not listed is silently unavailable, regardless of what the component's WIT file imports.
+:::
+
+Run the following script in your terminal to create a file called `deployment.yaml` containing a manifest.
 
 ```shell
 cat > deployment.yaml << 'EOF'
@@ -286,8 +314,9 @@ EOF
 
 This is a deployment manifest for a [Kubernetes custom resource](../kubernetes-operator/crds.mdx). For the purposes of this quickstart, the most important fields to highlight in the specification are:
 
+- `hostSelector.hostgroup`: Selects which pool of wasmCloud hosts runs this workload. The Helm chart installs three host pods labelled `hostgroup: default`—this is the correct target for most deployments. Custom host groups can be created to isolate workloads or provide specialized capabilities.
 - `components.image`: This defines the registry address we will use to fetch our Wasm image.
-- `hostInterfaces`: These are the interfaces that the host will allow the Wasm component to utilize. **Without an explicit capability grant, the component will not have access to those interfaces.** Since the WASI HTTP and Key-Value interfaces are [well-known interfaces built in to the host](../overview/interfaces.mdx), all we have to do is enable them.
+- `hostInterfaces`: These declare which capability interfaces the host will make available to the component. **Without an explicit entry here, the component cannot access that capability.** Since the HTTP and key-value capabilities use [well-known built-in interfaces](../overview/interfaces.mdx), all we have to do is list them.
 
 Open the file and update the image name with the correct registry address. If you're using GitHub Packages, that means replacing `<namespace>` with your GitHub namespace.
 
@@ -328,18 +357,28 @@ kubectl get workloaddeployments
 
 Use `curl` to invoke the Wasm workload with an HTTP request:
 
+:::note[macOS with OrbStack]
+OrbStack manages port 80 on macOS, intercepting traffic before it reaches the cluster. Run a port-forward in a separate terminal:
+
+```shell
+kubectl port-forward svc/runtime-gateway 8080:80
+```
+
+Then substitute `localhost:8080` for `localhost` in the hello-world command, and use `-H "Host: blobby.localhost.direct" http://localhost:8080/...` in place of `http://blobby.localhost.direct/...` in the Blobby commands further below.
+:::
+
 ```shell
 curl localhost
 ```
 ```text
-Hello, World! x1
+Hello x1, World!
 ```
 
 ## Deploy the Blobby file server
 
 Now let's deploy a more feature-rich example: **Blobby** ("Little Blobby Tables"), a simple file server that demonstrates the [`wasi:blobstore`](https://github.com/WebAssembly/wasi-blobstore) capability alongside `wasi:http`.
 
-Apply the following manifest to deploy the [`blobby-ui`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/blobby) component from a wasmCloud-hosted OCI image:
+The manifest below uses `host: blobby.localhost.direct` to route HTTP traffic — `blobby.localhost.direct` is a public DNS alias for `127.0.0.1`, so no `/etc/hosts` changes are needed. Apply it to deploy the [`blobby-ui`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/blobby) component from a wasmCloud-hosted OCI image:
 
 ```shell
 kubectl apply -f - <<EOF
@@ -364,7 +403,7 @@ spec:
           interfaces:
             - blobstore
           config:
-            buckets: default
+            buckets: blobby
         - namespace: wasi
           package: logging
           version: 0.1.0-draft
@@ -372,11 +411,9 @@ spec:
             - logging
       components:
         - name: blobby
-          image: ghcr.io/wasmcloud/components/blobby-ui:0.5.0
+          image: ghcr.io/wasmcloud/components/blobby-ui:0.5.2
 EOF
 ```
-
-The `host: blobby.localhost.direct` config tells the Runtime Gateway to route requests with that hostname to this component. `blobby.localhost.direct` is a public DNS alias for `127.0.0.1`, so no `/etc/hosts` changes are needed.
 
 Verify the deployment:
 
@@ -384,29 +421,85 @@ Verify the deployment:
 kubectl get workloaddeployments
 ```
 
-Once running, try the file server:
+Once running, open **http://blobby.localhost.direct** in your browser to use the file manager UI:
+
+![Blobby Storage Manager UI showing an uploaded file with Copy Link, Download, and Delete buttons](../images/blobby-ui.png)
+
+You can also interact with the file server directly from the command line:
+
+Upload a file:
 
 ```shell
-# Upload a file
 echo "Hello, wasmCloud!" > hello.txt
 curl -H "Content-Type: text/plain" http://blobby.localhost.direct/hello.txt --data-binary @hello.txt
+```
 
-# List all files
+List all files:
+
+```shell
 curl -X POST http://blobby.localhost.direct/
+```
 
-# Download the file
+Download a file:
+
+```shell
 curl http://blobby.localhost.direct/hello.txt
+```
 
-# Delete the file
+Delete a file:
+
+```shell
 curl -X DELETE http://blobby.localhost.direct/hello.txt
 ```
 
+## Clean up
+
+To remove the deployments created in this tutorial:
+
+```shell
+kubectl delete workloaddeployment http-hello-world blobby
+```
+
+To tear down the cluster entirely:
+
+<Tabs groupId="k8s-env" queryString>
+  <TabItem value="existing" label="Existing cluster" default>
+
+Remove the wasmCloud Helm release:
+
+```shell
+helm uninstall wasmcloud
+```
+
+  </TabItem>
+  <TabItem value="kind" label="kind">
+
+```shell
+kind delete cluster
+```
+
+  </TabItem>
+  <TabItem value="k3d" label="k3d">
+
+```shell
+k3d cluster delete wasmcloud
+```
+
+  </TabItem>
+  <TabItem value="k3s" label="k3s">
+
+```shell
+k3s-uninstall.sh
+```
+
+  </TabItem>
+</Tabs>
+
 ## What's next?
 
-Ready to take the next steps on your wasmCloud journey?
-
-* If you're a developer, check out the [Developer Guide](../wash/developer-guide/index.mdx) for more detail on the steps we explored in this quickstart.
-* If you're a platform operator, learn more about the [Kubernetes Operator](../kubernetes-operator/index.mdx).
+- **Explore the interfaces:** Learn how [WASI interfaces](../overview/interfaces.mdx) work and browse the full list of built-in capabilities your components can use.
+- **Go deeper with components:** The [Developer Guide](../wash/developer-guide/index.mdx) covers building, publishing, debugging, and composing components.
+- **Deploy to production:** The [Operator Manual](../kubernetes-operator/operator-manual/overview.mdx) covers production topics: RBAC, private registries, and CI/CD pipelines.
 
 
 
