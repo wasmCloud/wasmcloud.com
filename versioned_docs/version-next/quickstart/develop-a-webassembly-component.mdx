@@ -7,7 +7,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import HubspotForm from 'react-hubspot-form';
 
-Once you know what your application needs to be able to do, you can add language-agnostic [**interfaces**](../overview/interfaces.mdx) for common capabilities like HTTP, key-value storage, or logging.
+Once you know what your application needs to be able to do, you can add language-agnostic [**interfaces**](../overview/interfaces.mdx) to access capabilities like HTTP, key-value storage, or logging.
 
 In this step, we'll discuss how to:
 
@@ -87,46 +87,11 @@ export { incomingHandler } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapt
 ```
 
   </TabItem>
-    <TabItem value="tinygo" label="Go">
-
-:::note[In progress]
-These instructions are in progress and will be available soon.
-:::
-
 {/*
-
-Let's extend this application to do more than just say "Hello!"
-
-Using the [FormValue](https://pkg.go.dev/net/http#Request.FormValue) method on the incoming request, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
-
-```go
-//go:generate go run go.bytecodealliance.org/cmd/wit-bindgen-go generate --world hello --out gen ./wit
-import (
-  "fmt"
-  "net/http"
-
-  "go.wasmcloud.dev/component/net/wasihttp"
-)
-
-func init() {
-  wasihttp.HandleFunc(handleRequest)
-}
-
-func handleRequest(w http.ResponseWriter, r *http.Request) {
-  name := "World"
-  if len(r.FormValue("name")) > 0 {
-    name = r.FormValue("name")
-  }
-  fmt.Fprintf(w, "Hello, %s!\n", name)
-  fmt.Fprintf(w, "Hello from Wasm!\n")
-}
-
-// Since we don't run this program like a CLI, the `main` function is empty. Instead,
-// we call the `handleRequest` function when an HTTP request is received.
-func main() {}
-```
-*/}
+  <TabItem value="tinygo" label="Go">
+Using the FormValue method, check the query string for a name parameter and return a personalized greeting.
   </TabItem>
+*/}
   <TabItem value="unlisted" label="My language isn't listed">
 
 If you prefer working in a language that isn't listed here, let us know!
@@ -173,9 +138,11 @@ Hello, Bob!
 
 Now let's add persistent storage to keep a record of each person that this application greeted.
 
-We'll use the **key-value capability** for this. We don't need to pick a library or a specific vendor implementation&mdash;all we have to do is add the interface to our component.
+We'll use the **key-value capability** for this. We don't need to pick a library or a specific vendor implementation&mdash;all we have to do is add the `wasi:keyvalue` interface to our component.
 
-We can use the [`wasi:keyvalue`](https://github.com/WebAssembly/wasi-keyvalue) interface for interacting with a key value store. Interfaces are declared in [WIT](../overview/interfaces.mdx) (WebAssembly Interface Types) files—adding an import to our component's WIT world grants it access to the capability.
+We can use the [`wasi:keyvalue`](https://github.com/WebAssembly/wasi-keyvalue) interface for interacting with a key-value store.
+
+Interfaces are declared in **WIT (WebAssembly Interface Types)** files. A WIT file is a language-neutral contract describing what your component imports (capabilities it consumes) and exports (functions it exposes). Adding an `import` line to your component's WIT `world` tells the runtime to provide that capability—without binding you to a specific library or vendor. You can read more about WIT on the [Interfaces](../overview/interfaces.mdx) page.
 
 <Tabs groupId="lang" queryString>
   <TabItem value="rust" label="Rust">
@@ -211,28 +178,11 @@ world typescript-http-hello-world-hono {
 ```
 
   </TabItem>
-  <TabItem value="tinygo" label="Go">
-:::note[In progress]
-These instructions are in progress and will be available soon.
-:::
-
 {/*
-Before we can use the interface, we'll need to update the `wit/world.wit` file:
-
-```wit
-package wasmcloud:hello;
-
-world hello {
-  include wasmcloud:component-go/imports@0.1.0;
-  import wasi:logging/logging@0.1.0-draft;
-  import wasi:keyvalue/atomics@0.2.0-draft;
-  import wasi:keyvalue/store@0.2.0-draft;
-
-  export wasi:http/incoming-handler@0.2.0;
-}
-```
-*/}
+  <TabItem value="tinygo" label="Go">
+Update `wit/world.wit` to import `wasi:keyvalue/atomics` and `wasi:keyvalue/store`.
   </TabItem>
+*/}
   <TabItem value="unlisted" label="My language isn't listed">
 
 If you prefer working in a language that isn't listed here, let us know!
@@ -256,7 +206,7 @@ If you prefer working in a language that isn't listed here, let us know!
 </Tabs>
 
 <Tabs groupId="lang" queryString>
-  
+
     <TabItem value="rust" label="Rust">
 
 We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface.
@@ -369,80 +319,11 @@ export { incomingHandler } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapt
 We've made changes, so once we save, the toolchain will once again automatically update the running application.
 
   </TabItem>
-  <TabItem value="tinygo" label="Go">
-:::note[In progress]
-These instructions are in progress and will be available soon.
-:::
-
 {/*
-In addition to using the `wasi:logging` interface, logs printed to STDERR will be output in host logs by default.
-
-We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface.
-
-Now let's use the atomic increment function to keep track of how many times we've greeted each person.
-
-**Note:** We'll need to restart the dev loop for the next step, so go ahead and stop it with Ctrl+C.
-
-```go
-//go:generate go run go.bytecodealliance.org/cmd/wit-bindgen-go generate --world hello --out gen ./wit
-package main
-
-import (
-  "fmt"
-  "net/http"
-
-  atomics "hello/gen/wasi/keyvalue/atomics"
-  store "hello/gen/wasi/keyvalue/store"
-  "go.wasmcloud.dev/component/log/wasilog"
-  "go.wasmcloud.dev/component/net/wasihttp"
-)
-
-func init() {
-  wasihttp.HandleFunc(handleRequest)
-}
-
-func handleRequest(w http.ResponseWriter, r *http.Request) {
-  logger := wasilog.ContextLogger("handleRequest")
-
-  name := "World"
-  if len(r.FormValue("name")) > 0 {
-    name = r.FormValue("name")
-  }
-  logger.Info("Greeting", "name", name)
-
-  kvStore := store.Open("default")
-  if err := kvStore.Err(); err != nil {
-    w.Write([]byte("Error: " + err.String()))
-    return
-  }
-  value := atomics.Increment(*kvStore.OK(), name, 1)
-  if err := value.Err(); err != nil {
-    w.Write([]byte("Error: " + err.String()))
-    return
-  }
-
-  fmt.Fprintf(w, "Hello x%d, %s!\n", *value.OK(), name)
-  fmt.Fprintf(w, "Hello, %s!\n", name)
-}
-
-// Since we don't run this program like a CLI, the main function is empty. Instead,
-// we call the handleRequest function when an HTTP request is received.
-func main() {}
-```
-
-Download the wasilog module for idiomatic Go logging that compiles to a component:
-
-```shell
-go get go.wasmcloud.dev/component/log/wasilog
-```
-
-Now restart the dev loop:
-
-```shell
-wash dev
-```
-*/}
+  <TabItem value="tinygo" label="Go">
+Use `store.Open`, `atomics.Increment`, and `wasilog` to implement the counter and logging.
   </TabItem>
+*/}
   <TabItem value="unlisted" label="My language isn't listed">
 
 If you prefer working in a language that isn't listed here, let us know!
