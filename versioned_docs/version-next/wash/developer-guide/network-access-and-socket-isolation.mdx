@@ -1,0 +1,129 @@
+---
+title: 'Network Access and Socket Isolation'
+date: 2026-03-19T00:00:00+00:00
+sidebar_position: 3
+draft: false
+---
+
+wasmCloud enforces a well-defined socket policy at the host level, giving you predictable security boundaries without requiring components to implement their own restrictions. This page explains what's allowed and denied by default, how the isolation model works, and when to use each networking pattern.
+
+## Host policy: what's allowed and what's not
+
+The wasmCloud host applies socket policy to all workloads. The policy is implemented in the host runtime and applies regardless of what a component's code attempts to do.
+
+### Allowed by default
+
+- **Outbound TCP connections** — components and services can connect to non-loopback addresses. This enables components to make outbound HTTP requests, connect to databases, or use any TCP-based protocol.
+- **TCP bind on loopback for services** — services can bind and listen on `127.0.0.1` (or the unspecified address `0.0.0.0`). This is how a service becomes the "localhost" for its workload.
+
+### Denied by default
+
+- **DNS / name resolution** — `ip-name-lookup` is disabled by default. Components and services must use IP addresses directly rather than hostnames. If your workload requires DNS resolution, it must be explicitly enabled.
+- **TCP bind for regular components** — only services can bind TCP ports and act as listeners. A regular component that attempts to bind a TCP port will be denied by the host.
+
+:::info[Policy is enforced at the host level]
+These restrictions are enforced by the wasmCloud runtime, not by the component itself. A component does not need to implement its own socket restrictions&mdash;the host ensures policy is applied regardless of what the component code attempts.
+:::
+
+## The isolation model
+
+### In-process loopback
+
+When a component connects to `127.0.0.1`, it does **not** reach the OS loopback interface. Instead, it connects to the service in its own workload via an in-process virtual network within the wasmCloud runtime. This means:
+
+- The connection never leaves the wasmCloud process
+- Components in one workload cannot reach services in another workload via loopback
+- The service is genuinely isolated to its own workload boundary
+
+### Port isolation across workloads
+
+Multiple workloads on the same wasmCloud host can each have services listening on the same port (for example, port 8080) without conflict. Each workload has its own isolated loopback network, so port numbers are scoped to the workload, not the host.
+
+### External access
+
+Because services bind to the in-process loopback network, they are not directly accessible from outside the wasmCloud process. To expose a service's functionality externally, pair it with a component that accepts external requests (for example, via `wasi:http/incoming-handler`) and proxies to the service over loopback.
+
+## Choosing a networking pattern
+
+### Service model (recommended for production)
+
+The [service model](../../overview/workloads/services.mdx) is the idiomatic approach for TCP communication between components and stateful processes in wasmCloud. A service runs continuously for the lifetime of the workload, binds TCP ports on the in-process loopback, and acts as the "localhost" for companion components.
+
+**Use the service model when:**
+- You need connection pooling, caching, or other stateful, long-running behavior
+- You're building with TCP-based protocols (database drivers, custom protocols)
+- You need to bridge between the WIT component model and existing TCP-based software
+- You're targeting production workloads on wasmCloud
+
+**Getting started:**
+
+The [`service-tcp` template](https://github.com/wasmCloud/wasmCloud/tree/main/templates/service-tcp) is a `wash new`-compatible Rust template for a two-component TCP service:
+
+```shell
+wash new https://github.com/wasmCloud/wasmCloud.git --name my-service --subfolder templates/service-tcp
+```
+
+### wasi-virt (for testing and cross-runtime portability)
+
+The [`wasi-virt`](https://github.com/bytecodealliance/wasi-virt) CLI tool virtualizes WASI interfaces at the component level, embedding stub implementations directly into a component binary. This is useful for:
+
+- **Unit testing** — run a component in isolation without a full runtime, with sockets virtualized to stubs that return controlled responses
+- **Cross-runtime portability** — produce a component that runs on runtimes that don't support `wasi:sockets` by embedding a stub implementation
+
+**`wasi-virt` is not the recommended approach for socket control on wasmCloud.** On wasmCloud, host policy is the sandboxing mechanism&mdash;you don't need component-level socket restrictions for security. Virtualizing sockets in your production component adds complexity without adding protection that the host doesn't already provide.
+
+The appropriate use of `wasi-virt` on wasmCloud is for **testing and portability**, not for production socket management.
+
+### Host policy enforcement
+
+Because the host enforces socket restrictions unconditionally, the security model for sockets on wasmCloud is:
+
+1. **Write your component or service** using `wasi:sockets` as needed&mdash;connect outbound, or (for services) bind and listen
+2. **Trust the host** to enforce policy — regular components cannot bind, DNS is off by default
+3. **Enable DNS explicitly** if your workload genuinely needs name resolution
+
+You don't need to implement your own socket access control in component code. The isolation comes from the host and the in-process network model, not from restrictions embedded in the component binary.
+
+## Practical example: `service-tcp` template
+
+The [`service-tcp` template](https://github.com/wasmCloud/wasmCloud/tree/main/templates/service-tcp) is a two-component Rust workspace that demonstrates the full service model pattern:
+
+- **`service-leet`** is a TCP service that listens on port 7777 and transforms text to leet speak
+- **`http-api`** is a component that accepts HTTP requests and proxies them to `service-leet` over TCP
+
+The service entry point uses the `#[wstd::main]` macro, which satisfies the `wasi:cli/run` export requirement automatically. It binds on `0.0.0.0:7777` and accepts incoming TCP connections:
+
+```rust
+use wstd::io::{AsyncRead, AsyncWrite};
+use wstd::iter::AsyncIterator;
+use wstd::net::TcpListener;
+
+#[wstd::main]
+async fn main() -> anyhow::Result<()> {
+    let listener = TcpListener::bind("0.0.0.0:7777").await?;
+    let mut incoming = listener.incoming();
+
+    while let Some(stream) = incoming.next().await {
+        let stream = stream?;
+        wstd::runtime::spawn(async move {
+            // process connection...
+        })
+        .detach();
+    }
+    Ok(())
+}
+```
+
+The companion component connects to `127.0.0.1:7777` to reach the service. Even though the service binds on `0.0.0.0`, the in-process loopback model means this connection stays inside the wasmCloud runtime — it reaches the service in the same workload, not the OS network stack:
+
+```rust
+let client = wstd::net::TcpStream::connect("127.0.0.1:7777").await?;
+```
+
+This is the core pattern: a component uses a plain TCP connect to `127.0.0.1` to reach its companion service, with the runtime enforcing workload isolation transparently.
+
+## Keep reading
+
+- Learn more about the service model in the [Services overview](../../overview/workloads/services.mdx) and the [Creating services guide](./create-services.mdx)
+- Learn more about [interfaces](../../overview/interfaces.mdx) and how `wasi:sockets` fits into the WASI P2 interface set
+- Browse [wasmCloud examples](https://github.com/wasmCloud/wasmCloud/tree/main/examples) on GitHub
