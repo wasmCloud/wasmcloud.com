@@ -34,7 +34,7 @@ function getValue(repo: string) {
   return parsedValue[repo] as CacheEntry | null;
 }
 
-function getStars(repo: string, signal?: AbortSignal): Promise<number> {
+function getStars(repo: string, signal?: AbortSignal): Promise<number | null> {
   const value = getValue(repo);
   const twentyFourHours = 24 * 60 * 60 * 1000;
   if (value && Date.now() - value.timestamp < twentyFourHours) {
@@ -45,6 +45,10 @@ function getStars(repo: string, signal?: AbortSignal): Promise<number> {
     .then((response) => response.json())
     .then((data) => {
       const stars = data.stargazers_count;
+      if (stars == null) {
+        // Rate-limited or unexpected response — return stale cached value without overwriting it
+        return value?.stars ?? null;
+      }
       storeValue(repo, stars);
       return stars;
     });
@@ -101,7 +105,7 @@ function init() {
       }
 
       getStars(repo, this.controller.signal).then((stars) => {
-        this.innerHTML = stars.toString();
+        if (stars != null) this.innerHTML = stars.toString();
       });
     }
 

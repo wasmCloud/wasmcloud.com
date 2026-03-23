@@ -137,7 +137,7 @@ const config = (async (): Promise<Config> => {
       [
         '@wasmcloud/docusaurus-github-stars',
         {
-          preloadRepo: 'wasmCloud/wasmCloud',
+          preloadRepo: process.env.NODE_ENV === 'production' ? 'wasmCloud/wasmCloud' : undefined,
         } satisfies PluginGithubStarsOptions,
       ],
       [
