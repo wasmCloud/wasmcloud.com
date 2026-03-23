@@ -48,13 +48,13 @@ wasmCloud makes use of:
 
 ## Reference Sections
 
-- **[NATS Subjects](/docs/reference/nats/subjects)** - Complete subject reference for wRPC, control interface, and wadm API
-- **[NATS Streams and Buckets](/docs/reference/nats/streams-and-buckets)** - JetStream resource requirements and production configuration
-- **[NATS Permissions](/docs/reference/nats/permissions)** - Account and permission configuration for secure deployments
-- **[NATS Leaf Nodes](/docs/reference/nats/leaf-nodes)** - Leaf node strategy and architectural patterns
+- **[NATS Subjects](/docs/v1/reference/nats/subjects)** - Complete subject reference for wRPC, control interface, and wadm API
+- **[NATS Streams and Buckets](/docs/v1/reference/nats/streams-and-buckets)** - JetStream resource requirements and production configuration
+- **[NATS Permissions](/docs/v1/reference/nats/permissions)** - Account and permission configuration for secure deployments
+- **[NATS Leaf Nodes](/docs/v1/reference/nats/leaf-nodes)** - Leaf node strategy and architectural patterns
 
 ## See Also
 
-- [NATS Ecosystem Overview](/docs/ecosystem/nats/) - Conceptual overview of NATS in wasmCloud
-- [NATS Deployment Guide](/docs/category/provisioning-nats/) - Deployment-specific NATS configuration
+- [NATS Ecosystem Overview](/docs/v1/ecosystem/nats/) - Conceptual overview of NATS in wasmCloud
+- [NATS Deployment Guide](/docs/v1/category/provisioning-nats/) - Deployment-specific NATS configuration
 - [NATS Documentation](https://docs.nats.io/) - Official NATS documentation

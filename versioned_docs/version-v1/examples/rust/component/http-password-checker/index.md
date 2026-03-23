@@ -11,7 +11,7 @@ This repository contains a WebAssembly Component written in [Rust][rust], which:
 [httpserver-provider]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/providers/http-server
 [httpserver-interface]: https://github.com/wasmCloud/interfaces/tree/main/httpserver
 [wadm]: https://github.com/wasmCloud/wadm
-[wasmcloud]: https://wasmcloud.com/docs/intro
+[wasmcloud]: https://wasmcloud.com/docs/v1/intro
 [rust]: https://rust-lang.org
 
 # Dependencies
@@ -45,7 +45,7 @@ wash dev
 - Deploys the built manifest (i.e all dependencies to run this application) locally
 - Watches your code for changes and re-deploys when necessary.
 
-[wasmcloud-host]: https://wasmcloud.com/docs/concepts/hosts
+[wasmcloud-host]: https://wasmcloud.com/docs/v1/concepts/hosts
 
 ## Send a request to the running component
 
@@ -71,7 +71,7 @@ You should see a JSON response like:
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
 
 # Issues/ FAQ
 

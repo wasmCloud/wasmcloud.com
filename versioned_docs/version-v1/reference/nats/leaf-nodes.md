@@ -62,7 +62,7 @@ This "anonymous localhost" connection pattern is commonly used in the [sidecar](
 
 ## JetStream Considerations
 
-When using leaf nodes with JetStream, additional configuration is required. See [Leaf Node Config (JetStream)](/docs/deployment/nats/js-leaf) for detailed configuration instructions.
+When using leaf nodes with JetStream, additional configuration is required. See [Leaf Node Config (JetStream)](/docs/v1/deployment/nats/js-leaf) for detailed configuration instructions.
 
 ## Global Connectivity
 
@@ -71,5 +71,5 @@ Using leaf nodes with services like [Synadia Cloud](https://www.synadia.com/ngs)
 ## See Also
 
 - [NATS Leaf Node Documentation](https://docs.nats.io/running-a-nats-service/configuration/leafnodes)
-- [Leaf Nodes & Sidecars](/docs/deployment/nats/leaf-nodes) - Deployment guide
-- [Leaf Node Config (JetStream)](/docs/deployment/nats/js-leaf) - JetStream-specific configuration
+- [Leaf Nodes & Sidecars](/docs/v1/deployment/nats/leaf-nodes) - Deployment guide
+- [Leaf Node Config (JetStream)](/docs/v1/deployment/nats/js-leaf) - JetStream-specific configuration

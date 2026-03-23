@@ -14,7 +14,7 @@ The following is a glossary of important or frequently used terms. These terms m
 
 Built-in providers are functionalities exposed by the wasmCloud host, such that the host itself can fulfull a component's imports on certain interfaces. Built-in providers may be linked with components. This limited set of functions for capabilities such as **logging** represents wasmCloud's **trusted compute base**.
 
-For more information, see [**Providers**](/docs/concepts/providers).
+For more information, see [**Providers**](/docs/v1/concepts/providers).
 
 ### Capability
 
@@ -24,31 +24,31 @@ An abstraction for a given functionality (such as key-value storage or connectio
 
 Components are portable, interoperable WebAssembly binaries that implement stateless logic. Components are `.wasm` files that include [interface](#interface) definitions which define the contracts through which they may relate to other entities.
 
-For more information, see [**Components**](/docs/concepts/components).
+For more information, see [**Components**](/docs/v1/concepts/components).
 
 ### Host
 
 A wasmCloud host is a runtime environment node consisting of a WebAssembly runtime ([Wasmtime](#wasmtime)) and additional layers of security and functionality. Multiple hosts may run on a single machine and hosts are meant to be ephemeral.
 
-For more information, see [**Hosts**](/docs/concepts/hosts/).
+For more information, see [**Hosts**](/docs/v1/concepts/hosts/).
 
 ### Interface
 
 Interfaces are contracts that define the relationships between entities like components and providers, often defining functionalities like HTTP or key-value storage at a high and vendor-agnostic level. Interfaces describe a component or provider's requirements ("imports") and exposed functions that may be used by other entities ("exports"). Interfaces are defined in [WebAssembly Interface Type (WIT)](#wit) files.
 
-For more information, see [**Interfaces**](/docs/concepts/interfaces/).
+For more information, see [**Interfaces**](/docs/v1/concepts/interfaces/).
 
 ### Lattice
 
 The lattice is a self-forming cluster of wasmCloud nodes. Each lattice is uniquely identified by a name, which is used to differentiate traffic from other lattices. Membership within a lattice requires a secret key for signing invocations and the ability to trust a specific set of public keys from other hosts.
 
-For more information, see [**Lattice**](/docs/concepts/lattice).
+For more information, see [**Lattice**](/docs/v1/concepts/lattice).
 
 ### Link
 
 A link is a connection between a component or provider's _requirements_ (**"imports"**) and the _exposed functions_ (or **"exports"**) of another entity.
 
-For more information, see [**Linking Components**](/docs/concepts/linking-components/).
+For more information, see [**Linking Components**](/docs/v1/concepts/linking-components/).
 
 ### NATS
 
@@ -60,7 +60,7 @@ For more information, see the [**NATS documentation**](https://docs.nats.io/).
 
 Providers are executable host plugins that implement longer-lived processes, typically providing reusable capabilities (such as key-value storage). Providers are written in Rust or Go, may be linked to one or more components, and interact with components according to defined [interfaces](#interface).
 
-For more information, see [**Providers**](/docs/concepts/providers).
+For more information, see [**Providers**](/docs/v1/concepts/providers).
 
 ### Provider Archive
 
@@ -70,13 +70,13 @@ A provider archive is a compressed file containing a provider's binary (or multi
 
 `wadm` is shorthand for **wasmCloud Application Deployment Manager**, the part of the wasmCloud platform that manages declarative application deployments.
 
-For more information, see [**wasmCloud Application Deployment Manager**](/docs/ecosystem/wadm/).
+For more information, see [**wasmCloud Application Deployment Manager**](/docs/v1/ecosystem/wadm/).
 
 ### `wash`
 
 `wash` is shorthand for **wasmCloud Shell**, the primary CLI tool for interacting with the wasmCloud platform. Using `wash`, you can build components, view component interfaces, start a local instance of wasmCloud, and more.
 
-For more information, see [**wasmCloud Shell**](/docs/ecosystem/wash/).
+For more information, see [**wasmCloud Shell**](/docs/v1/ecosystem/wash/).
 
 ### Wasmtime
 
@@ -88,7 +88,7 @@ For more information, see the [**Wasmtime documentation**](https://docs.wasmtime
 
 wRPC stands for "WIT over RPC"&mdash;or if you want to decode it completely, **WebAssembly Interface Type over Remote Procedure Call**. wRPC is an RPC protocol for communicating according to WIT definitions over a transport layer; this is the means by which wasmCloud can dynamically link distributed WebAssembly components at runtime over the lattice.
 
-For more information, see [**Linking at Runtime**](/docs/concepts/linking-components/linking-at-runtime).
+For more information, see [**Linking at Runtime**](/docs/v1/concepts/linking-components/linking-at-runtime).
 
 ## General WebAssembly terminology
 
@@ -98,7 +98,7 @@ The following are common terms in the WebAssembly ecosystem that will come up fr
 
 The Component Model is a specification for WebAssembly binaries that enables them to **interoperate**&mdash;meaning that a component written in one language (Rust, for example) can communicate with a component written in another language (such as Go) using shared types and functions. When we talk about [components](#component) in wasmCloud, we are simply talking about standard WebAssembly components conforming to the Component Model, which may run anywhere else that runs components.
 
-For more information on components and the Component Model, see [**Components**](/docs/concepts/components/) or the [**Component Model documentation**](https://component-model.bytecodealliance.org/).
+For more information on components and the Component Model, see [**Components**](/docs/v1/concepts/components/) or the [**Component Model documentation**](https://component-model.bytecodealliance.org/).
 
 ### Module
 

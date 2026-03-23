@@ -30,8 +30,8 @@ By default, the `blobstore-fs` and `messaging-nats` providers are used as they r
 
 This component (the image processor) and the HTTP task manager component communicate via [wRPC][wrpc] (and the [NATS messaging system powering wasmCloud][nats]), so there's no need to hit the external API, WebAssembly function calls are automatically transformed into low-latency distributed RPC invocations to the HTTP task manager.
 
-[nats]: https://wasmcloud.com/docs/deployment/nats/cluster-config
-[wasmcloud-wrpc]: https://wasmcloud.com/docs/reference/glossary#wrpc
+[nats]: https://wasmcloud.com/docs/v1/deployment/nats/cluster-config
+[wasmcloud-wrpc]: https://wasmcloud.com/docs/v1/reference/glossary#wrpc
 [provider-blobstore-fs]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-blobstore-fs
 [provider-blobstore-s3]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-blobstore-s3
 [provider-blobstore-azure]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-blobstore-azure
@@ -57,7 +57,7 @@ Note that if you'd like to build with `cargo` you need to specify the `--target`
 cargo build --target=wasm32-wasip1
 ```
 
-[wash]: https://wasmcloud.com/docs/cli
+[wash]: https://wasmcloud.com/docs/v1/cli
 
 ## Launch
 
@@ -82,7 +82,7 @@ Confirm that the application was deployed successfully:
 wash app get
 ```
 
-[wasmcloud-docs-host]: https://wasmcloud.com/docs/concepts/hosts
+[wasmcloud-docs-host]: https://wasmcloud.com/docs/v1/concepts/hosts
 
 ## Using this component
 

@@ -11,9 +11,9 @@ The application...
 
 [wasi-http]: https://github.com/WebAssembly/wasi-http
 [httpserver-provider]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-http-server
-[wasmCloud]: https://wasmcloud.com/docs/intro
+[wasmCloud]: https://wasmcloud.com/docs/v1/intro
 [tinygo]: https://tinygo.org/getting-started/install/
-[wash]:  https://wasmcloud.com/docs/ecosystem/wash/
+[wash]:  https://wasmcloud.com/docs/v1/ecosystem/wash/
 [wasm-tools]: https://github.com/bytecodealliance/wasm-tools#installation
 
 ## 📦 Dependencies
@@ -48,7 +48,7 @@ cd examples/component/http-server
 In addition to the standard elements of a Go project, the example directory includes the following files and directories:
 
 - `build/`: Target directory for compiled `.wasm` binaries
-- `gen/`: Target directory for Go bindings of [interfaces](https://wasmcloud.com/docs/concepts/interfaces)
+- `gen/`: Target directory for Go bindings of [interfaces](https://wasmcloud.com/docs/v1/concepts/interfaces)
 - `wit/`: Directory for WebAssembly Interface Type (WIT) packages that define interfaces
 - `bindings.wadge_test.go`: Automatically generated test bindings
 - `wadm.yaml`: Declarative application manifest
@@ -217,6 +217,6 @@ pgrep -la ghcr_io
 
 ## 📖 Further reading
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
 
-For more on building components, see the [Component Developer Guide](https://wasmcloud.com/docs/developer/components/) in the wasmCloud documentation. 
+For more on building components, see the [Component Developer Guide](https://wasmcloud.com/docs/v1/developer/components/) in the wasmCloud documentation. 

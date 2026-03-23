@@ -6,7 +6,7 @@ draft: false
 description: 'Support for wit-defined WebAssembly components'
 ---
 
-The wasmCloud host communicates with WebAssembly guests using the [WebAssembly component model](https://github.com/WebAssembly/component-model). You can read more about components in our [Platform Overview](https://wasmcloud.com/docs/concepts/components).
+The wasmCloud host communicates with WebAssembly guests using the [WebAssembly component model](https://github.com/WebAssembly/component-model). You can read more about components in our [Platform Overview](https://wasmcloud.com/docs/v1/concepts/components).
 
 ### Reference
 

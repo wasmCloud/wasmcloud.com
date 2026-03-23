@@ -74,7 +74,7 @@ spec:
       traits: ...
 ```
 
-The `image` property of the `component` component contains either a `.wasm` file reference or an OCI image reference URL. You can learn more about wasmCloud and packaging with OCI on the [Packaging](/docs/concepts/packaging.mdx) page.
+The `image` property of the `component` component contains either a `.wasm` file reference or an OCI image reference URL. You can learn more about wasmCloud and packaging with OCI on the [Packaging](/docs/v1/concepts/packaging) page.
 
 :::info[Launching WebAssembly components from local files]
 
@@ -96,7 +96,7 @@ The `id` property is an optional unique identifier you can assign your component
 
 Configuration specified in the `config` property will be available to the component at runtime. The `config` property is generally most useful for making arbitrary data available at runtime via the [wasi-runtime-config](https://github.com/WebAssembly/wasi-runtime-config) interface.
 
-⚠️ **NOTE**: Essential configuration options (like specifying ports for an HTTP or Redis server) are typically passed to components and providers through the `source_config` and `target_config` properties of the `link` trait. These properties are covered in the [Traits](#traits) section below, and you can read more about links, sources, and targets on the [Linking at Runtime](/docs/concepts/linking-components/linking-at-runtime.mdx) page.
+⚠️ **NOTE**: Essential configuration options (like specifying ports for an HTTP or Redis server) are typically passed to components and providers through the `source_config` and `target_config` properties of the `link` trait. These properties are covered in the [Traits](#traits) section below, and you can read more about links, sources, and targets on the [Linking at Runtime](/docs/v1/concepts/linking-components/linking-at-runtime) page.
 
 ### Capability providers
 
@@ -121,7 +121,7 @@ The `id` property is an optional unique identifier you can assign your capabilit
 
 Configuration specified in the `config` property will be available at runtime via the data passed to the provider&mdash;see the [keyvalue-redis](https://github.com/wasmCloud/wasmCloud/blob/main/crates/provider-keyvalue-redis/src/lib.rs#L64) provider for example usage. The `config` property is generally most useful for making arbitrary data available at runtime according to the [wasi-runtime-config](https://github.com/WebAssembly/wasi-runtime-config) interface.
 
-⚠️ **NOTE**: Essential configuration options (like specifying ports for an HTTP or Redis server) are typically passed to components and providers through the `source_config` and `target_config` properties of the `link` trait. These properties are covered in the [Traits](#traits) section below, and you can read more about links, sources, and targets on the [Linking at Runtime](/docs/concepts/linking-components/linking-at-runtime.mdx) page.
+⚠️ **NOTE**: Essential configuration options (like specifying ports for an HTTP or Redis server) are typically passed to components and providers through the `source_config` and `target_config` properties of the `link` trait. These properties are covered in the [Traits](#traits) section below, and you can read more about links, sources, and targets on the [Linking at Runtime](/docs/v1/concepts/linking-components/linking-at-runtime) page.
 
 ## Traits
 
@@ -210,9 +210,9 @@ The `link` trait links two entities together with a set of configuration values.
 
 The value of the `target` field is the `name` of the entity (in this case, the `kvredis` capability provider) to which this component is linking. 
 
-The `namespace`, `package`, and `interfaces` fields are used to identify the [interface(s)](/docs/concepts/interfaces.mdx) over which the component and the linked entity will communicate. In the example above, a WebAssembly component is linking to the `kvredis` capability provider over the `wasi:keyvalue/atomics` and `wasi:keyvalue/store` interfaces.
+The `namespace`, `package`, and `interfaces` fields are used to identify the [interface(s)](/docs/v1/concepts/interfaces) over which the component and the linked entity will communicate. In the example above, a WebAssembly component is linking to the `kvredis` capability provider over the `wasi:keyvalue/atomics` and `wasi:keyvalue/store` interfaces.
 
-The `target_config` field provides essential configuration data to pass on to the provider&mdash;in the example above, that means the address and port of a local Redis server. This link uses a **`target_config`** (rather than a `source_config`) because the WebAssembly component _imports_ on the `keyvalue` interface. For more information on how to understand and use sources and targets, see the [Linking at Runtime](/docs/concepts/linking-components/linking-at-runtime.mdx) page.
+The `target_config` field provides essential configuration data to pass on to the provider&mdash;in the example above, that means the address and port of a local Redis server. This link uses a **`target_config`** (rather than a `source_config`) because the WebAssembly component _imports_ on the `keyvalue` interface. For more information on how to understand and use sources and targets, see the [Linking at Runtime](/docs/v1/concepts/linking-components/linking-at-runtime) page.
 
 :::info[Target vs source configuration]
 Links include both a `target_config` and a `source_config` field for providing configuration. This can be used to provide configuration values to just the component that needs them. For example, in the above snippet, the _target_ of the link is the Redis provider which needs to know what URL to connect to, and the _source_ of the link is a component that doesn't need that configuration. This is very important for security sensitive configuration that you don't want to expose unnecessarily to additional components.
@@ -222,7 +222,7 @@ The values in these fields are a simple key-value map that will be passed as lin
 
 ## Putting it all together
 
-So far we've seen bits and pieces of the application specification YAML. Here's the complete manifest for the [Customize and Extend](/docs/tour/customize-and-extend/) step of the [Quickstart](/docs/tour/hello-world.mdx) example:
+So far we've seen bits and pieces of the application specification YAML. Here's the complete manifest for the [Customize and Extend](/docs/v1/tour/customize-and-extend/) step of the [Quickstart](/docs/v1/tour/hello-world) example:
 
 ```yaml
 apiVersion: core.oam.dev/v1beta1
@@ -280,5 +280,5 @@ spec:
 
 ## Further reading
 
-* You can find a step-by-step explanation of the source and target linking in the Quickstart manifest on the [Linking at Runtime](/docs/concepts/linking-components/linking-at-runtime#providers) page. 
+* You can find a step-by-step explanation of the source and target linking in the Quickstart manifest on the [Linking at Runtime](/docs/v1/concepts/linking-components/linking-at-runtime#providers) page. 
 * For examples of other application manifests, see the `wadm.yaml` files for the projects in the [**examples** directory of the wasmCloud repository](https://github.com/wasmCloud/wasmCloud/tree/main/examples).

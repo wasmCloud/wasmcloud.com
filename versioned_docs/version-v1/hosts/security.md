@@ -6,7 +6,7 @@ draft: false
 description: 'wasmCloud Ecosystem Security'
 ---
 
-wasmCloud embraces a [zero trust](https://en.wikipedia.org/wiki/Zero_trust_networks) security model. With the WebAssembly component model, every function call must be declared and embedded in a component's WIT, giving wasmCloud full ability to deny the component from invoking anything or accessing any resources at runtime. See the [policy service](/docs/deployment/security/policy-service) documentation for information on how to evaluate policies to increase the default security of wasmCloud.
+wasmCloud embraces a [zero trust](https://en.wikipedia.org/wiki/Zero_trust_networks) security model. With the WebAssembly component model, every function call must be declared and embedded in a component's WIT, giving wasmCloud full ability to deny the component from invoking anything or accessing any resources at runtime. See the [policy service](/docs/v1/deployment/security/policy-service) documentation for information on how to evaluate policies to increase the default security of wasmCloud.
 
 :::warning[Planned changes to claims]
 The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans to overhaul claims in the next major release of wasmCloud, leveraging the OCI specification’s existing support for attestation, and using SPIFFE for workload identity. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4693: “Remove usage of wascap and nkeys.”](https://github.com/wasmCloud/wasmCloud/issues/4639)
@@ -23,7 +23,7 @@ Every component in the ecosystem is a WebAssembly component that contains an emb
 
 In our ecosystem, the issuer of a component is the unique public key of an **account** (see the _Key Types_ section below), and the subject of a component is the component's public key.
 
-The [wash](/docs/ecosystem/wash) tool is responsible for creating keys and extracting and embedding signed JWTs within components.
+The [wash](/docs/v1/ecosystem/wash) tool is responsible for creating keys and extracting and embedding signed JWTs within components.
 
 Each JWT embedded within a component is cryptographically signed using the [ed25519](https://ed25519.cr.yp.to/) signature algorithm. For information on why we chose this method of security over others, please check out our [Archictural Decision Record](https://wasmcloud.github.io/adr/).
 
@@ -71,6 +71,6 @@ While the number of key encodings available is larger than this list, the follow
 - Capability Pro**v**ider (Ser**v**ice) - Produces public keys with the **V** prefix.
 - Server/**N**ode - Produces public keys with the **N** (node) prefix, used by the host runtime.
 - **O**perator - Produces public keys with the **O** prefix.
-- **C**luster - Produces public keys with the **C** prefix, used by the [lattice](/docs/reference/glossary#lattice).
+- **C**luster - Produces public keys with the **C** prefix, used by the [lattice](/docs/v1/reference/glossary#lattice).
 
 As mentioned, _by convention_, component tokens are issued by accounts. **A**ccounts are, by convention, issued by operators. Ser**v**ices (capability pro**v**iders) are also issued/signed by accounts. Servers (wasmcloud processes/**n**odes) are currently self-issued/self-signed, leaving the crucial lattice security up to the **C**luster keys.

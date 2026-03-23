@@ -19,7 +19,7 @@ const DEFAULT_CONTENT = {
     </p>
   ),
   link: {
-    href: 'https://wasmcloud.com/docs/deployment/k8s/',
+    href: '/docs/kubernetes-operator',
     text: 'Deploy the wasmCloud k8s Operator',
   },
   img: {

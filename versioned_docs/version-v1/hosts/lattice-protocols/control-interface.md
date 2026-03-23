@@ -15,7 +15,7 @@ also a [wasmcloud-control-interface](https://docs.rs/wasmcloud-control-interface
 provides a convenient API for accessing the control interface.
 
 ℹ️ All control interface interactions take place on a _separate_ NATS client connection from the RPC
-connection for [security reasons](/docs/deployment/security/nats-segmentation). All requests and replies on the control interface connection are serialized via **JSON**.
+connection for [security reasons](/docs/v1/deployment/security/nats-segmentation). All requests and replies on the control interface connection are serialized via **JSON**.
 
 ## NATS control interface
 
@@ -675,4 +675,4 @@ the lattice name (also referred to as the "lattice ID"). Lattice events are
 JSON-serialized [CloudEvents](https://github.com/cloudevents/spec/blob/v1.0.1/json-format.md) for
 easy, standardized consumption. This means that the `data` field in the cloud event envelope is just
 another JSON object and does not need to be decoded further. For documentation on all emitted
-events, check out the [reference guide](/docs/reference/cloud-event-list.mdx)
+events, check out the [reference guide](/docs/v1/reference/cloud-event-list)

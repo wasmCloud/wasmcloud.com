@@ -178,7 +178,7 @@ world hello {
 
 You can then fetch dependencies with `wash wit deps` (or automatically with `wash build`). If you `ls wit/deps` you'll see a directory containing your custom interface.
 
-Congratulations&mdash;you've written a simple custom interface and added it to a component. For more details on implementing custom interfaces with components and providers, see the [Provider section of the Developer Guide](/docs/developer/providers/).
+Congratulations&mdash;you've written a simple custom interface and added it to a component. For more details on implementing custom interfaces with components and providers, see the [Provider section of the Developer Guide](/docs/v1/developer/providers/).
 
 ## Sharing your interface
 
@@ -196,7 +196,7 @@ wash wit build
 
 By default this will output a file with the same name as your package with a `.wasm` extension. See the help documentation for `wash wit build` for other options for selecting a different directory or file name. By default, `wash wit build` will not output any dependencies to the `wit/deps` directory. If you need the dependencies available locally (for debugging or generating documentation), run `wash wit deps` to fetch the dependencies and output them to the `wit/deps` directory.
 
-Once you have built your WIT package, you can publish it to a registry. The `wash` CLI has a `wash wit publish` command that will publish your package to a registry. For this to work properly, you will need to have a valid config file for the Wasm package tooling. Please see the [Dependencies documentation](/docs/developer/components/build#interface-dependencies-and-wash-build) for more information.
+Once you have built your WIT package, you can publish it to a registry. The `wash` CLI has a `wash wit publish` command that will publish your package to a registry. For this to work properly, you will need to have a valid config file for the Wasm package tooling. Please see the [Dependencies documentation](/docs/v1/developer/components/build#interface-dependencies-and-wash-build) for more information.
 
 ## Further reading
 

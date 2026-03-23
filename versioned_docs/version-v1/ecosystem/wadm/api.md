@@ -12,12 +12,12 @@ The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7
 :::
 
 The most common way to interact with a Wadm installation (which could be a single server or a
-cluster) is through the [wash](/docs/ecosystem/wadm/usage/) command-line tool or the [Rust client
+cluster) is through the [wash](/docs/v1/ecosystem/wadm/usage/) command-line tool or the [Rust client
 crate](https://docs.rs/wadm-client/latest/wadm_client/). However, if you are planning on creating
 your own integration or writing a non-Rust language binding, then this reference will help.
 
 Please note that in production deployments, you will likely be using separate NATS credentials for
-accessing wadm. Please see the [operator guide](/docs/deployment/wadm/) for more information for running
+accessing wadm. Please see the [operator guide](/docs/v1/deployment/wadm/) for more information for running
 wadm in production.
 
 ## Subject space

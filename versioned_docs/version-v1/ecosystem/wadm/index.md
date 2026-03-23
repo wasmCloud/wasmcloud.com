@@ -13,14 +13,14 @@ The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7
 
 ## Overview
 
-The **wasmCloud Application Deployment Manager (wadm)** manages declarative [application](/docs/concepts/applications) deployments, reconciling the current state of an application with the desired state.
+The **wasmCloud Application Deployment Manager (wadm)** manages declarative [application](/docs/v1/concepts/applications) deployments, reconciling the current state of an application with the desired state.
 
 In a declarative deployment pattern, developers define the components, configuration, and scaling properties of their applications using static configuration files that can be versioned, shared, edited, and otherwise used as a source of truth. In wasmCloud, those application manifests conform to the [**Open Application Model (OAM)**](https://oam.dev/) and may be written in YAML or JSON. Once a deployment is declared, wadm issues the low-level commands responsible for making that declaration a reality.
 
 :::info[For the Kubernetes developer]
 Application manifests should be very familiar to Kubernetes developers. Moreover, you can think of a wasmCloud application deployment as roughly analogous to a Kubernetes deployment: once you define your application components in a manifest, wadm will ensure that your application reaches desired state based on that manifest.
 
-If you're interested in deploying WebAssembly applications on Kubernetes, check out [our Kubernetes operator](/docs/kubernetes) that makes it easy to deploy and leverage declarative wadm manifests.
+If you're interested in deploying WebAssembly applications on Kubernetes, check out [our Kubernetes operator](/docs/v1/kubernetes) that makes it easy to deploy and leverage declarative wadm manifests.
 :::
 
 ## Application deployment lifecycle
@@ -46,8 +46,8 @@ The diagram below illustrates the lifecycle of an application once deployed to w
 
 The following pages provide more detail on various aspects of application deployment with wasmCloud and wadm:
 
-- [Defining Applications](/docs/ecosystem/wadm/model) - How to describe an application in a deployment manifest.
-- [Deploying Applications](/docs/ecosystem/wadm/usage) - Approaches to deploying applications.
-- [Using the wadm API](/docs/ecosystem/wadm/api) - Overview of the high-level functionality exposed by wadm
-- [Application Status](/docs/ecosystem/wadm/status) - Further details on application status.
-- [Migrating from 0.82](/docs/ecosystem/wadm/migrating) - Guidance for users adapting v0.82 manifests for use with the most current version.
+- [Defining Applications](/docs/v1/ecosystem/wadm/model) - How to describe an application in a deployment manifest.
+- [Deploying Applications](/docs/v1/ecosystem/wadm/usage) - Approaches to deploying applications.
+- [Using the wadm API](/docs/v1/ecosystem/wadm/api) - Overview of the high-level functionality exposed by wadm
+- [Application Status](/docs/v1/ecosystem/wadm/status) - Further details on application status.
+- [Migrating from 0.82](/docs/v1/ecosystem/wadm/migrating) - Guidance for users adapting v0.82 manifests for use with the most current version.

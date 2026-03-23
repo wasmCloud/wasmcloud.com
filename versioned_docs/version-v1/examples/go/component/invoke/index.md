@@ -1,7 +1,7 @@
 # Go Component SDK with Custom WIT
 
 [This example](https://github.com/wasmCloud/go/tree/main/examples/component/invoke) is a WebAssembly component that demonstrates how to
-use the wasmCloud [Go Component SDK](https://github.com/wasmCloud/go/tree/main/component) in conjunction with your own custom [WIT interfaces](https://wasmcloud.com/docs/concepts/interfaces).
+use the wasmCloud [Go Component SDK](https://github.com/wasmCloud/go/tree/main/component) in conjunction with your own custom [WIT interfaces](https://wasmcloud.com/docs/v1/concepts/interfaces).
 
 You can find this application's custom interface in `wit/world.wit`:
 
@@ -43,7 +43,7 @@ cd examples/component/invoke
 In addition to the standard elements of a Go project, the example directory includes the following files and directories:
 
 - `build/`: Target directory for compiled `.wasm` binaries
-- `gen/`: Target directory for Go bindings of [interfaces](https://wasmcloud.com/docs/concepts/interfaces)
+- `gen/`: Target directory for Go bindings of [interfaces](https://wasmcloud.com/docs/v1/concepts/interfaces)
 - `wit/`: Directory for WebAssembly Interface Type (WIT) packages that define interfaces
 - `bindings.wadge_test.go`: Automatically generated test bindings
 - `wadm.yaml`: Declarative application manifest
@@ -52,7 +52,7 @@ In addition to the standard elements of a Go project, the example directory incl
 
 ### Build the component
 
-We will build and deploy this example manually, since we will be using the [`wash call` subcommand](https://wasmcloud.com/docs/cli/wash#wash-call) to interact with the application, requiring a stable identity to call. (As you gain experience with wasmCloud, you will likely want to use the [`wash dev` subcommand](https://wasmcloud.com/docs/cli/wash#wash-dev) to automate your development process.)
+We will build and deploy this example manually, since we will be using the [`wash call` subcommand](https://wasmcloud.com/docs/v1/cli/wash#wash-call) to interact with the application, requiring a stable identity to call. (As you gain experience with wasmCloud, you will likely want to use the [`wash dev` subcommand](https://wasmcloud.com/docs/v1/cli/wash#wash-dev) to automate your development process.)
 
 Build the component:
 
@@ -84,7 +84,7 @@ wash app list
 
 ### Invoke the component
 
-Once the application is deployed, you can call the component using the [`wash call` subcommand](https://wasmcloud.com/docs/cli/wash#wash-call), which invokes a function on a component:
+Once the application is deployed, you can call the component using the [`wash call` subcommand](https://wasmcloud.com/docs/v1/cli/wash#wash-call), which invokes a function on a component:
 
 ```shell
 wash call invoke_example-invoker example:invoker/invoker.call
@@ -119,4 +119,4 @@ Hello from the invoker!
 
 ## 📖 Further reading
 
-For more on custom interfaces, see the [Interface Developer Guide](https://wasmcloud.com/docs/developer/interfaces/creating-an-interface) in the wasmCloud documentation.
+For more on custom interfaces, see the [Interface Developer Guide](https://wasmcloud.com/docs/v1/developer/interfaces/creating-an-interface) in the wasmCloud documentation.
