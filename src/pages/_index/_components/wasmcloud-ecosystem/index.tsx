@@ -17,7 +17,7 @@ function WasmCloudEcosystem({}: Props) {
         <SectionHeading>Wasm-native works with cloud-native</SectionHeading>
         <p>wasmCloud works with the tools you know and love today.</p>
         <p>
-          <Link className="button" href="/docs/integrations">
+          <Link className="button" href="/docs/v1/integrations">
             Integrations Catalog
           </Link>
         </p>

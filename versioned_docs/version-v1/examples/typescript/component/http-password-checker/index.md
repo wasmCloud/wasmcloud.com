@@ -17,7 +17,7 @@ This example also serves as a great example of using JS ecosystem projects, nota
 [httpserver-provider]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/providers/http-server
 [httpserver-interface]: https://github.com/wasmCloud/interfaces/tree/main/httpserver
 [wadm]: https://github.com/wasmCloud/wadm
-[wasmcloud]: https://wasmcloud.com/docs/intro
+[wasmcloud]: https://wasmcloud.com/docs/v1/intro
 [zod]: https://github.com/colinhacks/zod
 [valibot]: https://github.com/fabian-hiller/valibot
 [npm-check-password-strength]: https://www.npmjs.com/package/check-password-strength
@@ -62,7 +62,7 @@ wash dev
 - Deploys the built manifest (i.e all dependencies to run this application) locally
 - Watches your code for changes and re-deploys when necessary.
 
-[wasmcloud-host]: https://wasmcloud.com/docs/concepts/hosts
+[wasmcloud-host]: https://wasmcloud.com/docs/v1/concepts/hosts
 
 ## Send a request to the running component
 
@@ -90,7 +90,7 @@ You should see a JSON response like:
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/tour/adding-capabilities?lang=typescript) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=typescript) section of the wasmCloud documentation.
 
 # Issues/ FAQ
 

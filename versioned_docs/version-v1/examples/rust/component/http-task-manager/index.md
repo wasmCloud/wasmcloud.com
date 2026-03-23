@@ -20,7 +20,7 @@ This application requires a few other pieces to function:
 - [wasmCloud SQLDB Postgres Provider][provider-sqldb-postgres] for persistence of tasks
 
 [postgres]: https://www.postgresql.org/
-[wasmcloud-wrpc]: https://wasmcloud.com/docs/reference/glossary#wrpc
+[wasmcloud-wrpc]: https://wasmcloud.com/docs/v1/reference/glossary#wrpc
 [provider-http-server]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-http-server
 [provider-sqldb-postgres]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-sqldb-postgres
 
@@ -45,7 +45,7 @@ Note that if you'd like to build with `cargo` you need to specify the `--target`
 cargo build --target=wasm32-wasip1
 ```
 
-[wash]: https://wasmcloud.com/docs/cli
+[wash]: https://wasmcloud.com/docs/v1/cli
 
 ## Launch
 
@@ -92,7 +92,7 @@ wash config put default-postgres \
 >
 > See [wasmCloud documentation for secrets][wasmcloud-secrets]
 
-[wasmcloud-secrets]: https://wasmcloud.com/docs/concepts/secrets
+[wasmcloud-secrets]: https://wasmcloud.com/docs/v1/concepts/secrets
 
 
 Next, we deploy our application:

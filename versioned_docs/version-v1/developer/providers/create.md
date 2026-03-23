@@ -19,7 +19,7 @@ To create this capability provider you'll need to install [wash](/docs/installat
 
 ## The messaging interface
 
-This capability provider will _provide_ the functionality for the `wasmcloud:messaging` interface. Interfaces are defined in WebAssembly Interface Type (WIT)&mdash;if you're new to WIT, see the [Interfaces](/docs/developer/interfaces/creating-an-interface/) section for an introduction to WIT, worlds, interfaces, imports and exports, and how all of these concepts tie together.
+This capability provider will _provide_ the functionality for the `wasmcloud:messaging` interface. Interfaces are defined in WebAssembly Interface Type (WIT)&mdash;if you're new to WIT, see the [Interfaces](/docs/v1/developer/interfaces/creating-an-interface/) section for an introduction to WIT, worlds, interfaces, imports and exports, and how all of these concepts tie together.
 
 Let's take a look at the [WIT for this interface](https://github.com/wasmCloud/messaging):
 
@@ -67,7 +67,7 @@ Feel free to take a look around the provider project. The important files are:
 
 1. `src/nats.rs`: We're going to be primarily implementing functionality here.
 1. `wasmcloud.toml`: Build information and metadata for the provider
-1. `wit/provider.wit`: The [interface](/docs/concepts/interfaces) this provider implements and uses
+1. `wit/provider.wit`: The [interface](/docs/v1/concepts/interfaces) this provider implements and uses
 
 ## Implementing the interface
 
@@ -82,7 +82,7 @@ world provider-messaging-nats {
 }
 ```
 
-For each `import` in the provider's `world`, you'll use an external trigger in order to invoke that function on a WebAssembly component dynamically at runtime. Here we import the `handler` interface, and we're going to invoke a [linked](/docs/concepts/linking-components/) component any time we receive a message on a NATS subscription.
+For each `import` in the provider's `world`, you'll use an external trigger in order to invoke that function on a WebAssembly component dynamically at runtime. Here we import the `handler` interface, and we're going to invoke a [linked](/docs/v1/concepts/linking-components/) component any time we receive a message on a NATS subscription.
 
 For each `export` in the provider's `world`, you'll need to implement a function to handle the functionality of that interface. WebAssembly components will be able to invoke exported functions dynamically at runtime. Here, we export the entire `consumer` interface, so we'll need to implement the `publish` and `request` functionality in the provider.
 
@@ -172,7 +172,7 @@ async fn publish(
 After retrieving the NATS client that is configured for the requesting component, we can simply `publish` the message to the provided subject and return the result. An optional recommended step is included to flush the NATS client after publishing, which ensures that the message is sent immediately and improves performance.
 
 :::info
-We created the NATS client for the requesting component inside of the `receive_link_config_as_target` function provided by the provider SDK. At runtime, when a component [links](/docs/concepts/linking-components/) to this capability provider, it will provide configuration for connecting to a NATS server. Check the implementation of that function to see how we use that configuration to create and store a client for lookups later.
+We created the NATS client for the requesting component inside of the `receive_link_config_as_target` function provided by the provider SDK. At runtime, when a component [links](/docs/v1/concepts/linking-components/) to this capability provider, it will provide configuration for connecting to a NATS server. Check the implementation of that function to see how we use that configuration to create and store a client for lookups later.
 :::
 
 Next we can do a similar step for implementing `request`:
@@ -225,7 +225,7 @@ We perform the same steps to fetch the NATS client, and instead of publishing a 
 
 ## Testing the provider
 
-Now that you've implemented all of the `import` and `export` functions for this provider, it's ready to test. Inside of the project directory you can run `wash build` to compile and package your provider into a provider archive. For more information on building, check out the [build](/docs/developer/providers/build) page. We'll use a prebuilt wasmCloud example component that uses `wasmcloud:messaging` to test this provider.
+Now that you've implemented all of the `import` and `export` functions for this provider, it's ready to test. Inside of the project directory you can run `wash build` to compile and package your provider into a provider archive. For more information on building, check out the [build](/docs/v1/developer/providers/build) page. We'll use a prebuilt wasmCloud example component that uses `wasmcloud:messaging` to test this provider.
 
 To generate the example component, use the following command. You can do this inside of your current project directory or as a separate folder:
 

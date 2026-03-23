@@ -4,8 +4,8 @@ Starting from version 0.28 of the [WAsmcloud SHell (`wash`)][wash], [plugins wri
 
 This folder contains an example WebAssembly plugin for `wash` that you can use as a starting point for your own projects.
 
-[wash]: https://wasmcloud.com/docs/cli
-[docs-wash-plugins]: https://wasmcloud.com/docs/ecosystem/wash/plugins
+[wash]: https://wasmcloud.com/docs/v1/cli
+[docs-wash-plugins]: https://wasmcloud.com/docs/v1/ecosystem/wash/plugins
 
 ## Prerequisites
 

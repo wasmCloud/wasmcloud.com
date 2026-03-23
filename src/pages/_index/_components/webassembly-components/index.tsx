@@ -19,7 +19,7 @@ const DEFAULT_CONTENT = {
     </p>
   ),
   link: {
-    href: 'https://wasmcloud.com/docs/concepts/components',
+    href: '/docs/overview/workloads/components',
     text: 'Read our components starter guide',
   },
   img: {

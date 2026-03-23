@@ -11,7 +11,7 @@ The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7
 For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7), [Issue #4642: “Transition the capability provider model into support for wRPC servers,”](https://github.com/wasmCloud/wasmCloud/issues/4642) and [Issue #4636: "Support configuring a wasmCloud host with shared capability providers."](https://github.com/wasmCloud/wasmCloud/issues/4636)
 :::
 
-A [provider archive](/docs/reference/glossary#provider-archive) (also called a _par file_) is an archive file (in unix 'tar' format) containing platform-specific executable files for a variety of CPU and OS combinations. A typical provider archive file contains executables for 64-bit Linux, x86_64 macOs, aarch64 macOs, and other supported platforms. The par file includes a cryptographically signed JSON Web Token (JWT) that contains a set of claims attestations for the capability provider.
+A [provider archive](/docs/v1/reference/glossary#provider-archive) (also called a _par file_) is an archive file (in unix 'tar' format) containing platform-specific executable files for a variety of CPU and OS combinations. A typical provider archive file contains executables for 64-bit Linux, x86_64 macOs, aarch64 macOs, and other supported platforms. The par file includes a cryptographically signed JSON Web Token (JWT) that contains a set of claims attestations for the capability provider.
 
 A provider archive can be uploaded to, or downloaded from, OCI registries.
 
@@ -21,7 +21,7 @@ The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/
 
 ## Build
 
-Providers are always compiled in "release" mode. `wash` has support to compile a capability provider for your native target with `wash build`, as long as a [wasmcloud.toml](/docs/reference/config/) file is present. The following section will continue on from the [Create](/docs/developer/providers/create/) page where we built a NATS messaging provider, but you can follow the same steps for any capability provider project.
+Providers are always compiled in "release" mode. `wash` has support to compile a capability provider for your native target with `wash build`, as long as a [wasmcloud.toml](/docs/v1/reference/config/) file is present. The following section will continue on from the [Create](/docs/v1/developer/providers/create/) page where we built a NATS messaging provider, but you can follow the same steps for any capability provider project.
 
 ```bash
 > wash build
@@ -88,7 +88,7 @@ x86_64-windows
 x86_64-macos
 ```
 
-With the build complete, now we can [continue to testing](/docs/developer/providers/test).
+With the build complete, now we can [continue to testing](/docs/v1/developer/providers/test).
 
 ## Interface dependencies and `wash build`
 

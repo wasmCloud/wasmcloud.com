@@ -79,4 +79,4 @@ The following subjects are required for optional wasmCloud features:
 
 - [NATS Documentation on Authorization](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/authorization)
 - [NATS JWT Authentication](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt)
-- [Connecting wadm to NATS](/docs/deployment/wadm/nats-credentials)
+- [Connecting wadm to NATS](/docs/v1/deployment/wadm/nats-credentials)

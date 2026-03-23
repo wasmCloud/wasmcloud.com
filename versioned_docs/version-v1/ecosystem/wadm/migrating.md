@@ -11,7 +11,7 @@ sidebar_position: 5
 The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans for an overhaul to scheduling in the next major release of wasmCloud. The new scheduling API will not use NATS to communicate between components by default, but will still support distributed communication via NATS. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4640: “Intentional distributed networking.”](https://github.com/wasmCloud/wasmCloud/issues/4640)
 :::
 
-The manifest format changed between wasmCloud `0.82.0` and wasmCloud `1.0.0`, and this page aims to guide you through converting your manifest to the latest compatible format. This page assumes that any [components](/docs/concepts/components.mdx) you specify in your manifest are built using WIT interfaces.
+The manifest format changed between wasmCloud `0.82.0` and wasmCloud `1.0.0`, and this page aims to guide you through converting your manifest to the latest compatible format. This page assumes that any [components](/docs/v1/concepts/components) you specify in your manifest are built using WIT interfaces.
 
 ## Component changes
 
@@ -49,7 +49,7 @@ spec:
 
 ## Link changes
 
-The primary changes to manifests are in links, as links are now **unidirectional** between a source and target and based entirely on a WIT interface rather than a wasmCloud contract. You will need to examine the way your component uses [interfaces](/docs/concepts/interfaces.mdx) in order to migrate to 1.0.
+The primary changes to manifests are in links, as links are now **unidirectional** between a source and target and based entirely on a WIT interface rather than a wasmCloud contract. You will need to examine the way your component uses [interfaces](/docs/v1/concepts/interfaces) in order to migrate to 1.0.
 
 Using the example of the [http-keyvalue-counter](https://github.com/wasmCloud/wasmCloud/tree/main/examples/rust/components/http-keyvalue-counter), let's work through the updates. By inspecting the component, you can determine the direction of each link that the component needs at runtime:
 

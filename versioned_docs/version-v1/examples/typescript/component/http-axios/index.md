@@ -13,7 +13,7 @@ the widely used HTTP request library `axios`.
 [axios]: https://www.npmjs.com/package/axios
 [ts]: https://www.typescriptlang.org/
 [wasi-cli]: clis://github.com/WebAssembly/wasi-cli
-[wasmcloud]: https://wasmcloud.com/docs/intro
+[wasmcloud]: https://wasmcloud.com/docs/v1/intro
 [wasmtime]: https://wasmtime.dev
 [jco]: https://github.com/bytecodealliance/jco
 
@@ -67,7 +67,7 @@ wash dev
 - Deploys the built manifest (i.e all dependencies to run this application) locally
 - Watches your code for changes and re-deploys when necessary.
 
-[wasmcloud-host]: https://wasmcloud.com/docs/concepts/hosts
+[wasmcloud-host]: https://wasmcloud.com/docs/v1/concepts/hosts
 [httpclient-provider]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/providers-http-client
 
 ## With `jco`
@@ -141,4 +141,4 @@ wash call wasmcloud:examples/invoke.call
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/tour/adding-capabilities?lang=typescript) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=typescript) section of the wasmCloud documentation.

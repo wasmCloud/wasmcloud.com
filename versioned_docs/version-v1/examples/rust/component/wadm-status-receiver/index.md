@@ -110,4 +110,4 @@ impl Guest for StatusReceiver {
 }
 ```
 
-[wasmcloud]: https://wasmcloud.com/docs/intro
+[wasmcloud]: https://wasmcloud.com/docs/v1/intro

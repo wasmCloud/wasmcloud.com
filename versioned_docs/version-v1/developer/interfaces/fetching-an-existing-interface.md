@@ -111,4 +111,4 @@ and help us build wasmCloud projects (whether components or providers).
 
 For more information and more examples, see the [configuration reference for WIT dependency pulling][reference-fetch-pull-cfg].
 
-[reference--fetch-pull-cfg]: https://wasmcloud.com/docs/reference/config/#wit-dependency-fetchpull-configuration---registrypull
+[reference--fetch-pull-cfg]: https://wasmcloud.com/docs/v1/reference/config/#wit-dependency-fetchpull-configuration---registrypull
