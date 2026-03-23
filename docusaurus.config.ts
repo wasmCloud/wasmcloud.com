@@ -108,12 +108,11 @@ const config = (async (): Promise<Config> => {
             lastVersion: 'current',
             versions: {
               current: {
-                label: '1.x',
+                label: 'v2',
               },
-              next: {
-                label: 'v2.0.0-rc',
-                path: 'v2.0.0-rc',
-                banner: 'none'
+              v1: {
+                label: 'v1',
+                path: 'v1',
               },
               0.82: {
                 label: '0.82',
@@ -137,7 +136,7 @@ const config = (async (): Promise<Config> => {
       [
         '@wasmcloud/docusaurus-github-stars',
         {
-          preloadRepo: 'wasmCloud/wasmCloud',
+          preloadRepo: process.env.NODE_ENV === 'production' ? 'wasmCloud/wasmCloud' : undefined,
         } satisfies PluginGithubStarsOptions,
       ],
       [
@@ -200,7 +199,7 @@ const config = (async (): Promise<Config> => {
         items: [
           { to: '/blog', label: 'Blog', position: 'left' },
           { to: '/community', label: 'Community', position: 'left' },
-          { type: 'doc', docId: 'intro', position: 'left', label: 'Docs' },
+          { type: 'doc', docId: 'index', position: 'left', label: 'Docs' },
           {
             type: 'docsVersionDropdown',
             // used for styling, see src/styles/theme/_navbar.css

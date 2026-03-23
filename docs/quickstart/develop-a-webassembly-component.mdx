@@ -1,0 +1,382 @@
+---
+title: 'Develop a Wasm Component'
+sidebar_position: 2
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import HubspotForm from 'react-hubspot-form';
+
+Once you know what your application needs to be able to do, you can add language-agnostic [**interfaces**](../overview/interfaces.mdx) to access capabilities like HTTP, key-value storage, or logging.
+
+In this step, we'll discuss how to:
+
+- Update our application to accept a name and return a personalized greeting.
+- Add more features to our application by plugging in **key-value** and **logging** capabilities.
+
+:::info[Prerequisites]
+This tutorial assumes you're following directly from the previous tutorial. If you don't have a "Hello world" application running, complete [**Quickstart**](./index.mdx) first.
+:::
+
+## Add functionality
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust">
+
+Let's extend this application to do more than just say "Hello!"
+
+We can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one or the path isn't in the format we expect, we'll default to saying "Hello, World!"
+
+```rust
+use wstd::http::{Body, Request, Response, StatusCode};
+
+#[wstd::http_server]
+async fn main(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    match req.uri().path_and_query().unwrap().as_str() {
+        "/" => home(req).await,
+        _ => not_found(req).await,
+    }
+}
+
+async fn home(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+  // Parse query string for name parameter // [!code ++]
+    let query = req.uri().query().unwrap_or(""); // [!code ++]
+    let name = match query.split("=").collect::<Vec<&str>>()[..] { // [!code ++]
+            ["name", name] => name, // [!code ++]
+            _ => "World", // [!code ++]
+        }; // [!code ++]
+  // Return a simple response with a string body
+    Ok(Response::new("Hello from Wasm!\n".into())) // [!code --]
+    Ok(Response::new(format!("Hello, {name}!\n").into())) // [!code ++]
+}
+
+async fn not_found(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    Ok(Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body("Not found\n".into())
+        .unwrap())
+}
+```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+Let's extend this application to do more than just say "Hello!"
+
+Using Hono's built-in query parameter parsing, we can check the request for a name provided in a query string, and then return a greeting with that name. If there isn't one, we'll default to saying "Hello, World!"
+
+```typescript
+import { Hono } from 'hono';
+import { fire } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
+
+const app = new Hono();
+
+app.get('/', (c) => {
+  return c.text('Hello from Wasm!\n'); // [!code --]
+  const name = c.req.query('name') || 'World'; // [!code ++]
+  return c.text(`Hello, ${name}!\n`); // [!code ++]
+});
+
+app.notFound((c) => {
+  return c.text('Not found\n', 404);
+});
+
+fire(app);
+
+export { incomingHandler } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
+```
+
+  </TabItem>
+{/*
+  <TabItem value="tinygo" label="Go">
+Using the FormValue method, check the query string for a name parameter and return a personalized greeting.
+  </TabItem>
+*/}
+  <TabItem value="unlisted" label="My language isn't listed">
+
+If you prefer working in a language that isn't listed here, let us know!
+
+{' '}
+
+<div style={{ display: 'flex', flexDirection: 'row' }}>
+  <div style={{ width: '100%' }}>
+    <HubspotForm
+      portalId="20760433"
+      formId="71e74f55-cc30-41de-9d41-e3d9dc159c71"
+      onSubmit={() => console.log('Submitted form')}
+      onReady={(form) => console.log('Form ready for submit')}
+      region="na1"
+      loading={<div>Loading...</div>}
+    />
+  </div>
+</div>
+
+  </TabItem>
+</Tabs>
+
+After saving your changes, your toolchain automatically builds and runs the updated application.
+
+We can `curl` the application again:
+
+```shell
+curl localhost:8000
+```
+
+```text
+Hello, World!
+```
+
+```shell
+curl 'localhost:8000?name=Bob'
+```
+
+```text
+Hello, Bob!
+```
+
+## Add persistent storage
+
+Now let's add persistent storage to keep a record of each person that this application greeted.
+
+We'll use the **key-value capability** for this. We don't need to pick a library or a specific vendor implementation&mdash;all we have to do is add the `wasi:keyvalue` interface to our component.
+
+We can use the [`wasi:keyvalue`](https://github.com/WebAssembly/wasi-keyvalue) interface for interacting with a key-value store.
+
+Interfaces are declared in **WIT (WebAssembly Interface Types)** files. A WIT file is a language-neutral contract describing what your component imports (capabilities it consumes) and exports (functions it exposes). Adding an `import` line to your component's WIT `world` tells the runtime to provide that capability—without binding you to a specific library or vendor. You can read more about WIT on the [Interfaces](../overview/interfaces.mdx) page.
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust">
+
+Before we can use the interface, we'll need to add a `wit/world.wit` file:
+
+```sh
+touch wit/world.wit
+```
+
+```wit
+package wasmcloud:templates@0.1.0;
+
+world rust-http-hello-world {
+    import wasi:keyvalue/store@0.2.0-draft; // [!code ++]
+    import wasi:keyvalue/atomics@0.2.0-draft; // [!code ++]
+}
+```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+Before we can use the interface, we'll need to update the `wit/world.wit` file:
+
+```wit
+package wasmcloud:templates@0.1.0;
+
+world typescript-http-hello-world-hono {
+  import wasi:keyvalue/store@0.2.0-draft; // [!code ++]
+  import wasi:keyvalue/atomics@0.2.0-draft; // [!code ++]
+
+  export wasi:http/incoming-handler@0.2.6;
+}
+```
+
+  </TabItem>
+{/*
+  <TabItem value="tinygo" label="Go">
+Update `wit/world.wit` to import `wasi:keyvalue/atomics` and `wasi:keyvalue/store`.
+  </TabItem>
+*/}
+  <TabItem value="unlisted" label="My language isn't listed">
+
+If you prefer working in a language that isn't listed here, let us know!
+
+{' '}
+
+<div style={{ display: 'flex', flexDirection: 'row' }}>
+  <div style={{ width: '100%' }}>
+    <HubspotForm
+      portalId="20760433"
+      formId="71e74f55-cc30-41de-9d41-e3d9dc159c71"
+      onSubmit={() => console.log('Submitted form')}
+      onReady={(form) => console.log('Form ready for submit')}
+      region="na1"
+      loading={<div>Loading...</div>}
+    />
+  </div>
+</div>
+
+  </TabItem>
+</Tabs>
+
+<Tabs groupId="lang" queryString>
+
+    <TabItem value="rust" label="Rust">
+
+We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface.
+
+Now we need to add `wit-bindgen` to our `Cargo.toml` so we can generate Rust bindings from the WIT world:
+
+```toml
+[dependencies]
+wstd = "0.6.3"
+wit-bindgen = "0.46.0" # [!code ++]
+```
+
+Now let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+```rust
+use wstd::http::{Body, Request, Response, StatusCode};
+
+// Generate keyvalue bindings from our WIT world // [!code ++]
+// wstd handles the http export via its macro // [!code ++]
+wit_bindgen::generate!({ // [!code ++]
+    world: "rust-http-hello-world", // [!code ++]
+    path: "wit", // [!code ++]
+    generate_all, // [!code ++]
+}); // [!code ++]
+
+use wasi::keyvalue::{atomics, store}; // [!code ++]
+
+#[wstd::http_server]
+async fn main(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    match req.uri().path_and_query().unwrap().as_str() {
+        "/" => home(req).await,
+        _ => not_found(req).await,
+    }
+}
+
+async fn home(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    // Parse query string for name parameter
+    let query = req.uri().query().unwrap_or("");
+    let name = match query.split("=").collect::<Vec<&str>>()[..] {
+            ["name", name] => name,
+            _ => "World",
+        };
+    // Open keyvalue bucket and increment counter for this name // [!code ++]
+    // Note: wasmtime's in-memory keyvalue provider requires empty string as identifier // [!code ++]
+    let bucket = store::open("") // [!code ++]
+        .map_err(|e| wstd::http::Error::msg(format!("keyvalue open error: {:?}", e)))?; // [!code ++]
+
+    let count = atomics::increment(&bucket, &name, 1) // [!code ++]
+        .map_err(|e| wstd::http::Error::msg(format!("keyvalue increment error: {:?}", e)))?; // [!code ++]
+
+    // Return greeting with count // [!code ++]
+    Ok(Response::new(format!("Hello x{count}, {name}!\n").into())) // [!code ++]
+    // Return a simple response with a string body // [!code --]
+    Ok(Response::new(format!("Hello, {name}!\n").into())) // [!code --]
+}
+
+async fn not_found(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    Ok(Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body("Not found\n".into())
+        .unwrap())
+}
+```
+
+We've made changes, so once we save, the toolchain will once again automatically update the running application.
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+
+We've given our application the ability to perform atomic incrementation and storage operations via the `wasi:keyvalue` interface.
+
+Now let's use the atomic increment function to keep track of how many times we've greeted each person.
+
+:::info[Missing Imports]
+
+[JCO](https://github.com/bytecodealliance/jco) does not yet generate types for `wasi:keyvalue`. For now, you can tell the TypeScript compiler to ignore the missing types by adding `//@ts-expect-error` before each import statement. Simply including the import statement will allow the host to provide the functionality at runtime.
+
+:::
+
+```typescript
+import { Hono } from 'hono';
+import { fire } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
+
+//@ts-expect-error -- these types aren't currently generated by JCO // [!code ++:4]
+import { increment } from 'wasi:keyvalue/atomics@0.2.0-draft';
+//@ts-expect-error -- these types aren't currently generated by JCO
+import { open } from 'wasi:keyvalue/store@0.2.0-draft';
+
+const app = new Hono();
+
+app.get('/', (c) => {
+  const name = c.req.query('name') || 'World';
+  return c.text(`Hello, ${name}!\n`); // [!code --]
+
+  // Open keyvalue bucket and increment counter for this name // [!code ++:4]
+  const bucket = open('');
+  const count = increment(bucket, name, 1);
+  return c.text(`Hello x${count}, ${name}!\n`); // [!code ++]
+});
+
+app.notFound((c) => {
+  return c.text('Not found\n', 404);
+});
+
+fire(app);
+
+export { incomingHandler } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
+```
+
+We've made changes, so once we save, the toolchain will once again automatically update the running application.
+
+  </TabItem>
+{/*
+  <TabItem value="tinygo" label="Go">
+Use `store.Open`, `atomics.Increment`, and `wasilog` to implement the counter and logging.
+  </TabItem>
+*/}
+  <TabItem value="unlisted" label="My language isn't listed">
+
+If you prefer working in a language that isn't listed here, let us know!
+
+{' '}
+
+<div style={{ display: 'flex', flexDirection: 'row' }}>
+  <div style={{ width: '100%' }}>
+    <HubspotForm
+      portalId="20760433"
+      formId="71e74f55-cc30-41de-9d41-e3d9dc159c71"
+      onSubmit={() => console.log('Submitted form')}
+      onReady={(form) => console.log('Form ready for submit')}
+      region="na1"
+      loading={<div>Loading...</div>}
+    />
+  </div>
+</div>
+
+  </TabItem>
+</Tabs>
+
+Let's `curl` the component again:
+
+```shell
+curl 'localhost:8000?name=Bob'
+```
+
+```text
+Hello x1, Bob!
+```
+
+```shell
+curl 'localhost:8000?name=Bob'
+```
+
+```text
+Hello x2, Bob!
+```
+
+```shell
+curl 'localhost:8000?name=Alice'
+```
+
+```text
+Hello x1, Alice!
+```
+
+## Next steps
+
+In this tutorial, you added a few more features and persistent storage to a simple microservice. You also got to see the process of developing with capabilities, where you can...
+
+- Write purely functional code that doesn't require you to pick a library or vendor upfront
+- Change your application _separately_ from its non-functional requirements
+
+So far, `wash` has satisfied our application's capability requirements automatically, so we can move quickly and focus on code. In the [next tutorial](./deploy-a-webassembly-workload.mdx), we'll deploy WebAssembly workloads to wasmCloud on a local Kubernetes cluster.

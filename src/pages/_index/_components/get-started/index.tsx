@@ -51,7 +51,7 @@ function GetStarted({
             <img src="/pages/home/icon/run.svg" alt="" />
             <h4>Deploy on wasmCloud</h4>
             <p>Deploy your application with the wasmCloud orchestrator</p>
-            <a href="/docs/ecosystem/wadm/" className="button">
+            <a href="/docs/v1/ecosystem/wadm/" className="button">
               Read Documentation
             </a>
           </GridItem>

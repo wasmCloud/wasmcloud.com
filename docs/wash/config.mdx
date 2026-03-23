@@ -1,0 +1,185 @@
+---
+title: "Configuration"
+sidebar_position: 4
+---
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Wasm Shell Configuration
+
+This document describes the configuration options available for the `wash` CLI. Configuration can be specified in YAML, JSON, or TOML format (`.json`, `.yaml`, `.yml`, or `.toml`).
+
+Wasm Shell uses two configuration files: 
+
+* [**User configuration**](#user-configuration) that is local to the machine 
+* [**Project configuration**](#project-configuration) in the `.wash` directory at the root of each project
+
+## Configuration hierarchy
+
+Configuration is merged with the following precedence (highest to lowest):
+
+1. CLI arguments
+2. Environment variables (`WASH_ prefix`)
+3. Project config (`.wash/config.yaml`)
+4. User config (`$HOME/.config/wash/config.yaml`)
+5. Default values
+
+## User configuration
+
+By default, user configuration files are found at `$HOME/.config/wash/config.yaml`. 
+
+:::warning[Under construction]
+This section is under active development&mdash;please check back soon for a more complete reference.
+:::
+
+## Project configuration
+
+Projects can be configured via a project config file that resides in the `.wash` directory at the project root, and which may be expressed in JSON, YAML, or TOML format.
+
+Top-level project configuration options include:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `version` | string | Configuration schema version |
+| `build` | object | Build configuration options |
+| `dev` | object | Development server configuration options |
+| `wit` | object | WIT dependency management configuration |
+
+### `version` configuration
+
+Specify the `wash` version for this project.
+
+Example:
+
+```yaml
+version: 2.0.0
+```
+
+### `build` configuration
+
+Wasm Shell builds WebAssembly component binaries by wrapping language-specific utilities like `cargo`, `go`, `npm`, etc, and project configuration files are used to define configuration for builds.
+
+Wasm Shell executes the build command for your language toolchain specified in your project configuration file. 
+
+#### `build` options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `command` | string | - | Build command to execute |
+| `env` | map | `{}` | Environment variables to set during the build process |
+| `component_path` | string | - | Path to the output Wasm component file |
+
+#### `build` examples
+
+<Tabs groupId="lang" queryString>
+  <TabItem value="rust" label="Rust" default>
+```yaml
+build:
+  command: cargo build --target wasm32-wasip2 --release
+  component_path: target/wasm32-wasip2/release/project_name.wasm
+```
+  </TabItem>
+  <TabItem value="tinygo" label="TinyGo">
+```yaml
+build:
+  command: go generate ./... && tinygo build -target wasip2 -wit-package ./wit -wit-world example -o build/output.wasm ./
+  component_path: build/output.wasm
+```
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+```yaml
+build:
+  command: npm run install-and-build
+  component_path: dist/output.wasm
+```
+
+This build command will execute the `install-and-build` script defined in your TypeScript project's `package.json` file. Make sure the value for `component_path` matches the path defined in your build script. 
+  </TabItem>
+</Tabs>
+
+### `dev` configuration
+
+`wash dev` builds a component according to the specified build options (unless otherwise specified in the `dev` options) and then starts a local development server. There are a variety of options available for local development.
+
+#### `dev` options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `command` | string | - | Custom command to run for building during development |
+| `address` | string | - | Address for the development server to listen on |
+| `service` | boolean | `false` | Whether to run as a long-running service with port binding |
+| `service_file` | string | - | Path to a service definition file |
+| `components` | array | `[]` | Additional components to load during development |
+| `volumes` | array | `[]` | Volumes to mount from host to guest |
+| `host_interfaces` | array | `[]` | WIT interfaces to expose from the host |
+| `tls_cert_path` | string | - | Path to TLS certificate file for HTTPS |
+| `tls_key_path` | string | - | Path to TLS private key file for HTTPS |
+| `tls_ca_path` | string | - | Path to TLS CA certificate file |
+| `wasi_webgpu` | boolean | `false` | Enable WASI WebGPU support |
+| `wasi_keyvalue_path` | string | - | Path for WASI key-value store data |
+| `wasi_blobstore_path` | string | - | Path for WASI blob store data |
+
+##### `dev.components[]`
+
+Additional components to load alongside your main component.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Name identifier for the component |
+| `file` | string | Path to the component Wasm file |
+
+##### `dev.volumes[]`
+
+Volume mounts for filesystem access from within the Wasm component.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `host_path` | string | Path on the host filesystem |
+| `guest_path` | string | Path as seen from within the Wasm component |
+
+#### `dev` example
+
+```yaml
+dev:
+  command: cargo build --target wasm32-wasip2 --debug
+  address: 127.0.0.1:8080
+  service: true
+  wasi_webgpu: true
+  tls_cert_path: "./certs/cert.pem"
+  tls_key_path: "./certs/key.pem"
+```
+
+### `wit` configuration
+
+Configuration for WIT (WebAssembly Interface Type) dependency management.
+
+#### `wit` options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `registries` | array | wasm.pkg registry | Registries for WIT package fetching |
+| `skip_fetch` | boolean | `false` | Skip fetching WIT dependencies |
+| `wit_dir` | string | `./wit` | Directory where WIT files are stored |
+| `sources` | map | `{}` | Source overrides for WIT dependencies (target → source mapping) |
+
+#### `wit.registries[]`
+
+Registry configuration for fetching WIT packages.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `url` | string | Registry URL endpoint |
+| `token` | string | Optional authentication token |
+
+#### `wit` example
+
+```yaml
+wit:
+  wit_dir: "./wit"
+  skip_fetch: false
+  registries:
+    - url: "https://private-registry.example.com"
+      token: "${REGISTRY_TOKEN}"
+  sources:
+    "wasi:http": "https://github.com/WebAssembly/wasi-http/archive/refs/tags/v0.2.0.tar.gz"
+```
