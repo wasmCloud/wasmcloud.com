@@ -108,12 +108,11 @@ const config = (async (): Promise<Config> => {
             lastVersion: 'current',
             versions: {
               current: {
-                label: '1.x',
+                label: 'v2',
               },
-              next: {
-                label: 'v2.0.0-rc',
-                path: 'v2.0.0-rc',
-                banner: 'none'
+              v1: {
+                label: 'v1',
+                path: 'v1',
               },
               0.82: {
                 label: '0.82',
