@@ -105,8 +105,21 @@ const sidebars = {
       id: 'wash/developer-guide/index',
       label: 'Introduction',
     },
-    'wash/developer-guide/build-and-publish',
-    'wash/developer-guide/create-services',
+    {
+      type: 'category',
+      label: 'Developing Workloads',
+      items: [
+        {
+          type: 'doc',
+          id: 'wash/developer-guide/build-and-publish',
+          label: 'Building and Publishing Components',
+        },
+        'wash/developer-guide/create-services',
+        'wash/developer-guide/network-access-and-socket-isolation',
+        'wash/developer-guide/debugging-components',
+        'wash/developer-guide/useful-webassembly-tools',
+      ],
+    },
     {
       type: 'category',
       label: 'Language Support',
@@ -126,9 +139,6 @@ const sidebars = {
       ],
     },
     'examples',
-    'wash/developer-guide/network-access-and-socket-isolation',
-    'wash/developer-guide/debugging-components',
-    'wash/developer-guide/useful-webassembly-tools',
 
     {
       type: 'html',
