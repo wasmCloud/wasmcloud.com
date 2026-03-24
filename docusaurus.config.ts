@@ -102,6 +102,7 @@ const config = (async (): Promise<Config> => {
             onUntruncatedBlogPosts: 'ignore',
           },
           docs: {
+            sidebarPath: require.resolve('./sidebars.js'),
             editUrl: 'https://github.com/wasmCloud/wasmcloud.com/edit/main/',
             beforeDefaultRehypePlugins: [rehypeShikiPlugin],
             rehypePlugins: [rehypeNameToId],
