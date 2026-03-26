@@ -92,6 +92,7 @@ const sidebars = {
             'kubernetes-operator/operator-manual/lightweight-deployments',
           ],
         },
+        'kubernetes-operator/workload-security',
         'kubernetes-operator/crds',
         'kubernetes-operator/api-reference',
       ],
