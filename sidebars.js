@@ -85,6 +85,7 @@ const sidebars = {
             'kubernetes-operator/operator-manual/overview',
             'kubernetes-operator/operator-manual/cicd',
             'kubernetes-operator/operator-manual/roles-and-rolebindings',
+            'kubernetes-operator/operator-manual/secrets-and-configuration',
             'kubernetes-operator/operator-manual/private-registries',
             'kubernetes-operator/operator-manual/filesystems-and-volumes',
             'kubernetes-operator/operator-manual/lightweight-deployments',
