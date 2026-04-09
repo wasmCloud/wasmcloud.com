@@ -16,7 +16,16 @@ function Cncf({}: Props) {
             wasmCloud is a <Link href="https://www.cncf.io/">Cloud Native Computing Foundation</Link> Incubating project
           </p>
         </SectionHeading>
-        <img src="/pages/home/cncf/cncf-white.svg" alt="Cloud Native Computing Foundation" />
+        <img
+          src="/pages/home/cncf/cncf-white.svg"
+          alt="Cloud Native Computing Foundation"
+          className={styles.logoDark}
+        />
+        <img
+          src="/pages/home/cncf/cncf-color.svg"
+          alt="Cloud Native Computing Foundation"
+          className={styles.logoLight}
+        />
       </SectionContent>
     </Section>
   );
