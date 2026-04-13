@@ -1,0 +1,331 @@
+---
+title: "Configuration"
+sidebar_position: 3
+---
+
+You can read runtime configuration values in a TypeScript component with the [`wasi:cli/environment`](https://github.com/WebAssembly/wasi-cli) interface. Configuration values can be supplied from inline key-value pairs, Kubernetes ConfigMaps, and Kubernetes Secrets. All arrive through the same interface regardless of source.
+
+This guide walks through adding `wasi:cli/environment` to the wasmCloud [`http-service-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-service-hono) template and shows how to provide values via a Kubernetes workload manifest.
+
+## Overview
+
+`wasi:cli/environment` is part of the standard WASI P2 suite and is always available in a wasmCloud host. It exposes a `getEnvironment` function that returns all configuration key-value pairs available to the component. In production, values come from `localResources.environment` in a `Workload` or `WorkloadDeployment` manifest, which accepts inline key-value pairs, Kubernetes ConfigMaps, and Kubernetes Secrets.
+
+:::tip[Guidance for operators]
+The [Secrets and Configuration Management](../../../../kubernetes-operator/operator-manual/secrets-and-configuration.mdx) page in the Operator Manual describes how the Kubernetes operator injects values via `wasi:cli/environment`. This guide covers the component author's side: how to declare and read those values in TypeScript.
+:::
+
+Our changes focus on two files:
+
+* `wit/world.wit` — Declare the `wasi:cli/environment` import
+* `src/component.ts` (or your main handler file) — Read configuration values in application code
+
+No changes are needed to `rolldown.config.mjs`: the default `external: /wasi:.*/` pattern already covers `wasi:cli` imports.
+
+## Step 1: Declare the WIT import in `wit/world.wit`
+
+Every capability your component uses must be declared in its WIT world. Open `wit/world.wit` and add an `import` line for the cli environment interface.
+
+```wit {4}
+package wasmcloud:templates@0.1.0;
+
+world typescript-http-service-hono {
+  import wasi:cli/environment@0.2.0;
+
+  export wasi:http/incoming-handler@0.2.6;
+}
+```
+
+### What this interface provides
+
+**`wasi:cli/environment`** exposes one function for reading configuration:
+
+- **`getEnvironment()`** — Returns all configuration key-value pairs as an array of `[string, string]` tuples.
+
+After adding the import and running `npm run build`, JCO generates a typed definition for the interface in `generated/types/interfaces/wasi-cli-environment.d.ts`:
+
+```typescript
+declare module 'wasi:cli/environment@0.2.0' {
+  export function getEnvironment(): Array<[string, string]>;
+  export function getArguments(): Array<string>;
+  export function initialCwd(): string | undefined;
+}
+```
+
+### How dependency resolution works
+
+When you run `npm run build`, the build pipeline calls `wkg wit fetch` as a setup step. This resolves the WIT package reference and downloads the definition into `wit/deps/` automatically. You don't need to manually download any WIT files.
+
+## Step 2: Import and use the interface in TypeScript
+
+With the WIT world updated, you can import `getEnvironment` in your TypeScript code. Because JCO generates types for `wasi:cli/environment`, no `@ts-expect-error` directive is needed.
+
+### Importing WIT interfaces
+
+Add this import at the top of your handler file:
+
+```typescript
+import { getEnvironment } from 'wasi:cli/environment@0.2.0';
+```
+
+### Reading configuration values
+
+`getEnvironment()` returns all key-value pairs as an array. Convert it to a plain object with `Object.fromEntries` for convenient key-based access:
+
+```typescript
+import { getEnvironment } from 'wasi:cli/environment@0.2.0';
+
+app.get('/', (c) => {
+  const config = Object.fromEntries(getEnvironment());
+
+  const appName = config['APP_NAME'] ?? 'My App';
+  const upstreamUrl = config['UPSTREAM_URL'];
+
+  if (!upstreamUrl) {
+    return c.text('UPSTREAM_URL is not configured', 500);
+  }
+
+  return c.json({ app: appName, upstream: upstreamUrl });
+});
+```
+
+Call `getEnvironment()` inside your route handlers rather than at module scope. Configuration is stable for the lifetime of each invocation, but calling it at module scope may execute before the host has provided the values.
+
+### Hono env pattern
+
+When using Hono, you can load all configuration once in the fetch event listener and pass it as the `env` argument to `app.fetch`. This gives every route and middleware access to config through `c.env`, and keeps configuration loading in one place:
+
+```typescript title="src/component.ts"
+/// <reference lib="WebWorker" />
+declare const self: ServiceWorkerGlobalScope;
+
+import { Hono } from 'hono';
+import { getEnvironment } from 'wasi:cli/environment@0.2.0';
+
+type AppConfig = {
+  APP_NAME?: string;
+  UPSTREAM_URL?: string;
+};
+
+const app = new Hono<{ Bindings: AppConfig }>();
+
+app.get('/', (c) => {
+  const appName = c.env.APP_NAME ?? 'My App';
+  const upstreamUrl = c.env.UPSTREAM_URL;
+
+  if (!upstreamUrl) {
+    return c.text('UPSTREAM_URL is not configured', 500);
+  }
+
+  return c.json({ app: appName, upstream: upstreamUrl });
+});
+
+self.addEventListener('fetch', (event) => {
+  const config = Object.fromEntries(getEnvironment()) as AppConfig;
+  event.respondWith(app.fetch(event.request, config));
+});
+```
+
+:::note[Compatibility with jco-std fire()]
+The Hono env pattern uses `self.addEventListener('fetch', ...)` directly rather than the `fire()` helper from `@bytecodealliance/jco-std`. If you're using `fire()`, read config with `getEnvironment()` inside each route handler instead.
+:::
+
+### Synchronous API
+
+`getEnvironment()` is **synchronous**. It doesn't return a Promise and requires no `await`. This is consistent with the WebAssembly component model's blocking call convention.
+
+## Step 3: Provide configuration values
+
+### In production (Kubernetes manifests)
+
+All configuration values are delivered to the component through the `localResources.environment` field in a `Workload` or `WorkloadDeployment` manifest. Three sources are supported and can be combined.
+
+#### Inline values
+
+The simplest approach — provide key-value pairs directly in the manifest:
+
+```yaml
+components:
+  - name: http-component
+    image: ghcr.io/your-org/your-component:latest
+    localResources:
+      environment:
+        config:
+          APP_NAME: My Service
+          UPSTREAM_URL: https://api.example.com
+```
+
+Inline values are suitable for non-sensitive configuration that is safe to store in version control.
+
+#### From a Kubernetes ConfigMap
+
+Reference a ConfigMap by name. Each key in the ConfigMap becomes a configuration value in the component:
+
+```yaml
+components:
+  - name: http-component
+    image: ghcr.io/your-org/your-component:latest
+    localResources:
+      environment:
+        configFrom:
+          - name: app-config
+```
+
+Create the ConfigMap separately:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: default
+data:
+  APP_NAME: My Service
+  UPSTREAM_URL: https://api.example.com
+```
+
+#### From a Kubernetes Secret
+
+Reference a Secret by name for sensitive values such as API keys or credentials:
+
+```yaml
+components:
+  - name: http-component
+    image: ghcr.io/your-org/your-component:latest
+    localResources:
+      environment:
+        secretFrom:
+          - name: app-secrets
+```
+
+Secret values are delivered to the component as plain strings. No decoding is required in your component code.
+
+#### Combining sources
+
+All three sources can be used together. When the same key appears in multiple sources, the order of precedence (lowest to highest) is: `config` → `configFrom` → `secretFrom`.
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      components:
+        - name: http-component
+          image: ghcr.io/your-org/your-component:latest
+          localResources:
+            environment:
+              config:
+                APP_NAME: My Service           # inline (lowest precedence)
+              configFrom:
+                - name: app-config             # non-sensitive config from ConfigMap
+              secretFrom:
+                - name: app-secrets            # sensitive values from Secret (highest precedence)
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            address: '0.0.0.0:8080'
+```
+
+:::tip
+For a complete reference to `localResources.environment` fields, including precedence rules and RBAC considerations, see [Secrets and Configuration Management](../../../../kubernetes-operator/operator-manual/secrets-and-configuration.mdx).
+:::
+
+### During development (`wash dev`)
+
+`wash dev` provides the `wasi:cli/environment` interface, but `localResources.environment` defaults to empty — there is currently no mechanism in `.wash/config.yaml` or the `wash dev` CLI to inject test configuration values into a component locally.
+
+The practical approach for development is to supply fallback defaults in your component code:
+
+```typescript
+const config = Object.fromEntries(getEnvironment());
+
+// Use ?? to supply development defaults when values aren't set
+const appName = config['APP_NAME'] ?? 'My App (dev)';
+const upstreamUrl = config['UPSTREAM_URL'] ?? 'http://localhost:9090';
+```
+
+This lets your component run correctly in development while reading real values in production. Test configuration-dependent behavior by deploying to a Kubernetes environment with the full manifest.
+
+## Build and verify
+
+### Build
+
+```bash
+npm run build
+```
+
+This runs the full pipeline:
+1. `wash wit fetch` — downloads `wasi:cli/environment` WIT definitions into `wit/deps/`
+2. `jco guest-types` — generates TypeScript type definitions in `generated/types/`
+3. `rolldown` — bundles TypeScript into `dist/component.js` (leaving `wasi:` imports external)
+4. `jco componentize` — compiles `dist/component.js` into a `.wasm` component
+
+### Verify the WIT import
+
+Use `wash inspect` to confirm that your component correctly declares a `wasi:cli/environment` import:
+
+```bash
+wash inspect dist/http_service_hono.wasm
+```
+
+You should see a line like:
+
+```
+  import wasi:cli/environment@0.2.x;
+```
+
+The exact patch version may differ from what you declared in `wit/world.wit` — this is normal. The JavaScript engine embedded by ComponentizeJS has its own WASI version requirements, and `jco componentize` resolves them automatically.
+
+### Run
+
+```bash
+npm run dev
+```
+
+The component loads and serves requests. In development, `getEnvironment()` returns an empty list — your component will use whatever fallback defaults you've provided. Deploy to Kubernetes to test configuration behavior end-to-end.
+
+## Summary: checklist for adding configuration
+
+1. **Add `import wasi:cli/environment@0.2.0` to `wit/world.wit`**.
+2. **Run `npm run build` once** so `wash wit fetch` downloads the WIT definition and `jco guest-types` generates the TypeScript type stubs in `generated/types/`.
+3. **Import `getEnvironment` in TypeScript** — no `@ts-expect-error` directive is needed because JCO generates types for this interface.
+4. **Call `getEnvironment()` inside route handlers**, not at module scope.
+5. **Convert with `Object.fromEntries(getEnvironment())`** for plain-object key-based access.
+6. **Provide fallback defaults with `??`** for every value your component reads — this keeps the component functional during `wash dev` when no configuration is injected.
+7. **No rolldown changes needed** — `wasi:cli` is already covered by the default `external: /wasi:.*/` pattern.
+8. **In production**, provide values via `localResources.environment` in your Kubernetes manifest, using `config:`, `configFrom:`, or `secretFrom:` as appropriate.
+
+---
+
+## API reference: `wasi:cli/environment` functions
+
+| Function | Signature | Description |
+|---|---|---|
+| `getEnvironment()` | `() => Array<[string, string]>` | Returns all configuration key-value pairs. Returns an empty array if no configuration has been provided to the component. |
+| `getArguments()` | `() => Array<string>` | Returns POSIX-style command-line arguments. Not used for configuration. |
+| `initialCwd()` | `() => string \| undefined` | Returns the initial working directory. Not used for configuration. |
+
+**Converting `getEnvironment()` output:**
+
+| Expression | Result type | Use when |
+|---|---|---|
+| `getEnvironment()` | `Array<[string, string]>` | Iterating over entries |
+| `Object.fromEntries(getEnvironment())` | `Record<string, string>` | Key-based access in route handlers |
+| `new Map(getEnvironment())` | `Map<string, string>` | When you need Map-specific methods |
+
+## Further reading
+
+- [Secrets and Configuration Management](../../../../kubernetes-operator/operator-manual/secrets-and-configuration.mdx) — operator reference for `localResources.environment`, ConfigMaps, and Secrets
+- [TypeScript Language Guide](../index.mdx) — toolchain overview, HTTP patterns, framework integration, and library compatibility
+- [Key-Value Storage](./key-value-storage.mdx) — persistent key-value storage for component state
+- [Language Support overview](../../index.mdx) — summary of all supported languages and toolchains
