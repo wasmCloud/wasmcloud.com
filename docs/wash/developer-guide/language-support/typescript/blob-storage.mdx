@@ -71,13 +71,11 @@ With the WIT world updated, you can now import functions from the new interfaces
 Add these imports at the top of `src/routes/items.ts`:
 
 ```typescript
-// @ts-expect-error - JCO doesn't generate types for wasi:blobstore yet
 import { getContainer, createContainer, containerExists } from 'wasi:blobstore/blobstore@0.2.0-draft';
-// @ts-expect-error - JCO doesn't generate types for wasi:blobstore yet
 import { OutgoingValue, IncomingValue } from 'wasi:blobstore/types@0.2.0-draft';
 ```
 
-**Why `@ts-expect-error`?** The `jco types` command generates `.d.ts` files for your WIT interfaces into `generated/types/`, but TypeScript can't resolve bare `wasi:` specifier imports against those files. The `@ts-expect-error` directive suppresses the resulting type error. The imports work correctly at runtime because `rolldown` marks them as external and `jco componentize` wires them up during Wasm component creation.
+The `jco guest-types` command generates `.d.ts` files for your WIT interfaces into `generated/types/`, and `tsconfig.json` references them through its `types` field. TypeScript resolves the bare `wasi:` specifier imports against these generated ambient module declarations, so you get full type checking and IDE autocompletion. At runtime, `rolldown` leaves these imports external (via `external: /wasi:.*/`) and `jco componentize` wires them up during Wasm component creation.
 
 ### Key pattern: import path = WIT interface name
 
@@ -398,7 +396,7 @@ To verify persistence, restart the component and confirm previously created item
 
 1. **Add `import` lines to `wit/world.wit`** for the interfaces you need.
 2. **Run `npm run build` once** so `wash wit fetch` downloads the WIT definitions and `jco types` generates TypeScript types you can reference.
-3. **Import functions in TypeScript** using the exact WIT interface name as the import path, with `@ts-expect-error` to suppress the type error.
+3. **Import functions in TypeScript** using the exact WIT interface name as the import path. TypeScript resolves the import against the ambient module declarations in `generated/types/`.
 4. **Use the imported functions** in your route handlers. Remember that Wasm component model calls are synchronous.
 5. **Handle serialization** -- most WIT interfaces use `Uint8Array` for binary data; use `TextEncoder`/`TextDecoder` and `JSON.stringify`/`JSON.parse` for structured data.
 6. **No bundler changes needed** -- `rolldown.config.mjs` already externalizes all `wasi:*` imports.

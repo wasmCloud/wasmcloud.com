@@ -135,13 +135,12 @@ With the WIT world updated, you can import messaging functions in TypeScript usi
 In `http-api/src/component.ts`:
 
 ```typescript
-// @ts-expect-error — types generated after running npm run setup:wit
 import { request } from 'wasmcloud:messaging/consumer@0.2.0';
 ```
 
-**Why `@ts-expect-error`?** The import path `wasmcloud:messaging/consumer@0.2.0` is a bare module specifier that TypeScript can't resolve against the project's type definitions at compile time, so it reports a type error. The directive suppresses that. The import itself works correctly at runtime: `rolldown` marks it as external, and `jco componentize` wires it to the real interface when building the Wasm component.
+The `jco guest-types` command (run by `npm run setup:wit`) generates `.d.ts` files in `generated/types/` that declare `wasmcloud:messaging/consumer@0.2.0` as an ambient module. Because `tsconfig.json` references those files via its `types` field, TypeScript resolves the bare specifier import with full type checking and IDE autocompletion. At runtime, `rolldown` marks the import as external and `jco componentize` wires it to the real interface when building the Wasm component.
 
-Once you've run `npm run setup:wit`, the generated signatures are available in `generated/types/interfaces/wasmcloud-messaging-consumer.d.ts` for reference:
+The generated signatures are available in `generated/types/interfaces/wasmcloud-messaging-consumer.d.ts` for reference:
 
 ```typescript
 declare module 'wasmcloud:messaging/consumer@0.2.0' {
@@ -229,17 +228,11 @@ export const handler = {
 
 The incoming message's `replyTo` field holds the subject the original caller is listening on. Publish your response there using `publish()`.
 
-`BrokerMessage` is declared locally as an interface because the generated types use a module augmentation syntax that TypeScript can't resolve at the import site — the same situation as the `@ts-expect-error` on the consumer import. The local interface gives you type safety without fighting the toolchain. In `task-worker/src/component.ts`:
+`BrokerMessage` is exported by the `wasmcloud:messaging/types@0.2.0` interface — import the type directly rather than redeclaring it. In `task-worker/src/component.ts`:
 
 ```typescript
-// @ts-expect-error — types generated after running npm run setup:wit
 import { publish } from 'wasmcloud:messaging/consumer@0.2.0';
-
-interface BrokerMessage {
-  subject: string;
-  body: Uint8Array;
-  replyTo?: string;
-}
+import type { BrokerMessage } from 'wasmcloud:messaging/types@0.2.0';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -424,7 +417,7 @@ For Kubernetes deployment, see the [runtime-operator documentation](https://gith
 1. **Add `import wasmcloud:messaging/consumer@0.2.0` to `wit/world.wit`**.
 2. **Add `wasmcloud:` to rolldown externals**: `external: [/wasi:.*/, /wasmcloud:.*/]`.
 3. **Run `npm run setup:wit` once** to download WIT definitions and generate type stubs (`jco guest-types`).
-4. **Import with `@ts-expect-error`**: `import { request, publish } from 'wasmcloud:messaging/consumer@0.2.0'`.
+4. **Import** `import { request, publish } from 'wasmcloud:messaging/consumer@0.2.0'` — TypeScript resolves the bare specifier against the ambient module declarations in `generated/types/`.
 5. **Use `request(subject, body, timeoutMs)`** for request-reply; wrap in try/catch since it throws on error or timeout.
 6. **Use `publish(msg)`** for fire-and-forget delivery with no reply expected.
 
