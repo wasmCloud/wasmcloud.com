@@ -64,11 +64,10 @@ With the WIT world updated, you can now import functions from the new interfaces
 Add these imports at the top of `src/component.ts`:
 
 ```typescript
-// @ts-expect-error - JCO doesn't generate types for wasi:filesystem yet
 import { getDirectories } from 'wasi:filesystem/preopens@0.2.2';
 ```
 
-**Why `@ts-expect-error`?** The `jco guest-types` command generates `.d.ts` files for your WIT interfaces into `generated/types/`, but TypeScript can't resolve bare `wasi:` specifier imports against those files. The `@ts-expect-error` directive suppresses the resulting type error. The imports work correctly at runtime because `rolldown` marks them as external and `jco componentize` wires them up during Wasm component creation.
+The `jco guest-types` command generates `.d.ts` files for your WIT interfaces into `generated/types/`, and `tsconfig.json` references them through its `types` field. TypeScript resolves the bare `wasi:` specifier imports against these generated ambient module declarations, so you get full type checking and IDE autocompletion. At runtime, `rolldown` leaves these imports external (via `external: /wasi:.*/`) and `jco componentize` wires them up during Wasm component creation.
 
 ### Key concepts
 
@@ -124,8 +123,6 @@ Here's a complete component that serves files from a preopened `/data` directory
 ```typescript title="src/component.ts"
 import { Hono } from 'hono';
 import { fire } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
-
-// @ts-expect-error - JCO doesn't generate types for wasi:filesystem yet
 import { getDirectories } from 'wasi:filesystem/preopens@0.2.2';
 
 const app = new Hono();
@@ -330,7 +327,7 @@ Important notes:
 
 1. **Add `import` lines to `wit/world.wit`** for `wasi:filesystem/types` and `wasi:filesystem/preopens`.
 2. **Run `npm run build` once** so `wash wit fetch` downloads the WIT definitions and `jco guest-types` generates TypeScript types you can reference.
-3. **Import `getDirectories`** from `wasi:filesystem/preopens` with `@ts-expect-error`.
+3. **Import `getDirectories`** from `wasi:filesystem/preopens`. TypeScript resolves the import against the generated ambient module declarations in `generated/types/`.
 4. **Use `getDirectories()`** to find preopened directories by path, then use `Descriptor` methods to read, write, and list files.
 5. **Configure volumes** in `.wash/config.yaml` for local development or in a WorkloadDeployment manifest for production.
 6. **No bundler changes needed** — `rolldown.config.mjs` already externalizes all `wasi:*` imports.
