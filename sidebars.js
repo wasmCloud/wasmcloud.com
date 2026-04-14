@@ -135,6 +135,7 @@ const sidebars = {
             'wash/developer-guide/language-support/typescript/key-value-storage',
             'wash/developer-guide/language-support/typescript/blob-storage',
             'wash/developer-guide/language-support/typescript/messaging',
+            'wash/developer-guide/language-support/typescript/filesystem',
           ],
         },
         'wash/developer-guide/language-support/go/index',
