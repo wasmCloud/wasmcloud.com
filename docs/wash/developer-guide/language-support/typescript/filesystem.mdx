@@ -1,0 +1,362 @@
+---
+title: "Filesystem"
+sidebar_position: 3
+---
+
+You can add filesystem capabilities to a component with the [`wasi:filesystem`](https://github.com/WebAssembly/WASI/tree/main/proposals/filesystem) interface.
+
+This guide walks through adding filesystem access to a wasmCloud TypeScript component, starting from the [`http-hello-world-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-hello-world-hono) template. You can use this guide as a model for implementing `wasi:filesystem` in your own components.
+
+## Overview
+
+WebAssembly components run in a sandboxed environment with no default access to the host filesystem. The `wasi:filesystem` interface provides secure, capability-based filesystem access through **preopens**: directories that are explicitly mounted into a component before instantiation.
+
+This is different from key-value and blob storage: instead of storing data in an abstract store, your component reads and writes files in mounted directories, just as a traditional application would. This makes `wasi:filesystem` particularly useful for:
+
+- Serving static assets (HTML, CSS, images)
+- Reading data files
+- Writing logs or output files
+- Any workload that needs to interact with files on disk
+
+:::info[Security model]
+Components have **no filesystem access by default**. Directories must be explicitly mounted via volume configuration in `wash dev` or via `volumeMounts` in a WorkloadDeployment manifest. A component can only access the directories that have been preopened for it&mdash;it cannot traverse outside those mount points. For details on deploying with volumes, see [Filesystems and Volumes](../../../../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx).
+:::
+
+Our changes will focus on two files:
+
+* `wit/world.wit` — Declare the new WIT imports
+* `src/component.ts` — Use the imported interfaces in application code
+
+No changes are needed to `rolldown.config.mjs`, `tsconfig.json`, `package.json`, or any other file.
+
+## Step 1: Declare the WIT imports in `wit/world.wit`
+
+Every capability your component uses must be declared in its WIT world. Open `wit/world.wit` and add `import` lines for the filesystem interfaces:
+
+```wit {4-5}
+package wasmcloud:templates@0.1.0;
+
+world typescript-http-hello-world-hono {
+  import wasi:filesystem/types@0.2.2;
+  import wasi:filesystem/preopens@0.2.2;
+
+  export wasi:http/incoming-handler@0.2.6;
+}
+```
+
+### What these interfaces provide
+
+- **`wasi:filesystem/preopens`** — Provides `getDirectories()`, which returns the set of preopened directories and their mount paths.
+- **`wasi:filesystem/types`** — Provides the `Descriptor` resource for file and directory operations (read, write, list, open, create, delete) and supporting types like `DirectoryEntryStream`, `DescriptorFlags`, and `OpenFlags`.
+
+### How dependency resolution works
+
+When you run `npm run build`, the build pipeline calls `wash wit fetch` as a setup step. This resolves the WIT package references (like `wasi:filesystem`) and downloads their definitions into the `wit/deps/` directory automatically. You don't need to manually download any WIT files.
+
+The bundler (`rolldown`) is already configured with `external: /wasi:.*/` in `rolldown.config.mjs`, which tells it to leave all `wasi:*` imports as external — they'll be resolved at component instantiation time, not at bundle time. This covers any new `wasi:` interface you add.
+
+## Step 2: Import and use the interface in TypeScript
+
+With the WIT world updated, you can now import functions from the new interfaces in your TypeScript code. The import paths match the WIT interface names exactly.
+
+### Importing WIT interfaces
+
+Add these imports at the top of `src/component.ts`:
+
+```typescript
+// @ts-expect-error - JCO doesn't generate types for wasi:filesystem yet
+import { getDirectories } from 'wasi:filesystem/preopens@0.2.2';
+```
+
+**Why `@ts-expect-error`?** The `jco guest-types` command generates `.d.ts` files for your WIT interfaces into `generated/types/`, but TypeScript can't resolve bare `wasi:` specifier imports against those files. The `@ts-expect-error` directive suppresses the resulting type error. The imports work correctly at runtime because `rolldown` marks them as external and `jco componentize` wires them up during Wasm component creation.
+
+### Key concepts
+
+#### Preopens
+
+The `getDirectories()` function returns an array of `[Descriptor, string]` tuples — each tuple pairs a directory descriptor with its mount path (e.g., `"/data"`). This is how your component discovers which directories are available:
+
+```typescript
+function getPreopenDir(path: string) {
+  const dirs = getDirectories();
+  for (const [descriptor, dirPath] of dirs) {
+    if (dirPath === path) {
+      return descriptor;
+    }
+  }
+  return null;
+}
+```
+
+#### Descriptors
+
+A `Descriptor` is a handle to an open file or directory. Directory descriptors (from preopens) can:
+
+- **List entries** with `readDirectory()`, which returns a `DirectoryEntryStream`
+- **Open files** with `openAt()`, which returns a new `Descriptor` for the file
+- **Create directories** with `createDirectoryAt()`
+
+File descriptors can:
+
+- **Read data** with `read(length, offset)`, which returns `[Uint8Array, boolean]` (data and end-of-file flag)
+- **Write data** with `write(buffer, offset)`, which returns the number of bytes written as a `bigint`
+
+#### Synchronous API
+
+All filesystem operations are **synchronous** in the Jco bindings. The WebAssembly component model uses blocking calls, so these don't return Promises. Your existing synchronous Hono route handlers work without modification.
+
+#### `bigint` for sizes and offsets
+
+The `wasi:filesystem` interface uses `bigint` values for file sizes and offsets (mapped from WIT's `u64` type). Use `BigInt()` to create these values:
+
+```typescript
+// Read up to 1MB starting at offset 0
+const [data, eof] = file.read(BigInt(1024 * 1024), BigInt(0));
+
+// Write at offset 0
+const bytesWritten = file.write(encoded, BigInt(0));
+```
+
+## Step 3: Build an HTTP file server
+
+Here's a complete component that serves files from a preopened `/data` directory, with endpoints to list files, read a file, and write a file:
+
+```typescript title="src/component.ts"
+import { Hono } from 'hono';
+import { fire } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
+
+// @ts-expect-error - JCO doesn't generate types for wasi:filesystem yet
+import { getDirectories } from 'wasi:filesystem/preopens@0.2.2';
+
+const app = new Hono();
+
+// Helper: find a preopened directory by its guest path
+function getPreopenDir(path: string) {
+  const dirs = getDirectories();
+  for (const [descriptor, dirPath] of dirs) {
+    if (dirPath === path) {
+      return descriptor;
+    }
+  }
+  return null;
+}
+
+// List files in the preopened /data directory
+app.get('/', (c) => {
+  const dir = getPreopenDir('/data');
+  if (!dir) {
+    return c.text('No /data directory available\n', 500);
+  }
+
+  const entries = [];
+  const stream = dir.readDirectory();
+  let entry = stream.readDirectoryEntry();
+  while (entry !== undefined) {
+    entries.push({ name: entry.name, type: entry.type });
+    entry = stream.readDirectoryEntry();
+  }
+
+  return c.json({ path: '/data', entries });
+});
+
+// Read a file from the /data directory
+app.get('/read/:filename', (c) => {
+  const dir = getPreopenDir('/data');
+  if (!dir) {
+    return c.text('No /data directory available\n', 500);
+  }
+
+  const filename = c.req.param('filename');
+
+  const file = dir.openAt(
+    { symlinkFollow: true },
+    filename,
+    {},
+    { read: true }
+  );
+
+  const [data, _eof] = file.read(BigInt(1024 * 1024), BigInt(0));
+  const text = new TextDecoder().decode(data);
+
+  return c.text(text);
+});
+
+// Write a file to the /data directory
+app.post('/write/:filename', async (c) => {
+  const dir = getPreopenDir('/data');
+  if (!dir) {
+    return c.text('No /data directory available\n', 500);
+  }
+
+  const filename = c.req.param('filename');
+  const body = await c.req.text();
+  const encoded = new TextEncoder().encode(body);
+
+  const file = dir.openAt(
+    { symlinkFollow: true },
+    filename,
+    { create: true, truncate: true },
+    { write: true }
+  );
+
+  const bytesWritten = file.write(encoded, BigInt(0));
+
+  return c.json({ filename, bytesWritten: Number(bytesWritten) });
+});
+
+app.notFound((c) => {
+  return c.text('Not found\n', 404);
+});
+
+fire(app);
+
+export { incomingHandler } from '@bytecodealliance/jco-std/wasi/0.2.x/http/adapters/hono/server';
+```
+
+### How `openAt` works
+
+The `openAt` method opens a file relative to a directory descriptor:
+
+```typescript
+dir.openAt(pathFlags, path, openFlags, descriptorFlags)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `pathFlags` | `{ symlinkFollow?: boolean }` | Whether to follow symlinks |
+| `path` | `string` | File path relative to the directory |
+| `openFlags` | `{ create?: boolean, truncate?: boolean, exclusive?: boolean, directory?: boolean }` | Controls file creation behavior |
+| `descriptorFlags` | `{ read?: boolean, write?: boolean, mutateDirectory?: boolean }` | Access mode for the opened file |
+
+Common patterns:
+
+```typescript
+// Open existing file for reading
+dir.openAt({ symlinkFollow: true }, 'data.txt', {}, { read: true });
+
+// Create or overwrite a file
+dir.openAt({ symlinkFollow: true }, 'output.txt', { create: true, truncate: true }, { write: true });
+
+// Create a new file (fail if it exists)
+dir.openAt({ symlinkFollow: true }, 'new.txt', { create: true, exclusive: true }, { write: true });
+```
+
+## Configure volumes for `wash dev`
+
+To mount a host directory into the component during development, add a `volumes` entry to `.wash/config.yaml`:
+
+```yaml title=".wash/config.yaml"
+build:
+  command: npm run build
+  component_path: dist/http_hello_world_hono.wasm
+
+dev:
+  volumes:
+    - host_path: ./testdata
+      guest_path: /data
+```
+
+The `host_path` specifies a directory on your local machine and `guest_path` specifies the mount path as seen by the component. The component's `getDirectories()` call will include an entry for `/data` that maps to the `testdata/` directory in your project.
+
+Create some test data:
+
+```bash
+mkdir -p testdata
+echo "Hello from the filesystem!" > testdata/hello.txt
+```
+
+## Build and verify
+
+### Build
+
+```bash
+npm run build
+```
+
+This runs the full pipeline:
+1. `wash wit fetch` — downloads `wasi:filesystem` WIT definitions into `wit/deps/`
+2. `jco guest-types` — generates TypeScript type definitions in `generated/types/`
+3. `rolldown` — bundles TypeScript into `dist/component.js` (leaving `wasi:` imports external)
+4. `jco componentize` — compiles `dist/component.js` into a `.wasm` component
+
+### Run
+
+```bash
+npm run dev
+```
+
+This starts `wash dev`, which reads the volume configuration from `.wash/config.yaml` and mounts the specified directory.
+
+### Test
+
+```bash
+# List files in the /data directory
+curl http://localhost:8000/
+
+# Read a file
+curl http://localhost:8000/read/hello.txt
+
+# Write a new file
+curl -X POST http://localhost:8000/write/greeting.txt -d "Hello, filesystem!"
+
+# Read the written file back
+curl http://localhost:8000/read/greeting.txt
+```
+
+Expected output:
+
+```
+{"path":"/data","entries":[{"name":"hello.txt","type":"regular-file"}]}
+Hello from the filesystem!
+{"filename":"greeting.txt","bytesWritten":18}
+Hello, filesystem!
+```
+
+Written files persist on the host at `testdata/greeting.txt` — you can verify with `cat testdata/greeting.txt`.
+
+## Production deployment
+
+In a production deployment, filesystem data is provided through Kubernetes Volumes. The volume is first made available to the wasmCloud host, then mounted into the component via a WorkloadDeployment manifest.
+
+For a full walkthrough of deploying with volumes, including host deployments, WorkloadDeployment manifests, and `volumeMounts` configuration, see [Filesystems and Volumes](../../../../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx).
+
+Important notes:
+
+- Volumes are defined at the host level and mounted into components via `localResources.volumeMounts`
+- The `mountPath` in the manifest corresponds to the guest path the component uses in `getDirectories()`
+- It is **not** necessary to define `wasi:filesystem` under `hostInterfaces`
+
+## Summary: checklist for adding filesystem access
+
+1. **Add `import` lines to `wit/world.wit`** for `wasi:filesystem/types` and `wasi:filesystem/preopens`.
+2. **Run `npm run build` once** so `wash wit fetch` downloads the WIT definitions and `jco guest-types` generates TypeScript types you can reference.
+3. **Import `getDirectories`** from `wasi:filesystem/preopens` with `@ts-expect-error`.
+4. **Use `getDirectories()`** to find preopened directories by path, then use `Descriptor` methods to read, write, and list files.
+5. **Configure volumes** in `.wash/config.yaml` for local development or in a WorkloadDeployment manifest for production.
+6. **No bundler changes needed** — `rolldown.config.mjs` already externalizes all `wasi:*` imports.
+7. **No new npm dependencies needed** — WIT interfaces are provided by the runtime, not by npm packages.
+
+---
+
+## API reference: `wasi:filesystem` operations used
+
+| Operation | Signature | Description |
+|-----------|-----------|-------------|
+| `getDirectories()` | `() => [Descriptor, string][]` | Return all preopened directories with their mount paths |
+| `dir.readDirectory()` | `() => DirectoryEntryStream` | Open a stream to read directory entries |
+| `stream.readDirectoryEntry()` | `() => DirectoryEntry \| undefined` | Read the next entry (returns `undefined` at end) |
+| `dir.openAt(pathFlags, path, openFlags, flags)` | `(...) => Descriptor` | Open a file or directory relative to a descriptor |
+| `file.read(length, offset)` | `(bigint, bigint) => [Uint8Array, boolean]` | Read bytes from a file at offset; boolean is EOF flag |
+| `file.write(buffer, offset)` | `(Uint8Array, bigint) => bigint` | Write bytes to a file at offset; returns bytes written |
+| `dir.createDirectoryAt(path)` | `(string) => void` | Create a subdirectory |
+| `dir.statAt(pathFlags, path)` | `(...) => DescriptorStat` | Get file attributes (type, size, timestamps) |
+| `dir.unlinkFileAt(path)` | `(string) => void` | Delete a file |
+| `dir.removeDirectoryAt(path)` | `(string) => void` | Delete an empty directory |
+
+## Further reading
+
+- [TypeScript Language Guide](../index.mdx) — toolchain overview, HTTP patterns, framework integration, and library compatibility
+- [Filesystems and Volumes](../../../../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx) — deploying components with volume mounts in Kubernetes
+- [Key-Value Storage](./key-value-storage.mdx) — persistent key-value storage for structured data
+- [Blob Storage](./blob-storage.mdx) — streaming blob storage for larger objects
+- [Language Support overview](../../index.mdx) — summary of all supported languages and toolchains
