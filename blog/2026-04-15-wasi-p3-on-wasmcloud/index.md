@@ -71,8 +71,7 @@ world http-handler {
 A few notes on the WIT:
 
 - The version suffix `0.3.0-rc-2026-03-15` is the current release candidate. It matches what Wasmtime 43 ships and what wasmCloud's `wasip3` feature expects.
-- Even though our world only directly imports three interfaces, you need the full `wasi-http`, `wasi-cli`, `wasi-io`, `wasi-sockets`, `wasi-filesystem`, `wasi-clocks`, `wasi-random`, and `wasi-blobstore` WIT packages in `wit/deps/` — `wasi-http.wit` transitively imports `wasi:cli` and `wasi:sockets`, and WIT resolution needs them all available.
-- wasmCloud maintains a canonical [set of P3 WIT deps](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-runtime/tests/fixtures/p3-wit-deps) you can copy directly.
+- wasmCloud maintains a canonical [set of P3 WIT deps](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-runtime/tests/fixtures/p3-wit-deps) you can copy directly into `wit/deps/`.
 
 ### Cargo.toml
 
@@ -158,11 +157,11 @@ The `wasip3` feature gates the P3 runtime code paths in `wash-runtime`. Without 
 ### Build the component
 
 ```sh
-cargo component build --release
+cargo build --target wasm32-wasip2 --release
 # Output: target/wasm32-wasip2/release/http_hello_p3.wasm
 ```
 
-(The output path still says `wasip2` because the host target is wasip2; the component itself targets the P3 WIT interfaces via the imports in `wit/world.wit`.)
+(We're building for `wasm32-wasip2` because [`wasm32-wasip3`](https://doc.rust-lang.org/rustc/platform-support/wasm32-wasip3.html) is not yet a supported rustc target. The component itself targets the P3 WIT interfaces via the imports in `wit/world.wit`; `wit-bindgen` emits a component binary directly from the `cdylib`.)
 
 ### Run it on wasmCloud
 
@@ -171,7 +170,7 @@ Create a `.wash/config.yaml`:
 ```yaml
 version: 2.0.2
 build:
-  command: "cargo component build --release"
+  command: "cargo build --target wasm32-wasip2 --release"
   component_path: "target/wasm32-wasip2/release/http_hello_p3.wasm"
 dev:
   wasip3: true
