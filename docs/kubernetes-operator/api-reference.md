@@ -150,7 +150,7 @@ _Appears in:_
 | `configFrom` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core) array_ | ConfigFrom is a list of references to ConfigMaps that will be provided to the workload.<br />The keys and values of all referenced ConfigMaps will be merged. In case of key conflicts,<br />the last ConfigMap in the list wins. |  | Optional: \{\} <br /> |
 | `secretFrom` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core) array_ | The keys and values of all referenced Secrets will be merged. In case of key conflicts,<br />the last Secret in the list wins.<br />The values of the Secrets will be base64-decoded, utf-8 decoded before being provided to the workload. |  | Optional: \{\} <br /> |
 | `config` _object (keys:string, values:string)_ |  |  | Optional: \{\} <br /> |
-| `name` _string_ | Optional instance name for multi-backend binding. When present, allows multiple entries with the same `namespace`+`package`. The name maps to the `identifier` argument in resource-opening functions (e.g., `store::open("cache")`). Must match `[a-z0-9][a-z0-9-]*`. |  | Optional: \{\} <br />Pattern: `^[a-z0-9][a-z0-9-]*$` <br /> |
+| `name` _string_ | Name uniquely identifies this interface instance when multiple entries<br />share the same namespace+package. Components use this name as the<br />identifier parameter in resource-opening functions (e.g., store::open(name)).<br />Required when multiple entries of the same namespace:package exist. |  | Optional: \{\} <br />Pattern: `^[a-z0-9][a-z0-9-]*$` <br /> |
 | `namespace` _string_ |  |  | Required: \{\} <br /> |
 | `package` _string_ |  |  | Required: \{\} <br /> |
 | `interfaces` _string array_ |  |  | MinItems: 1 <br />Required: \{\} <br /> |
@@ -191,6 +191,41 @@ _Appears in:_
 | `path` _string_ | Path of the file or directory on the host. |  | Required: \{\} <br /> |
 
 
+
+
+#### KubernetesServiceRef
+
+
+
+KubernetesServiceRef references an existing Kubernetes Service that the
+operator will manage an EndpointSlice for, pointing to the host pods that
+are running this workload.
+
+
+
+_Appears in:_
+- [KubernetesSpec](#kubernetesspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the name of the Kubernetes Service in the same namespace. |  | Required: \{\} <br /> |
+
+
+#### KubernetesSpec
+
+
+
+KubernetesSpec groups Kubernetes-specific configuration for a workload.
+
+
+
+_Appears in:_
+- [WorkloadDeploymentSpec](#workloaddeploymentspec)
+- [WorkloadSpec](#workloadspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `service` _[KubernetesServiceRef](#kubernetesserviceref)_ | Service references an existing Kubernetes Service that the operator will<br />maintain an EndpointSlice for, pointing to the host pods running this<br />workload. When set, the operator also registers DNS aliases for the<br />service (e.g. service-name, service-name.namespace.svc.cluster.local)<br />with the host so cluster-internal callers can reach the workload via<br />Service DNS without going through an external gateway. |  | Optional: \{\} <br /> |
 
 
 #### LocalResources
@@ -266,6 +301,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `name` _string_ | Name must match the Name of a Volume defined in the WorkloadSpec.Volumes field. |  | Required: \{\} <br /> |
 | `mountPath` _string_ | MountPath is the path within the component where the volume should be mounted. |  | Required: \{\} <br /> |
+| `readOnly` _boolean_ | ReadOnly indicates whether the volume should be mounted as read-only. |  | Optional: \{\} <br /> |
 
 
 #### Workload
@@ -308,6 +344,7 @@ _Appears in:_
 | `name` _string_ |  |  | Required: \{\} <br /> |
 | `image` _string_ |  |  | Required: \{\} <br /> |
 | `imagePullSecret` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core)_ |  |  | Optional: \{\} <br /> |
+| `imagePullPolicy` _[PullPolicy](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#pullpolicy-v1-core)_ |  |  | Optional: \{\} <br /> |
 | `poolSize` _integer_ |  |  | Optional: \{\} <br /> |
 | `maxInvocations` _integer_ |  |  | Optional: \{\} <br /> |
 | `localResources` _[LocalResources](#localresources)_ |  |  | Optional: \{\} <br /> |
@@ -401,6 +438,7 @@ _Appears in:_
 | `template` _[WorkloadReplicaTemplate](#workloadreplicatemplate)_ |  |  | Required: \{\} <br /> |
 | `deployPolicy` _[WorkloadDeployPolicy](#workloaddeploypolicy)_ |  | RollingUpdate | Optional: \{\} <br /> |
 | `artifacts` _[WorkloadDeploymentArtifact](#workloaddeploymentartifact) array_ |  |  | Optional: \{\} <br /> |
+| `kubernetes` _[KubernetesSpec](#kubernetesspec)_ | Kubernetes groups Kubernetes-specific configuration such as Service<br />references and endpoint management. |  | Optional: \{\} <br /> |
 
 
 
@@ -519,6 +557,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `image` _string_ |  |  | Required: \{\} <br /> |
 | `imagePullSecret` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#localobjectreference-v1-core)_ |  |  | Optional: \{\} <br /> |
+| `imagePullPolicy` _[PullPolicy](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#pullpolicy-v1-core)_ |  |  | Optional: \{\} <br /> |
 | `maxRestarts` _integer_ |  |  | Optional: \{\} <br /> |
 | `localResources` _[LocalResources](#localresources)_ |  |  | Optional: \{\} <br /> |
 
@@ -543,6 +582,7 @@ _Appears in:_
 | `hostInterfaces` _[HostInterface](#hostinterface) array_ |  |  | Optional: \{\} <br /> |
 | `service` _[WorkloadService](#workloadservice)_ |  |  | Optional: \{\} <br /> |
 | `volumes` _[Volume](#volume) array_ |  |  | Optional: \{\} <br /> |
+| `kubernetes` _[KubernetesSpec](#kubernetesspec)_ | Kubernetes groups Kubernetes-specific configuration such as Service<br />references and endpoint management. |  | Optional: \{\} <br /> |
 
 
 
