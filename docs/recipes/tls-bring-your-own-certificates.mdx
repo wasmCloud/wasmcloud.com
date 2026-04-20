@@ -1,0 +1,281 @@
+---
+title: 'TLS with Bring-Your-Own Certificates'
+description: 'Serve HTTPS from a wasmCloud host group using your own TLS certificates'
+---
+
+This recipe shows how to configure a wasmCloud host group to serve HTTPS using TLS certificates you provide. By the end, you will have a kind cluster running wasmCloud with a host group that terminates TLS using a certificate stored in a Kubernetes Secret.
+
+## Prerequisites
+
+- A Kubernetes cluster (this recipe uses [kind](https://kind.sigs.k8s.io/))
+- [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl)
+- [Helm](https://helm.sh/docs) v3.8.0+
+- A TLS certificate and private key (self-signed or CA-issued)
+
+If you do not already have a certificate, you can generate a self-signed one for testing:
+
+```shell
+openssl req -x509 -newkey rsa:2048 -keyout tls.key -out tls.crt -days 365 -nodes \
+  -subj "/CN=example.com" \
+  -addext "subjectAltName=DNS:example.com,DNS:localhost,DNS:*.default.svc.cluster.local"
+```
+
+You will also need a CA certificate. For self-signed certificates, the certificate itself serves as the CA:
+
+```shell
+cp tls.crt ca.crt
+```
+
+## Step 1: Create the cluster
+
+Create a kind cluster with port 30443 mapped for HTTPS ingress:
+
+```yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30443
+        hostPort: 8443
+        protocol: TCP
+```
+
+Save this as `kind-config.yaml` and create the cluster:
+
+```shell
+kind create cluster --config kind-config.yaml
+```
+
+## Step 2: Create the TLS Secret
+
+Store your certificate, key, and CA certificate in a Kubernetes Secret:
+
+```shell
+kubectl create secret generic byoc-cert \
+  --from-file=tls.crt=tls.crt \
+  --from-file=tls.key=tls.key \
+  --from-file=ca.crt=ca.crt
+```
+
+The Secret must contain three keys: `tls.crt`, `tls.key`, and `ca.crt`. The wasmCloud host reads all three when starting its HTTPS listener.
+
+## Step 3: Install wasmCloud with TLS enabled
+
+Create a `values.yaml` file that configures the host group to use your certificate:
+
+```yaml
+global:
+  tls:
+    enabled: true
+
+runtime:
+  hostGroups:
+    - name: default
+      replicas: 1
+      service:
+        type: ClusterIP
+      http:
+        enabled: true
+        port: 8443
+        tls:
+          enabled: true
+          certificate:
+            secretName: "byoc-cert"
+            generate:
+              enabled: false
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+```
+
+Key fields:
+
+- `global.tls.enabled: true` enables TLS for the platform's NATS connections and certificate infrastructure.
+- `http.tls.enabled: true` tells the host group to serve HTTPS instead of HTTP.
+- `http.tls.certificate.secretName` points to the Secret created in Step 2.
+- `http.tls.certificate.generate.enabled: false` disables auto-generated certificates so the host uses your Secret.
+- `http.port: 8443` sets the HTTPS listen port on the host pod.
+
+Install with Helm:
+
+```shell
+helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  -f values.yaml
+```
+
+Wait for the pods to start:
+
+```shell
+kubectl rollout status deploy -l app.kubernetes.io/instance=wasmcloud -n default
+```
+
+## Step 4: Expose the host group with a NodePort Service
+
+Create a Service that routes external traffic to the host group on port 8443:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wasmcloud-https
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    wasmcloud.com/hostgroup: default
+    wasmcloud.com/name: hostgroup
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+      nodePort: 30443
+      protocol: TCP
+```
+
+```shell
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: wasmcloud-https
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    wasmcloud.com/hostgroup: default
+    wasmcloud.com/name: hostgroup
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+      nodePort: 30443
+      protocol: TCP
+EOF
+```
+
+The `nodePort: 30443` maps to `hostPort: 8443` on the kind node (from Step 1), making the host group reachable at `https://localhost:8443` on your machine.
+
+## Step 5: Deploy a workload and verify
+
+Deploy a simple hello-world component:
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: hello-world
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      components:
+        - name: hello-world
+          image: ghcr.io/wasmcloud/components/hello-world:0.1.0
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: example.com
+```
+
+```shell
+kubectl apply -f - <<EOF
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: hello-world
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      components:
+        - name: hello-world
+          image: ghcr.io/wasmcloud/components/hello-world:0.1.0
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: example.com
+EOF
+```
+
+Wait for the workload to become ready:
+
+```shell
+kubectl get workloaddeployments --watch
+```
+
+Send an HTTPS request. Use `-k` to skip certificate verification (for self-signed certificates) and set the `Host` header to match the `host` value in the manifest:
+
+```shell
+curl -k -H "Host: example.com" https://localhost:8443
+```
+
+You should see:
+
+```text
+Hello from wasmCloud!
+```
+
+To verify that TLS is active, add `-v` to the curl command:
+
+```shell
+curl -kv -H "Host: example.com" https://localhost:8443
+```
+
+The output should include a TLS handshake showing the certificate's common name:
+
+```text
+* Server certificate:
+*  subject: CN=example.com
+```
+
+## Using auto-generated certificates
+
+If you do not have your own certificates, the Helm chart can generate self-signed certificates automatically. Replace the `http.tls.certificate` section in your `values.yaml`:
+
+```yaml
+http:
+  tls:
+    enabled: true
+    certificate:
+      secretName: ""
+      generate:
+        enabled: true
+        validity: 365
+        commonName: "example.com"
+        domains:
+          - "localhost"
+          - "*.example.com"
+          - "hostgroup-default.default.svc.cluster.local"
+```
+
+When `generate.enabled` is `true` and `secretName` is empty, the chart creates a self-signed certificate with the specified common name and SANs. This is useful for development and testing.
+
+## Clean up
+
+```shell
+kubectl delete workloaddeployment hello-world
+kubectl delete svc wasmcloud-https
+helm uninstall wasmcloud
+kind delete cluster
+```
+
+## Related documentation
+
+- [Operator and Gateway Overview](../kubernetes-operator/operator-manual/overview.mdx)
+- [Custom Resource Definitions](../kubernetes-operator/crds.mdx)
+- [Helm chart values reference](https://github.com/wasmCloud/wasmCloud/blob/main/charts/runtime-operator/values.yaml)
