@@ -143,6 +143,16 @@ const sidebars = {
       ],
     },
     'examples',
+    {
+      type: 'category',
+      label: 'Recipes',
+      link: { type: 'doc', id: 'recipes/index' },
+      items: [
+        'recipes/tls-bring-your-own-certificates',
+        'recipes/expose-workload-via-kubernetes-service',
+        'recipes/inject-configuration-from-configmaps-and-secrets',
+      ],
+    },
 
     {
       type: 'html',

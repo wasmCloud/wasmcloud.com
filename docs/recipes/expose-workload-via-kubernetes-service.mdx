@@ -1,0 +1,241 @@
+---
+title: 'Expose a Workload via Kubernetes Service'
+description: 'Route cluster traffic to a workload through a Kubernetes Service and EndpointSlice'
+---
+
+This recipe shows how to expose a wasmCloud workload to other services in your Kubernetes cluster using a standard Kubernetes Service. The operator manages an EndpointSlice that points to the host pods running the workload, so cluster-internal DNS (e.g. `my-service.default.svc.cluster.local`) resolves to the correct pods automatically.
+
+By the end, you will have a workload reachable by name from anywhere in the cluster.
+
+## Prerequisites
+
+- A Kubernetes cluster with wasmCloud installed via the [Helm chart](../kubernetes-operator/index.mdx) (runtime-operator **v2.0.3 or later** — the `kubernetes.service` field was added in 2.0.3)
+- [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl)
+
+## Overview
+
+When you set `spec.kubernetes.service.name` (or `spec.template.spec.kubernetes.service.name` on a `WorkloadDeployment`) to the name of an existing Kubernetes Service, the operator:
+
+1. Creates and maintains an EndpointSlice for that Service, pointing to the pod IPs of the hosts running the workload.
+2. Registers Service DNS aliases (`my-service`, `my-service.default`, `my-service.default.svc`) with the host, so the host's HTTP router accepts requests whose `Host` header matches any of these forms.
+
+This means you can call the workload from other pods by resolving its Service DNS name (short name or fully-qualified, in-cluster or cross-namespace), as long as the request's `Host` header is one of the registered aliases. Note that the fully-qualified `.cluster.local` form is **not** a registered alias — use it for DNS resolution only, and set the `Host` header to one of the shorter forms.
+
+## Step 1: Create the Kubernetes Service
+
+Create a Service before deploying the workload. The operator references this Service by name and manages its EndpointSlice.
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-service
+  namespace: default
+spec:
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+```
+
+Note that the Service does not include a `selector`. The operator manages the EndpointSlice directly, so no label matching is needed.
+
+```shell
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-service
+  namespace: default
+spec:
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+EOF
+```
+
+## Step 2: Deploy the workload with a Service reference
+
+Create a `WorkloadDeployment` that references the Service by name under `spec.template.spec.kubernetes.service`:
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: hello-world
+  namespace: default
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      kubernetes:
+        service:
+          name: hello-service
+      components:
+        - name: hello-world
+          image: ghcr.io/wasmcloud/components/hello-world:0.1.0
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: hello-service
+```
+
+Key fields:
+
+- `kubernetes.service.name: hello-service` tells the operator to create an EndpointSlice for the `hello-service` Service. The EndpointSlice will contain the pod IPs of the host pods running this workload.
+- `hostInterfaces[].config.host: hello-service` registers the hostname with the wasmCloud host so it routes incoming HTTP requests on that hostname to this component.
+
+```shell
+kubectl apply -f - <<EOF
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: hello-world
+  namespace: default
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      kubernetes:
+        service:
+          name: hello-service
+      components:
+        - name: hello-world
+          image: ghcr.io/wasmcloud/components/hello-world:0.1.0
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: hello-service
+EOF
+```
+
+## Step 3: Verify the EndpointSlice
+
+Once the workload is running, confirm that the operator has created an EndpointSlice:
+
+```shell
+kubectl get endpointslices -l kubernetes.io/service-name=hello-service
+```
+
+You should see an EndpointSlice with endpoints pointing to the host pod IPs:
+
+```text
+NAME                     ADDRESSTYPE   PORTS   ENDPOINTS     AGE
+hello-service-a46c2b39   IPv4          80      10.244.0.15   30s
+```
+
+The `PORTS` column shows `80` — the port the wasmCloud host listens on inside the pod. Kube-proxy forwards traffic from the Service's front-facing port (`8080` in this example) to port `80` on the host pod. You do not need to set `targetPort` on the Service; the operator manages the EndpointSlice directly.
+
+## Step 4: Call the workload from within the cluster
+
+From any pod in the cluster, the workload is now reachable via the Service DNS name. To test, run a one-off curl pod:
+
+```shell
+kubectl run curl-test --rm -it --restart=Never --image=curlimages/curl -- \
+  curl -s -H "Host: hello-service" http://hello-service:8080
+```
+
+You should see:
+
+```text
+Hello from wasmCloud!
+```
+
+The request reaches the workload through the standard Kubernetes Service DNS resolution and EndpointSlice routing.
+
+:::note[The `Host` header must match a registered alias]
+The host's HTTP router matches on the `Host` header, not the TCP destination. The operator registers three aliases for a Service named `my-svc` in namespace `default`:
+
+- `my-svc`
+- `my-svc.default`
+- `my-svc.default.svc`
+
+Any of these values in the `Host` header will match. The fully-qualified `my-svc.default.svc.cluster.local` form is **not** registered — use it for DNS resolution only and override the header.
+
+Also note: `curl http://my-svc:8080` (no explicit `-H`) sends `Host: my-svc:8080` (with port) and returns `400 Bad Request`. Strip the port by passing `-H "Host: my-svc"`.
+:::
+
+## Exposing the Service externally
+
+The Service created above is `ClusterIP` by default, meaning it is only reachable from within the cluster. To expose it externally, you can change the Service type or add an Ingress.
+
+### Using NodePort
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-service
+  namespace: default
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      nodePort: 30080
+```
+
+### Using LoadBalancer
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-service
+  namespace: default
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+```
+
+### Using an Ingress controller
+
+If your cluster has an Ingress controller (such as Nginx Ingress or Traefik), you can create an Ingress resource that routes to the Service:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello-ingress
+  namespace: default
+spec:
+  rules:
+    - host: hello.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hello-service
+                port:
+                  number: 8080
+```
+
+## Clean up
+
+```shell
+kubectl delete workloaddeployment hello-world
+kubectl delete svc hello-service
+```
+
+## Related documentation
+
+- [Custom Resource Definitions](../kubernetes-operator/crds.mdx) for the full `KubernetesSpec` field reference
+- [API Reference](../kubernetes-operator/api-reference.md) for `KubernetesServiceRef` and `KubernetesSpec`
+- [Operator and Gateway Overview](../kubernetes-operator/operator-manual/overview.mdx) for the architecture of the operator and host groups
