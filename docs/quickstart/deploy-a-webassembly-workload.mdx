@@ -228,19 +228,22 @@ sudo chown $USER ~/.kube/config
 
 Use Helm to install the wasmCloud operator:
 
+:::note[Runtime Gateway deprecated in 2.0.3]
+The tutorial below routes HTTP traffic through a Kubernetes Service whose EndpointSlice the operator manages directly. The earlier **Runtime Gateway** component that proxied traffic to workloads is deprecated as of 2.0.3 and will be removed in a future release; the local-dev overlay (`values.local.yaml`) disables it by default.
+:::
+
 <Tabs groupId="k8s-env" queryString>
   <TabItem value="existing" label="Existing cluster" default>
 
 ```shell
 helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
-  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml \
-  --set gateway.service.type=LoadBalancer
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml
 ```
 
   </TabItem>
   <TabItem value="kind" label="kind">
 
-The [`values.local.yaml`](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml) file configures the Runtime Gateway as a NodePort service on port 30950, which the kind cluster config maps to host port 80:
+The [`values.local.yaml`](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml) file configures each host's HTTP listener on port 80. The kind cluster config maps container port 30950 to host port 80, so any NodePort Service on port 30950 will be reachable at `localhost`:
 
 ```shell
 helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
@@ -250,23 +253,21 @@ helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-op
   </TabItem>
   <TabItem value="k3d" label="k3d">
 
-k3d supports `LoadBalancer` services natively, so we override the gateway service type:
+k3d supports `LoadBalancer` services natively and we started the cluster with port 80 mapped to the load balancer:
 
 ```shell
 helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
-  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml \
-  --set gateway.service.type=LoadBalancer
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml
 ```
 
   </TabItem>
   <TabItem value="k3s" label="k3s">
 
-k3s includes a built-in load balancer (Klipper), so we override the gateway service type:
+k3s includes a built-in load balancer (Klipper) that binds `LoadBalancer` services to node ports:
 
 ```shell
 helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
-  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml \
-  --set gateway.service.type=LoadBalancer
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml
 ```
 
   </TabItem>
@@ -280,53 +281,29 @@ kubectl rollout status deploy -l app.kubernetes.io/instance=wasmcloud -n default
 
 ## Deploy Wasm workload
 
-Now we'll deploy our Wasm application using a [`WorkloadDeployment`](../kubernetes-operator/crds.mdx#workloaddeployment) manifest.
+We'll deploy the Wasm application with two resources: a Kubernetes `Service` that receives HTTP traffic, and a [`WorkloadDeployment`](../kubernetes-operator/crds.mdx#workloaddeployment) that references the Service and tells the operator to schedule the component onto a host. The operator maintains an EndpointSlice for the Service pointing at the host pods running the workload, so standard Kubernetes DNS and routing reach the component directly.
 
 :::info[wasmCloud security model]
 wasmCloud components are **deny-by-default**: a component cannot use any capability—HTTP, key-value storage, logging, or any other—unless the host is explicitly told to allow it. The `hostInterfaces` field in a workload manifest is the allowlist. Each entry names an interface package that the host will make available to the component. Any interface not listed is silently unavailable, regardless of what the component's WIT file imports.
 :::
 
-Run the following script in your terminal to create a file called `deployment.yaml` containing a manifest.
+Run the following script in your terminal to create a file called `deployment.yaml` containing both manifests.
+
+<Tabs groupId="k8s-env" queryString>
+  <TabItem value="existing" label="Existing cluster" default>
 
 ```shell
 cat > deployment.yaml << 'EOF'
-  apiVersion: runtime.wasmcloud.dev/v1alpha1
-  kind: WorkloadDeployment
-  metadata:
-    name: http-hello-world
-  spec:
-    replicas: 1
-    template:
-      spec:
-        hostSelector:
-          hostgroup: default
-        components:
-          - name: http-hello-world
-            image: ghcr.io/<namespace>/http-hello-world:0.1.0
-        hostInterfaces:
-          - namespace: wasi
-            package: http
-            interfaces:
-              - incoming-handler
-            config:
-              host: localhost
-          - namespace: wasi
-            package: keyvalue
-            interfaces:
-              - atomics
-              - store
-EOF
-```
-
-This is a deployment manifest for a [Kubernetes custom resource](../kubernetes-operator/crds.mdx). For the purposes of this quickstart, the most important fields to highlight in the specification are:
-
-- `hostSelector.hostgroup`: Selects which pool of wasmCloud hosts runs this workload. The Helm chart installs three host pods labelled `hostgroup: default`—this is the correct target for most deployments. Custom host groups can be created to isolate workloads or provide specialized capabilities.
-- `components.image`: This defines the registry address we will use to fetch our Wasm image.
-- `hostInterfaces`: These declare which capability interfaces the host will make available to the component. **Without an explicit entry here, the component cannot access that capability.** Since the HTTP and key-value capabilities use [well-known built-in interfaces](../overview/interfaces.mdx), all we have to do is list them.
-
-Open the file and update the image name with the correct registry address. If you're using GitHub Packages, that means replacing `<namespace>` with your GitHub namespace.
-
-```yaml {13}
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-hello-world
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      protocol: TCP
+---
 apiVersion: runtime.wasmcloud.dev/v1alpha1
 kind: WorkloadDeployment
 metadata:
@@ -337,6 +314,54 @@ spec:
     spec:
       hostSelector:
         hostgroup: default
+      kubernetes:
+        service:
+          name: http-hello-world
+      components:
+        - name: http-hello-world
+          image: ghcr.io/<namespace>/http-hello-world:0.1.0
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+        - namespace: wasi
+          package: keyvalue
+          interfaces:
+            - atomics
+            - store
+EOF
+```
+
+  </TabItem>
+  <TabItem value="kind" label="kind">
+
+```shell
+cat > deployment.yaml << 'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-hello-world
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      protocol: TCP
+      nodePort: 30950
+---
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: http-hello-world
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      kubernetes:
+        service:
+          name: http-hello-world
       components:
         - name: http-hello-world
           image: ghcr.io/<namespace>/http-hello-world:0.1.0
@@ -352,7 +377,112 @@ spec:
           interfaces:
             - atomics
             - store
+EOF
 ```
+
+  </TabItem>
+  <TabItem value="k3d" label="k3d">
+
+```shell
+cat > deployment.yaml << 'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-hello-world
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      protocol: TCP
+---
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: http-hello-world
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      kubernetes:
+        service:
+          name: http-hello-world
+      components:
+        - name: http-hello-world
+          image: ghcr.io/<namespace>/http-hello-world:0.1.0
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: localhost
+        - namespace: wasi
+          package: keyvalue
+          interfaces:
+            - atomics
+            - store
+EOF
+```
+
+  </TabItem>
+  <TabItem value="k3s" label="k3s">
+
+```shell
+cat > deployment.yaml << 'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-hello-world
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      protocol: TCP
+---
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: http-hello-world
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      kubernetes:
+        service:
+          name: http-hello-world
+      components:
+        - name: http-hello-world
+          image: ghcr.io/<namespace>/http-hello-world:0.1.0
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: localhost
+        - namespace: wasi
+          package: keyvalue
+          interfaces:
+            - atomics
+            - store
+EOF
+```
+
+  </TabItem>
+</Tabs>
+
+The manifest has two resources: a Kubernetes [custom resource](../kubernetes-operator/crds.mdx) (`WorkloadDeployment`) that describes the workload, and a standard `Service`. The fields to highlight in the `WorkloadDeployment`:
+
+- `hostSelector.hostgroup`: Selects which pool of wasmCloud hosts runs this workload. The Helm chart installs three host pods labelled `hostgroup: default`—this is the correct target for most deployments. Custom host groups can be created to isolate workloads or provide specialized capabilities.
+- `kubernetes.service.name`: References the Service by name. The operator creates and maintains an EndpointSlice for this Service that points at the host pods running the workload, and registers the Service's DNS names (`http-hello-world`, `http-hello-world.default`, `http-hello-world.default.svc`) with the host's HTTP router. For local development, `config.host: localhost` is added so the component also answers requests whose `Host` header is `localhost`.
+- `components.image`: Defines the registry address we will use to fetch our Wasm image.
+- `hostInterfaces`: Declares which capability interfaces the host will make available to the component. **Without an explicit entry here, the component cannot access that capability.** Since the HTTP and key-value capabilities use [well-known built-in interfaces](../overview/interfaces.mdx), all we have to do is list them.
+
+Open the file and update the image name with the correct registry address. If you're using GitHub Packages, that means replacing `<namespace>` with your GitHub namespace.
 
 Now use `kubectl` to apply the manifest:
 
@@ -372,7 +502,7 @@ Use `curl` to invoke the Wasm workload with an HTTP request:
 OrbStack manages port 80 on macOS, intercepting traffic before it reaches the cluster. Run a port-forward in a separate terminal:
 
 ```shell
-kubectl port-forward svc/runtime-gateway 8080:80
+kubectl port-forward svc/http-hello-world 8080:80
 ```
 
 Then substitute `localhost:8080` for `localhost` in the hello-world command, and use `-H "Host: blobby.localhost.direct" http://localhost:8080/...` in place of `http://blobby.localhost.direct/...` in the Blobby commands further below.
@@ -389,10 +519,30 @@ Hello x1, World!
 
 Now let's deploy a more feature-rich example: **Blobby** ("Little Blobby Tables"), a simple file server that demonstrates the [`wasi:blobstore`](https://github.com/WebAssembly/wasi-blobstore) capability alongside `wasi:http`.
 
-The manifest below uses `host: blobby.localhost.direct` to route HTTP traffic — `blobby.localhost.direct` is a public DNS alias for `127.0.0.1`, so no `/etc/hosts` changes are needed. Apply it to deploy the [`blobby-ui`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/blobby) component from a wasmCloud-hosted OCI image:
+Because only one NodePort/LoadBalancer Service can claim the external port at a time, **delete the `http-hello-world` workload and its Service before deploying Blobby**:
+
+```shell
+kubectl delete workloaddeployment http-hello-world
+kubectl delete service http-hello-world
+```
+
+The Blobby manifest routes HTTP traffic on `blobby.localhost.direct`, a public DNS alias for `127.0.0.1`, so no `/etc/hosts` changes are needed. Apply the manifest below to deploy the [`blobby-ui`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/blobby) component alongside a Service of the appropriate type for your environment:
+
+<Tabs groupId="k8s-env" queryString>
+  <TabItem value="existing" label="Existing cluster" default>
 
 ```shell
 kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: blobby
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      protocol: TCP
+---
 apiVersion: runtime.wasmcloud.dev/v1alpha1
 kind: WorkloadDeployment
 metadata:
@@ -401,6 +551,9 @@ spec:
   replicas: 1
   template:
     spec:
+      kubernetes:
+        service:
+          name: blobby
       hostInterfaces:
         - namespace: wasi
           package: http
@@ -425,6 +578,163 @@ spec:
           image: ghcr.io/wasmcloud/components/blobby-ui:0.5.2
 EOF
 ```
+
+  </TabItem>
+  <TabItem value="kind" label="kind">
+
+```shell
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: blobby
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      protocol: TCP
+      nodePort: 30950
+---
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: blobby
+spec:
+  replicas: 1
+  template:
+    spec:
+      kubernetes:
+        service:
+          name: blobby
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: blobby.localhost.direct
+        - namespace: wasi
+          package: blobstore
+          version: 0.2.0-draft
+          interfaces:
+            - blobstore
+          config:
+            buckets: blobby
+        - namespace: wasi
+          package: logging
+          version: 0.1.0-draft
+          interfaces:
+            - logging
+      components:
+        - name: blobby
+          image: ghcr.io/wasmcloud/components/blobby-ui:0.5.2
+EOF
+```
+
+  </TabItem>
+  <TabItem value="k3d" label="k3d">
+
+```shell
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: blobby
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      protocol: TCP
+---
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: blobby
+spec:
+  replicas: 1
+  template:
+    spec:
+      kubernetes:
+        service:
+          name: blobby
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: blobby.localhost.direct
+        - namespace: wasi
+          package: blobstore
+          version: 0.2.0-draft
+          interfaces:
+            - blobstore
+          config:
+            buckets: blobby
+        - namespace: wasi
+          package: logging
+          version: 0.1.0-draft
+          interfaces:
+            - logging
+      components:
+        - name: blobby
+          image: ghcr.io/wasmcloud/components/blobby-ui:0.5.2
+EOF
+```
+
+  </TabItem>
+  <TabItem value="k3s" label="k3s">
+
+```shell
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: blobby
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      protocol: TCP
+---
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: blobby
+spec:
+  replicas: 1
+  template:
+    spec:
+      kubernetes:
+        service:
+          name: blobby
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: blobby.localhost.direct
+        - namespace: wasi
+          package: blobstore
+          version: 0.2.0-draft
+          interfaces:
+            - blobstore
+          config:
+            buckets: blobby
+        - namespace: wasi
+          package: logging
+          version: 0.1.0-draft
+          interfaces:
+            - logging
+      components:
+        - name: blobby
+          image: ghcr.io/wasmcloud/components/blobby-ui:0.5.2
+EOF
+```
+
+  </TabItem>
+</Tabs>
 
 Verify the deployment:
 
@@ -465,10 +775,11 @@ curl -X DELETE http://blobby.localhost.direct/hello.txt
 
 ## Clean up
 
-To remove the deployments created in this tutorial:
+To remove the deployments and their Services created in this tutorial:
 
 ```shell
-kubectl delete workloaddeployment http-hello-world blobby
+kubectl delete workloaddeployment http-hello-world blobby --ignore-not-found
+kubectl delete service http-hello-world blobby --ignore-not-found
 ```
 
 To tear down the cluster entirely:

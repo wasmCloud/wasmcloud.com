@@ -1,15 +1,18 @@
 ---
-title: 'Operator and Gateway Overview'
-description: 'Overview of the WasmCloud Operator and Gateway Deployments'
+title: 'Operator Overview'
+description: 'Overview of the wasmCloud operator and its components on Kubernetes'
 sidebar_position: 1
 ---
 
-There are four primary deployments that comprise wasmCloud in a Kubernetes system:
+There are three primary deployments that comprise wasmCloud in a Kubernetes cluster:
 
-1. **wasmCloud Operator** — watches for workload CRDs and schedules Wasm workloads onto hosts
-2. **Runtime Gateway** — routes incoming HTTP traffic to deployed Wasm workloads
-3. **Host Group** — a pool of pods running [cluster hosts (washlets)](../../runtime/washlet.mdx) that execute Wasm components
-4. **NATS** — message broker providing the control-plane transport between the operator and hosts
+1. **wasmCloud Operator** — watches workload CRDs, schedules Wasm workloads onto hosts, and manages EndpointSlices for user-defined Services
+2. **Host Group** — a pool of pods running [cluster hosts (washlets)](../../runtime/washlet.mdx) that execute Wasm components
+3. **NATS** — message broker providing the control-plane transport between the operator and hosts
+
+:::note[Runtime Gateway deprecated in 2.0.3]
+Earlier releases included a separate **Runtime Gateway** deployment that proxied HTTP traffic to workloads. The gateway is deprecated as of 2.0.3 and is scheduled for removal. HTTP routing is now handled natively by Kubernetes Services: the operator manages an EndpointSlice for each Service referenced by a workload, so requests arriving through standard Kubernetes Service DNS reach the right host pods without any wasmCloud-specific ingress. The gateway pod is still installed by the chart for backwards compatibility; set `gateway.enabled: false` to skip it.
+:::
 
 ## Architecture
 
@@ -21,22 +24,13 @@ The wasmCloud operator (`runtime-operator`) is the control-plane entity that wat
 
 - **Watching CRDs**: Monitors `WorkloadDeployment`, `WorkloadReplicaSet`, `Workload`, `Host`, and `Artifact` resources across all (or configured) namespaces.
 - **Scheduling workloads**: Reads the `WorkloadDeployment` spec and selects a `Host` that matches the `hostSelector` criteria, then creates the appropriate child resources to run the Wasm component.
+- **EndpointSlice management**: For workloads that reference a Kubernetes Service via `spec.kubernetes.service.name`, the operator creates and maintains an EndpointSlice pointing to the pod IPs of the hosts running the workload. It also registers Service DNS aliases with the host's HTTP router so requests arriving via cluster DNS reach the correct component.
 - **Host communication**: Sends workload start/stop requests and polls host health over NATS, using the `runtime.host.<hostID>.<operation>` subject pattern (e.g. `runtime.host.<hostID>.workload.start`).
 - **Status reporting**: Updates the `status` subresource of each CRD to reflect whether scheduling succeeded or failed, and surfaces Kubernetes events for observability.
 - **Leader election**: When enabled and running with multiple replicas, uses a `coordination.k8s.io/v1` Lease in the operator's own namespace to elect a single active instance and avoid split-brain reconciliation.
 - **Metrics endpoint**: Exposes a `/metrics` endpoint (Prometheus format) protected by Kubernetes token review and subject access review, suitable for scraping by monitoring tools.
 
 The operator runs with the `wasmcloud-runtime-operator` ServiceAccount. See [Roles and Role Bindings](./roles-and-rolebindings.mdx) for the full set of permissions required.
-
-## Runtime Gateway
-
-The Runtime Gateway acts as a reverse proxy that routes incoming HTTP traffic to the appropriate Wasm workload running on a host. Its responsibilities include:
-
-- **Traffic routing**: Listens on a configurable port and forwards HTTP requests to the Wasm component that registered the matching route.
-- **Host discovery**: Watches `Host` and `Workload` CRDs (read-only) to maintain an up-to-date routing table as workloads are deployed or removed.
-- **Service integration**: Exposed via a Kubernetes `Service`, allowing you to configure `NodePort`, `LoadBalancer`, or `ClusterIP` access depending on your environment.
-
-The gateway runs with the `wasmcloud-runtime-operator-gateway` ServiceAccount, which has read-only access to `Host` and `Workload` resources. It cannot modify cluster state.
 
 ## Host group
 
@@ -61,17 +55,20 @@ The Helm chart bundles NATS with JetStream enabled (`nats.enabled: true` by defa
 
 ## Request flow
 
-When a `WorkloadDeployment` is applied:
+When a `WorkloadDeployment` that references a Kubernetes Service is applied:
 
 1. The **wasmCloud operator** detects the new CRD, selects a matching host from the host group, and sends a workload start request to the host **via NATS** (`runtime.host.<hostID>.workload.start`).
-2. The operator updates the `WorkloadDeployment` status to reflect the scheduling outcome.
-3. The **Runtime Gateway** observes the new `Workload` resource via the Kubernetes API and adds a routing rule for HTTP traffic.
-4. Incoming HTTP requests hit the Gateway's Service, which forwards them directly to the appropriate host pod (by pod IP), where the **wash runtime** executes the Wasm component.
+2. The operator injects the Service's DNS aliases (e.g. `my-svc`, `my-svc.default`, `my-svc.default.svc`) into the host's HTTP router so incoming requests with a matching `Host` header route to this component.
+3. The operator creates and maintains an **EndpointSlice** owned by the referenced Service, populated with the pod IPs of the hosts running the workload.
+4. Incoming HTTP requests resolve the Service's ClusterIP via standard Kubernetes DNS and are forwarded by kube-proxy to the host pod IPs in the EndpointSlice, where the **wash runtime** executes the Wasm component.
+
+See the [Expose a Workload via Kubernetes Service](../../recipes/expose-workload-via-kubernetes-service.mdx) recipe for a step-by-step walk-through.
 
 ## Related documentation
 
 - [Custom Resource Definitions (CRDs)](../crds.mdx) — describes the `WorkloadDeployment`, `Host`, `Workload`, and other resources
-- [Roles and Role Bindings](./roles-and-rolebindings.mdx) — details the RBAC permissions required by the operator and gateway
+- [Helm Values Reference](./helm-values.mdx) — commonly-overridden configuration values
+- [Roles and Role Bindings](./roles-and-rolebindings.mdx) — details the RBAC permissions required by the operator
 - [Filesystems and Volumes](./filesystems-and-volumes.mdx) — how to mount volumes into host pods
 - [Secrets and Configuration Management](./secrets-and-configuration.mdx) — supplying environment variables, ConfigMaps, and Secrets to components
 - [Private Registries](./private-registries.mdx) — how to pull Wasm component images from private OCI registries
