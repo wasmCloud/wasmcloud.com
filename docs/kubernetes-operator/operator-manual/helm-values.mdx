@@ -1,0 +1,161 @@
+---
+title: 'Helm Values Reference'
+description: 'Commonly-used configuration values for the wasmCloud runtime-operator Helm chart'
+sidebar_position: 3
+---
+
+This page documents the configuration values you are most likely to override when installing the [`runtime-operator` Helm chart](https://github.com/wasmCloud/wasmCloud/tree/main/charts/runtime-operator). For the authoritative list of every value the chart supports, run:
+
+```shell
+helm show values oci://ghcr.io/wasmcloud/charts/runtime-operator --version <version>
+```
+
+## Top-level structure
+
+The chart's `values.yaml` is organized into five top-level sections:
+
+| Section | Purpose |
+|---|---|
+| `global` | Settings that apply across all components (image registry, TLS, image pull secrets) |
+| `nats` | The bundled NATS server — set `enabled: false` to connect an external NATS cluster instead |
+| `operator` | The wasmCloud runtime-operator deployment |
+| `gateway` | **Deprecated in 2.0.3.** Legacy runtime-gateway. Set `enabled: false` to skip installing it |
+| `runtime` | Host group deployments (pods running the `wash` host binary) |
+
+## `global`
+
+### `global.image.registry`
+
+Override the container image registry for all components at once. Useful for air-gapped or mirrored deployments.
+
+```yaml
+global:
+  image:
+    registry: myregistry.example.com
+```
+
+See [Private Registries and Air-Gapped Deployments](./private-registries.mdx) for the full mirroring workflow.
+
+### `global.tls.enabled`
+
+Introduced in 2.0.3. Set to `false` to disable TLS for NATS connections and skip certificate generation. Intended for clusters where a service mesh (e.g. Istio, Linkerd) provides mTLS between pods.
+
+```yaml
+global:
+  tls:
+    enabled: false
+```
+
+When `global.tls.enabled` is `false`, the chart ignores `global.certificates.generate` — no self-signed certs are created and NATS runs plaintext.
+
+### `global.certificates.generate`
+
+Controls whether the chart generates self-signed TLS certificates for NATS and the control plane. Set to `false` when bringing your own certificate secrets. See the [TLS: bring your own certificates](../../recipes/tls-bring-your-own-certificates.mdx) recipe for the full BYOC flow.
+
+## `operator`, `nats`, `runtime` — pod labels and annotations
+
+Introduced in 2.0.3. Each deployment accepts `podLabels` and `podAnnotations` that are merged into the pod template. This is most commonly used for service mesh injection:
+
+```yaml
+operator:
+  podLabels:
+    sidecar.istio.io/inject: "true"
+  podAnnotations:
+    proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
+
+nats:
+  podLabels:
+    sidecar.istio.io/inject: "true"
+
+runtime:
+  podLabels:
+    sidecar.istio.io/inject: "true"
+```
+
+## `operator`
+
+### `operator.watchNamespaces`
+
+By default, the operator watches every namespace in the cluster. Set `watchNamespaces` to a list of namespace names to scope it down:
+
+```yaml
+operator:
+  watchNamespaces:
+    - team-a
+    - team-b
+```
+
+When `watchNamespaces` is populated, the chart generates namespace-scoped `Role` and `RoleBinding` resources for each listed namespace (instead of a single `ClusterRole`).
+
+### `operator.image.tag`
+
+Defaults to the chart's `appVersion`. Override only when you need to pin to a specific operator build that differs from the chart release:
+
+```yaml
+operator:
+  image:
+    tag: "2.0.3"
+```
+
+The same pattern applies to `gateway.image.tag` and `runtime.image.tag`.
+
+## `gateway` (deprecated)
+
+:::warning[Deprecated]
+The runtime-gateway is deprecated as of 2.0.3. HTTP routing is now handled by the runtime-operator via EndpointSlices tied to user-defined Kubernetes Services. See [Expose a Workload via Kubernetes Service](../../recipes/expose-workload-via-kubernetes-service.mdx) for the replacement pattern.
+
+To skip installing the gateway, set `gateway.enabled: false`.
+:::
+
+```yaml
+gateway:
+  enabled: false
+```
+
+## `runtime`
+
+### `runtime.hostGroups`
+
+A host group is a `Deployment` of pods running the `wash` host. You can define multiple groups to isolate workloads or provide specialized capabilities (e.g. WebGPU-enabled hosts):
+
+```yaml
+runtime:
+  hostGroups:
+    - name: default
+      replicas: 3
+      http:
+        enabled: true
+        port: 80
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+    - name: gpu
+      replicas: 1
+      webgpu:
+        enabled: true
+```
+
+`WorkloadDeployment` manifests target a group via `spec.template.spec.hostSelector.hostgroup`.
+
+### `runtime.hostGroups[].http.port`
+
+Starting in 2.0.3, this value is honored by the host (it was previously hardcoded). This is the port the host's HTTP server listens on inside the pod, and the port the operator populates into each managed EndpointSlice. The upstream chart default is `9191`; the [`values.local.yaml`](https://github.com/wasmCloud/wasmCloud/blob/main/charts/runtime-operator/values.local.yaml) overlay overrides it to `80` for local development.
+
+### `runtime.hostGroups[].webgpu.enabled`
+
+Enables the WebGPU plugin on hosts in the group. Requires a host image built with the `wasi-webgpu` feature.
+
+### `runtime.image.tag`
+
+Starting in 2.0.3, this value defaults to the chart's `appVersion` (previously defaulted to a hardcoded tag). Leave unset to track the chart release.
+
+## Related documentation
+
+- [Kubernetes Operator introduction](../index.mdx) — install and deploy walk-through
+- [Private Registries](./private-registries.mdx) — mirroring images for air-gapped deployments
+- [TLS: bring your own certificates](../../recipes/tls-bring-your-own-certificates.mdx)
+- [Expose a Workload via Kubernetes Service](../../recipes/expose-workload-via-kubernetes-service.mdx)

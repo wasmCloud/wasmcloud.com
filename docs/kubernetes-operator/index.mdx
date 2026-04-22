@@ -21,12 +21,17 @@ Along with the wasmCloud operator, the wasmCloud platform on Kubernetes consists
 
 * [**Custom resource definitions (CRDs)**](crds.mdx) for wasmCloud infrastructure and Wasm workloads.
 * [**wasmCloud host(s)**](../glossary.mdx#host) - Sandboxed runtime environments for WebAssembly components. (By default, these are `wash` binaries using the `wash host` command to run a [cluster host (washlet)](../runtime/washlet.mdx) that surfaces the `wash-runtime` API over NATS.)
-* [**Runtime Gateway**](./operator-manual/overview.mdx#runtime-gateway) - HTTP reverse proxy that routes incoming requests to the appropriate wasmCloud host based on deployed workloads. Exposed as a Kubernetes Service.
 * [**NATS with JetStream**](../glossary.mdx#nats) - CNCF project that provides a connective layer for transport between operator and hosts, along with built-in object storage through JetStream. NATS carries all control-plane traffic to the host (the host never communicates directly with the Kubernetes API). The operator sends workload start/stop requests to individual hosts via NATS subjects, and hosts self-register by publishing heartbeat messages the operator subscribes to. The Helm chart bundles NATS automatically—you can also connect an existing NATS cluster by setting `nats.enabled: false` and pointing the operator at your endpoint.
+
+HTTP traffic reaches workloads through standard Kubernetes Services: the operator manages an EndpointSlice for each user-defined Service referenced by a workload, so cluster DNS (e.g. `my-svc.default.svc.cluster.local`) resolves directly to the host pods. See [Expose a Workload via Kubernetes Service](../recipes/expose-workload-via-kubernetes-service.mdx) for the full pattern.
+
+:::note[Runtime Gateway deprecated in 2.0.3]
+Earlier releases included a separate Runtime Gateway deployment that proxied HTTP traffic to workloads. The gateway is deprecated as of 2.0.3 and will be removed in a future release; routing is now handled by the operator via EndpointSlices. The chart still installs a gateway pod by default for backwards compatibility — set `gateway.enabled: false` to skip it.
+:::
 
 The entire platform can be deployed with [Helm](https://helm.sh/docs) using the [**wasmCloud operator Helm chart**](https://github.com/wasmCloud/wasmCloud/tree/main/charts/runtime-operator). (NATS and hosts can also be installed separately, if you wish.)
 
-For a detailed breakdown of each component's responsibilities and the request flow, see the [Operator and Gateway Overview](./operator-manual/overview.mdx).
+For a detailed breakdown of each component's responsibilities and the request flow, see the [Operator Overview](./operator-manual/overview.mdx). For commonly-overridden chart values, see the [Helm Values Reference](./operator-manual/helm-values.mdx).
 
 ## Get started with the wasmCloud operator 
 
@@ -101,14 +106,13 @@ Use Helm to install the wasmCloud operator from an OCI chart image:
 
 ```shell
 helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
-  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml \
-  --set gateway.service.type=LoadBalancer
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml
 ```
 
   </TabItem>
   <TabItem value="kind" label="kind">
 
-The [`values.local.yaml`](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml) file configures the Runtime Gateway as a NodePort service on port 30950, which the kind cluster config maps to host port 80:
+The [`values.local.yaml`](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml) file configures the host HTTP port to 80, which the kind cluster config maps to host port 80 via a NodePort Service:
 
 ```shell
 helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
@@ -118,29 +122,23 @@ helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-op
   </TabItem>
   <TabItem value="k3d" label="k3d">
 
-k3d supports `LoadBalancer` services natively, so we override the gateway service type:
-
 ```shell
 helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
-  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml \
-  --set gateway.service.type=LoadBalancer
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml
 ```
 
   </TabItem>
   <TabItem value="k3s" label="k3s">
 
-k3s includes a built-in load balancer (Klipper), so we override the gateway service type:
-
 ```shell
 helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
-  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml \
-  --set gateway.service.type=LoadBalancer
+  -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml
 ```
 
   </TabItem>
 </Tabs>
 
-Along with the wasmCloud operator, Runtime Gateway, wasmCloud CRDs, and NATS, the Helm chart will deploy **three wasmCloud hosts** using the [`wasmcloud/wash`](https://github.com/wasmCloud/wasmCloud/pkgs/container/wash) container image.
+Along with the wasmCloud operator, wasmCloud CRDs, and NATS, the Helm chart will deploy **three wasmCloud hosts** using the [`wasmcloud/wash`](https://github.com/wasmCloud/wasmCloud/pkgs/container/wash) container image.
 
 You can build your own hosts that provide extended capabilities via [host plugins](../glossary.mdx#host-plugin). 
 
@@ -158,9 +156,20 @@ Once all pods are running, you're ready to deploy a Wasm workload.
 
 ### Deploy a Wasm component
 
-Use a [`WorkloadDeployment`](./crds.mdx#workloaddeployment) manifest to deploy a Wasm component workload to your cluster:
+Deploying a Wasm component that handles HTTP traffic takes two resources: a Kubernetes `Service` that exposes the component, and a [`WorkloadDeployment`](./crds.mdx#workloaddeployment) that references the Service. The operator creates an EndpointSlice for the Service pointing at whichever host pods are running the workload.
 
 ```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-world
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+---
 apiVersion: runtime.wasmcloud.dev/v1alpha1
 kind: WorkloadDeployment
 metadata:
@@ -171,6 +180,9 @@ spec:
     spec:
       hostSelector:
         hostgroup: default
+      kubernetes:
+        service:
+          name: hello-world
       components:
         - name: hello-world
           image: ghcr.io/wasmcloud/components/hello-world:0.1.0
@@ -179,26 +191,21 @@ spec:
           package: http
           interfaces:
             - incoming-handler
-          config:
-            host: localhost
 ```
 
-This manifest deploys a simple "Hello world!" component that uses the `wasi:http` interface to the `default` hostgroup, making it available to call via HTTP from outside the cluster. 
+This manifest deploys a simple "Hello world!" component that uses the `wasi:http` interface, scheduled on the `default` hostgroup and reachable inside the cluster at `hello-world.default.svc.cluster.local`.
 
-You can deploy from the [wasmCloud-hosted manifest](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/examples/http-hello-world/manifests/workloaddeployment.yaml) with this `kubectl` command:
-
-```shell
-kubectl apply -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/examples/http-hello-world/manifests/workloaddeployment.yaml
-```
+For a kind-optimized NodePort variant that answers `curl localhost` on port 80, see the [wasmCloud-hosted hello-world manifest](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/examples/http-hello-world/manifests/workloaddeployment.yaml) used by the [Installation](../installation.mdx#deploy-a-wasm-workload) guide.
 
 :::note[]
-Learn more about `WorkloadDeployments` and other wasmCloud resources in the [Custom Resource Definitions (CRDs) section](./crds.mdx).
+Learn more about `WorkloadDeployments` and other wasmCloud resources in the [Custom Resource Definitions (CRDs) section](./crds.mdx). For the full Service-routing walk-through, see [Expose a Workload via Kubernetes Service](../recipes/expose-workload-via-kubernetes-service.mdx).
 :::
 
-Now you can use `curl` to invoke the component with an HTTP request:
+Verify the component is reachable from inside the cluster:
 
 ```shell
-curl localhost -i
+kubectl run curl --rm -it --image=curlimages/curl --restart=Never -- \
+  curl -s http://hello-world.default.svc.cluster.local
 ```
 ```text
 Hello from wasmCloud!
@@ -206,10 +213,11 @@ Hello from wasmCloud!
 
 ## Clean up
 
-Delete the workload deployment:
+Delete the workload deployment and its Service:
 
 ```shell
 kubectl delete workloaddeployment hello-world
+kubectl delete service hello-world
 ```
 
 Uninstall wasmCloud:
