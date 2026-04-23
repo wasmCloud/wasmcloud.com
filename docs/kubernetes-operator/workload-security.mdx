@@ -1,0 +1,102 @@
+---
+title: 'Workload Security'
+description: 'Security model and controls for wasmCloud components running on Kubernetes'
+---
+
+wasmCloud workload security operates in two complementary layers:
+
+- **The WebAssembly sandbox** — enforced by the [Wasmtime](https://wasmtime.dev/) runtime, which provides strong isolation guarantees for every component by default
+- **Kubernetes controls** — NetworkPolicy for host pods, and RBAC for the operator and gateway ServiceAccounts
+
+This page covers the sandbox model, `allowedHosts`, and NetworkPolicy. For RBAC configuration, see [Roles and Role Bindings](./operator-manual/roles-and-rolebindings.mdx).
+
+## The WebAssembly sandbox
+
+Every wasmCloud component runs inside the [Wasmtime](https://wasmtime.dev/) WebAssembly runtime, which provides strong, runtime-enforced isolation regardless of what the component code does:
+
+- **Memory isolation** — each component instance has its own linear memory. One component cannot read or write another's memory, and cannot access the host process's memory.
+- **No implicit system access** — components cannot open files, make network connections, read environment variables, or call system APIs unless the host explicitly provides an implementation of the corresponding WASI interface.
+- **Capability-based access** — a component can only use a capability if it declares the relevant WIT interface import *and* the host has a matching plugin bound to that interface. Undeclared capabilities are structurally unreachable, not merely blocked at runtime.
+
+In practice this means the security posture of a component is determined by what it imports, what the operator mounts via `localResources`, and what `hostInterfaces` are bound to it. A component with no `hostInterfaces` and no `localResources` has no access to anything outside its own computation.
+
+:::tip
+Use `wash inspect <component.wasm>` to see exactly which interfaces a component imports before deploying it.
+:::
+
+## Restricting outbound HTTP with `allowedHosts`
+
+When a component has the `wasi:http/outgoing-handler` interface bound, it can make outbound HTTP requests. Use `allowedHosts` to restrict which URLs it may call:
+
+```yaml
+components:
+  - name: http-component
+    image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+    localResources:
+      allowedHosts:
+        - https://api.example.com
+        - https://storage.googleapis.com
+```
+
+Any request to a URL not on the list is blocked by the host before it leaves the process. This is enforced at the wasmCloud level, independently of any Kubernetes NetworkPolicy.
+
+:::note
+`allowedHosts` controls outbound HTTP calls made via `wasi:http/outgoing-handler`. It does not restrict network access that may be available through other host interfaces that are explicitly bound to the component.
+:::
+
+## Kubernetes NetworkPolicy for host pods
+
+The wasmCloud Helm chart does not include a `NetworkPolicy` by default. In environments where network isolation is required, you can apply one manually.
+
+Host pods carry the labels `wasmcloud.com/hostgroup: <group>` and `wasmcloud.com/name: hostgroup`. A baseline policy that allows only the traffic the host pods need looks like this:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wasmcloud-hostgroup
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      wasmcloud.com/name: hostgroup
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow the Runtime Gateway to forward HTTP requests to host pods
+    - from:
+        - podSelector:
+            matchLabels:
+              wasmcloud.com/name: runtime-gateway
+      ports:
+        - port: 80
+  egress:
+    # Allow outbound to NATS for control-plane communication
+    - to:
+        - podSelector:
+            matchLabels:
+              wasmcloud.com/name: nats
+      ports:
+        - port: 4222
+    # Allow DNS resolution
+    - ports:
+        - port: 53
+          protocol: UDP
+```
+
+:::note
+The exact pod label selectors depend on your Helm release name and values. Verify the labels on your gateway and NATS pods before applying this policy:
+
+```shell
+kubectl get pods --show-labels -n <namespace>
+```
+:::
+
+If your components make outbound HTTP calls via `wasi:http/outgoing-handler`, you will also need to add egress rules for ports 80 and 443 to allow those requests to leave the host pod. Combine this with `allowedHosts` for defense in depth — NetworkPolicy enforces the Kubernetes-level boundary, while `allowedHosts` enforces the wasmCloud-level boundary.
+
+## Related documentation
+
+- [Roles and Role Bindings](./operator-manual/roles-and-rolebindings.mdx) — RBAC for the operator and gateway ServiceAccounts, including namespace-scoped restrictions
+- [Secrets and Configuration Management](./operator-manual/secrets-and-configuration.mdx) — supplying sensitive values to components via Kubernetes Secrets
+- [Custom Resource Definitions](./crds.mdx) — full field reference for `allowedHosts`, `hostInterfaces`, and other workload controls
