@@ -15,9 +15,17 @@ This guide walks through reading `wasi:cli/environment` from a Rust component an
 The [Secrets and Configuration Management](../../../../kubernetes-operator/operator-manual/secrets-and-configuration.mdx) page in the Operator Manual describes how the Kubernetes operator injects values via `wasi:cli/environment`. This guide covers the component author's side: how to read those values in Rust.
 :::
 
-`wasi:cli/environment` is bundled into [`wstd`](https://github.com/bytecodealliance/wstd) through its `wasip2` dependency. You can read configuration directly through `wasi::cli::environment::get_environment` without adding `wit-bindgen` or any new dependency to your `Cargo.toml`. If your component already depends on `wstd` for HTTP, the import is free.
+`wasi:cli/environment` is provided by the [`wasip2`](https://crates.io/crates/wasip2) crate maintained by the Bytecode Alliance. `wstd` already depends on `wasip2` internally, but does not re-export it publicly, so you add `wasip2` as a direct dependency and call `wasip2::cli::environment::get_environment` from your handler. No `wit-bindgen` setup is required.
 
-## Step 1: Read configuration values
+## Step 1: Add the dependency
+
+```toml title="Cargo.toml"
+[dependencies]
+wasip2 = "1.0"
+wstd = "0.6"
+```
+
+## Step 2: Read configuration values
 
 Add a helper that reads all key-value pairs into a `HashMap` for convenient lookup:
 
@@ -26,7 +34,7 @@ use std::collections::HashMap;
 use wstd::http::{Body, Request, Response};
 
 fn load_config() -> HashMap<String, String> {
-    wstd::wasi::cli::environment::get_environment()
+    wasip2::cli::environment::get_environment()
         .into_iter()
         .collect()
 }
@@ -55,7 +63,7 @@ Call `get_environment()` (or your `load_config` helper) inside each request hand
 
 `get_environment` is synchronous in WIT. It returns `Vec<(String, String)>` directly without an `async` wrapper. Your handler can be synchronous or asynchronous — the call works the same way either way.
 
-## Step 2: Provide configuration values
+## Step 3: Provide configuration values
 
 ### In production (Kubernetes manifests)
 
@@ -192,9 +200,9 @@ wasm-tools component wit target/wasm32-wasip2/release/<crate>.wasm | grep enviro
 
 You should see a line like `import wasi:cli/environment@0.2.x`. The exact patch version is governed by the `wasip2` crate version that `wstd` resolves to.
 
-## Without `wstd`: the `wit-bindgen` path
+## Alternative: the `wit-bindgen` path
 
-If your component does not use `wstd`, you can still call `wasi:cli/environment` by generating bindings with `wit-bindgen`:
+If you would rather not depend on `wasip2` directly, you can declare the import in your WIT world and generate bindings with `wit-bindgen`:
 
 ```wit title="wit/world.wit"
 package wasmcloud:my-component;
@@ -216,12 +224,12 @@ use bindings::wasi::cli::environment::get_environment;
 let config: std::collections::HashMap<String, String> = get_environment().into_iter().collect();
 ```
 
-The function name and signature are identical to the `wstd`-bundled path. Choose whichever fits your existing setup.
+The function name and signature are identical to the `wasip2` crate path. Choose whichever fits your existing setup.
 
 ## Summary: checklist for adding configuration
 
-1. **Read configuration through `wasi::cli::environment::get_environment`**. If you depend on `wstd`, the function is already available under `wstd::wasi::cli::environment::get_environment`. Otherwise, declare the import in `wit/world.wit` and generate bindings with `wit-bindgen`.
-2. **Call `get_environment()` inside request handlers**, not at module scope.
+1. **Add `wasip2 = "1.0"` to `Cargo.toml`** (or use `wit-bindgen` if you prefer to declare the import in your WIT world).
+2. **Call `wasip2::cli::environment::get_environment()` inside request handlers**, not at module scope.
 3. **Collect into a `HashMap`** for ergonomic key lookup: `get_environment().into_iter().collect::<HashMap<_, _>>()`.
 4. **Provide fallback defaults** with `unwrap_or_else` for every value your component reads. This keeps the component functional during `wash dev` when no configuration is injected.
 5. **In production**, provide values via `localResources.environment` in your Kubernetes manifest, using `config:`, `configFrom:`, or `secretFrom:` as appropriate.

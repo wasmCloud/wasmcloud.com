@@ -22,15 +22,21 @@ This is different from key-value or blob storage. Instead of storing data in an 
 Components have **no filesystem access by default**. Directories must be explicitly mounted via volume configuration in `wash dev` or via `volumeMounts` in a WorkloadDeployment manifest. A component can only access the directories that have been preopened for it; it cannot traverse outside those mount points. For details on deploying with volumes, see [Filesystems and Volumes](../../../../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx).
 :::
 
-`wasi:filesystem` is bundled into [`wstd`](https://github.com/bytecodealliance/wstd) through its `wasip2` dependency, so you can use it without adding `wit-bindgen`. The examples below use the `wstd`-bundled path. A `wit-bindgen` variant is described at the end.
+`wasi:filesystem` is provided by the [`wasip2`](https://crates.io/crates/wasip2) crate maintained by the Bytecode Alliance. `wstd` already depends on `wasip2` internally but does not re-export it publicly, so you add `wasip2` as a direct dependency. The examples below use this path. A `wit-bindgen` variant is described at the end.
 
-## Step 1: Read preopens with `wstd`
+```toml title="Cargo.toml"
+[dependencies]
+wasip2 = "1.0"
+wstd = "0.6"
+```
+
+## Step 1: Read preopens
 
 `get_directories` returns a `Vec<(Descriptor, String)>`. Each tuple pairs a directory descriptor with its mount path inside the component:
 
 ```rust title="src/lib.rs"
-use wstd::wasi::filesystem::preopens::get_directories;
-use wstd::wasi::filesystem::types::Descriptor;
+use wasip2::filesystem::preopens::get_directories;
+use wasip2::filesystem::types::Descriptor;
 
 fn open_preopen(path: &str) -> Option<Descriptor> {
     get_directories()
@@ -58,7 +64,7 @@ File descriptors expose:
 ### Reading a file
 
 ```rust
-use wstd::wasi::filesystem::types::{DescriptorFlags, OpenFlags, PathFlags};
+use wasip2::filesystem::types::{DescriptorFlags, OpenFlags, PathFlags};
 
 fn read_file(dir: &Descriptor, name: &str) -> Result<String, String> {
     let file = dir
@@ -99,7 +105,7 @@ fn write_file(dir: &Descriptor, name: &str, data: &[u8]) -> Result<u64, String> 
 ### Listing entries
 
 ```rust
-use wstd::wasi::filesystem::types::DescriptorType;
+use wasip2::filesystem::types::DescriptorType;
 
 struct Entry {
     name: String,
@@ -139,8 +145,8 @@ use axum::{
     routing::get,
 };
 use serde::Serialize;
-use wstd::wasi::filesystem::preopens::get_directories;
-use wstd::wasi::filesystem::types::{
+use wasip2::filesystem::preopens::get_directories;
+use wasip2::filesystem::types::{
     Descriptor, DescriptorFlags, DescriptorType, OpenFlags, PathFlags,
 };
 
@@ -264,6 +270,7 @@ The `Cargo.toml` for this pattern:
 axum = { version = "0.8", default-features = false, features = ["json", "matched-path"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+wasip2 = "1.0"
 wstd = "0.6"
 wstd-axum = "0.6"
 ```
@@ -334,9 +341,9 @@ Important notes:
 - The `mountPath` in the manifest corresponds to the guest path the component sees in `get_directories()`.
 - You do not need to declare `wasi:filesystem` under `hostInterfaces`.
 
-## Without `wstd`: the `wit-bindgen` path
+## Alternative: the `wit-bindgen` path
 
-If your component does not depend on `wstd`, declare the imports in your WIT world and generate bindings with `wit-bindgen`:
+If you would rather declare the imports in your WIT world and generate bindings with `wit-bindgen`:
 
 ```wit title="wit/world.wit"
 package wasmcloud:my-component;
@@ -362,7 +369,7 @@ The function and type names are identical between paths.
 
 ## Summary: checklist for adding filesystem access
 
-1. **Decide on the binding path**. If your component uses `wstd`, read filesystem types under `wstd::wasi::filesystem::*`. Otherwise, declare the imports in `wit/world.wit` and use `wit_bindgen::generate!`.
+1. **Decide on the binding path**. The simplest option is to add `wasip2 = "1.0"` to `Cargo.toml` and read filesystem types from `wasip2::filesystem::*`. Otherwise, declare the imports in `wit/world.wit` and use `wit_bindgen::generate!`.
 2. **Use `get_directories()`** to discover preopened mounts. Look up the descriptor whose mount path matches the directory you need.
 3. **Open files with `open_at`** using the appropriate `OpenFlags` and `DescriptorFlags` bitflags.
 4. **Read with `file.read(length, offset)`** and write with `file.write(buffer, offset)`. Both return `Result` types.
