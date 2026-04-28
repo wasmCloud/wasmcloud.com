@@ -42,7 +42,7 @@ The compiled component is written to `target/wasm32-wasip2/release/<crate_name>.
 `wstd` handles WASI bindings internally through its dependency on the [`wasip2`](https://crates.io/crates/wasip2) crate. For standard HTTP components, `wstd` is the only dependency you need.
 
 :::note[`wstd` is a transitional library]
-`wstd` exists because mainstream async runtimes like `tokio` and `async-std` do not yet support WASI 0.2. Once they do, the `wstd` project recommends migrating to those runtimes. The API is designed to make that migration straightforward.
+`wstd` exists because mainstream async runtimes like `tokio` and `async-std` do not yet provide a complete WASI 0.2 story for HTTP-export components. As of `tokio` 1.51, `tokio` supports `wasm32-wasip2` for raw socket networking via `wasi:sockets`, but it does not yet drive the `wasi:http/incoming-handler` export that wasmCloud HTTP components rely on. Once mainstream runtimes cover that path, the `wstd` project recommends migrating to them. The API is designed to make that migration straightforward.
 :::
 
 Available modules:
@@ -62,6 +62,73 @@ Available modules:
 [`wit-bindgen`](https://github.com/bytecodealliance/wit-bindgen) is a lower-level tool that generates Rust code from WIT interface definitions. You don't need `wit-bindgen` for standard HTTP components — `wstd` handles those bindings internally. However, `wit-bindgen` is essential when you need to use WASI interfaces that aren't included in `wstd`, such as `wasi:keyvalue` or `wasi:config`.
 
 See [Adding custom WASI interfaces](#adding-custom-wasi-interfaces) for details on using `wstd` and `wit-bindgen` together.
+
+## Async runtime: when to use `wstd` vs `tokio`
+
+Both `wstd` and `tokio` 1.51+ compile against `wasm32-wasip2`. Choosing between them comes down to what your component exports, since the two runtimes solve different parts of the problem.
+
+| Use case | Runtime |
+|---|---|
+| Component exports `wasi:http/incoming-handler` (HTTP service) | `wstd` (or [`wstd-axum`](https://docs.rs/wstd-axum) for routing) |
+| Component is a long-running TCP server or client over `wasi:sockets` | `tokio` 1.51+ with `RUSTFLAGS="--cfg tokio_unstable"` |
+| Component uses tokio sync primitives (`Mutex`, `mpsc`, `oneshot`) as in-process utilities | `wstd` for the runtime, with `tokio = { version = "1.51", features = ["sync"] }` as a passive dependency |
+
+### Why HTTP components stay on `wstd`
+
+Tokio's wasip2 work covers `wasi:sockets` networking. It does not provide a bridge to `wasi:http/incoming-handler`. The `wstd-axum` crate, which adapts an `axum::Router` onto the wasi-http export, explicitly disables `tokio` and `hyper` integrations: a Wasm component receives HTTP through host-imported interfaces, not raw sockets, so the standard tokio-and-hyper path doesn't apply.
+
+Pulling tokio's runtime into an HTTP-export component also expands the WASI capability surface the component demands. The diff below shows the imports of two functionally equivalent components that build cleanly. The first uses `wstd` only; the second initializes a `tokio` current-thread runtime inside an `incoming-handler` implementation.
+
+```text title="wstd-only component (minimal)"
+import wasi:io/poll@0.2.9
+import wasi:io/streams@0.2.9
+import wasi:io/error@0.2.9
+import wasi:http/types@0.2.9
+import wasi:cli/{stderr, environment, exit}@0.2.9
+import wasi:clocks/monotonic-clock@0.2.9
+import wasi:random/insecure-seed@0.2.9
+export wasi:http/incoming-handler@0.2.9
+```
+
+```text title="tokio-runtime-inside-handler component (over-broad)"
+import wasi:http/types@0.2.4
+import wasi:io/{poll, streams, error}@0.2.6
+import wasi:sockets/{network, tcp}@0.2.6
+import wasi:filesystem/{types, preopens}@0.2.6
+import wasi:cli/{environment, exit, stdin, stdout, stderr}@0.2.6
+import wasi:clocks/{monotonic-clock, wall-clock}@0.2.6
+import wasi:random/insecure-seed@0.2.6
+export wasi:http/incoming-handler@0.2.2
+```
+
+The second component imports `wasi:sockets/*` and `wasi:filesystem/*` it never uses, and the version skew between `wasi:http/types@0.2.4` and the `0.2.6` cluster makes it fragile to link against most hosts. Stick to `wstd` (or `wstd-axum`) for any component that exports HTTP.
+
+### When tokio is the right answer
+
+If your component opens raw TCP listeners or connects out over TCP, tokio's wasip2 path is the supported runtime. The wasmCloud [`service-tcp`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/service-tcp) template is the canonical example. Cargo features that work on `wasm32-wasip2`:
+
+- `sync`, `macros`, `rt`, `time`, `io-util`, `net`
+
+Cargo features that do not work on `wasm32-wasip2` today:
+
+- `fs` (no `tokio::fs`)
+- DNS lookups (`tokio::net::lookup_host`)
+- Multi-threading (`rt-multi-thread`)
+- Signal handling
+
+Use `#[tokio::main(flavor = "current_thread")]`. wasip2 is single-threaded.
+
+### Tokio sync primitives inside a `wstd` component
+
+If a library you depend on wants `tokio::sync::Mutex` or you want `mpsc` for in-component fan-out, you can pull tokio in as a passive utility crate without contaminating the WASI import surface:
+
+```toml title="Cargo.toml"
+[dependencies]
+wstd = "0.6"
+tokio = { version = "1.51", features = ["sync"] }
+```
+
+Verified component imports match a `wstd`-only build, byte for byte. Avoid widening to `features = ["full"]` or enabling `rt`/`net`/`fs` in this configuration: that pulls mio into the dep tree and the surface expands as in the second example above.
 
 ## Handling HTTP requests
 
@@ -95,6 +162,33 @@ Key points:
 - Route matching is manual (pattern match on `req.uri().path()`). For complex routing, you can use helper functions or a lightweight router crate.
 - `Response::new()` creates a 200 OK response. Use `Response::builder()` for custom status codes or headers.
 - Handler functions can be `async`, enabling outgoing HTTP calls, key-value operations, or other async work within a request.
+
+### Routing with `wstd-axum`
+
+For anything more involved than a single handler, [`wstd-axum`](https://docs.rs/wstd-axum) lets you write the component using the [`axum`](https://docs.rs/axum) framework. `wstd-axum` adapts an `axum::Router` onto `wasi:http/incoming-handler`:
+
+```rust
+use axum::{Router, routing::get};
+
+#[wstd_axum::http_server]
+fn main() -> Router {
+    Router::new()
+        .route("/", get(|| async { "Hello from wasmCloud!\n" }))
+        .route("/api/greet/{name}", get(|axum::extract::Path(name): axum::extract::Path<String>|
+            async move { format!("Hello, {name}!\n") }))
+}
+```
+
+`Cargo.toml` must opt out of axum's default features and only enable feature flags that don't require `tokio` or `hyper`:
+
+```toml
+[dependencies]
+axum = { version = "0.8", default-features = false, features = ["json", "query", "matched-path"] }
+wstd = "0.6"
+wstd-axum = "0.6"
+```
+
+The wasmCloud [`http-service`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-service) template demonstrates this pattern end to end.
 
 ### Outgoing HTTP requests
 
@@ -354,7 +448,8 @@ Any Rust crate that compiles to `wasm32-wasip2` works inside a Wasm component. T
 
 ### What does not work
 
-- **`tokio`, `async-std`, `smol`** — mainstream async runtimes do not yet support WASI 0.2. `wstd` exists specifically to fill this gap. When these runtimes add WASI 0.2 support, migration from `wstd` is expected to be straightforward.
+- **`tokio` for `wasi:http/incoming-handler` components** — `tokio` 1.51+ supports `wasm32-wasip2` for raw socket networking, but it does not bridge to `wasi:http/incoming-handler`. Use `wstd` (or `wstd-axum`) for HTTP-export components. See [Async runtime: when to use `wstd` vs `tokio`](#async-runtime-when-to-use-wstd-vs-tokio).
+- **`async-std`, `smol`** — these mainstream async runtimes do not yet support WASI 0.2.
 - **Crates that use `std::net` or `std::fs` directly** — these require OS-level syscalls not available in the Wasm sandbox. Use `wstd::net` and WASI filesystem interfaces instead.
 - **Crates with native C dependencies** — anything that links to a C library via `build.rs` (e.g., `openssl-sys`, `libsqlite3-sys`) will not compile for `wasm32-wasip2`.
 - **Crates using threads** — `std::thread` is not available in WASI 0.2. Async concurrency through `wstd` is the alternative.
@@ -372,7 +467,7 @@ Any Rust crate that compiles to `wasm32-wasip2` works inside a Wasm component. T
 Use `wash new` to scaffold a Rust component project:
 
 ```shell
-wash new https://github.com/wasmCloud/wasmCloud.git --name hello --subfolder examples/http-hello-world
+wash new https://github.com/wasmCloud/wasmCloud.git --name hello --subfolder templates/http-hello-world
 ```
 
 ### Development loop
@@ -419,11 +514,24 @@ wasm-tools component wit target/wasm32-wasip2/release/my_component.wasm
 
 This prints the resolved WIT world, showing exactly which interfaces the component imports and exports.
 
+## Working with WASI interfaces
+
+These guides walk through adding WASI interfaces to a Rust component:
+
+- [Key-Value Storage](./key-value-storage.mdx) — replace an in-memory data store with persistent key-value storage
+- [Messaging](./messaging.mdx) — implement communication between components over a messaging interface
+- [Filesystem](./filesystem.mdx) — read and write files from preopened directories
+- [Configuration](./configuration.mdx) — read configuration values injected from Kubernetes ConfigMaps, Secrets, and inline environment variables
+
+The patterns in these guides (declaring WIT imports, generating bindings via `wit-bindgen` alongside `wstd`, handling serialization) apply to any WASI interface you add to a Rust component.
+
 ## Further reading
 
 - [Developer Guide](../../index.mdx?lang=rust) — quickstart tutorial for creating, building, and running a Rust component
+- [wasmCloud Rust templates](https://github.com/wasmCloud/wasmCloud/tree/main/templates) — project templates for the most common starting points
 - [wasmCloud Rust examples](https://github.com/wasmCloud/wasmCloud/tree/main/examples) — example projects in the `wash` repository
 - [`wstd` documentation](https://docs.rs/wstd) — API reference for the async Wasm standard library
+- [`wstd-axum` documentation](https://docs.rs/wstd-axum) — `axum` adapter for `wasi:http/incoming-handler`
 - [`wstd` repository](https://github.com/bytecodealliance/wstd) — source code and examples
 - [`wit-bindgen` documentation](https://docs.rs/wit-bindgen) — API reference for the WIT bindings generator
 - [`wasm32-wasip2` platform support](https://doc.rust-lang.org/nightly/rustc/platform-support/wasm32-wasip2.html) — Rust target documentation

@@ -1,0 +1,429 @@
+---
+title: 'Messaging'
+sidebar_position: 2
+---
+
+You can add messaging capabilities to a Rust component with the [`wasmcloud:messaging`](https://github.com/wasmCloud/wasmCloud/tree/main/wit/messaging.wit) interface.
+
+This guide walks through the wasmCloud [`http-api-with-distributed-workloads`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-api-with-distributed-workloads) Rust template, which dispatches work from an HTTP API to a background component over a message broker. You can use it as a model for adding `wasmcloud:messaging` to your own components.
+
+## Overview
+
+Messaging typically spans **at least two components**. A component can import `consumer` to publish events without a handler in the same deployment; for example, the component might publish audit events that an external NATS subscriber consumes. A handler can also receive messages from multiple senders.
+
+The example template demonstrates a two-component request-reply pattern that may serve as a starting point. The template consists of:
+
+- **`http-api`** — An HTTP component that accepts a `POST /task` request and uses `wasmcloud:messaging/consumer` to dispatch a request message and await its reply.
+- **`task-leet`** — A headless component that exports `wasmcloud:messaging/handler` to receive messages, process them (in this case, leet-speak the payload), and publish a reply.
+
+![Messaging flow](../../../images/messaging-flow.svg)
+
+:::info[NATS in production]
+`wasmcloud:messaging` uses NATS as its production transport, built into the wasmCloud runtime. During development with `wash dev`, messaging is handled in-process and no NATS server is required. In production, the runtime connects to NATS automatically when the host starts with a NATS URL.
+:::
+
+The template is organized as a Cargo workspace with two crates and a shared `wit/world.wit`:
+
+```
+http-api-with-distributed-workloads/
+├── Cargo.toml          # workspace, declares both crates
+├── wit/
+│   └── world.wit       # shared WIT worlds for both crates
+├── http-api/
+│   ├── Cargo.toml
+│   └── src/lib.rs      # imports consumer, exports HTTP handler
+└── task-leet/
+    ├── Cargo.toml
+    └── src/lib.rs      # exports handler, imports consumer for replies
+```
+
+`wasmcloud:messaging` is **not** bundled into `wstd`. Both crates use `wit-bindgen` to generate bindings for the messaging interfaces. The `http-api` crate combines `wit-bindgen`-generated `consumer` bindings with `wstd`'s `#[http_server]` macro for the HTTP export. The `task-leet` crate uses `wit-bindgen` only.
+
+:::tip[Complete example]
+A full working example is available as a template:
+```shell
+wash new https://github.com/wasmCloud/wasmCloud.git \
+  --name http-api-with-distributed-workloads \
+  --subfolder templates/http-api-with-distributed-workloads
+```
+:::
+
+## Step 1: Declare the WIT worlds
+
+Both components share a single `wit/world.wit`. The HTTP API only sends messages, so it imports `consumer` only. The worker receives messages and replies, so it both imports `consumer` and exports `handler`:
+
+```wit title="wit/world.wit"
+package wasmcloud:template@0.1.0;
+
+// wasi:http/incoming-handler is exported via wstd's #[http_server] proc macro,
+// so it does not appear explicitly in the http-api world.
+world http-api {
+  import wasmcloud:messaging/consumer@0.2.0;
+}
+
+world task {
+  import wasmcloud:messaging/consumer@0.2.0;
+  export wasmcloud:messaging/handler@0.2.0;
+}
+```
+
+### What these interfaces provide
+
+| Interface | Direction | Purpose |
+|---|---|---|
+| [`wasmcloud:messaging/consumer`](https://github.com/wasmCloud/wasmCloud/blob/main/wit/messaging.wit) | import | Send messages (`request`, `publish`) |
+| [`wasmcloud:messaging/handler`](https://github.com/wasmCloud/wasmCloud/blob/main/wit/messaging.wit) | export | Receive messages (`handle-message`) |
+
+The underlying message type used by both interfaces:
+
+```wit
+record broker-message {
+  subject: string,
+  body: list<u8>,       // Vec<u8> in Rust
+  reply-to: option<string>,
+}
+```
+
+### How dependency resolution works
+
+When you run `wash dev` or `wash build`, the build pipeline calls `wash wit fetch` as a setup step. `wasmcloud:messaging` is hosted at the `wasmcloud.com` package registry, distinct from the `wasi.dev` registry used for standard WASI interfaces. Both registries are resolved automatically; no extra configuration is required.
+
+## Step 2: Use `consumer::request` from the HTTP API
+
+The `http-api` crate combines `#[wstd::http_server]` for the HTTP export with `wit-bindgen`-generated bindings for the `wasmcloud:messaging/consumer` import. Generate bindings against the `http-api` world:
+
+```rust title="http-api/src/lib.rs"
+mod bindings {
+    wit_bindgen::generate!({
+        path: "../wit",
+        world: "http-api",
+        generate_all,
+    });
+}
+
+use anyhow::Context as _;
+use bindings::wasmcloud::messaging::consumer;
+use serde::Deserialize;
+use wstd::{
+    http::{Body, Request, Response, StatusCode},
+    time::Duration,
+};
+
+#[derive(Deserialize)]
+struct TaskRequest {
+    worker: Option<String>,
+    payload: String,
+}
+
+#[wstd::http_server]
+async fn main(req: Request<Body>) -> anyhow::Result<Response<Body>> {
+    match req.uri().path() {
+        "/task" => create_task(req).await,
+        _ => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body("Not found\n".into())
+            .map_err(Into::into),
+    }
+}
+
+async fn create_task(mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
+    let task: TaskRequest = req
+        .body_mut()
+        .json()
+        .await
+        .context("failed to parse body")?;
+
+    let subject = format!("tasks.{}", task.worker.unwrap_or_else(|| "default".into()));
+    let body = task.payload.into_bytes();
+    let timeout_ms = Duration::from_secs(5).as_millis() as u32;
+
+    match consumer::request(&subject, &body, timeout_ms) {
+        Ok(reply) => Response::builder()
+            .status(StatusCode::OK)
+            .body(reply.body.into())
+            .map_err(Into::into),
+        Err(err) => Response::builder()
+            .status(StatusCode::BAD_GATEWAY)
+            .body(err.into())
+            .map_err(Into::into),
+    }
+}
+```
+
+`consumer::request(subject, body, timeout_ms)` implements the request-reply pattern. It publishes `body` to `subject`, blocks until a reply arrives (or until `timeout_ms` elapses), and returns the reply as a `BrokerMessage`. It is **synchronous** in WIT, even though we call it from an `async fn` here. There is no `await` to add.
+
+`consumer::request` returns `Result<BrokerMessage, String>`. On error (timeout, no subscriber, delivery failure), the `Err(String)` describes what went wrong.
+
+:::warning[Timeout behavior]
+If no component is subscribed to `subject` within `timeout_ms` milliseconds, `consumer::request` returns `Err`. During `wash dev`, the wasmCloud runtime routes calls in-process, so timeouts only occur if the handler itself errors or takes too long. In production, a missing NATS subscription or an unreachable server both surface as timeout errors.
+:::
+
+`http-api/Cargo.toml`:
+
+```toml title="http-api/Cargo.toml"
+[package]
+name = "http-api"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+wit-bindgen = "0.41"
+wstd = "0.6"
+```
+
+### Subject naming
+
+Subjects are arbitrary dot-separated strings following NATS subject conventions. The template uses `tasks.{worker}` so multiple worker types can each subscribe to their own sub-subject:
+
+```text
+tasks.task-worker   →  handled by the task-worker component
+tasks.summarizer    →  would be handled by a hypothetical summarizer component
+```
+
+In development with `wash dev`, all messages are routed in-process regardless of subject. Subjects only become meaningful in production where NATS subscription patterns control routing.
+
+## Step 3: Implement the handler in the worker
+
+The worker exports `wasmcloud:messaging/handler@0.2.0` and imports `consumer` so it can publish replies. Generate bindings against the `task` world:
+
+```rust title="task-leet/src/lib.rs"
+wit_bindgen::generate!({
+    path: "../wit",
+    world: "task",
+    with: {
+        "wasmcloud:messaging/types@0.2.0": generate,
+        "wasmcloud:messaging/consumer@0.2.0": generate,
+    },
+});
+
+use crate::wasmcloud::messaging::types::BrokerMessage;
+use wasmcloud::messaging::consumer;
+
+struct Component;
+export!(Component);
+
+impl exports::wasmcloud::messaging::handler::Guest for Component {
+    fn handle_message(msg: BrokerMessage) -> Result<(), String> {
+        let Some(subject) = msg.reply_to else {
+            return Err("missing reply_to".to_string());
+        };
+
+        let payload = String::from_utf8(msg.body.to_vec())
+            .map_err(|e| format!("failed to decode body: {e}"))?;
+
+        consumer::publish(&BrokerMessage {
+            subject,
+            body: to_leet_speak(&payload).into(),
+            reply_to: None,
+        })
+    }
+}
+
+fn to_leet_speak(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| match c.to_ascii_lowercase() {
+            'a' => '4',
+            'e' => '3',
+            'i' => '1',
+            'o' => '0',
+            's' => '5',
+            't' => '7',
+            'l' => '1',
+            _ => c,
+        })
+        .collect()
+}
+```
+
+`exports::wasmcloud::messaging::handler::Guest::handle_message` is the export shape `wit-bindgen` generates for `export wasmcloud:messaging/handler@0.2.0`. Implement it on a unit struct and call `export!` to register the implementation.
+
+`handle_message` returns `Result<(), String>`. Returning `Err` propagates back to the caller; if the sender called `consumer::request`, the `Err` surfaces there as the request's `Err` variant.
+
+`consumer::publish(&msg)` is fire-and-forget delivery. It returns `Result<(), String>`, but since the worker is the last hop in this template, the calling pattern is `?` to propagate any delivery failure.
+
+`task-leet/Cargo.toml`:
+
+```toml title="task-leet/Cargo.toml"
+[package]
+name = "task-leet"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.41"
+wstd = "0.6"
+```
+
+### Fire-and-forget handlers
+
+If a handler does not need to reply (one-way notification pattern), omit the `consumer::publish` call:
+
+```rust
+impl exports::wasmcloud::messaging::handler::Guest for Component {
+    fn handle_message(msg: BrokerMessage) -> Result<(), String> {
+        let event = serde_json::from_slice::<Event>(&msg.body)
+            .map_err(|e| format!("decode: {e}"))?;
+        process_event(event); // side effects only, no reply
+        Ok(())
+    }
+}
+```
+
+## Step 4: Configure multi-component development
+
+A multi-crate workspace has a root `Cargo.toml` that lists each crate as a workspace member, plus a root `.wash/config.yaml` that points `component_path` at the primary component (the HTTP API) and lists the additional component under `dev: components:`:
+
+```toml title="Cargo.toml (workspace root)"
+[workspace]
+resolver = "3"
+members = ["http-api", "task-leet"]
+
+[workspace.package]
+edition = "2024"
+
+[workspace.dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+wit-bindgen = "0.41"
+wstd = "0.6"
+```
+
+```yaml title=".wash/config.yaml"
+build:
+  command: cargo build --target wasm32-wasip2 --release
+  component_path: target/wasm32-wasip2/release/http_api.wasm
+
+dev:
+  components:
+    - name: task-leet
+      file: target/wasm32-wasip2/release/task_leet.wasm
+```
+
+The `dev: components:` list tells `wash dev` to deploy the worker alongside the main component. `wash dev` automatically links both components through the wasmCloud runtime; no NATS server is required during development.
+
+## Build and verify
+
+```shell
+wash dev
+```
+
+`wash dev` builds both crates, starts an HTTP server on port 8000, and routes messaging calls between the components in-process.
+
+```shell
+# Send a task — the worker converts the payload to leet speak
+curl -s -X POST http://localhost:8000/task \
+  -H 'Content-Type: application/json' \
+  -d '{"worker": "task-leet", "payload": "Hello World"}'
+```
+
+```text
+H3110 W0r1d
+```
+
+A request without a payload returns `400`:
+
+```shell
+curl -s -X POST http://localhost:8000/task \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+## Production deployment
+
+Both components run on the same wasmCloud host. Start the host with a NATS URL; the runtime's built-in messaging plugin connects to NATS automatically. Deploy both components together with a `WorkloadDeployment` manifest:
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: http-api-with-distributed-workloads
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: your-domain.example.com
+        - namespace: wasmcloud
+          package: messaging
+          interfaces:
+            - consumer
+            - handler
+          config:
+            subscriptions: "tasks.>"
+      components:
+        - name: http-api
+          image: <registry>/http-api:latest
+        - name: task-leet
+          image: <registry>/task-leet:latest
+```
+
+Key points about the manifest:
+
+- **`hostInterfaces`** declares which built-in host capabilities the workload needs. No separate HTTP server or NATS component is listed; both are provided by the runtime.
+- **`interfaces: [consumer, handler]`** declares both the sending and receiving sides of the messaging interface. The runtime automatically wires subscriptions to the component that exports `handler` (the worker), not to the HTTP API which only imports `consumer`.
+- **`subscriptions`** is a comma-separated list of NATS subject patterns. `tasks.>` matches any subject starting with `tasks.`, covering any number of worker types.
+- **HTTP `host` config** is the Host header the runtime uses to route incoming HTTP requests to this workload. The actual listen address is set at host startup (`--http-addr`).
+
+:::info[Subject-based routing in production]
+Because NATS subscriptions are configured per-workload at deploy time, subject naming becomes a contract between sender and handler. The `tasks.{worker}` convention in this template means each worker type can be independently scaled and replaced without modifying the HTTP API. Deploy a new worker with its own subscription and the API keeps working unchanged.
+:::
+
+## Summary: checklist for adding `wasmcloud:messaging`
+
+**For a component that sends messages (consumer):**
+
+1. **Add `import wasmcloud:messaging/consumer@0.2.0` to its WIT world**.
+2. **Add `wit-bindgen` to `Cargo.toml`** and generate bindings with `wit_bindgen::generate!`.
+3. **Call `consumer::request(subject, body, timeout_ms)`** for request-reply; it returns `Result<BrokerMessage, String>`.
+4. **Call `consumer::publish(&msg)`** for fire-and-forget delivery; it returns `Result<(), String>`.
+
+**For a component that handles messages (handler):**
+
+1. **Add both `import wasmcloud:messaging/consumer@0.2.0` and `export wasmcloud:messaging/handler@0.2.0` to its WIT world**. The import is needed for `publish()` (replies); the export declares the handler.
+2. **Implement `exports::wasmcloud::messaging::handler::Guest::handle_message`** on a unit struct and call `export!`.
+3. **Use `msg.reply_to`** to find the reply subject for request-reply patterns; call `consumer::publish` to respond.
+4. **Return `Err(String)` to signal failure** — the value propagates back to the caller.
+
+**For multi-component development:**
+
+1. **Use a Cargo workspace** with each component as a workspace member.
+2. **Declare `dev: components:` in root `.wash/config.yaml`** with the path to each additional component's `.wasm` file.
+3. **`wash dev` routes messages in-process** — no NATS server required during development.
+4. **In production**, use a `WorkloadDeployment` manifest with a `wasmcloud:messaging` `hostInterface` entry. Include `handler` in the interfaces list and set `subscriptions` in the `config` block.
+
+## API reference: `wasmcloud:messaging` functions used
+
+| Function | Signature | Description |
+|---|---|---|
+| `consumer::request(subject, body, timeout_ms)` | `fn(&str, &[u8], u32) -> Result<BrokerMessage, String>` | Publish to `subject` and block until a reply arrives or `timeout_ms` elapses. |
+| `consumer::publish(msg)` | `fn(&BrokerMessage) -> Result<(), String>` | Fire-and-forget publish. |
+| `handler::Guest::handle_message(msg)` | `fn(BrokerMessage) -> Result<(), String>` | Called by the runtime for each delivered message. Return `Err` to signal failure. |
+
+**`BrokerMessage` fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `subject` | `String` | The message subject (NATS topic) |
+| `body` | `Vec<u8>` | Raw message payload |
+| `reply_to` | `Option<String>` | Reply subject set automatically by `consumer::request` |
+
+## Further reading
+
+- [Rust Language Guide](./index.mdx) — toolchain overview, HTTP patterns, async runtime guidance, and crate compatibility
+- [Key-Value Storage](./key-value-storage.mdx) — persistent state for a single component
+- [Configuration](./configuration.mdx) — read configuration values from ConfigMaps, Secrets, and inline environment variables
+- [Language Support overview](../index.mdx) — summary of all supported languages and toolchains

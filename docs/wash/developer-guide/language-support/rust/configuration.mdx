@@ -1,0 +1,244 @@
+---
+title: 'Configuration'
+sidebar_position: 4
+---
+
+You can read runtime configuration values in a Rust component with the [`wasi:cli/environment`](https://github.com/WebAssembly/wasi-cli) interface. Configuration values can be supplied from inline key-value pairs, Kubernetes ConfigMaps, and Kubernetes Secrets. All arrive through the same interface regardless of source.
+
+This guide walks through reading `wasi:cli/environment` from a Rust component and shows how to provide values via a Kubernetes workload manifest.
+
+## Overview
+
+`wasi:cli/environment` is part of the standard WASI 0.2 suite and is always available in a wasmCloud host. It exposes a `get-environment` function that returns all configuration key-value pairs available to the component. In production, values come from `localResources.environment` in a `Workload` or `WorkloadDeployment` manifest, which accepts inline key-value pairs, Kubernetes ConfigMaps, and Kubernetes Secrets.
+
+:::tip[Guidance for operators]
+The [Secrets and Configuration Management](../../../../kubernetes-operator/operator-manual/secrets-and-configuration.mdx) page in the Operator Manual describes how the Kubernetes operator injects values via `wasi:cli/environment`. This guide covers the component author's side: how to read those values in Rust.
+:::
+
+`wasi:cli/environment` is bundled into [`wstd`](https://github.com/bytecodealliance/wstd) through its `wasip2` dependency. You can read configuration directly through `wasi::cli::environment::get_environment` without adding `wit-bindgen` or any new dependency to your `Cargo.toml`. If your component already depends on `wstd` for HTTP, the import is free.
+
+## Step 1: Read configuration values
+
+Add a helper that reads all key-value pairs into a `HashMap` for convenient lookup:
+
+```rust title="src/lib.rs"
+use std::collections::HashMap;
+use wstd::http::{Body, Request, Response};
+
+fn load_config() -> HashMap<String, String> {
+    wstd::wasi::cli::environment::get_environment()
+        .into_iter()
+        .collect()
+}
+
+#[wstd::http_server]
+async fn main(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    let config = load_config();
+
+    let app_name = config
+        .get("APP_NAME")
+        .cloned()
+        .unwrap_or_else(|| "My App (dev)".to_string());
+    let upstream_url = config
+        .get("UPSTREAM_URL")
+        .cloned()
+        .unwrap_or_else(|| "http://localhost:9090".to_string());
+
+    let body = format!("app={app_name}\nupstream={upstream_url}\n");
+    Ok(Response::new(Body::from(body)))
+}
+```
+
+Call `get_environment()` (or your `load_config` helper) inside each request handler rather than at module scope. Configuration is stable for the lifetime of an invocation, but reading at module scope can run before the host has finished injecting values.
+
+### Synchronous API
+
+`get_environment` is synchronous in WIT. It returns `Vec<(String, String)>` directly without an `async` wrapper. Your handler can be synchronous or asynchronous — the call works the same way either way.
+
+## Step 2: Provide configuration values
+
+### In production (Kubernetes manifests)
+
+All configuration values are delivered to the component through the `localResources.environment` field in a `Workload` or `WorkloadDeployment` manifest. Three sources are supported and can be combined.
+
+#### Inline values
+
+The simplest approach: provide key-value pairs directly in the manifest:
+
+```yaml
+components:
+  - name: http-component
+    image: ghcr.io/your-org/your-component:latest
+    localResources:
+      environment:
+        config:
+          APP_NAME: My Service
+          UPSTREAM_URL: https://api.example.com
+```
+
+Inline values are suitable for non-sensitive configuration that is safe to store in version control.
+
+#### From a Kubernetes ConfigMap
+
+Reference a ConfigMap by name. Each key in the ConfigMap becomes a configuration value in the component:
+
+```yaml
+components:
+  - name: http-component
+    image: ghcr.io/your-org/your-component:latest
+    localResources:
+      environment:
+        configFrom:
+          - name: app-config
+```
+
+Create the ConfigMap separately:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: default
+data:
+  APP_NAME: My Service
+  UPSTREAM_URL: https://api.example.com
+```
+
+#### From a Kubernetes Secret
+
+Reference a Secret by name for sensitive values such as API keys or credentials:
+
+```yaml
+components:
+  - name: http-component
+    image: ghcr.io/your-org/your-component:latest
+    localResources:
+      environment:
+        secretFrom:
+          - name: app-secrets
+```
+
+Secret values are delivered to the component as plain strings. No decoding is required in your component code.
+
+#### Combining sources
+
+All three sources can be used together. When the same key appears in multiple sources, the order of precedence (lowest to highest) is: `config` → `configFrom` → `secretFrom`.
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDeployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      components:
+        - name: http-component
+          image: ghcr.io/your-org/your-component:latest
+          localResources:
+            environment:
+              config:
+                APP_NAME: My Service           # inline (lowest precedence)
+              configFrom:
+                - name: app-config             # non-sensitive config from ConfigMap
+              secretFrom:
+                - name: app-secrets            # sensitive values from Secret (highest precedence)
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            address: '0.0.0.0:8080'
+```
+
+:::tip
+For a complete reference to `localResources.environment` fields, including precedence rules and RBAC considerations, see [Secrets and Configuration Management](../../../../kubernetes-operator/operator-manual/secrets-and-configuration.mdx).
+:::
+
+### During development (`wash dev`)
+
+`wash dev` provides the `wasi:cli/environment` interface, but `localResources.environment` defaults to empty. There is currently no mechanism in `.wash/config.yaml` or the `wash dev` CLI to inject test configuration values into a component locally.
+
+The practical approach for development is to supply fallback defaults in your component code, as shown in the example above. This lets your component run correctly during `wash dev` while reading real values in production.
+
+## Build and verify
+
+```shell
+wash dev
+```
+
+`wash dev` builds the component and serves it on `http://localhost:8000`. With no configuration injected, your fallback defaults take effect:
+
+```shell
+curl http://localhost:8000
+```
+
+```text
+app=My App (dev)
+upstream=http://localhost:9090
+```
+
+To verify the import is correctly declared, inspect the built component:
+
+```shell
+wasm-tools component wit target/wasm32-wasip2/release/<crate>.wasm | grep environment
+```
+
+You should see a line like `import wasi:cli/environment@0.2.x`. The exact patch version is governed by the `wasip2` crate version that `wstd` resolves to.
+
+## Without `wstd`: the `wit-bindgen` path
+
+If your component does not use `wstd`, you can still call `wasi:cli/environment` by generating bindings with `wit-bindgen`:
+
+```wit title="wit/world.wit"
+package wasmcloud:my-component;
+
+world my-component {
+  import wasi:cli/environment@0.2.2;
+
+  export wasi:http/incoming-handler@0.2.2;
+}
+```
+
+```rust title="src/lib.rs"
+mod bindings {
+    wit_bindgen::generate!({ generate_all });
+}
+
+use bindings::wasi::cli::environment::get_environment;
+
+let config: std::collections::HashMap<String, String> = get_environment().into_iter().collect();
+```
+
+The function name and signature are identical to the `wstd`-bundled path. Choose whichever fits your existing setup.
+
+## Summary: checklist for adding configuration
+
+1. **Read configuration through `wasi::cli::environment::get_environment`**. If you depend on `wstd`, the function is already available under `wstd::wasi::cli::environment::get_environment`. Otherwise, declare the import in `wit/world.wit` and generate bindings with `wit-bindgen`.
+2. **Call `get_environment()` inside request handlers**, not at module scope.
+3. **Collect into a `HashMap`** for ergonomic key lookup: `get_environment().into_iter().collect::<HashMap<_, _>>()`.
+4. **Provide fallback defaults** with `unwrap_or_else` for every value your component reads. This keeps the component functional during `wash dev` when no configuration is injected.
+5. **In production**, provide values via `localResources.environment` in your Kubernetes manifest, using `config:`, `configFrom:`, or `secretFrom:` as appropriate.
+
+## API reference: `wasi:cli/environment` functions
+
+For the upstream WIT definitions, see the [`wasi:cli` 0.2.x interfaces](https://github.com/WebAssembly/wasi-cli/tree/main/wit) in the `WebAssembly/wasi-cli` repository.
+
+| Function | Signature | Description |
+|---|---|---|
+| `get_environment` | `fn() -> Vec<(String, String)>` | Returns all configuration key-value pairs. Returns an empty `Vec` if no configuration has been provided to the component. |
+| `get_arguments` | `fn() -> Vec<String>` | Returns POSIX-style command-line arguments. Not used for configuration. |
+| `initial_cwd` | `fn() -> Option<String>` | Returns the initial working directory. Not used for configuration. |
+
+## Further reading
+
+- [Secrets and Configuration Management](../../../../kubernetes-operator/operator-manual/secrets-and-configuration.mdx) — operator reference for `localResources.environment`, ConfigMaps, and Secrets
+- [Rust Language Guide](./index.mdx) — toolchain overview, HTTP patterns, async runtime guidance, and crate compatibility
+- [Key-Value Storage](./key-value-storage.mdx) — persistent key-value storage for component state
+- [Language Support overview](../index.mdx) — summary of all supported languages and toolchains

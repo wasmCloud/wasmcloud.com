@@ -128,7 +128,17 @@ const sidebars = {
       label: 'Language Support',
       link: { type: 'doc', id: 'wash/developer-guide/language-support/index' },
       items: [
-        'wash/developer-guide/language-support/rust/index',
+        {
+          type: 'category',
+          label: 'Rust Language Guide',
+          link: { type: 'doc', id: 'wash/developer-guide/language-support/rust/index' },
+          items: [
+            'wash/developer-guide/language-support/rust/key-value-storage',
+            'wash/developer-guide/language-support/rust/messaging',
+            'wash/developer-guide/language-support/rust/filesystem',
+            'wash/developer-guide/language-support/rust/configuration',
+          ],
+        },
         {
           type: 'category',
           label: 'TypeScript Language Guide',
