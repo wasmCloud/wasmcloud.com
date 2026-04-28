@@ -1,0 +1,393 @@
+---
+title: 'Filesystem'
+sidebar_position: 3
+---
+
+You can add filesystem capabilities to a Rust component with the [`wasi:filesystem`](https://github.com/WebAssembly/WASI/tree/main/proposals/filesystem) interface.
+
+This guide walks through adding filesystem access to a Rust component using `wit-bindgen` alongside `wstd`.
+
+## Overview
+
+WebAssembly components run in a sandboxed environment with no default access to the host filesystem. The `wasi:filesystem` interface provides secure, capability-based filesystem access through **preopens**: directories that are explicitly mounted into a component before instantiation.
+
+This is different from key-value or blob storage. Instead of storing data in an abstract store, your component reads and writes files in mounted directories, just as a traditional application would. `wasi:filesystem` is particularly useful for:
+
+- Serving static assets (HTML, CSS, images)
+- Reading data files
+- Writing logs or output files
+- Any workload that needs to interact with files on disk
+
+:::info[Security model]
+Components have **no filesystem access by default**. Directories must be explicitly mounted via volume configuration in `wash dev` or via `volumeMounts` in a WorkloadDeployment manifest. A component can only access the directories that have been preopened for it; it cannot traverse outside those mount points. For details on deploying with volumes, see [Filesystems and Volumes](../../../../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx).
+:::
+
+`wasi:filesystem` is bundled into [`wstd`](https://github.com/bytecodealliance/wstd) through its `wasip2` dependency, so you can use it without adding `wit-bindgen`. The examples below use the `wstd`-bundled path. A `wit-bindgen` variant is described at the end.
+
+## Step 1: Read preopens with `wstd`
+
+`get_directories` returns a `Vec<(Descriptor, String)>`. Each tuple pairs a directory descriptor with its mount path inside the component:
+
+```rust title="src/lib.rs"
+use wstd::wasi::filesystem::preopens::get_directories;
+use wstd::wasi::filesystem::types::Descriptor;
+
+fn open_preopen(path: &str) -> Option<Descriptor> {
+    get_directories()
+        .into_iter()
+        .find(|(_, mount)| mount == path)
+        .map(|(desc, _)| desc)
+}
+```
+
+In the rest of this guide, `open_preopen("/data")` returns the `Descriptor` for the `/data` mount point.
+
+## Step 2: Read and write files
+
+A `Descriptor` is a handle to an open file or directory. Directory descriptors expose:
+
+- `read_directory()` returns a `DirectoryEntryStream`
+- `open_at(...)` opens a file relative to the directory and returns a new `Descriptor`
+- `create_directory_at(name)` creates a subdirectory
+
+File descriptors expose:
+
+- `read(length, offset)` returns `Result<(Vec<u8>, bool), ErrorCode>` (data and EOF flag)
+- `write(buffer, offset)` returns `Result<u64, ErrorCode>` (bytes written)
+
+### Reading a file
+
+```rust
+use wstd::wasi::filesystem::types::{DescriptorFlags, OpenFlags, PathFlags};
+
+fn read_file(dir: &Descriptor, name: &str) -> Result<String, String> {
+    let file = dir
+        .open_at(
+            PathFlags::SYMLINK_FOLLOW,
+            name,
+            OpenFlags::empty(),
+            DescriptorFlags::READ,
+        )
+        .map_err(|e| format!("open: {e:?}"))?;
+    let (bytes, _eof) = file
+        .read(1024 * 1024, 0)
+        .map_err(|e| format!("read: {e:?}"))?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+```
+
+The first parameter to `open_at`, `PathFlags::SYMLINK_FOLLOW`, controls how symbolic links in the path are resolved. The third and fourth parameters are bitflags that control file creation behavior and access mode.
+
+### Writing a file
+
+```rust
+fn write_file(dir: &Descriptor, name: &str, data: &[u8]) -> Result<u64, String> {
+    let file = dir
+        .open_at(
+            PathFlags::SYMLINK_FOLLOW,
+            name,
+            OpenFlags::CREATE | OpenFlags::TRUNCATE,
+            DescriptorFlags::WRITE,
+        )
+        .map_err(|e| format!("open: {e:?}"))?;
+    file.write(data, 0).map_err(|e| format!("write: {e:?}"))
+}
+```
+
+`OpenFlags::CREATE | OpenFlags::TRUNCATE` overwrites an existing file or creates a new one. Use `OpenFlags::CREATE | OpenFlags::EXCLUSIVE` to fail if the file already exists.
+
+### Listing entries
+
+```rust
+use wstd::wasi::filesystem::types::DescriptorType;
+
+struct Entry {
+    name: String,
+    kind: DescriptorType,
+}
+
+fn list_entries(dir: &Descriptor) -> Result<Vec<Entry>, String> {
+    let stream = dir
+        .read_directory()
+        .map_err(|e| format!("read_directory: {e:?}"))?;
+    let mut out = Vec::new();
+    while let Some(entry) = stream
+        .read_directory_entry()
+        .map_err(|e| format!("read_directory_entry: {e:?}"))?
+    {
+        out.push(Entry {
+            name: entry.name,
+            kind: entry.type_,
+        });
+    }
+    Ok(out)
+}
+```
+
+`read_directory_entry` returns `Result<Option<DirectoryEntry>, ErrorCode>`. `Ok(None)` signals end of stream.
+
+## Step 3: A complete file server component
+
+Putting it together with `wstd-axum`:
+
+```rust title="src/lib.rs"
+use axum::{
+    Json, Router,
+    extract::Path,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::get,
+};
+use serde::Serialize;
+use wstd::wasi::filesystem::preopens::get_directories;
+use wstd::wasi::filesystem::types::{
+    Descriptor, DescriptorFlags, DescriptorType, OpenFlags, PathFlags,
+};
+
+const PREOPEN: &str = "/data";
+
+#[wstd_axum::http_server]
+fn main() -> Router {
+    Router::new()
+        .route("/", get(list))
+        .route("/files/{name}", get(read).put(write))
+}
+
+#[derive(Serialize)]
+struct Listing {
+    path: String,
+    entries: Vec<EntryInfo>,
+}
+
+#[derive(Serialize)]
+struct EntryInfo {
+    name: String,
+    kind: String,
+}
+
+fn entry_kind(t: DescriptorType) -> &'static str {
+    match t {
+        DescriptorType::Directory => "directory",
+        DescriptorType::RegularFile => "regular-file",
+        DescriptorType::SymbolicLink => "symlink",
+        _ => "other",
+    }
+}
+
+fn open_preopen(path: &str) -> Option<Descriptor> {
+    get_directories()
+        .into_iter()
+        .find(|(_, mount)| mount == path)
+        .map(|(desc, _)| desc)
+}
+
+async fn list() -> Result<Json<Listing>, AppError> {
+    let dir = open_preopen(PREOPEN).ok_or(AppError::no_preopen())?;
+    let stream = dir
+        .read_directory()
+        .map_err(|e| AppError::internal(format!("read_directory: {e:?}")))?;
+    let mut entries = Vec::new();
+    while let Some(entry) = stream
+        .read_directory_entry()
+        .map_err(|e| AppError::internal(format!("read_directory_entry: {e:?}")))?
+    {
+        entries.push(EntryInfo {
+            name: entry.name,
+            kind: entry_kind(entry.type_).to_string(),
+        });
+    }
+    Ok(Json(Listing {
+        path: PREOPEN.to_string(),
+        entries,
+    }))
+}
+
+async fn read(Path(name): Path<String>) -> Result<Vec<u8>, AppError> {
+    let dir = open_preopen(PREOPEN).ok_or(AppError::no_preopen())?;
+    let file = dir
+        .open_at(
+            PathFlags::SYMLINK_FOLLOW,
+            &name,
+            OpenFlags::empty(),
+            DescriptorFlags::READ,
+        )
+        .map_err(|e| AppError::internal(format!("open_at: {e:?}")))?;
+    let (bytes, _eof) = file
+        .read(1024 * 1024, 0)
+        .map_err(|e| AppError::internal(format!("read: {e:?}")))?;
+    Ok(bytes)
+}
+
+async fn write(Path(name): Path<String>, body: axum::body::Bytes) -> Result<StatusCode, AppError> {
+    let dir = open_preopen(PREOPEN).ok_or(AppError::no_preopen())?;
+    let file = dir
+        .open_at(
+            PathFlags::SYMLINK_FOLLOW,
+            &name,
+            OpenFlags::CREATE | OpenFlags::TRUNCATE,
+            DescriptorFlags::WRITE,
+        )
+        .map_err(|e| AppError::internal(format!("open_at: {e:?}")))?;
+    file.write(&body, 0)
+        .map_err(|e| AppError::internal(format!("write: {e:?}")))?;
+    Ok(StatusCode::CREATED)
+}
+
+struct AppError {
+    status: StatusCode,
+    message: String,
+}
+
+impl AppError {
+    fn internal(msg: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: msg.into(),
+        }
+    }
+    fn no_preopen() -> Self {
+        Self::internal(format!("no {PREOPEN} preopen mounted"))
+    }
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> axum::response::Response {
+        (self.status, format!("{}\n", self.message)).into_response()
+    }
+}
+```
+
+The `Cargo.toml` for this pattern:
+
+```toml title="Cargo.toml"
+[dependencies]
+axum = { version = "0.8", default-features = false, features = ["json", "matched-path"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+wstd = "0.6"
+wstd-axum = "0.6"
+```
+
+## Configure volumes for `wash dev`
+
+To mount a host directory into the component during development, add a `volumes` entry to `.wash/config.yaml`:
+
+```yaml title=".wash/config.yaml"
+build:
+  command: cargo build --target wasm32-wasip2 --release
+  component_path: target/wasm32-wasip2/release/<crate>.wasm
+
+dev:
+  volumes:
+    - host_path: ./testdata
+      guest_path: /data
+```
+
+`host_path` is a directory on your local machine, `guest_path` is where the component sees it. The component's `get_directories()` call will include an entry whose mount string is `/data` and whose descriptor is rooted at `testdata/` in your project.
+
+Create some test data:
+
+```shell
+mkdir -p testdata
+echo "Hello from the filesystem!" > testdata/hello.txt
+```
+
+## Build and verify
+
+```shell
+wash dev
+```
+
+```shell
+# List files in the /data directory
+curl http://localhost:8000/
+
+# Read a file
+curl http://localhost:8000/files/hello.txt
+
+# Write a new file
+curl -X PUT --data-binary 'Hello, filesystem!' http://localhost:8000/files/greeting.txt
+
+# Read the written file back
+curl http://localhost:8000/files/greeting.txt
+```
+
+Expected output:
+
+```text
+{"path":"/data","entries":[{"name":"hello.txt","kind":"regular-file"}]}
+Hello from the filesystem!
+Hello, filesystem!
+```
+
+Written files persist on the host at `testdata/greeting.txt`.
+
+## Production deployment
+
+In a production deployment, filesystem data is provided through Kubernetes Volumes. The volume is first made available to the wasmCloud host, then mounted into the component via a WorkloadDeployment manifest.
+
+For a full walkthrough of deploying with volumes, including host deployments, WorkloadDeployment manifests, and `volumeMounts` configuration, see [Filesystems and Volumes](../../../../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx).
+
+Important notes:
+
+- Volumes are defined at the host level and mounted into components via `localResources.volumeMounts`.
+- The `mountPath` in the manifest corresponds to the guest path the component sees in `get_directories()`.
+- You do not need to declare `wasi:filesystem` under `hostInterfaces`.
+
+## Without `wstd`: the `wit-bindgen` path
+
+If your component does not depend on `wstd`, declare the imports in your WIT world and generate bindings with `wit-bindgen`:
+
+```wit title="wit/world.wit"
+package wasmcloud:my-component;
+
+world my-component {
+  import wasi:filesystem/types@0.2.2;
+  import wasi:filesystem/preopens@0.2.2;
+
+  export wasi:http/incoming-handler@0.2.2;
+}
+```
+
+```rust title="src/lib.rs"
+mod bindings {
+    wit_bindgen::generate!({ generate_all });
+}
+
+use bindings::wasi::filesystem::preopens::get_directories;
+use bindings::wasi::filesystem::types::{Descriptor, DescriptorFlags, OpenFlags, PathFlags};
+```
+
+The function and type names are identical between paths.
+
+## Summary: checklist for adding filesystem access
+
+1. **Decide on the binding path**. If your component uses `wstd`, read filesystem types under `wstd::wasi::filesystem::*`. Otherwise, declare the imports in `wit/world.wit` and use `wit_bindgen::generate!`.
+2. **Use `get_directories()`** to discover preopened mounts. Look up the descriptor whose mount path matches the directory you need.
+3. **Open files with `open_at`** using the appropriate `OpenFlags` and `DescriptorFlags` bitflags.
+4. **Read with `file.read(length, offset)`** and write with `file.write(buffer, offset)`. Both return `Result` types.
+5. **Configure volumes** in `.wash/config.yaml` for local development or in a WorkloadDeployment manifest for production.
+6. **No bundler or generator changes needed** — `wstd` already brings the bindings, and `wit-bindgen` generates them when you ask for `generate_all`.
+
+## API reference: `wasi:filesystem` operations used
+
+| Operation | Signature | Description |
+|-----------|-----------|-------------|
+| `get_directories` | `fn() -> Vec<(Descriptor, String)>` | Returns all preopened directories with their mount paths |
+| `dir.read_directory` | `fn() -> Result<DirectoryEntryStream, ErrorCode>` | Open a stream over the directory's entries |
+| `stream.read_directory_entry` | `fn() -> Result<Option<DirectoryEntry>, ErrorCode>` | Read the next entry; `None` at end |
+| `dir.open_at(path_flags, name, open_flags, descriptor_flags)` | `fn(...) -> Result<Descriptor, ErrorCode>` | Open a file or directory relative to a descriptor |
+| `file.read(length, offset)` | `fn(u64, u64) -> Result<(Vec<u8>, bool), ErrorCode>` | Read bytes from a file; bool is EOF |
+| `file.write(buffer, offset)` | `fn(&[u8], u64) -> Result<u64, ErrorCode>` | Write bytes to a file at offset; returns bytes written |
+| `dir.create_directory_at(name)` | `fn(&str) -> Result<(), ErrorCode>` | Create a subdirectory |
+| `dir.stat_at(path_flags, name)` | `fn(...) -> Result<DescriptorStat, ErrorCode>` | Get file attributes (type, size, timestamps) |
+| `dir.unlink_file_at(name)` | `fn(&str) -> Result<(), ErrorCode>` | Delete a file |
+| `dir.remove_directory_at(name)` | `fn(&str) -> Result<(), ErrorCode>` | Delete an empty directory |
+
+## Further reading
+
+- [Rust Language Guide](./index.mdx) — toolchain overview, HTTP patterns, async runtime guidance, and crate compatibility
+- [Filesystems and Volumes](../../../../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx) — deploying components with volume mounts in Kubernetes
+- [Key-Value Storage](./key-value-storage.mdx) — persistent key-value storage for structured data
+- [Configuration](./configuration.mdx) — read configuration values from ConfigMaps, Secrets, and inline environment variables
+- [Language Support overview](../index.mdx) — summary of all supported languages and toolchains
