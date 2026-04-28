@@ -79,7 +79,9 @@ Tokio's wasip2 work covers `wasi:sockets` networking. It does not provide a brid
 
 Pulling tokio's runtime into an HTTP-export component also expands the WASI capability surface the component demands. The diff below shows the imports of two functionally equivalent components that build cleanly. The first uses `wstd` only; the second initializes a `tokio` current-thread runtime inside an `incoming-handler` implementation.
 
-```text title="wstd-only component (minimal)"
+A `wstd`-only component declares only the imports it needs:
+
+```text
 import wasi:io/poll@0.2.9
 import wasi:io/streams@0.2.9
 import wasi:io/error@0.2.9
@@ -90,7 +92,9 @@ import wasi:random/insecure-seed@0.2.9
 export wasi:http/incoming-handler@0.2.9
 ```
 
-```text title="tokio-runtime-inside-handler component (over-broad)"
+A component that initializes a `tokio` runtime inside its `incoming-handler` ends up importing a much broader surface, including sockets and filesystem interfaces it never uses:
+
+```text
 import wasi:http/types@0.2.4
 import wasi:io/{poll, streams, error}@0.2.6
 import wasi:sockets/{network, tcp}@0.2.6
@@ -120,9 +124,9 @@ Use `#[tokio::main(flavor = "current_thread")]`. wasip2 is single-threaded.
 
 ### Tokio sync primitives inside a `wstd` component
 
-If a library you depend on wants `tokio::sync::Mutex` or you want `mpsc` for in-component fan-out, you can pull tokio in as a passive utility crate without contaminating the WASI import surface:
+If a library you depend on wants `tokio::sync::Mutex` or you want `mpsc` for in-component fan-out, you can pull tokio in as a passive utility crate without contaminating the WASI import surface. In `Cargo.toml`:
 
-```toml title="Cargo.toml"
+```toml
 [dependencies]
 wstd = "0.6"
 tokio = { version = "1.51", features = ["sync"] }
@@ -233,7 +237,7 @@ Many draft interfaces like `wasi:keyvalue` are self-contained — they don't sha
 
 **1. Add `wit-bindgen` to `Cargo.toml`:**
 
-```toml title="Cargo.toml"
+```toml
 [package]
 name = "my-component"
 edition = "2024"
@@ -247,9 +251,9 @@ wstd = "0.6"
 wit-bindgen = "0.46.0"
 ```
 
-**2. Declare the imports in your WIT world:**
+**2. Declare the imports in `wit/world.wit`:**
 
-```wit title="wit/world.wit"
+```wit
 package myorg:mycomponent;
 
 world my-world {
@@ -267,9 +271,9 @@ wkg wit fetch
 
 This populates `wit/deps/` with the interface definitions for `wasi:keyvalue`, `wasi:http`, and their transitive dependencies.
 
-**4. Generate bindings and use the interface:**
+**4. Generate bindings and use the interface in `src/lib.rs`:**
 
-```rust title="src/lib.rs"
+```rust
 use wstd::http::{Body, Request, Response};
 
 // Generate bindings for all interfaces in the WIT world.
@@ -357,7 +361,7 @@ my-component/
 
 ### `Cargo.toml`
 
-```toml title="Cargo.toml"
+```toml
 [package]
 name = "my-component"
 version = "0.1.0"
@@ -375,7 +379,9 @@ wstd = "0.6"
 
 ### WIT world
 
-```wit title="wit/world.wit"
+In `wit/world.wit`:
+
+```wit
 package wasmcloud:hello;
 
 world hello {
@@ -415,7 +421,7 @@ The following namespaces are resolved automatically without configuration:
 
 Rust projects use a [project configuration file](../../../config.mdx) at `.wash/config.yaml` that tells `wash` how to build the component:
 
-```yaml title=".wash/config.yaml"
+```yaml
 build:
   command: cargo build --target wasm32-wasip2 --release
   component_path: target/wasm32-wasip2/release/hello_world.wasm
@@ -425,9 +431,9 @@ The `command` field specifies the build command and `component_path` points to t
 
 ### Optimizing binary size
 
-Wasm component binaries can be reduced with standard Cargo release profile settings:
+Wasm component binaries can be reduced with standard Cargo release profile settings. Add the following to `Cargo.toml`:
 
-```toml title="Cargo.toml"
+```toml
 [profile.release]
 opt-level = "z"       # Optimize for size
 lto = true            # Link-time optimization

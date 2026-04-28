@@ -50,9 +50,11 @@ wash new https://github.com/wasmCloud/wasmCloud.git \
 
 ## Step 1: Declare the WIT worlds
 
-Both components share a single `wit/world.wit`. The HTTP API only sends messages, so it imports `consumer` only. The worker receives messages and replies, so it both imports `consumer` and exports `handler`:
+Both components share a single `wit/world.wit`. The HTTP API only sends messages, so it imports `consumer` only. The worker receives messages and replies, so it both imports `consumer` and exports `handler`.
 
-```wit title="wit/world.wit"
+In `wit/world.wit`:
+
+```wit
 package wasmcloud:template@0.1.0;
 
 // wasi:http/incoming-handler is exported via wstd's #[http_server] proc macro,
@@ -90,9 +92,9 @@ When you run `wash dev` or `wash build`, the build pipeline calls `wash wit fetc
 
 ## Step 2: Use `consumer::request` from the HTTP API
 
-The `http-api` crate combines `#[wstd::http_server]` for the HTTP export with `wit-bindgen`-generated bindings for the `wasmcloud:messaging/consumer` import. Generate bindings against the `http-api` world:
+The `http-api` crate combines `#[wstd::http_server]` for the HTTP export with `wit-bindgen`-generated bindings for the `wasmcloud:messaging/consumer` import. In `http-api/src/lib.rs`, generate bindings against the `http-api` world:
 
-```rust title="http-api/src/lib.rs"
+```rust
 mod bindings {
     wit_bindgen::generate!({
         path: "../wit",
@@ -158,9 +160,9 @@ async fn create_task(mut req: Request<Body>) -> anyhow::Result<Response<Body>> {
 If no component is subscribed to `subject` within `timeout_ms` milliseconds, `consumer::request` returns `Err`. During `wash dev`, the wasmCloud runtime routes calls in-process, so timeouts only occur if the handler itself errors or takes too long. In production, a missing NATS subscription or an unreachable server both surface as timeout errors.
 :::
 
-`http-api/Cargo.toml`:
+In `http-api/Cargo.toml`:
 
-```toml title="http-api/Cargo.toml"
+```toml
 [package]
 name = "http-api"
 version = "0.1.0"
@@ -189,9 +191,9 @@ In development with `wash dev`, all messages are routed in-process regardless of
 
 ## Step 3: Implement the handler in the worker
 
-The worker exports `wasmcloud:messaging/handler@0.2.0` and imports `consumer` so it can publish replies. Generate bindings against the `task` world:
+The worker exports `wasmcloud:messaging/handler@0.2.0` and imports `consumer` so it can publish replies. In `task-leet/src/lib.rs`, generate bindings against the `task` world:
 
-```rust title="task-leet/src/lib.rs"
+```rust
 wit_bindgen::generate!({
     path: "../wit",
     world: "task",
@@ -244,9 +246,9 @@ fn to_leet_speak(input: &str) -> String {
 
 `consumer::publish(&msg)` is fire-and-forget delivery. It returns `Result<(), String>`, but since the worker is the last hop in this template, the calling pattern is `?` to propagate any delivery failure.
 
-`task-leet/Cargo.toml`:
+In `task-leet/Cargo.toml`:
 
-```toml title="task-leet/Cargo.toml"
+```toml
 [package]
 name = "task-leet"
 version = "0.1.0"
@@ -277,9 +279,11 @@ impl exports::wasmcloud::messaging::handler::Guest for Component {
 
 ## Step 4: Configure multi-component development
 
-A multi-crate workspace has a root `Cargo.toml` that lists each crate as a workspace member, plus a root `.wash/config.yaml` that points `component_path` at the primary component (the HTTP API) and lists the additional component under `dev: components:`:
+A multi-crate workspace has a root `Cargo.toml` that lists each crate as a workspace member, plus a root `.wash/config.yaml` that points `component_path` at the primary component (the HTTP API) and lists the additional component under `dev: components:`.
 
-```toml title="Cargo.toml (workspace root)"
+In the workspace root `Cargo.toml`:
+
+```toml
 [workspace]
 resolver = "3"
 members = ["http-api", "task-leet"]
@@ -294,7 +298,9 @@ wit-bindgen = "0.41"
 wstd = "0.6"
 ```
 
-```yaml title=".wash/config.yaml"
+In `.wash/config.yaml`:
+
+```yaml
 build:
   command: cargo build --target wasm32-wasip2 --release
   component_path: target/wasm32-wasip2/release/http_api.wasm
