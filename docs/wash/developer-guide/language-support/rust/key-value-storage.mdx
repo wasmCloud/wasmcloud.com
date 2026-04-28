@@ -15,12 +15,7 @@ This guide walks through adding `wasi:keyvalue` to a Rust component using `wit-b
 By default, a wasmCloud deployment uses NATS JetStream for storage via the built-in [WASI Key-Value NATS plugin](https://github.com/wasmCloud/wasmCloud/blob/main/crates/wash-runtime/src/plugin/wasi_keyvalue/nats.rs). You can use [host plugins](../../../../runtime/index.mdx) to back `wasi:keyvalue` with a different storage solution.
 :::
 
-In Rust, two pieces collaborate to make this work:
-
-- **`wstd`** handles the `wasi:http/incoming-handler` export via the `#[wstd::http_server]` proc macro
-- **`wit-bindgen`** generates Rust bindings for the keyvalue interface, which `wstd` doesn't provide
-
-These two coexist because draft interfaces like `wasi:keyvalue` are self-contained: they don't share types with `wasi:io` or other standard interfaces, so there are no type conflicts between what `wasip2` (bundled with `wstd`) provides and what `wit-bindgen` generates.
+`wasi:keyvalue` is a draft interface and is not bundled into `wstd`. To use it, your component generates Rust bindings with `wit-bindgen` while still relying on `wstd` to drive the HTTP export. The two coexist because draft interfaces like `wasi:keyvalue` are self-contained: they don't share types with `wasi:io` or other standard interfaces, so there are no type conflicts between what `wasip2` (the crate `wstd` is built on) provides and what `wit-bindgen` generates.
 
 :::tip[Complete example]
 A full working example is available as a template:
@@ -31,27 +26,28 @@ wash new https://github.com/wasmCloud/wasmCloud.git \
 ```
 :::
 
-## Step 1: Declare the WIT imports in `wit/world.wit`
+## Step 1: Declare the WIT import
 
-Every capability your component uses must be declared in its WIT world. Open `wit/world.wit` and add an `import` line for `wasi:keyvalue/store`:
+Every capability your component uses must be declared in its WIT world. The `wstd::http_server` macro provides the `wasi:http/incoming-handler` export, so the world only needs to declare the `wasi:keyvalue/store` import.
 
-```wit {4}
+In `wit/world.wit`:
+
+```wit
 package wasmcloud:http-kv-service;
 
+// wasi:http/incoming-handler is exported via wstd's #[http_server] proc macro.
 world http-kv-service {
   import wasi:keyvalue/store@0.2.0-draft;
-
-  export wasi:http/incoming-handler@0.2.2;
 }
 ```
 
 If you also need atomic operations like `increment`, add `wasi:keyvalue/atomics@0.2.0-draft` as a second import.
 
-When you run `wash dev` or `wash build`, the build pipeline calls `wash wit fetch`, which resolves the WIT package references and downloads their definitions into `wit/deps/`. You don't need to manually fetch any WIT files.
+When you run `wash build`, the build pipeline calls `wash wit fetch`, which resolves the WIT package references and downloads their definitions into `wit/deps/`. If you have not run `wash wit fetch` before, you may need to run it manually the first time before `cargo build` works.
 
-## Step 2: Add `wit-bindgen` to `Cargo.toml`
+## Step 2: Add the dependencies
 
-`wstd` alone does not bring in `wit-bindgen`. Add it as a direct dependency in `Cargo.toml`:
+In `Cargo.toml`:
 
 ```toml
 [package]
@@ -65,14 +61,150 @@ crate-type = ["cdylib"]
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-wit-bindgen = "0.41"
+wit-bindgen = "0.46"
+wstd = "0.6"
 ```
 
-Note that this template-style `Cargo.toml` does not depend on `wstd` at all, since the component handles the HTTP export directly through `wit-bindgen`-generated bindings rather than through the `#[wstd::http_server]` macro. If you prefer the macro form, add `wstd = "0.6"` and follow the [hybrid pattern](#hybrid-wstd--wit-bindgen-pattern) below.
+Any `wit-bindgen` 0.4x release works; `0.46` is what current `wstd` releases pair cleanly with.
 
 ## Step 3: Generate bindings and use the interface
 
-In `src/lib.rs`, generate bindings for everything in the world (both the `wasi:keyvalue` import and the `wasi:http/incoming-handler` export) with `wit_bindgen::generate!`:
+In `src/lib.rs`, generate bindings for the `wasi:keyvalue/store` import and call them from inside a `#[wstd::http_server]` handler:
+
+```rust
+wit_bindgen::generate!({
+    world: "http-kv-service",
+    path: "wit",
+    generate_all,
+});
+
+use serde::Deserialize;
+use wasi::keyvalue::store::open;
+use wstd::http::{Body, Method, Request, Response, StatusCode};
+
+const BACKEND: &str = "in_memory";
+
+#[derive(Deserialize)]
+struct KvPayload {
+    key: String,
+    value: String,
+}
+
+#[wstd::http_server]
+async fn main(mut req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    match *req.method() {
+        Method::POST => post(&mut req).await,
+        Method::GET => get(&req).await,
+        _ => Response::builder()
+            .status(StatusCode::METHOD_NOT_ALLOWED)
+            .body(Body::from("Method Not Allowed\n"))
+            .map_err(Into::into),
+    }
+}
+
+async fn post(req: &mut Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    let body_bytes = req.body_mut().contents().await?.to_vec();
+    let payload: KvPayload = serde_json::from_slice(&body_bytes)
+        .map_err(|e| wstd::http::Error::msg(format!("invalid JSON: {e}")))?;
+
+    let bucket = open(BACKEND)
+        .map_err(|e| wstd::http::Error::msg(format!("open bucket: {e:?}")))?;
+    bucket
+        .set(&payload.key, payload.value.as_bytes())
+        .map_err(|e| wstd::http::Error::msg(format!("set: {e:?}")))?;
+
+    Ok(Response::new(Body::from(format!("[{BACKEND}] Stored '{}'\n", payload.key))))
+}
+
+async fn get(req: &Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
+    let path_and_query = req.uri().path_and_query().map(|p| p.as_str()).unwrap_or("");
+    let Some(key) = parse_query_param(path_and_query, "key") else {
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(Body::from("Missing required query parameter: key\n"))
+            .map_err(Into::into);
+    };
+
+    let bucket = open(BACKEND)
+        .map_err(|e| wstd::http::Error::msg(format!("open bucket: {e:?}")))?;
+    match bucket
+        .get(&key)
+        .map_err(|e| wstd::http::Error::msg(format!("get: {e:?}")))?
+    {
+        Some(bytes) => Ok(Response::new(Body::from(format!(
+            "[{BACKEND}] {}\n",
+            String::from_utf8_lossy(&bytes)
+        )))),
+        None => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from(format!("[{BACKEND}] Key '{key}' not found\n")))
+            .map_err(Into::into),
+    }
+}
+
+fn parse_query_param(path_and_query: &str, param: &str) -> Option<String> {
+    let query = path_and_query.splitn(2, '?').nth(1)?;
+    for pair in query.split('&') {
+        let mut parts = pair.splitn(2, '=');
+        if parts.next()? == param {
+            return parts.next().map(|v| v.to_string());
+        }
+    }
+    None
+}
+```
+
+The `generate_all` option tells `wit-bindgen` to generate bindings for every interface in the world. The `wasi:keyvalue/store` interface lands at `wasi::keyvalue::store`. The HTTP export is still owned by `wstd`'s `#[http_server]` macro, not by `wit-bindgen`.
+
+### Opening a bucket and choosing a backend
+
+Every keyvalue operation goes through a `Bucket` resource returned by `store::open`. The string you pass to `open` is a logical bucket name. The wasmCloud runtime maps it to a physical store based on `.wash/config.yaml` (or the host's `wasi:keyvalue` plugin configuration in production), so the same component code runs against any supported backend without modification.
+
+The shipped [`http-kv-service`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-kv-service) template uses the bucket name as a logical "backend" identifier. Set `BACKEND` in `src/lib.rs` to one of the values below and uncomment the matching block in `.wash/config.yaml`:
+
+| `BACKEND`     | Required config key            | Example value                    |
+|---------------|--------------------------------|----------------------------------|
+| `in_memory`   | *(none, default in `wash dev`)* | —                                |
+| `filesystem`  | `wasi_keyvalue_path`           | `/tmp/keyvalue-store`            |
+| `nats`        | `wasi_keyvalue_nats_url`       | `nats://127.0.0.1:4222`          |
+| `redis`       | `wasi_keyvalue_redis_url`      | `redis://127.0.0.1:6379`         |
+
+The component code is unchanged across backends.
+
+Treat the bucket as a per-request resource and open it inside each handler rather than caching it at module scope.
+
+### Serialization: values are `list<u8>`
+
+`wasi:keyvalue/store` uses `list<u8>` (`Vec<u8>` in Rust) for values. To store structured data, serialize before `set` and deserialize after `get`:
+
+```rust
+let item_bytes = serde_json::to_vec(&item).map_err(|e| format!("serialize: {e}"))?;
+bucket.set(key, &item_bytes).map_err(|e| format!("set: {e:?}"))?;
+
+if let Some(bytes) = bucket.get(key).map_err(|e| format!("get: {e:?}"))? {
+    let item: Item = serde_json::from_slice(&bytes).map_err(|e| format!("deserialize: {e}"))?;
+}
+```
+
+### Synchronous API
+
+All `wasi:keyvalue/store` calls (`open`, `get`, `set`, `delete`, `exists`, `list-keys`) are synchronous in WIT. The `wit-bindgen`-generated bindings expose them as plain functions, not `async fn`. They work just as well from a synchronous handler if your component does not need `async`.
+
+## Alternative: `wit-bindgen`-only (no `wstd`)
+
+If you want full control over the HTTP export and prefer not to bring in `wstd`, you can let `wit-bindgen` generate the `wasi:http/incoming-handler` export too. Declare both the keyvalue import and the HTTP export in your WIT world:
+
+```wit
+package wasmcloud:http-kv-service;
+
+world http-kv-service {
+  import wasi:keyvalue/store@0.2.0-draft;
+
+  export wasi:http/incoming-handler@0.2.2;
+}
+```
+
+Then implement the `Guest` trait directly:
 
 ```rust
 mod bindings {
@@ -84,10 +216,7 @@ mod bindings {
 use bindings::{
     exports::wasi::http::incoming_handler::Guest,
     wasi::{
-        http::types::{
-            Fields, IncomingBody, IncomingRequest, Method, OutgoingBody, OutgoingResponse,
-            ResponseOutparam,
-        },
+        http::types::{Fields, IncomingRequest, OutgoingBody, OutgoingResponse, ResponseOutparam},
         keyvalue::store::open,
     },
 };
@@ -96,168 +225,14 @@ struct Component;
 
 impl Guest for Component {
     fn handle(request: IncomingRequest, response_out: ResponseOutparam) {
-        let (status, body) = match request.method() {
-            Method::Post => handle_post(request),
-            Method::Get => handle_get(request),
-            _ => (405u16, "Method Not Allowed\n".to_string()),
-        };
-
-        let response = OutgoingResponse::new(Fields::new());
-        response.set_status_code(status).unwrap();
-        let out_body = response.body().unwrap();
-        ResponseOutparam::set(response_out, Ok(response));
-        let stream = out_body.write().unwrap();
-        stream.blocking_write_and_flush(body.as_bytes()).unwrap();
-        drop(stream);
-        OutgoingBody::finish(out_body, None).unwrap();
+        // ... assemble the response by hand
     }
 }
 
 bindings::export!(Component with_types_in bindings);
 ```
 
-The `generate_all` option tells `wit-bindgen` to generate bindings for every interface in the world: imports, exports, and their transitive dependencies. The `wasi:keyvalue/store` interface lands at `bindings::wasi::keyvalue::store`.
-
-### Opening a bucket
-
-Every keyvalue operation goes through a `Bucket` resource returned by `store::open`:
-
-```rust
-const BUCKET: &str = "default";
-
-fn handle_post(request: IncomingRequest) -> (u16, String) {
-    let bucket = match open(BUCKET) {
-        Ok(b) => b,
-        Err(e) => return (500, format!("open bucket: {e:?}\n")),
-    };
-    // ... use the bucket
-}
-```
-
-The string passed to `open` is a logical bucket name. The wasmCloud runtime maps it to a physical store based on the host's `wasi:keyvalue` plugin configuration. Treat the bucket as a per-request resource and open it inside each handler rather than caching it at module scope.
-
-### Storing a value
-
-`bucket.set` takes a `&str` key and a `&[u8]` value:
-
-```rust
-#[derive(serde::Deserialize)]
-struct KvPayload {
-    key: String,
-    value: String,
-}
-
-fn handle_post(request: IncomingRequest) -> (u16, String) {
-    let body_bytes = match read_body(request) {
-        Ok(b) => b,
-        Err(e) => return (400, format!("read body: {e}\n")),
-    };
-
-    let payload: KvPayload = match serde_json::from_slice(&body_bytes) {
-        Ok(v) => v,
-        Err(e) => return (400, format!("invalid JSON: {e}\n")),
-    };
-
-    let bucket = match open(BUCKET) {
-        Ok(b) => b,
-        Err(e) => return (500, format!("open bucket: {e:?}\n")),
-    };
-
-    match bucket.set(&payload.key, payload.value.as_bytes()) {
-        Ok(()) => (200, format!("Stored '{}'\n", payload.key)),
-        Err(e) => (500, format!("set: {e:?}\n")),
-    }
-}
-```
-
-### Reading a value
-
-`bucket.get` returns `Result<Option<Vec<u8>>, Error>`. `Ok(None)` means the key was not found:
-
-```rust
-fn handle_get(request: IncomingRequest) -> (u16, String) {
-    let path_and_query = request.path_with_query().unwrap_or_default();
-    let key = match parse_query_param(&path_and_query, "key") {
-        Some(k) => k,
-        None => return (400, "Missing required query parameter: key\n".to_string()),
-    };
-
-    let bucket = match open(BUCKET) {
-        Ok(b) => b,
-        Err(e) => return (500, format!("open bucket: {e:?}\n")),
-    };
-
-    match bucket.get(&key) {
-        Ok(Some(bytes)) => (200, format!("{}\n", String::from_utf8_lossy(&bytes))),
-        Ok(None) => (404, format!("Key '{key}' not found\n")),
-        Err(e) => (500, format!("get: {e:?}\n")),
-    }
-}
-```
-
-### Serialization: values are `list<u8>`
-
-`wasi:keyvalue/store` uses `list<u8>` (`Vec<u8>` in Rust) for values. To store structured data, serialize before `set` and deserialize after `get`:
-
-```rust
-let item_bytes = serde_json::to_vec(&item).map_err(|e| format!("serialize: {e}"))?;
-bucket.set(key, &item_bytes).map_err(|e| format!("set: {e:?}"))?;
-
-let bytes = bucket.get(key).map_err(|e| format!("get: {e:?}"))?;
-if let Some(bytes) = bytes {
-    let item: Item = serde_json::from_slice(&bytes).map_err(|e| format!("deserialize: {e}"))?;
-}
-```
-
-### Synchronous API
-
-All `wasi:keyvalue/store` calls (`open`, `get`, `set`, `delete`, `exists`, `list-keys`) are synchronous in WIT. The `wit-bindgen`-generated bindings expose them as plain functions, not `async fn`. Your handlers don't need to be async to use them.
-
-## Hybrid: `wstd` + `wit-bindgen` pattern
-
-If your component already uses `#[wstd::http_server]` and you want to add `wasi:keyvalue` on top, both can coexist. Declare only the new imports in WIT (let `wstd`'s macro provide the HTTP export) and use `wit-bindgen` for the import bindings.
-
-In `wit/world.wit`:
-
-```wit
-package wasmcloud:my-component;
-
-// wasi:http/incoming-handler is exported via wstd's #[http_server] proc macro.
-world my-component {
-  import wasi:keyvalue/store@0.2.0-draft;
-}
-```
-
-In `src/lib.rs`:
-
-```rust
-wit_bindgen::generate!({
-    world: "my-component",
-    path: "wit",
-    generate_all,
-});
-
-use wasi::keyvalue::store::open;
-use wstd::http::{Body, Request, Response};
-
-#[wstd::http_server]
-async fn main(_req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
-    let bucket = open("default")
-        .map_err(|e| wstd::http::Error::msg(format!("open bucket: {e:?}")))?;
-    // ... use bucket
-    Ok(Response::new(Body::from("ok\n")))
-}
-```
-
-In `Cargo.toml`:
-
-```toml
-[dependencies]
-wstd = "0.6"
-wit-bindgen = "0.46"
-```
-
-This gives you `wstd`'s ergonomic HTTP handling and async support alongside the keyvalue interface. See [Adding custom WASI interfaces](./index.mdx#adding-custom-wasi-interfaces) in the language guide for the full pattern, including handling type conflicts when imports overlap with `wasi:io`.
+This gives you the lowest-level WIT API at the cost of more boilerplate. See [Adding custom WASI interfaces](./index.mdx#adding-custom-wasi-interfaces) in the language guide for the full pattern, including handling type conflicts when imports overlap with `wasi:io`.
 
 ## Build and verify
 
@@ -282,27 +257,14 @@ curl "http://localhost:8000?key=missing"
 
 To verify persistence with a non-default backend, pick a backend in `.wash/config.yaml` (filesystem, NATS, Redis), restart the component, and confirm previously stored keys are still readable.
 
-## Choosing a backend
-
-The `BUCKET` constant in `src/lib.rs` is just a logical name; the host runtime selects the actual storage backend based on `.wash/config.yaml`. The [`http-kv-service`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-kv-service) template's `.wash/config.yaml` documents the available backends:
-
-| Backend       | Required config key            | Example value                    |
-|---------------|--------------------------------|----------------------------------|
-| `in_memory`   | *(none, default in `wash dev`)* | —                                |
-| `filesystem`  | `wasi_keyvalue_path`           | `/tmp/keyvalue-store`            |
-| `nats`        | `wasi_keyvalue_nats_url`       | `nats://127.0.0.1:4222`          |
-| `redis`       | `wasi_keyvalue_redis_url`      | `redis://127.0.0.1:6379`         |
-
-The component code is unchanged across backends.
-
 ## Summary: checklist for adding any WIT interface
 
 1. **Add `import` lines to `wit/world.wit`** for the interfaces you need.
-2. **Add `wit-bindgen` to `Cargo.toml`** if it isn't already a dependency.
+2. **Add `wit-bindgen` to `Cargo.toml`** if it is not already a dependency. Any 0.4x release works.
 3. **Generate bindings** with `wit_bindgen::generate!({ generate_all })`. For interfaces that share types with `wasi:io` (like `wasi:blobstore`), use the `with` option to point shared types at `wasip2`'s definitions to avoid duplicates.
-4. **Use the generated functions** under `bindings::wasi::<package>::<interface>::*`.
-5. **Handle serialization** — most WIT interfaces use `list<u8>` (`Vec<u8>`) for binary data; use `serde_json` for structured data.
-6. **No new Rust dependencies needed** beyond `wit-bindgen` itself — WIT interfaces are provided by the runtime, not by crates.io packages.
+4. **Use the generated functions** at `wasi::<package>::<interface>::*` (or `bindings::wasi::<package>::<interface>::*` if you wrap the macro in a module).
+5. **Handle serialization.** Most WIT interfaces use `list<u8>` (`Vec<u8>`) for binary data. Use `serde_json` for structured data.
+6. **Stable WASI 0.2 interfaces** like `wasi:cli/environment` and `wasi:filesystem` are available via the `wasip2` crate without `wit-bindgen`. Draft interfaces like `wasi:keyvalue` need `wit-bindgen`. See [Adding custom WASI interfaces](./index.mdx#adding-custom-wasi-interfaces) for the distinction.
 
 ## API reference: `wasi:keyvalue/store` operations used
 

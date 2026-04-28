@@ -178,6 +178,8 @@ wit-bindgen = "0.41"
 wstd = "0.6"
 ```
 
+Any `wit-bindgen` 0.4x release works. The template pins `0.41` because it is the version the rest of the wasmCloud Rust template fleet uses; newer 0.4x releases are interchangeable.
+
 ### Subject naming
 
 Subjects are arbitrary dot-separated strings following NATS subject conventions. The template uses `tasks.{worker}` so multiple worker types can each subscribe to their own sub-subject:
@@ -244,7 +246,7 @@ fn to_leet_speak(input: &str) -> String {
 
 `handle_message` returns `Result<(), String>`. Returning `Err` propagates back to the caller; if the sender called `consumer::request`, the `Err` surfaces there as the request's `Err` variant.
 
-`consumer::publish(&msg)` is fire-and-forget delivery. It returns `Result<(), String>`, but since the worker is the last hop in this template, the calling pattern is `?` to propagate any delivery failure.
+`consumer::publish(&msg)` is fire-and-forget delivery. It returns `Result<(), String>`. Because the worker is the last hop in this template, the snippet returns the call's `Result` directly as `handle_message`'s return value, propagating any delivery failure to the runtime.
 
 In `task-leet/Cargo.toml`:
 
@@ -279,7 +281,7 @@ impl exports::wasmcloud::messaging::handler::Guest for Component {
 
 ## Step 4: Configure multi-component development
 
-A multi-crate workspace has a root `Cargo.toml` that lists each crate as a workspace member, plus a root `.wash/config.yaml` that points `component_path` at the primary component (the HTTP API) and lists the additional component under `dev: components:`.
+A convenient layout uses a Cargo workspace with a root `Cargo.toml` that lists each crate as a workspace member, plus a root `.wash/config.yaml` that points `component_path` at the primary component (the HTTP API) and lists the additional component under `dev: components:`. A standalone two-crate layout works too; the workspace just makes the shared dependencies easier to manage.
 
 In the workspace root `Cargo.toml`:
 
@@ -321,8 +323,9 @@ wash dev
 
 `wash dev` builds both crates, starts an HTTP server on port 8000, and routes messaging calls between the components in-process.
 
+Send a task. The worker converts the payload to leet speak:
+
 ```shell
-# Send a task — the worker converts the payload to leet speak
 curl -s -X POST http://localhost:8000/task \
   -H 'Content-Type: application/json' \
   -d '{"worker": "task-leet", "payload": "Hello World"}'
