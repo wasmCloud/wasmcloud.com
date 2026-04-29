@@ -21,8 +21,8 @@ By default, a wasmCloud deployment uses NATS JetStream for storage via the built
 A full working example is available as a template:
 ```shell
 wash new https://github.com/wasmCloud/wasmCloud.git \
-  --name http-kv-service \
-  --subfolder templates/http-kv-service
+  --name http-kv-handler \
+  --subfolder templates/http-kv-handler
 ```
 :::
 
@@ -33,10 +33,10 @@ Every capability your component uses must be declared in its WIT world. The `wst
 In `wit/world.wit`:
 
 ```wit
-package wasmcloud:http-kv-service;
+package wasmcloud:http-kv-handler;
 
 // wasi:http/incoming-handler is exported via wstd's #[http_server] proc macro.
-world http-kv-service {
+world http-kv-handler {
   import wasi:keyvalue/store@0.2.0-draft;
 }
 ```
@@ -51,7 +51,7 @@ In `Cargo.toml`:
 
 ```toml
 [package]
-name = "http-kv-service"
+name = "http-kv-handler"
 edition = "2024"
 version = "0.1.0"
 
@@ -73,7 +73,7 @@ In `src/lib.rs`, generate bindings for the `wasi:keyvalue/store` import and call
 
 ```rust
 wit_bindgen::generate!({
-    world: "http-kv-service",
+    world: "http-kv-handler",
     path: "wit",
     generate_all,
 });
@@ -160,7 +160,7 @@ The `generate_all` option tells `wit-bindgen` to generate bindings for every int
 
 Every keyvalue operation goes through a `Bucket` resource returned by `store::open`. The string you pass to `open` is a logical bucket name. The wasmCloud runtime maps it to a physical store based on `.wash/config.yaml` (or the host's `wasi:keyvalue` plugin configuration in production), so the same component code runs against any supported backend without modification.
 
-The shipped [`http-kv-service`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-kv-service) template uses the bucket name as a logical "backend" identifier. Set `BACKEND` in `src/lib.rs` to one of the values below and uncomment the matching block in `.wash/config.yaml`:
+The shipped [`http-kv-handler`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-kv-handler) template uses the bucket name as a logical "backend" identifier. Set `BACKEND` in `src/lib.rs` to one of the values below and uncomment the matching block in `.wash/config.yaml`:
 
 | `BACKEND`     | Required config key            | Example value                    |
 |---------------|--------------------------------|----------------------------------|
@@ -195,9 +195,9 @@ All `wasi:keyvalue/store` calls (`open`, `get`, `set`, `delete`, `exists`, `list
 If you want full control over the HTTP export and prefer not to bring in `wstd`, you can let `wit-bindgen` generate the `wasi:http/incoming-handler` export too. Declare both the keyvalue import and the HTTP export in your WIT world:
 
 ```wit
-package wasmcloud:http-kv-service;
+package wasmcloud:http-kv-handler;
 
-world http-kv-service {
+world http-kv-handler {
   import wasi:keyvalue/store@0.2.0-draft;
 
   export wasi:http/incoming-handler@0.2.2;
