@@ -22,7 +22,7 @@ Install the parts of the [wasmCloud platform](./overview/index.mdx) that you nee
 <Tabs groupId="macoslinux-method" queryString>
   <TabItem value="script" label="Install script" default>
 
-In your terminal, run the installation script to download and install the latest version of `wash` (**`2.0.3`**):
+In your terminal, run the installation script to download and install the latest version of `wash` (**`2.0.4`**):
 
 ```shell
 curl -fsSL https://wasmcloud.com/sh | bash
@@ -66,7 +66,7 @@ Homebrew updates your PATH automatically. You're ready to use `wash` in any term
 
   <TabItem value="windows" label="Windows">
 
-In PowerShell, run the installation script to download and install the latest version of `wash` (**`2.0.3`**):
+In PowerShell, run the installation script to download and install the latest version of `wash` (**`2.0.4`**):
 
 ```powershell
 iwr -useb https://wasmcloud.com/ps1 | iex
@@ -108,7 +108,7 @@ Pre-built binaries for macOS, Linux, and Windows are [available on GitHub](https
   </TabItem>
 </Tabs>
 
-Verify that `wash` is properly installed and check your version for **`2.0.3`** with:
+Verify that `wash` is properly installed and check your version for **`2.0.4`** with:
 
 ```bash
 wash -V
@@ -138,14 +138,36 @@ curl -fLO https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/
 Use Helm to install the wasmCloud operator from an OCI chart image, using the [values for local installation](https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml). The overlay disables the deprecated Runtime Gateway by default — HTTP traffic is routed by the operator via EndpointSlices tied to standard Kubernetes Services:
 
 ```shell
-helm install wasmcloud --version 2.0.3 oci://ghcr.io/wasmcloud/charts/runtime-operator \
+helm install wasmcloud --version 2.0.4 oci://ghcr.io/wasmcloud/charts/runtime-operator \
+  --namespace wasmcloud --create-namespace \
   -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/refs/heads/main/charts/runtime-operator/values.local.yaml
 ```
+
+:::warning[Existing wasmCloud state in the cluster]
+If you've previously installed the wasmCloud operator (in any namespace), `helm install` may fail with:
+
+```text
+Error: INSTALLATION FAILED: ... ClusterRole "wasmcloud-runtime-operator-..." cannot be imported into the current release
+```
+
+Helm 3 does not re-import cluster-scoped resources owned by a previous release. If you no longer need the prior install, fully clean up its cluster-scoped resources:
+
+```shell
+helm uninstall wasmcloud --namespace <previous-namespace>
+kubectl delete clusterrole -l app.kubernetes.io/instance=wasmcloud
+kubectl delete clusterrolebinding -l app.kubernetes.io/instance=wasmcloud
+kubectl delete crd -l app.kubernetes.io/instance=wasmcloud
+```
+
+**Deleting the CRDs also deletes any existing `WorkloadDeployment`, `Host`, `Workload`, `WorkloadReplicaSet`, and `Artifact` resources in the cluster.** Make sure you have manifests checked in (or otherwise saved) for anything you want to recreate before running the CRD delete.
+
+After cleanup, re-run the install command above.
+:::
 
 Verify the deployment:
 
 ```shell
-kubectl get pods -l app.kubernetes.io/instance=wasmcloud -n default
+kubectl get pods -l app.kubernetes.io/instance=wasmcloud -n wasmcloud
 ```
 
 Once all pods are running, you're ready to deploy a Wasm workload.
@@ -181,7 +203,7 @@ kubectl delete service hello-world
 Uninstall wasmCloud:
 
 ```shell
-helm uninstall wasmcloud
+helm uninstall wasmcloud --namespace wasmcloud
 ```
 
 Delete the local Kubernetes environment:
