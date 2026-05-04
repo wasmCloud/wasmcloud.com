@@ -18,6 +18,8 @@ import {
   transformerNotationFocus,
 } from '@shikijs/transformers';
 import rehypeNameToId from 'rehype-name-to-id';
+import { WASMCLOUD_VERSION } from './src/wasmcloud-version';
+import wasmCloudVersionPlugin from './src/remark/wasmcloud-version';
 
 const rehypeShikiPlugin = [
   rehypeShiki,
@@ -104,6 +106,7 @@ const config = (async (): Promise<Config> => {
           docs: {
             sidebarPath: require.resolve('./sidebars.js'),
             editUrl: 'https://github.com/wasmCloud/wasmcloud.com/edit/main/',
+            remarkPlugins: [[wasmCloudVersionPlugin, { version: WASMCLOUD_VERSION }]],
             beforeDefaultRehypePlugins: [rehypeShikiPlugin],
             rehypePlugins: [rehypeNameToId],
             lastVersion: 'current',
