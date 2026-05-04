@@ -6,6 +6,12 @@ name: update-version
 on:
   repository_dispatch:
     types: [wasmcloud-release]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "wasmCloud version to set (e.g. 2.1.0)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -14,6 +20,8 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      NEW_VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -22,8 +30,6 @@ jobs:
           token: ${{ secrets.WASMCLOUD_BOT_PAT }}
 
       - name: Update version constant
-        env:
-          NEW_VERSION: ${{ github.event.client_payload.version }}
         run: |
           sed -i \
             "s/export const WASMCLOUD_VERSION = '[^']*';/export const WASMCLOUD_VERSION = '${NEW_VERSION}';/" \
@@ -34,13 +40,13 @@ jobs:
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d1b9cd0f26de2b553b # v7.0.8
         with:
           token: ${{ secrets.WASMCLOUD_BOT_PAT }}
-          commit-message: "docs: update wasmCloud version to ${{ github.event.client_payload.version }}"
-          branch: "docs/update-version-${{ github.event.client_payload.version }}"
-          title: "docs: update wasmCloud version to ${{ github.event.client_payload.version }}"
+          commit-message: "docs: update wasmCloud version to ${{ env.NEW_VERSION }}"
+          branch: "docs/update-version-${{ env.NEW_VERSION }}"
+          title: "docs: update wasmCloud version to ${{ env.NEW_VERSION }}"
           body: |
             Automated version bump from the wasmCloud release pipeline.
 
-            Updates `src/wasmcloud-version.ts` to `${{ github.event.client_payload.version }}`.
+            Updates `src/wasmcloud-version.ts` to `${{ env.NEW_VERSION }}`.
             The remark plugin propagates the new value to all `{{WASMCLOUD_VERSION}}` placeholders
             in code blocks across the docs at build time — no other files need editing.
           labels: "automated,documentation"
