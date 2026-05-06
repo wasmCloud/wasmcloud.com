@@ -1,3 +1,7 @@
+---
+description: "TypeScript Wasm component example: build an HTTP server using the Hono framework with wasi:http on wasmCloud."
+---
+
 # HTTP Server with Hono
 
 This example demonstrates how to use [`hono`](https://hono.dev) with a custom adapter that works with the `wasi:http` interface. The `hono` library is a lightweight and fast web framework for building HTTP servers. See the [hono documentation](https://hono.dev/docs) for more details.

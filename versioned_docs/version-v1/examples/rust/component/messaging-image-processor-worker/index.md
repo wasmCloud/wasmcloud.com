@@ -1,3 +1,7 @@
+---
+description: "Rust Wasm component example: async image processing worker that listens for jobs via messaging and stores results in blobstore."
+---
+
 # Messaging Image Processor Worker
 
 This WebAssembly component listens for jobs (in this case, related to image processing) and performs the requested operations on assets stored in object storage (denoted by the individual job data).

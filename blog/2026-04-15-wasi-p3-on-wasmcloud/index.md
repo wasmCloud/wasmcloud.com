@@ -1,5 +1,5 @@
 ---
-title: "Writing and running async components on wasmCloud with WASI P3"
+title: "Async Components on wasmCloud with WASI P3"
 authors: [ericgregory]
 slug: wasi-p3-on-wasmcloud
 image: './images/p3-blog-header.webp'

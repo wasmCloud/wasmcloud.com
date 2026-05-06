@@ -3,6 +3,7 @@ title: 'Build'
 date: 2024-04-10T11:02:05+06:00
 sidebar_position: 2
 draft: false
+description: "Build a wasmCloud capability provider binary from Rust source code using wash build."
 ---
 
 :::warning[Planned changes to providers]

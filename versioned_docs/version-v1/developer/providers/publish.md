@@ -3,6 +3,7 @@ title: 'Publish'
 date: 2024-04-10T11:02:05+06:00
 sidebar_position: 4
 draft: false
+description: "Package and publish wasmCloud capability providers to OCI registries for deployment."
 ---
 
 :::warning[Planned changes to providers]

@@ -3,6 +3,7 @@ title: 'Intro'
 date: 2024-04-10T11:02:05+06:00
 sidebar_position: 0
 draft: false
+description: "Build custom wasmCloud capability providers: implement interfaces like messaging, HTTP, and key-value in Rust."
 ---
 
 :::warning[Planned changes to providers]

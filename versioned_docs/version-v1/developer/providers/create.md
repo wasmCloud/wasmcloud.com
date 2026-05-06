@@ -3,6 +3,7 @@ title: 'Create'
 date: 2024-04-10T11:02:05+06:00
 sidebar_position: 1
 draft: false
+description: "Create a new wasmCloud capability provider from a template using wash and implement a WIT interface."
 ---
 
 :::warning[Planned changes to providers]

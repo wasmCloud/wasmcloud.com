@@ -3,6 +3,7 @@ title: 'WASI Support'
 date: 2023-12-28
 sidebar_position: 5
 draft: false
+description: "WASI API support reference for wasmCloud: supported imports, exports, and interface versions."
 ---
 
 :::info

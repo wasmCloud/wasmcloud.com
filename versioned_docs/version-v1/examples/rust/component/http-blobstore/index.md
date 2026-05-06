@@ -1,3 +1,7 @@
+---
+description: "Rust Wasm component example: perform blob storage operations via HTTP using S3, Azure, filesystem, or NATS providers."
+---
+
 # HTTP Blobstore Example Component
 
 This example demonstrates the WASI Blobstore interface by performing various blob storage operations and exposing the results via HTTP. The component can work with any available blobstore providers, including S3, Azure blob, local filesystem, and NATS.
