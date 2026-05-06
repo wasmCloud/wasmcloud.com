@@ -1,6 +1,7 @@
 ---
 title: 'Leaf Node Config (JetStream)'
 sidebar_position: 3
+description: "Configure NATS leaf nodes with JetStream for wasmCloud lattices across distributed environments."
 ---
 
 :::warning[Planned changes to scheduling]

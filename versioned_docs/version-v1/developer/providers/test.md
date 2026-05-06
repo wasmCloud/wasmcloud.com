@@ -3,6 +3,7 @@ title: 'Test'
 date: 2024-04-10T11:02:05+06:00
 sidebar_position: 3
 draft: false
+description: "Test wasmCloud capability providers locally with integration tests, wash, and live components."
 ---
 
 :::warning[Planned changes to providers]

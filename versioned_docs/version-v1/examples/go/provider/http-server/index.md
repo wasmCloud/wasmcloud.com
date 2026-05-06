@@ -1,3 +1,7 @@
+---
+description: "Go capability provider example: HTTP server that forwards requests to components via wasi:http/incoming-handler."
+---
+
 # HTTP Server Provider
 
 This [capability provider example](https://github.com/wasmCloud/go/tree/main/examples/provider/http-server) imports the `wasi:http/incoming-handler` interface and demonstrates how to forward HTTP requests to components that export the same interface, enabling components to accept incoming HTTP(s) requests.

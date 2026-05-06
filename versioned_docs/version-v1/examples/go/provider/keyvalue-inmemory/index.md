@@ -1,3 +1,7 @@
+---
+description: "Go capability provider example: in-memory key-value store implementing wrpc:keyvalue/store for wasmCloud."
+---
+
 # In-Memory Key-Value Storage Provider
 
 [This capability provider example](https://github.com/wasmCloud/go/tree/main/examples/provider/keyvalue-inmemory) implements `wrpc:keyvalue/store@0.2.0-draft` to provide key-value functionality (backed in-memory) for components that **import** the same interface. 

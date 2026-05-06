@@ -1,3 +1,7 @@
+---
+description: "Rust Wasm component example: monitor and react to key-value store operations via HTTP and wasi-keyvalue."
+---
+
 # HTTP KeyValue Watcher
 
 This component demonstrates a Wasm-based system for monitoring and reacting to key-value store operations through HTTP interfaces. It integrates with [wasi-http](https://github.com/WebAssembly/wasi-http) for handling Outgoing HTTP responses and [wasi-keyvalue](https://github.com/WebAssembly/wasi-keyvalue) for key-value store interactions. The component establishes watch triggers based on link configuration and executes configurable reactions when events occur. At runtime, it [links](https://wasmcloud.com/docs/v1/concepts/linking-components) to a Redis-backed implementation of the key-value store interface.

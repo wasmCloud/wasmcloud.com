@@ -3,6 +3,7 @@ title: 'RPC'
 date: 2024-08-09T11:02:05+06:00
 sidebar_position: 2
 draft: false
+description: "How wasmCloud uses wRPC for distributed communication between components and providers over NATS."
 ---
 
 wasmCloud uses the ByteCode Alliance hosted project [wRPC](https://github.com/bytecodealliance/wrpc) for all distributed communication between components and capability providers. wasmCloud was the first reference implementation for wRPC, and was designed to make distributed communication between components to feel exactly like [composing components](/docs/v1/ecosystem/wasmtime/#composition-and-the-runtime).

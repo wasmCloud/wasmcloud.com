@@ -3,6 +3,7 @@ title: 'Components'
 date: 2018-12-29T12:00:00+00:00
 sidebar_position: 2
 draft: false
+description: "Develop wasmCloud application components: create, build, run, configure, and publish WebAssembly components."
 ---
 
 To perform the steps in this guide, you'll need to have completed [installation](/docs/installation) of `wash`. You'll be able to pick your own language, or follow the "bring your own component" guide to develop a component in any language that supports Wasm components. For a conceptual overview of wasmCloud components, see the [component concepts](/docs/v1/concepts/components) documentation.

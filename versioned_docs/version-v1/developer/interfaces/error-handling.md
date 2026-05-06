@@ -3,6 +3,7 @@ title: "Errors"
 date: 2025-04-25T11:02:05+06:00
 sidebar_position: 8
 draft: false
+description: "Handle errors in wasmCloud custom interfaces and wRPC calls between components and providers."
 ---
 
 # Error handling with custom interfaces and wRPC
