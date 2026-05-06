@@ -16,9 +16,9 @@ function CommunityPostItem({ children, className }: Props): JSX.Element {
   return (
     <div className={clsx(styles.postItem, className)}>
       <div className={styles.text}>
-        <h2 className={styles.title}>
+        <h1 className={styles.title}>
           <Link to={blogPost.metadata.permalink}>{blogPost.metadata.title}</Link>
-        </h2>
+        </h1>
         <div className={styles.meta}>
           <BlogPostItemHeaderAuthors className={styles.authors} />
           <span className={styles.separator} />
