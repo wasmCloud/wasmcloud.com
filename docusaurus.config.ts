@@ -129,6 +129,70 @@ const config = (async (): Promise<Config> => {
             beforeDefaultRehypePlugins: [rehypeShikiPlugin],
             rehypePlugins: [rehypeNameToId],
           },
+          sitemap: {
+            changefreq: 'weekly',
+            priority: 0.5,
+            filename: 'sitemap.xml',
+            createSitemapItems: async (params) => {
+              const { defaultCreateSitemapItems, ...rest } = params;
+              const items = await defaultCreateSitemapItems(rest);
+              return items.map((item) => {
+                const url = item.url;
+
+                // Homepage — highest priority
+                if (url.endsWith('wasmcloud.com/')) {
+                  return { ...item, priority: 1.0, changefreq: 'daily' };
+                }
+
+                // v2 docs (current, no version prefix) — high priority
+                if (url.includes('/docs/') && !url.includes('/docs/v1/') && !url.includes('/docs/0.82/')) {
+                  // Docs landing, quickstart, overview — highest doc priority
+                  if (
+                    url.match(/\/docs\/$/) ||
+                    url.includes('/docs/quickstart/') ||
+                    url.includes('/docs/overview/')
+                  ) {
+                    return { ...item, priority: 0.9, changefreq: 'weekly' };
+                  }
+                  return { ...item, priority: 0.8, changefreq: 'weekly' };
+                }
+
+                // Blog posts — high priority, recent ones change less
+                if (url.includes('/blog/') && !url.match(/\/blog\/(page\/|tags\/)/)) {
+                  if (url.match(/\/blog\/?$/)) {
+                    return { ...item, priority: 0.8, changefreq: 'daily' };
+                  }
+                  return { ...item, priority: 0.7, changefreq: 'monthly' };
+                }
+
+                // Blog pagination and tag pages — low priority
+                if (url.match(/\/blog\/(page\/|tags\/)/)) {
+                  return { ...item, priority: 0.3, changefreq: 'weekly' };
+                }
+
+                // Community meeting notes
+                if (url.includes('/community/')) {
+                  if (url.match(/\/community\/?$/)) {
+                    return { ...item, priority: 0.7, changefreq: 'weekly' };
+                  }
+                  return { ...item, priority: 0.5, changefreq: 'weekly' };
+                }
+
+                // v1 docs — deprioritized
+                if (url.includes('/docs/v1/')) {
+                  return { ...item, priority: 0.3, changefreq: 'monthly' };
+                }
+
+                // 0.82 docs — already disallowed in robots.txt, minimal priority
+                if (url.includes('/docs/0.82/')) {
+                  return { ...item, priority: 0.1, changefreq: 'yearly' };
+                }
+
+                // Everything else (standalone pages like /contact, etc.)
+                return { ...item, priority: 0.5, changefreq: 'monthly' };
+              });
+            },
+          },
           theme: {
             customCss: [require.resolve('./src/styles/index.css')],
           },
