@@ -137,54 +137,52 @@ const config = (async (): Promise<Config> => {
               const { defaultCreateSitemapItems, ...rest } = params;
               const items = await defaultCreateSitemapItems(rest);
               return items.map((item) => {
-                const url = item.url;
+                // Use pathname so priorities work on deploy previews too
+                const path = new URL(item.url).pathname;
 
                 // Homepage — highest priority
-                if (url.endsWith('wasmcloud.com/')) {
+                if (path === '/') {
                   return { ...item, priority: 1.0, changefreq: 'daily' };
                 }
 
                 // v2 docs (current, no version prefix) — high priority
-                if (url.includes('/docs/') && !url.includes('/docs/v1/') && !url.includes('/docs/0.82/')) {
-                  // Docs landing, quickstart, overview — highest doc priority
+                if (path.startsWith('/docs/') && !path.startsWith('/docs/v1/') && !path.startsWith('/docs/0.82/')) {
                   if (
-                    url.match(/\/docs\/$/) ||
-                    url.includes('/docs/quickstart/') ||
-                    url.includes('/docs/overview/')
+                    path === '/docs/' ||
+                    path.startsWith('/docs/quickstart/') ||
+                    path.startsWith('/docs/overview/')
                   ) {
                     return { ...item, priority: 0.9, changefreq: 'weekly' };
                   }
                   return { ...item, priority: 0.8, changefreq: 'weekly' };
                 }
 
-                // Blog posts — high priority, recent ones change less
-                if (url.includes('/blog/') && !url.match(/\/blog\/(page\/|tags\/)/)) {
-                  if (url.match(/\/blog\/?$/)) {
+                // Blog posts — high priority
+                if (path.startsWith('/blog/') || path === '/blog/') {
+                  if (path === '/blog/' || path === '/blog') {
                     return { ...item, priority: 0.8, changefreq: 'daily' };
+                  }
+                  if (path.startsWith('/blog/page/') || path.startsWith('/blog/tags/')) {
+                    return { ...item, priority: 0.3, changefreq: 'weekly' };
                   }
                   return { ...item, priority: 0.7, changefreq: 'monthly' };
                 }
 
-                // Blog pagination and tag pages — low priority
-                if (url.match(/\/blog\/(page\/|tags\/)/)) {
-                  return { ...item, priority: 0.3, changefreq: 'weekly' };
-                }
-
                 // Community meeting notes
-                if (url.includes('/community/')) {
-                  if (url.match(/\/community\/?$/)) {
+                if (path.startsWith('/community/') || path === '/community/') {
+                  if (path === '/community/' || path === '/community') {
                     return { ...item, priority: 0.7, changefreq: 'weekly' };
                   }
                   return { ...item, priority: 0.5, changefreq: 'weekly' };
                 }
 
                 // v1 docs — deprioritized
-                if (url.includes('/docs/v1/')) {
+                if (path.startsWith('/docs/v1/')) {
                   return { ...item, priority: 0.3, changefreq: 'monthly' };
                 }
 
                 // 0.82 docs — already disallowed in robots.txt, minimal priority
-                if (url.includes('/docs/0.82/')) {
+                if (path.startsWith('/docs/0.82/')) {
                   return { ...item, priority: 0.1, changefreq: 'yearly' };
                 }
 
