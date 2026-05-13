@@ -12,7 +12,7 @@ Get started building components for wasmCloud.
 * **Examples** are complete applications demonstrating specific wasmCloud capabilities.
 
 :::info[Compatibility]
-All templates and examples on this page target wasmCloud v2 and require `wash` 2.0.0+. Components target the [WASI 0.2 component model](./overview/interfaces.mdx). Interface versions shown reflect what is pinned in each template or example at time of writing; `wash new` always pulls current source from the repository.
+All templates and examples on this page target wasmCloud v2 and require `wash` 2.0.0+; a small number of entries require a newer `wash` version and call this out inline (for example, [WebGPU TensorFlow](#webgpu-tensorflow) requires 2.1.0+ because WebGPU in services landed in that release). Components target the [WASI 0.2 component model](./overview/interfaces.mdx). Interface versions shown reflect what is pinned in each template or example at time of writing; `wash new` always pulls current source from the repository.
 :::
 
 ## Templates
@@ -21,6 +21,10 @@ All templates and examples on this page target wasmCloud v2 and require `wash` 2
 |---|---|---|
 | [HTTP Hello World](#http-hello-world) | Rust | HTTP server using `wstd` |
 | [TCP Service](#tcp-service) | Rust | HTTP API + TCP service workspace |
+| [HTTP Client (Rust)](#http-client-rust) | Rust | Outgoing HTTP proxy with `wstd::http::Client` |
+| [HTTP Handler (axum)](#http-handler-axum) | Rust | Full REST API handler using `axum` via `wstd-axum` |
+| [HTTP Handler with Key-Value Storage (Rust)](#http-handler-with-key-value-storage-rust) | Rust | REST API + `wasi:keyvalue` |
+| [HTTP API with Distributed Workloads (Rust)](#http-api-with-distributed-workloads-rust) | Rust | Two components coordinating via `wasmcloud:messaging` |
 | [HTTP Hello World (Hono)](#http-hello-world-hono) | TypeScript | HTTP server using Hono |
 | [HTTP Hello World (Fetch API)](#http-hello-world-fetch-api) | TypeScript | HTTP server using the Fetch API |
 | [HTTP Client](#http-client) | TypeScript | Outgoing HTTP proxy |
@@ -28,6 +32,7 @@ All templates and examples on this page target wasmCloud v2 and require `wash` 2
 | [HTTP Handler with Blob Storage (Hono)](#http-handler-with-blob-storage-hono) | TypeScript | REST API + `wasi:blobstore` |
 | [HTTP Handler with Filesystem (Hono)](#http-handler-with-filesystem-hono) | TypeScript | REST API + `wasi:filesystem` |
 | [HTTP Handler with Key-Value Storage (Hono)](#http-handler-with-key-value-storage-hono) | TypeScript | REST API + `wasi:keyvalue` |
+| [HTTP Handler with Logging (Hono)](#http-handler-with-logging-hono) | TypeScript | REST API + structured logging via `wasi:logging` |
 | [HTTP API with Distributed Workloads](#http-api-with-distributed-workloads) | TypeScript | Two components coordinating via `wasmcloud:messaging` |
 | [TCP Echo Service](#tcp-echo-service) | TypeScript | HTTP component + TCP service workload |
 
@@ -62,17 +67,70 @@ Create from template:
 wash new https://github.com/wasmCloud/wasmCloud.git --name my-service --subfolder templates/service-tcp
 ```
 
+#### HTTP Client (Rust)
+
+An HTTP proxy component that makes outgoing HTTP requests using [`wstd::http::Client`](https://docs.rs/wstd/latest/wstd/http/struct.Client.html). Uses the `wstd` `#[http_server]` proc macro to handle the incoming request and proxies the call upstream.
+
+- **Source**: [`wasmCloud/wasmCloud — templates/http-client`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-client)
+- **Interfaces**: Imports `wasi:http/outgoing-handler@0.2.2`; exports `wasi:http/incoming-handler@0.2.2`
+
+Create from template:
+
+```shell
+wash new https://github.com/wasmCloud/wasmCloud.git --name my-project --subfolder templates/http-client
+```
+
+#### HTTP Handler (axum)
+
+A full-featured HTTP handler component using [`axum`](https://docs.rs/axum) for routing, wired to `wasi:http/incoming-handler` via [`wstd-axum`](https://docs.rs/wstd-axum). The template demonstrates routing, query parameters, and JSON request and response bodies, with `axum`'s default features (which depend on `tokio` and `hyper`) disabled in favor of the Wasm-compatible feature set.
+
+- **Source**: [`wasmCloud/wasmCloud — templates/http-handler`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-handler)
+- **Interfaces**: Exports `wasi:http/incoming-handler@0.2.2`
+
+Create from template:
+
+```shell
+wash new https://github.com/wasmCloud/wasmCloud.git --name my-project --subfolder templates/http-handler
+```
+
+#### HTTP Handler with Key-Value Storage (Rust)
+
+An HTTP handler component that stores and retrieves key-value pairs over HTTP, backed by `wasi:keyvalue/store`. The component speaks only the WASI interface; the host runtime selects the underlying storage backend (in-memory, filesystem, NATS, Redis, and others) based on `.wash/config.yaml`, so the same component code runs against any supported backend without modification.
+
+- **Source**: [`wasmCloud/wasmCloud — templates/http-kv-handler`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-kv-handler)
+- **Interfaces**: Imports `wasi:keyvalue/store@0.2.0-draft`; exports `wasi:http/incoming-handler@0.2.2`
+
+Create from template:
+
+```shell
+wash new https://github.com/wasmCloud/wasmCloud.git --name my-project --subfolder templates/http-kv-handler
+```
+
+#### HTTP API with Distributed Workloads (Rust)
+
+A two-component Rust workspace demonstrating distributed workloads over messaging. An `http-api` component receives `POST /task` requests and dispatches work via `wasmcloud:messaging/consumer`; a `task-leet` component exports `wasmcloud:messaging/handler` and transforms the payload (e.g., text → "leet speak"). During `wash dev`, the runtime routes calls between components in-process — no NATS server required.
+
+- **Source**: [`wasmCloud/wasmCloud — templates/http-api-with-distributed-workloads`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-api-with-distributed-workloads)
+- **`http-api` interfaces**: Imports `wasmcloud:messaging/consumer@0.2.0`; exports `wasi:http/incoming-handler` (via the `wstd` `#[http_server]` proc macro)
+- **`task-leet` interfaces**: Imports `wasmcloud:messaging/consumer@0.2.0`; exports `wasmcloud:messaging/handler@0.2.0`
+
+Create from template:
+
+```shell
+wash new https://github.com/wasmCloud/wasmCloud.git --name my-project --subfolder templates/http-api-with-distributed-workloads
+```
+
 ### TypeScript
 
 Requires [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) v14.17+ and [TypeScript](https://www.typescriptlang.org/) v5.6+. After scaffolding with `wash new`, run `npm run dev` from the project directory to start the development loop. See [Quickstart prerequisites](./quickstart/index.mdx#install-wash) for setup instructions.
 
-TypeScript templates use the [`@bytecodealliance/jco-std`](https://github.com/bytecodealliance/jco) adapter for WASI compatibility and are available on the [`v2` branch of `wasmCloud/typescript`](https://github.com/wasmCloud/typescript/tree/v2/templates).
+TypeScript templates use the [`@bytecodealliance/jco-std`](https://github.com/bytecodealliance/jco) adapter for WASI compatibility and are available in the [`templates/` directory of `wasmCloud/typescript`](https://github.com/wasmCloud/typescript/tree/main/templates).
 
 #### HTTP Hello World (Hono)
 
 A minimal HTTP server component using the [Hono](https://hono.dev/) web framework.
 
-- **Source**: [`wasmCloud/typescript — templates/http-hello-world-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-hello-world-hono)
+- **Source**: [`wasmCloud/typescript — templates/http-hello-world-hono`](https://github.com/wasmCloud/typescript/tree/main/templates/http-hello-world-hono)
 - **Interfaces**: Exports `wasi:http/incoming-handler@0.2.6`
 
 Create from template:
@@ -85,7 +143,7 @@ wash new https://github.com/wasmCloud/typescript.git --name my-project --subfold
 
 A minimal HTTP server component using the Service Worker [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) pattern.
 
-- **Source**: [`wasmCloud/typescript — templates/http-hello-world-fetch`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-hello-world-fetch)
+- **Source**: [`wasmCloud/typescript — templates/http-hello-world-fetch`](https://github.com/wasmCloud/typescript/tree/main/templates/http-hello-world-fetch)
 - **Interfaces**: Exports `wasi:http/incoming-handler@0.2.3`
 
 Create from template:
@@ -98,7 +156,7 @@ wash new https://github.com/wasmCloud/typescript.git --name my-project --subfold
 
 An HTTP proxy component that makes outgoing HTTP requests. Supports GET, POST, PUT, DELETE, and PATCH with custom header forwarding, request body handling, JSON parsing, and response header extraction.
 
-- **Source**: [`wasmCloud/typescript — templates/http-client`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-client)
+- **Source**: [`wasmCloud/typescript — templates/http-client`](https://github.com/wasmCloud/typescript/tree/main/templates/http-client)
 - **Interfaces**: Imports `wasi:http/outgoing-handler@0.2.3`; exports `wasi:http/incoming-handler@0.2.3`
 
 Create from template:
@@ -111,8 +169,8 @@ wash new https://github.com/wasmCloud/typescript.git --name my-project --subfold
 
 A full-featured HTTP handler component using Hono, demonstrating middleware patterns including CORS, request logging, response timing, and request ID tracking, with RESTful CRUD endpoints and error handling.
 
-- **Source**: [`wasmCloud/typescript — templates/http-handler-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-handler-hono)
-- **Interfaces**: Exports `wasi:http/incoming-handler@0.2.3`
+- **Source**: [`wasmCloud/typescript — templates/http-handler-hono`](https://github.com/wasmCloud/typescript/tree/main/templates/http-handler-hono)
+- **Interfaces**: Exports `wasi:http/incoming-handler@0.2.6`
 
 Create from template:
 
@@ -124,7 +182,7 @@ wash new https://github.com/wasmCloud/typescript.git --name my-project --subfold
 
 An HTTP handler component using Hono, backed by `wasi:blobstore` for persistent file storage. Provides a complete REST API for blob CRUD operations.
 
-- **Source**: [`wasmCloud/typescript — templates/http-blobstore-handler-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-blobstore-handler-hono)
+- **Source**: [`wasmCloud/typescript — templates/http-blobstore-handler-hono`](https://github.com/wasmCloud/typescript/tree/main/templates/http-blobstore-handler-hono)
 - **Interfaces**: Imports `wasi:blobstore/blobstore@0.2.0-draft`; exports `wasi:http/incoming-handler@0.2.6`
 
 Create from template:
@@ -150,13 +208,26 @@ wash new https://github.com/wasmCloud/typescript.git --name my-project --subfold
 
 An HTTP handler component using Hono, backed by `wasi:keyvalue` for persistent key-value storage. Demonstrates CRUD operations, atomic incrementation, and Hono middleware patterns. When run with `npm run dev`, a NATS-KV key-value provider is automatically configured.
 
-- **Source**: [`wasmCloud/typescript — templates/http-kv-handler-hono`](https://github.com/wasmCloud/typescript/tree/v2/templates/http-kv-handler-hono)
+- **Source**: [`wasmCloud/typescript — templates/http-kv-handler-hono`](https://github.com/wasmCloud/typescript/tree/main/templates/http-kv-handler-hono)
 - **Interfaces**: Imports `wasi:keyvalue/store@0.2.0-draft`, `wasi:keyvalue/atomics@0.2.0-draft`; exports `wasi:http/incoming-handler@0.2.6`
 
 Create from template:
 
 ```shell
 wash new https://github.com/wasmCloud/typescript.git --name my-project --subfolder templates/http-kv-handler-hono
+```
+
+#### HTTP Handler with Logging (Hono)
+
+An HTTP handler component using Hono that emits structured logs via `wasi:logging`. Every request and response is logged at the appropriate level (`trace`, `debug`, `info`, `warn`, `error`, `critical`) so you can see how WASI logging integrates with the wasmCloud host's structured log output.
+
+- **Source**: [`wasmCloud/typescript — templates/http-logging-handler-hono`](https://github.com/wasmCloud/typescript/tree/main/templates/http-logging-handler-hono)
+- **Interfaces**: Imports `wasi:logging/logging@0.1.0-draft`; exports `wasi:http/incoming-handler@0.2.6`
+
+Create from template:
+
+```shell
+wash new https://github.com/wasmCloud/typescript.git --name my-project --subfolder templates/http-logging-handler-hono
 ```
 
 #### HTTP API with Distributed Workloads
@@ -178,8 +249,8 @@ wash new https://github.com/wasmCloud/typescript.git --name my-project --subfold
 A two-workload TypeScript project demonstrating the wasmCloud service model. A TCP `service` workload accepts connections on `127.0.0.1:7878`, reads lines, and replies with the word count. A `component` workload exposes `POST /count`, forwards text to the TCP service over the in-process loopback network, and returns a JSON response.
 
 - **Source**: [`wasmCloud/typescript — templates/service-tcp-echo`](https://github.com/wasmCloud/typescript/tree/main/templates/service-tcp-echo)
-- **`service` interfaces**: Imports `wasi:sockets/tcp@0.2.3`; exports `wasi:cli/run@0.2.0`
-- **`component` interfaces**: Imports `wasi:sockets/tcp@0.2.3`; exports `wasi:http/incoming-handler@0.2.6`
+- **`service` interfaces**: Imports `wasi:sockets/tcp@0.2.3` (and related socket interfaces); exports `wasi:cli/run@0.2.0`
+- **`component` interfaces**: Imports `wasi:sockets/tcp@0.2.3` (and related socket interfaces); exports `wasi:http/incoming-handler@0.2.6`
 
 Create from template:
 
@@ -189,47 +260,106 @@ wash new https://github.com/wasmCloud/typescript.git --name my-project --subfold
 
 ## Examples
 
-Complete example applications are available in the [`examples/` directory of `wasmCloud/wasmCloud`](https://github.com/wasmCloud/wasmCloud/tree/main/examples). Run `wash dev` from any example directory to build and start a local development environment.
+Complete example applications are available in the [`examples/` directory of `wasmCloud/wasmCloud`](https://github.com/wasmCloud/wasmCloud/tree/main/examples) (Rust) and the [`examples/components/` directory of `wasmCloud/typescript`](https://github.com/wasmCloud/typescript/tree/main/examples/components) (TypeScript). Run `wash dev` from any example directory to build and start a local development environment.
 
 | Example | Language | OCI Artifact |
 |---|---|---|
-| [HTTP Hello World (Rust)](#http-hello-world-rust) | Rust | [`ghcr.io/wasmcloud/components/hello-world`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fhello-world) |
-| [Blobby](#blobby) | Rust | [`ghcr.io/wasmcloud/components/blobby-ui`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fblobby-ui) |
-| [QR Code Generator](#qr-code-generator) | Rust | — |
-| [HTTP Hello World (Go)](#http-hello-world-go) | Go | — |
+| [Blobby](#blobby) | Rust | [`ghcr.io/wasmcloud/components/blobby`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fblobby) |
+| [gRPC Hello World](#grpc-hello-world) | Rust | [`components/grpc-hello-world-client`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fgrpc-hello-world-client), [`components/grpc-hello-world-server`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fgrpc-hello-world-server) |
+| [OpenTelemetry HTTP Counter](#opentelemetry-http-counter) | Rust | [`ghcr.io/wasmcloud/components/otel-http`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fotel-http) |
+| [QR Code Generator](#qr-code-generator) | Rust | [`ghcr.io/wasmcloud/components/qrcode`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fqrcode) |
+| [HTTP Axios](#http-axios) | TypeScript | — |
+| [HTTP Password Checker](#http-password-checker) | TypeScript | — |
+| [HTTP Server with Hono](#http-server-with-hono) | TypeScript | — |
+| [HTTP stdio](#http-stdio) | TypeScript | — |
+| [HTTP Streaming](#http-streaming) | TypeScript | — |
+| [WebGPU TensorFlow](#webgpu-tensorflow) | TypeScript | — |
+| [WASI Config from Kubernetes Env](#wasi-config-from-kubernetes-env) | TypeScript | — |
 
 ### Rust
 
-#### HTTP Hello World (Rust)
-
-A simple HTTP server demonstrating how to handle HTTP requests using the `wstd` async runtime.
-
-- **Source**: [`wasmCloud/wasmCloud — templates/http-hello-world`](https://github.com/wasmCloud/wasmCloud/tree/main/templates/http-hello-world)
-- **OCI artifact**: `ghcr.io/wasmcloud/components/hello-world:0.1.0`
-- **Kubernetes manifest**: [`templates/http-hello-world/manifests/workloaddeployment.yaml`](https://github.com/wasmCloud/wasmCloud/blob/main/templates/http-hello-world/manifests/workloaddeployment.yaml)
-- **Interfaces**: Exports `wasi:http/incoming-handler`
-
 #### Blobby
 
-A file server component ("Little Blobby Tables") demonstrating CRUD operations on blob storage, served through a web UI.
+A file server component ("Little Blobby Tables") demonstrating CRUD operations on blob storage, served through a web UI. Built with the [`wstd`](https://docs.rs/wstd) async runtime.
 
 - **Source**: [`wasmCloud/wasmCloud — examples/blobby`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/blobby)
-- **Interfaces**: Imports `wasi:blobstore/blobstore@0.2.0-draft`, `wasi:logging/logging@0.1.0-draft`; exports `wasi:http/incoming-handler@0.2.1`
+- **OCI artifact**: `ghcr.io/wasmcloud/components/blobby`
+- **Interfaces**: Imports `wasi:blobstore/blobstore@0.2.0-draft`; exports `wasi:http/incoming-handler` (via the `wstd` `#[http_server]` proc macro)
+
+#### gRPC Hello World
+
+Two components demonstrating how to make and serve gRPC calls from a wasmCloud component. `component-client` calls an external gRPC server; `component-server` serves gRPC traffic to an external client. Built with [`tonic`](https://github.com/hyperium/tonic) and [`prost`](https://github.com/tokio-rs/prost) over HTTP/2.
+
+- **Source**: [`wasmCloud/wasmCloud — examples/grpc-hello-world`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/grpc-hello-world)
+- **OCI artifacts**: `ghcr.io/wasmcloud/components/grpc-hello-world-client`, `ghcr.io/wasmcloud/components/grpc-hello-world-server`
+- **`component-client` interfaces**: Imports `wasi:http/outgoing-handler`; exports `wasi:http/incoming-handler` (via `wstd`)
+- **`component-server` interfaces**: Exports `wasi:http/incoming-handler` (via `wstd`)
+
+#### OpenTelemetry HTTP Counter
+
+An HTTP counter service instrumented with OpenTelemetry through the `wasi:otel` interfaces. Each request creates a parent server span, emits child spans for downstream HTTP / blobstore / keyvalue operations, records structured log entries correlated with the active trace, and exports request-count and response-size metrics.
+
+- **Source**: [`wasmCloud/wasmCloud — examples/otel-http`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/otel-http)
+- **OCI artifact**: `ghcr.io/wasmcloud/components/otel-http`
+- **Interfaces**: Imports `wasi:otel/{tracing,logs,metrics,types}@0.2.0-rc.1`, `wasi:http/outgoing-handler@0.2.2`, `wasi:blobstore/{blobstore,container}@0.2.0-draft`, `wasi:keyvalue/{store,atomics}@0.2.0-draft`, `wasi:config/store@0.2.0-rc.1`, `wasi:clocks/wall-clock@0.2.0`, `wasi:logging/logging@0.1.0-draft`; exports `wasi:http/incoming-handler@0.2.2`
 
 #### QR Code Generator
 
 A QR code generator that accepts text input via HTTP and returns a PNG-encoded QR code, with a web UI.
 
 - **Source**: [`wasmCloud/wasmCloud — examples/qrcode`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/qrcode)
+- **OCI artifact**: `ghcr.io/wasmcloud/components/qrcode`
 - **Interfaces**: Exports `wasi:http/incoming-handler@0.2.2`
 
-### Go
+### TypeScript
 
-Requires [Go](https://go.dev/doc/install) 1.23+, [TinyGo](https://tinygo.org/getting-started/install/) (latest), and [`wasm-tools` v1.225.0](https://github.com/bytecodealliance/wasm-tools/releases/tag/v1.225.0). See [Quickstart prerequisites](./quickstart/index.mdx#install-wash) for setup instructions.
+#### HTTP Axios
 
-#### HTTP Hello World (Go)
+A CLI-style component that uses [`axios`](https://www.npmjs.com/package/axios) to perform an outbound HTTP request and returns the result through a custom WIT interface. The same component can be invoked via `wash call`, `wasmtime run`, or `jco run` through its `wasi:cli/run` entrypoint. Demonstrates pulling in a widely-used npm package and using it inside a component.
 
-A simple HTTP server built in Go using [`github.com/julienschmidt/httprouter`](https://github.com/julienschmidt/httprouter) for routing and the [`go.wasmcloud.dev/component`](https://github.com/wasmCloud/component-sdk-go) SDK for wasmCloud integration.
+- **Source**: [`wasmCloud/typescript — examples/components/http-axios`](https://github.com/wasmCloud/typescript/tree/main/examples/components/http-axios)
+- **Interfaces**: Exports `wasi:cli/run@0.2.3` and a custom `wasmcloud:examples/invoke` interface
 
-- **Source**: [`wasmCloud/wasmCloud — examples/go-hello-world`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/go-hello-world)
-- **Interfaces**: Exports `wasi:http/incoming-handler@0.2.0`
+#### HTTP Password Checker
+
+A `wasi:http`-compliant HTTP handler that provides an API for checking password strength. Uses only standard WASI interfaces (no wasmCloud-specific dependencies) and demonstrates pulling in JS ecosystem packages inside a component — notably [`valibot`](https://github.com/fabian-hiller/valibot) for schema validation and [`check-password-strength`](https://www.npmjs.com/package/check-password-strength) for the strength heuristic.
+
+- **Source**: [`wasmCloud/typescript — examples/components/http-password-checker`](https://github.com/wasmCloud/typescript/tree/main/examples/components/http-password-checker)
+- **Interfaces**: Exports `wasi:http/incoming-handler@0.2.2`
+
+#### HTTP Server with Hono
+
+An HTTP server component built on [Hono](https://hono.dev) via a custom adapter that bridges Hono onto the `wasi:http/incoming-handler` interface. Includes example routes (`/api/data`, `/api/config`) and demonstrates a minimal Hono + `wasi:http` setup.
+
+- **Source**: [`wasmCloud/typescript — examples/components/http-server-with-hono`](https://github.com/wasmCloud/typescript/tree/main/examples/components/http-server-with-hono)
+- **Interfaces**: Exports `wasi:http/incoming-handler@0.2.3`
+
+#### HTTP stdio
+
+A small HTTP handler that demonstrates writing to stdout and stderr from inside a component via the `wasi:cli` stream interfaces. Responds to `GET /?name=<name>` while logging the request to the host's stdout/stderr.
+
+- **Source**: [`wasmCloud/typescript — examples/components/http-stdio`](https://github.com/wasmCloud/typescript/tree/main/examples/components/http-stdio)
+- **Interfaces**: Imports `wasi:cli/stdout@0.2.6`, `wasi:cli/stderr@0.2.6`; exports `wasi:http/incoming-handler@0.2.6`
+
+#### HTTP Streaming
+
+An HTTP component that performs a streaming response using `wasi:http` and `wasi:io` primitives, streaming 1 MiB of random bytes on every request. Demonstrates how to stream a response body from a TypeScript component without buffering.
+
+- **Source**: [`wasmCloud/typescript — examples/components/http-streaming`](https://github.com/wasmCloud/typescript/tree/main/examples/components/http-streaming)
+- **Interfaces**: Imports `wasi:random/random@0.2.3`; exports `wasi:http/incoming-handler@0.2.3`
+
+#### WebGPU TensorFlow
+
+A two-workload TypeScript example demonstrating GPU-accelerated machine learning inside a wasmCloud workload, running [TensorFlow.js](https://www.tensorflow.org/js) with the [WebGPU backend](https://www.tensorflow.org/js/guide/platform_environment) on top of `wasi:webgpu`. A `service` workload loads a style-transfer model into GPU memory at startup and serves a binary protocol on loopback TCP `127.0.0.1:7878`; a `component` workload serves the browser UI and forwards `POST /stylize` requests to the service, returning the stylized JPEG.
+
+- **Source**: [`wasmCloud/typescript — examples/components/webgpu-tensorflow`](https://github.com/wasmCloud/typescript/tree/main/examples/components/webgpu-tensorflow)
+- **`service` interfaces**: Imports `wasi:webgpu/webgpu@0.0.1`, `wasi:graphics-context/graphics-context@0.0.1`, `wasi:sockets/tcp@0.2.3` (and related socket interfaces); exports `wasi:cli/run@0.2.3`
+- **`component` interfaces**: Imports `wasi:sockets/tcp@0.2.3` (and related socket interfaces); exports `wasi:http/incoming-handler@0.2.3`
+- **Requirements**: `wash` ≥ 2.1.0 (WebGPU in services landed in 2.1.0) and a GPU on the host machine running `wash dev`
+
+#### WASI Config from Kubernetes Env
+
+An HTTP component that reads runtime configuration via the `wasi:config/store` interface, demonstrating how wasmCloud sources config from Kubernetes ConfigMaps and Secrets at runtime. Exposes `GET /config` (all values as JSON) and `GET /config/:key` (a single value). The component contains no Kubernetes-specific code — values are injected by the wasmCloud config provider, which can be backed by a ConfigMap or Secret in a Kubernetes deployment.
+
+- **Source**: [`wasmCloud/typescript — examples/components/wasi-config-from-k8s-env`](https://github.com/wasmCloud/typescript/tree/main/examples/components/wasi-config-from-k8s-env)
+- **Interfaces**: Imports `wasi:config/store@0.2.0-rc.1`; exports `wasi:http/incoming-handler@0.2.6`
