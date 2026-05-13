@@ -87,6 +87,37 @@ operator:
 
 When `watchNamespaces` is populated, the chart generates namespace-scoped `Role` and `RoleBinding` resources for each listed namespace (instead of a single `ClusterRole`).
 
+### `operator.hostNamespaces`
+
+Introduced in 2.1. List of namespaces where host pods run. The operator's pod informer cache and per-namespace pod RBAC cover this set so the host-pod controller can manage finalizers on host pods. Leave empty when host pods only run in the operator's own namespace (the chart's default).
+
+```yaml
+operator:
+  hostNamespaces:
+    - team-a
+    - team-b
+```
+
+When you set `runtime.hostGroups[].namespace` to deploy host pods outside the operator's namespace, also include those namespaces here — otherwise the operator can't observe or finalize the host pods running there.
+
+### `operator.allowSharedHosts`
+
+Introduced in 2.1. Default: `true`. Controls whether `WorkloadDeployment`s can schedule onto hosts whose `Host.environment` differs from the workload's own namespace, via `spec.template.spec.environment`.
+
+```yaml
+operator:
+  allowSharedHosts: false
+```
+
+The default (`true`) preserves the existing behavior where workloads with no `environment` set may schedule onto any matching host regardless of which tenant namespace the host runs in. This is permissive: in a multi-tenant cluster where each tenant has its own namespace and host pods, a workload in `team-a` can target hosts in `team-b` simply by setting `spec.template.spec.environment: team-b`.
+
+Set to `false` when namespace boundaries are part of your tenant isolation model. With `allowSharedHosts: false`:
+
+- Scheduling is locked to the workload's own namespace.
+- Any cross-namespace `environment` value is rejected with a `CrossEnvironmentSchedulingDenied` Warning Event and a `HostSelection=False` condition on the Workload.
+
+See [Troubleshooting: Workload stays unscheduled with `allowSharedHosts: false`](../../troubleshooting.mdx#workload-stays-unscheduled-with-allowsharedhosts-false) for the symptom and resolution patterns.
+
 ### `operator.image.tag`
 
 Defaults to the chart's `appVersion`. Override only when you need to pin to a specific operator build that differs from the chart release:
@@ -140,6 +171,20 @@ runtime:
 ```
 
 `WorkloadDeployment` manifests target a group via `spec.template.spec.hostSelector.hostgroup`.
+
+### `runtime.hostGroups[].namespace`
+
+Introduced in 2.1. Namespace to deploy this host group's `Deployment`, `Service`, generated TLS Secret, and `ServiceAccount` into. Empty (default) deploys to the chart release's namespace.
+
+```yaml
+runtime:
+  hostGroups:
+    - name: team-a
+      namespace: team-a
+      replicas: 2
+```
+
+When you override this, ensure the namespace exists and is included in [`operator.hostNamespaces`](#operatorhostnamespaces) so the operator has the pod RBAC and informer cache access it needs to manage host pod lifecycle there. Each host's `Host.environment` will reflect the namespace where its pod runs, which is what `allowSharedHosts: false` matches against for namespace-scoped scheduling.
 
 ### `runtime.hostGroups[].http.port`
 
