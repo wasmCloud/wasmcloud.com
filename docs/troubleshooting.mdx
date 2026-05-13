@@ -1,0 +1,236 @@
+---
+title: "Troubleshooting"
+sidebar_position: 12
+description: "Common errors and their fixes when running wasmCloud workloads on Kubernetes."
+---
+
+This page collects common errors you may encounter when running wasmCloud workloads and the resolutions for each. Entries include the literal error message, the underlying cause, and the fix.
+
+If you hit an error that isn't listed here, please open an issue on [github.com/wasmCloud/wasmCloud](https://github.com/wasmCloud/wasmCloud/issues) or ask in the [wasmCloud Slack](https://slack.wasmcloud.com/) so we can document it.
+
+## Workload deployment
+
+### Missing host interface implementation in the linker
+
+You see an error similar to the following when a `WorkloadDeployment` fails to start:
+
+```
+component imports instance `wasi:config/store@0.2.0-rc.1`, but a matching implementation was not found in the linker
+```
+
+**Cause:** A wasmCloud host advertises the set of [host plugins](./overview/hosts/plugins.mdx) it provides (for example, `wasi:keyvalue`, `wasi:blobstore`, `wasi:config`, `wasi:logging`, `wasmcloud:messaging`), but a workload must declare *which* of those interfaces its components import. The runtime resolves and links interfaces declaratively from the workload spec; if the import isn't declared, the linker has no matching implementation to wire in and the component fails to instantiate.
+
+**Fix:** Add the missing interface under `spec.hostInterfaces` (in a `Workload`) or `spec.template.spec.hostInterfaces` (in a `WorkloadDeployment`). For the error above, the relevant entry is:
+
+```yaml
+hostInterfaces:
+  - namespace: wasi
+    package: config
+    version: "0.2.0-rc.1"
+    interfaces:
+      - store
+    config:
+      example.greeting: "hello from wasi:config"
+      example.environment: "dev"
+```
+
+Each entry requires `namespace`, `package`, and `interfaces`; `version` and `config` are optional. The same pattern applies to other host plugins:
+
+```yaml
+hostInterfaces:
+  - namespace: wasi
+    package: keyvalue
+    interfaces: [store, atomics, batch]
+    config:
+      backend: nats
+      bucket: my-bucket
+  - namespace: wasi
+    package: blobstore
+    interfaces: [blobstore]
+  - namespace: wasmcloud
+    package: messaging
+    interfaces: [consumer, producer]
+```
+
+**See also:** [Host Interfaces](./kubernetes-operator/crds.mdx#host-interfaces) for the full field reference (including the `name` field for multi-backend binding) and the [`HostInterface` API reference](./kubernetes-operator/api-reference.md#hostinterface). If you're hitting this error in `wash dev` rather than on Kubernetes, see [Debugging Components: Unknown import errors](./wash/developer-guide/debugging-components.mdx#unknown-import-errors).
+
+### Outbound HTTP call from a component is blocked
+
+A component that imports `wasi:http/outgoing-handler` and is bound to the corresponding host interface still cannot reach an external URL — the call fails or returns an error to the component, even though the network path appears clear.
+
+**Cause:** The host enforces a per-component allowlist of outbound destinations via `localResources.allowedHosts`. When the list is non-empty, any outbound HTTP request whose host doesn't match an entry is blocked at the wasmCloud layer before the request leaves the process — independently of any Kubernetes `NetworkPolicy`. If `allowedHosts` is set but does not include the host the component is trying to reach, the call is rejected.
+
+**Fix:** Add the host to `allowedHosts` for the component:
+
+```yaml
+components:
+  - name: http-component
+    image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+    localResources:
+      allowedHosts:
+        - api.example.com
+        - storage.googleapis.com
+        - "*.s3.amazonaws.com"
+```
+
+Entries are matched against the request's host (no scheme, no path) using case-insensitive comparison. A leading wildcard like `*.example.com` matches any subdomain but **not** the bare `example.com` — list both if you need both.
+
+If `allowedHosts` is empty (or the field is omitted), **all outbound HTTP requests are allowed** — the allowlist only takes effect when at least one entry is present.
+
+**See also:** [Workload Security — Restricting outbound HTTP with `allowedHosts`](./kubernetes-operator/workload-security.mdx#restricting-outbound-http-with-allowedhosts). If outbound HTTP is blocked at the cluster level rather than the wasmCloud level, see the same page for [NetworkPolicy](./kubernetes-operator/workload-security.mdx#kubernetes-networkpolicy-for-host-pods) guidance.
+
+### Workload image fails to pull from a private registry
+
+A `WorkloadDeployment` never reaches its desired replica count, and either the underlying `Artifact` fails to resolve or the host records a registry authentication error when fetching the component image. The pull URL points to a private registry (private GHCR, ECR, ACR, a self-hosted registry, etc.).
+
+**Cause:** wasmCloud references component images by registry URL. When the image is private, the resource that references it needs registry credentials in the form of a Kubernetes [`docker-registry` Secret](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-from-private-registry/), pointed to via the `imagePullSecret` field. If the field is omitted, or the Secret doesn't grant pull access to the image, the pull fails.
+
+**Fix:**
+
+1. Create a `docker-registry` Secret in the workload's namespace:
+
+   ```shell
+   kubectl create secret docker-registry ghcr-secret \
+     --namespace default \
+     --docker-server=ghcr.io \
+     --docker-username=<github-username> \
+     --docker-password=<github-pat-with-read-packages>
+   ```
+
+2. Reference the Secret from the resource that fetches the image. On an `Artifact` (recommended for automatic rollout on new image versions):
+
+   ```yaml
+   apiVersion: runtime.wasmcloud.dev/v1alpha1
+   kind: Artifact
+   metadata:
+     name: my-component
+     namespace: default
+   spec:
+     image: ghcr.io/my-org/my-component:0.1.0
+     imagePullSecret:
+       name: ghcr-secret
+   ```
+
+   Or directly on a `WorkloadComponent` (or `WorkloadService`) when not using an Artifact:
+
+   ```yaml
+   components:
+     - name: my-component
+       image: ghcr.io/my-org/my-component:0.1.0
+       imagePullSecret:
+         name: ghcr-secret
+   ```
+
+3. The Secret must live in the **same namespace** as the resource that references it.
+
+**See also:** [`ArtifactSpec`](./kubernetes-operator/api-reference.md#artifactspec) and the [CRDs guide](./kubernetes-operator/crds.mdx#artifact). For mirroring the wasmCloud chart's own images to a private registry (air-gapped installs), see [Private Registries and Air-Gapped Deployments](./kubernetes-operator/operator-manual/private-registries.mdx).
+
+## Scheduling
+
+### Workload stays unscheduled — no host matches `hostSelector`
+
+A `WorkloadDeployment` reports zero ready replicas indefinitely. The image pulls cleanly, there are no runtime errors, and `kubectl describe workloaddeployment` shows the workload as pending without recent placement events — the operator has simply found no host to put it on.
+
+**Cause:** `hostSelector` is a label selector matched against `Host` metadata labels. If no `Host` object carries labels matching the selector, the workload has nowhere to land. The most common cause is a typo or mismatch between the workload's selector (commonly `hostgroup: default`) and the labels on the host pool defined in Helm values (`runtime.hostGroups[]`).
+
+**Fix:** Compare the selector to your host labels.
+
+```shell
+# List host labels across namespaces
+kubectl get hosts -A --show-labels
+
+# Inspect the selector on the workload
+kubectl get workloaddeployment <name> -n <namespace> \
+  -o jsonpath='{.spec.template.spec.hostSelector}'
+```
+
+Either update the workload's selector to match an existing host group:
+
+```yaml
+spec:
+  template:
+    spec:
+      hostSelector:
+        hostgroup: my-team
+```
+
+…or add a matching host group in Helm values. The host group's `name` becomes the value of the `hostgroup` label on `Host` resources it produces:
+
+```yaml
+runtime:
+  hostGroups:
+    - name: my-team
+      replicas: 3
+```
+
+If a host group exists but the workload still doesn't schedule, also check `allowSharedHosts` — see the next entry.
+
+**See also:** [`runtime.hostGroups`](./kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroups) for host group configuration, [`WorkloadSpec`](./kubernetes-operator/api-reference.md#workloadspec) for the selector field.
+
+### Workload stays unscheduled with `allowSharedHosts: false`
+
+After enabling `operator.allowSharedHosts: false`, workloads that previously scheduled successfully now stay unscheduled, even though `hostSelector` still matches host labels in another namespace.
+
+**Cause:** As of [wasmCloud 2.1](/blog/wasmcloud-2-1-0-release/), `allowSharedHosts: false` enforces namespace-level scheduling isolation. A workload is only placed onto hosts whose `Host.environment` matches the workload's own namespace (or a value explicitly set via `WorkloadDeployment.spec.template.spec.environment`). Hosts in other namespaces are skipped regardless of label matches. This is the intended security boundary, but it can surprise teams who relied on cross-namespace host sharing before the upgrade.
+
+**Fix:** Choose the model that matches your isolation requirements.
+
+- **Run a host pool in the workload's namespace.** Add a host group to Helm values that the operator creates in the workload's namespace:
+
+  ```yaml
+  runtime:
+    hostGroups:
+      - name: team-a
+        namespace: team-a
+        replicas: 2
+  ```
+
+- **Opt in to a specific shared namespace** by setting `environment` on the WorkloadDeployment, pointing to a namespace where a host pool is intentionally shared:
+
+  ```yaml
+  spec:
+    template:
+      spec:
+        environment: shared-infra
+        hostSelector:
+          hostgroup: shared
+  ```
+
+  Cross-namespace placement requires that sharing is allowed for the target — if `allowSharedHosts: false` is set globally, the workload's namespace must match the host's `environment` for placement to succeed.
+
+- **Re-enable host sharing** if your isolation requirements allow it, returning to a cluster-wide host pool model:
+
+  ```yaml
+  operator:
+    allowSharedHosts: true
+  ```
+
+**See also:** [wasmCloud 2.1.0 release notes](/blog/wasmcloud-2-1-0-release/) for the full namespace-scoped scheduling model.
+
+## Hosts and namespaces
+
+### `Host` objects don't appear in the expected namespace
+
+After upgrading to wasmCloud 2.1, `kubectl get hosts` in your workload's namespace returns no results, or `Host` objects you expected to find are missing.
+
+**Cause:** As of [wasmCloud 2.1](/blog/wasmcloud-2-1-0-release/), the `Host` CRD is **namespace-scoped** rather than cluster-scoped. The runtime-operator creates every `Host` object in its own namespace — not in the namespace where the underlying host pod actually runs. Each `Host` records the pod's location in the new `Host.environment` field (a top-level field on the `Host` resource, not nested under `spec`), populated automatically from the downward API for in-cluster hosts (or supplied via `--environment` for external ones).
+
+**Fix:** Look in the operator's namespace, or list across all namespaces:
+
+```shell
+# List every host you have permission to see
+kubectl get hosts -A
+
+# List hosts in the operator's namespace
+kubectl get hosts -n <operator-namespace>
+```
+
+The `ENVIRONMENT` column in the default `kubectl get hosts` output shows each host's environment. To filter by environment, use a jsonpath query against the top-level `environment` field:
+
+```shell
+kubectl get hosts -A -o jsonpath='{range .items[?(@.environment=="team-a")]}{.metadata.name}{"\n"}{end}'
+```
+
+If you were relying on `ClusterRole` bindings to grant host visibility, note that user-facing host roles in 2.1 are generated as namespaced `Role`s. A namespace admin can now grant host visibility within their own namespace without cluster-admin involvement.
+
+**See also:** [Migration to v2](./migration.mdx) for upgrade notes, and the [Host API reference](./kubernetes-operator/api-reference.md#host).
