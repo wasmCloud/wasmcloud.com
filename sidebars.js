@@ -173,6 +173,7 @@ const sidebars = {
     },
     'glossary',
     'faq',
+    'troubleshooting',
     'migration',
 
     {
