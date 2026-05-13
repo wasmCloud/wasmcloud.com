@@ -132,6 +132,7 @@ _Appears in:_
 | `hostId` _string_ |  |  | Required: \{\} <br /> |
 | `hostname` _string_ |  |  | Optional: \{\} <br /> |
 | `httpPort` _integer_ |  |  | Optional: \{\} <br /> |
+| `environment` _string_ | Environment records where the host is running. For Kubernetes host<br />pods this is the pod's namespace; for out-of-cluster hosts it can be<br />any operator-defined identifier (e.g. a region or data center). |  | Optional: \{\} <br /> |
 
 
 #### HostInterface
@@ -578,6 +579,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `hostSelector` _object (keys:string, values:string)_ |  |  | Optional: \{\} <br /> |
 | `hostId` _string_ |  |  | Optional: \{\} <br /> |
+| `environment` _string_ | Environment, if set, scopes scheduling to Hosts whose Environment<br />matches this value, regardless of the Workload's own namespace.<br />The value is matched against Host.Environment — typically a<br />Kubernetes namespace for in-cluster host pods, or any<br />operator-defined identifier for out-of-cluster hosts (e.g. a<br />region or data center). Only honored when the operator is started<br />with allowSharedHosts=true, or when Environment equals the<br />Workload's namespace. |  | Optional: \{\} <br /> |
 | `components` _[WorkloadComponent](#workloadcomponent) array_ |  |  | Optional: \{\} <br /> |
 | `hostInterfaces` _[HostInterface](#hostinterface) array_ |  |  | Optional: \{\} <br /> |
 | `service` _[WorkloadService](#workloadservice)_ |  |  | Optional: \{\} <br /> |
