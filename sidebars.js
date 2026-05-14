@@ -160,6 +160,7 @@ const sidebars = {
       label: 'Recipes',
       link: { type: 'doc', id: 'recipes/index' },
       items: [
+        'recipes/plugin-or-service',
         'recipes/tls-bring-your-own-certificates',
         'recipes/expose-workload-via-kubernetes-service',
         'recipes/inject-configuration-from-configmaps-and-secrets',
