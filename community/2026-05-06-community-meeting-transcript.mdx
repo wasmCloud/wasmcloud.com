@@ -1,0 +1,465 @@
+---
+date: '2026-05-06'
+title: 'Transcript: WebGPU Demos, Namespace-Level Hosts & MySQL Connection Pooling'
+description: 'Full transcript of the May 6, 2026 wasmCloud community call covering WebGPU demos with TensorFlow.js, namespace-scoped Kubernetes hosts, workload configuration, and WASI socket connection pooling.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - webassembly news
+  - wasm edge
+  - webgpu
+  - tensorflow js wasm
+  - wasi sockets
+  - platform engineering
+  - gpu multi-tenancy
+  - connection pooling
+image: https://i.ytimg.com/vi/0Ju3PCGyJqk/maxresdefault.jpg
+showTitle: true
+slug: 2026-05-06-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-05-06-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=0Ju3PCGyJqk" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=0Ju3PCGyJqk" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [05:31](https://youtu.be/0Ju3PCGyJqk?t=331)
+
+Hello and welcome to wasmCloud Wednesday. It is May 6th, and we've got a very busy agenda today. We've got a bunch of things happening in the wasmCloud space, which is awesome. Lots of new features and examples have been landing. So we've got three demos, potentially even more, depending on time. And we also have an allocated discussion session. Aditya and I both want to talk through allowed hosts and some of the work that he's been doing on basically connection pooling using services. So up first is Mendy. Mendy, are you able to share?
+
+**Liam Randall** [06:13](https://youtu.be/0Ju3PCGyJqk?t=373)
+
+Yes? Let's find a window. Sorry,
+
+**Mendy Berger** [06:29](https://youtu.be/0Ju3PCGyJqk?t=389)
+
+Hey. Okay, I'm assuming you can see my screen, right? Okay, so this is a demo using webGPU inside WASI. So first of all, just show how it works. You can take any image. Here, we have some pre-filled images, for example, the Statue of Liberty, and you can restylize it. So let's do like this, like pen and ink style. So we just run it, takes a few seconds, and we have the Statue of Liberty restyled. So what this actually does is it runs a model on top of TensorFlow.js, all inside Wasm, inside Styling Monkey with JCO — like this is all Wasm, but no changes to TensorFlow.js. It thinks it runs in a browser, and it's pretty cool. I'll just show one more example, maybe a different style, Lincoln Memorial, whatever, a different drawing style. So the way this actually works internally, I'll just give a very brief overview. This is a service, so the actual setting up the GPU, warming it up, that takes a lot of time. It can take like almost half a minute sometimes. So we have this running in a service in the background. We set it up once, and then we have a component that serves an API with the static assets. And it calls out to the service to actually do the inferencing, to do the actual styling. We do also do on the service a warm-up stylize, if you can call it that. That gives us much faster speed. So we just do it with a bunch of zeros, but it initializes all the right buffers and GPU setup. But once that's done, it's pretty fast. Actually, the time here, a lot more goes down to decoding the JPEG than actual inference, because that's really quick anyway. That's it. That's my demo.
+
+**Bailey Hayes** [08:53](https://youtu.be/0Ju3PCGyJqk?t=533)
+
+Can you show some code, Mendy?
+
+**Mendy Berger** [08:56](https://youtu.be/0Ju3PCGyJqk?t=536)
+
+Ooh, let's see if I have it open. Give me just a second, I'm going to wing it, but let's try — change what I'm sharing.
+
+**Bailey Hayes** [09:17](https://youtu.be/0Ju3PCGyJqk?t=557)
+
+Yeah, what I want people to see is the dependency tree. Like show them where you're pulling in TensorFlow and how.
+
+**Mendy Berger** [09:23](https://youtu.be/0Ju3PCGyJqk?t=563)
+
+Oh yeah, turns out I have too many things open. I hope this is the right one, except way too many VS Code. I believe it is, okay. So this is actually an example that's going to be in the TypeScript examples repo. It's a PR now. It should be merged, hopefully soon. We've been going back and forth on it for a while, but I think it is close to done. TensorFlow.js is just regular TensorFlow.js package based on NPM. It knows nothing about where it's running. We do import also a shim that is on top of the Wasm webGPU. Even though obviously webGPU is based on webGPU, there are minor changes that you just have to sometimes change a type or change some things to throw rather than return the result type, like stuff like that, small things like that. So this package — a GFX JS webGPU — will probably be the polyfill. And yeah, then in the actual service, it's pretty simple how it works. Yeah, you can see just TensorFlow.js being imported. And then we import the webGPU backend — it has multiple backends. We import the webGPU backend, and it just thinks that it's running in a browser. It knows nothing about what we're trying to do.
+
+**Bailey Hayes** [11:09](https://youtu.be/0Ju3PCGyJqk?t=669)
+
+Which basically a different way of saying that is that you're able to take TensorFlow.js and existing TensorFlow.js examples, and it works off the shelf. And the code that you're showing us right here is just idiomatic TypeScript, and the uglies you've kind of put in a helper package for people, essentially. Are there any other rough edges you'd call out for people if they were going to try this themselves?
+
+**Mendy Berger** [11:38](https://youtu.be/0Ju3PCGyJqk?t=698)
+
+Yes. So first of all, since it thinks it runs in a browser, one of the things I had to polyfill is the navigator object. It for some reason checks the navigator object. So just have to polyfill — just set it to an empty string. All the values empty string, it just works. Small things like that, but for the most part, it just works.
+
+**Bailey Hayes** [12:00](https://youtu.be/0Ju3PCGyJqk?t=720)
+
+Nice. Yeah, thank you. Hey, Frank.
+
+**Frank Schaffa** [12:07](https://youtu.be/0Ju3PCGyJqk?t=727)
+
+I'm just curious, how much of Claude did you use for this?
+
+**Mendy Berger** [12:13](https://youtu.be/0Ju3PCGyJqk?t=733)
+
+Quite a lot. I would say, yeah, this is the kind of thing that Claude can knock out pretty well. And I know Liam has built some other examples on top of webGPU. I don't have a lot to call out, but Liam has built some other — hopefully you don't hate me for that —
+
+**Liam Randall** [12:31](https://youtu.be/0Ju3PCGyJqk?t=751)
+
+No, no, not at all. I was actually just about to share here. Let me share my screen. I'll show you a couple examples here.
+
+**Mendy Berger** [12:39](https://youtu.be/0Ju3PCGyJqk?t=759)
+
+Yeah, Claude just eats it up, right? Like Claude is pretty good doing these examples.
+
+**Liam Randall** [12:45](https://youtu.be/0Ju3PCGyJqk?t=765)
+
+You know, Frank, my experience of what I've been doing is working with Claude and Gemini and other LLMs to sort of understand what does the DevX look like here. So I've been building out a number of domain-specific examples for defense, for financial services and other things. And I'll walk through a couple here. So this particular one — you can check it out, but I'll let the screen highlight. Here is an example of using the Sentinel-1 satellite, which is satellite-to-ground radar, to cross-reference radar scans of an area with AIS data ship broadcast, and sort of look for deviations between signals where ships are broadcasting versus not. And the powerful thing is these radar images can be quite large — 25,000 by 16,000 pixels, three bytes per pixel. And it's the type of math that you're doing that lines up very well to a GPU. So there's a little GPU flag here, and in the demo you can sort of watch it run across the GPU or the CPU. And this is not client side. This is all server side that's being done with a Rust backend. Now, of course, this is all wasmCloud. This is a pattern using a fan-out over NATS. So there's a tiny API gateway that's about 390K including the map assets that are embedded. And then there is the backend that's doing a CPU path, a GPU path, as well as the AIS data that's under 300 kilobytes here that scales out in order to pull these things down. And you can see that bringing the GPU in this case gives you a huge, huge performance boost.
+
+For orgs that are maybe like financial services instrumented, here's an example that's called Wasm Street that is basically an options trading platform. It'll let you take a stock, look at option chains, and then build collars and ladders and various option strategies for achieving different risk profiles, and it does have a GPU enablement here. Essentially in this particular example, behind the scenes, to calculate those option pricings I'm doing Monte Carlo strategies and things like that. But the strategy grid search does use the GPU in order to basically crunch recommendations across hundreds of different strategy types, and then show you the top strategies for a moon shot, for a balanced income approach, and then lets you sort of evaluate given a set of volatility settings for a stock what you're looking at. And these are just toys that we've created as demos, but what we're doing is exercising webGPU and various other pieces of the platform. Any questions? My question is, why can't I find the mute button?
+
+**Colin Murphy** [16:01](https://youtu.be/0Ju3PCGyJqk?t=961)
+
+So we got TensorFlow. Are all these models TensorFlow?
+
+**Bailey Hayes** [16:07](https://youtu.be/0Ju3PCGyJqk?t=967)
+
+No, no. Yeah, okay, so that's a key difference. So what Mendy showed is a new thing that we hadn't had before, which is showing end to end with TensorFlow.js, using JCO, and all the investments that Mendy and Victor have been doing on making it possible to have basically nice, idiomatic TypeScript and existing NPM libraries to just work. And then what Liam was showing is doing that also with Rust, basically the Rust side of the backends.
+
+**Colin Murphy** [16:36](https://youtu.be/0Ju3PCGyJqk?t=996)
+
+Okay, cool. Yeah, so on the backend, the libraries that are using webGPU — what are we using? Are we still using the ONNX runtime? Or what are we doing?
+
+**Bailey Hayes** [16:48](https://youtu.be/0Ju3PCGyJqk?t=1008)
+
+Go ahead, Liam.
+
+**Liam Randall** [16:49](https://youtu.be/0Ju3PCGyJqk?t=1009)
+
+In this particular case, I'm actually just doing raw webGPU computing. So there are no machine learning models in either one of these examples, and I'll link these in chat and then on wasmCloud Slack as well. These particular ones will show up on the Cosmonic docs as soon as I have a chance later this week to write these up. And I'll sort of walk through the storyboarding there. But if we just look at some of the code here — let me look at the dark vessels one instead, just know that codebase a little better because I've worked on it more recently. If we look behind the scenes here, you'll see that there is a CPU path and then a GPU path, and I'm just using WASI webGPU and then raw matrix math in order to get this done. So what I was trying to do was give you some different examples, and we will do some that use models and the TensorFlow ones that are out there, but we want to show the whole range of capabilities with the WASI webGPU support here.
+
+**Mendy Berger** [18:00](https://youtu.be/0Ju3PCGyJqk?t=1080)
+
+Yeah, I think I would — yeah, I was going to say what Liam already said. We're trying to show different things running on webGPU. So Liam did a lot of raw webGPU. I did TensorFlow.js thinking it's like regular GPU, and I think, I believe, Colin, you've been working on the ONNX runtime, which is a whole big thing. But yeah, it's different paths of using webGPU.
+
+**Bailey Hayes** [18:22](https://youtu.be/0Ju3PCGyJqk?t=1102)
+
+Yeah, so you demoed three weeks ago, Colin, that was C++, right?
+
+**Colin Murphy** [18:27](https://youtu.be/0Ju3PCGyJqk?t=1107)
+
+Yeah, it was C++, but I had ORT models or ONNX models that had to get — I had to use. But Mendy, you were using TensorFlow models, or were you making direct — yeah, for Mendy.
+
+**Mendy Berger** [18:48](https://youtu.be/0Ju3PCGyJqk?t=1128)
+
+Sorry, I'm not trying to —
+
+**Bailey Hayes** [18:49](https://youtu.be/0Ju3PCGyJqk?t=1129)
+
+Did you use a TensorFlow model for your thing?
+
+**Colin Murphy** [18:51](https://youtu.be/0Ju3PCGyJqk?t=1131)
+
+Yeah, did you use a TensorFlow model? Sorry.
+
+**Mendy Berger** [18:54](https://youtu.be/0Ju3PCGyJqk?t=1134)
+
+I believe so, yeah.
+
+**Colin Murphy** [18:56](https://youtu.be/0Ju3PCGyJqk?t=1136)
+
+Okay, so that's cool. So we've got ONNX, we've got TensorFlow. We got to get PyTorch in there, you know, and then we can just make a real platform.
+
+**Bailey Hayes** [19:11](https://youtu.be/0Ju3PCGyJqk?t=1151)
+
+Got it all? Yeah.
+
+**Colin Murphy** [19:16](https://youtu.be/0Ju3PCGyJqk?t=1156)
+
+That's awesome. Yeah, this webGPU thing is so huge. I think it is whatever — whenever that means, that means. But I think it is so —
+
+**Liam Randall** [19:25](https://youtu.be/0Ju3PCGyJqk?t=1165)
+
+I agree. Well, let me tease a little further then. You know what's going on maybe in the kitchen here. So the story — everybody understands that the GPUs are stupid powerful. But when you think about if you're an enterprise or an org and you want to say, well, how do I really enable this field of 1,000 flowers, you start to think about a different set of concerns. At the intersection of GPUs you think about multi-tenancy. You think about scale platforms. And underneath the hood here, what we have now is a highly multi-tenant platform for GPU analysis. And let me sketch this.
+
+At the top layer, we have webGPU which has some multi-tenancy features — the ability to initialize and load models. You know, if you think about the tabs in your browser all sharing an underlying allocation that you have. Then you hit the virtual machine or the system layer, and especially on server side, there's a standard that's called wgpu. And what that is, is a multi-tenancy standard that, you know, like a VMware Broadcom VCF or Red Hat OpenShift implements to give you a second layer of multi-tenancy. Then at the hardware layer, depending on if you're Nvidia, there's a thing called MIG, which lets you take a GPU and chop it into smaller GPUs that all show up as separate hardware. And then on AMD and Intel, they use a standard called SR-IOV. The AMD cards can be chopped into like 16 different cards, and then the Intels can be chopped into like 128 different cards. And now what you end up with is the ability to take a physical piece of discrete hardware and then launch a full, completely isolated, multi-tenant GPU platform of platforms all the way down. That's the direction that we're headed in here.
+
+**Colin Murphy** [21:18](https://youtu.be/0Ju3PCGyJqk?t=1278)
+
+Yeah. And I think the other thing too is that I needed — so what I did for my talk, what I've done the last couple weeks, is because it's going to be a browser-based experience, I'm trying to just have the webGPU thing do the model part on wasmCloud, and I'm having the browser — because there are these browser APIs that are really good for handling, for like breaking a video up into images or resizing images, and that stuff still is pretty slow on WASI because we just don't have the SIMD stuff, right? And so that's what I'm doing. I'm generating all the images and then sending a stream of them to the backend service, and then getting back the transformed images and regenerating a video. But the cool thing is that because I got all these images, I can send them in batches. I could spread it out over lots and lots of different nodes if they're available and really kind of maximize my GPU time. And then just have to have like this kind of what you had looked like, Liam, like something to kind of thread it all back together and give it back to the client. And then we can have really fast inference, which I think is kind of what you're saying. But my example will be really good too.
+
+**Liam Randall** [22:48](https://youtu.be/0Ju3PCGyJqk?t=1368)
+
+No, I like your example. You know, when you think about what you're actually doing, it's a map-reduce pattern. You know, how do you eat an elephant? One bite at a time. You just need a million people in order to get it out. So I think what we need is like a funny name for map-reduce over video. Like video-reduce, or Prism, or something that's like take the light, break it into components, bend it all together. Rainbow, you know, that's what I feel drawn to, visual.
+
+**Colin Murphy** [23:20](https://youtu.be/0Ju3PCGyJqk?t=1400)
+
+Do that? Yeah. PRISM.
+
+**Liam Randall** [23:22](https://youtu.be/0Ju3PCGyJqk?t=1402)
+
+Solid. PRISM reduce something.
+
+**Bailey Hayes** [23:24](https://youtu.be/0Ju3PCGyJqk?t=1404)
+
+Yeah. All right, well, hey, this was awesome, guys, but we have a ton of agenda items, so keep moving. Jeremy, you've got a demo for a host at the namespace level. I think we need to go through that, because that's a pretty significant change that we're making, but I think you show how to land it in a non-breaking way, which is pretty sweet.
+
+**Jeremy Fleitz** [23:48](https://youtu.be/0Ju3PCGyJqk?t=1428)
+
+Yeah, let's see here. Okay, so this is currently wasmCloud 2.0 today, when you deploy it inside a Kubernetes cluster. You deploy it into a namespace. The runtime operator and the host can be deployed into another namespace, but typically by default they're inside the same namespace. Once the host is running inside the pod, the runtime operator will receive the heartbeat from it, and then it creates a cluster-level host CRD.
+
+Now the original reason why we did this is because if you think about it from a container perspective and platform engineering, you create a deployment, you want to get all these containers on the different nodes. You don't care where the nodes are running at that make up the cluster. We were really thinking that the host is a cluster-level thing, so that way people get to use that exact same type of thought process and say, oh, I got a WebAssembly component, I want to deploy it to a host, I don't care where the host is running inside what namespace — it's a cluster-level thing.
+
+The problem with that is that requires teams to install cluster role permissions instead of just namespace-level permissions. This goes against the idea of us, as wasmCloud, saying we just simply extend Kubernetes and you can use all your existing Open Policy and network policies. We're not really saying that. We're kind of saying with this one, we also need a cluster-level permission over here, by the way. And that kind of raised a little bit of a flag.
+
+So what this does is it moves to this model where you can still have the host inside that same namespace. But this also will allow it to be easier to deploy hosts into individual namespaces. And the host CRD — because the whole entire lifecycle of this host CRD, by the way, is controlled by the runtime operator — it just lives right next to the runtime operator inside that same deployed namespace. So we don't lose any type of functionality as far as what the CRD provides, as far as visibility. You can still just do, you know, `kubectl get host`, just put `-A`, capital A, and you'll still get the exact same list as you did prior.
+
+But what this does mean is now we can remove that cluster-level permission and just make it so that it's all just role namespace, all the permissions. So this PR is out here. I still got a couple minor changes I need to check in for adding this to the end-to-end test suite, as well as some minor fixes.
+
+But the way that this was done is there's now an allowed-share host variable value inside the Helm chart. By default, it's true, and that is just so that it's backwards compatible, so that nothing has to change when you do the upgrade. Now you will have to update your CRDs, so there will have to be — instead of doing a `helm upgrade`, you'd have to do the `helm upgrade` with CRDs to update those to add this new environment field. But since we don't have environment field on the workload today, any existing workload will still just work just by doing the simple upgrade.
+
+But just to show what this looks like a little bit better. So this is like existing workload that's deployed, and I was using this for testing. If you notice I'm saying the workload deployments in namespace A, but there's nothing in the spec other than this host selector saying the default host group that it wants to go to. The next workload deployment, I still have namespace A, but I say in the environment I want to go to namespace A, so this means it's going to be scheduled onto a host that's inside namespace A.
+
+The reason why we call this environment instead of host namespace is just because a host doesn't really have to be inside the cluster. It could be an external host that is connected internal to the cluster. Think of like an edge type of host.
+
+And then I got a couple other examples going, like cross-environment, where this is namespace B, you know, go to namespace A, and then I got one that's backwards, A to B.
+
+So right now, I have this — this is the actual values YAML that I used for setting up the hosts. And so for the host groups, there's now a new field called namespace. This is optional. If you don't specify it, just like today, it'll install all the hosts to the same namespace where the runtime operator is. So I just went ahead and split a host group for host group default namespace A, host group default namespace B. So now I actually have my host groups that are spread out across two different namespaces. And then finally, I have one — I call it default GPU, but I didn't — oh, yeah, I do have it enabled. Okay, yeah. So I do have webGPU enabled here. So this is kind of like my "okay, you have these tenant hosts that are out there, I can schedule everything, but maybe I want to have a common GPU host that I want to lock it down, so you have to really ask for permissions to schedule any workload there, so I'm not wasting any valuable resources."
+
+I guess one other thing to quickly call out — with us adding this to the spec like this in the CRD, you can use Open Policy, once again, to even restrict people from taking their workload and putting it to hosts that you don't want them to.
+
+So I got this running right now. If I just look at my workloads, this is the one where I do have the values testing YAML. I have three different hosts that are running, and then the cross-environment one, you'll see that the workload deployment's in namespace A but it went to namespace B, and then A to A, etc.
+
+I'm just gonna show you the hosts real quick. And then here's all the hosts right here that are running. All the CRDs are in the default namespace, but the actual environment right here is what namespace the host is running. So if I look at my pods here, you'll see like host group default is namespace A, host group default is namespace B, and then this one with the GPU is inside the default namespace, right next to the runtime operator.
+
+So if I bring this back up again, I'm going to go ahead and do a Helm update and just basically move all my different hosts. And I want to get back down to just having one host inside my default namespace. And what I expect to see is — because the workload deployments that specifically say a certain environment they want to be deployed on, they should not go to the default new host, because there's no environment that's set up. There's no host that's saying, hey, I'm this environment, it's not reporting that.
+
+So down here at the very bottom, I'm going to update it to cluster. And so then cluster over here, if you look at it, there's no namespace specified. It's just replica count of three.
+
+So now, if I do this again — and sure enough, all the ones that had the environment that was specified are not scheduled anymore. And the only one that didn't have any environment, it just didn't care. Just wanted to go to a default workload or default host group, it was able to be scheduled. I will pause for any questions.
+
+**Colin Murphy** [31:38](https://youtu.be/0Ju3PCGyJqk?t=1898)
+
+What's the advantage of that behavior?
+
+**Jeremy Fleitz** [31:41](https://youtu.be/0Ju3PCGyJqk?t=1901)
+
+Yeah, good question. So really, it goes back down to one — we're moving this so you don't need the RBAC permission for cluster level. Because right now, when you go to like a tightened-down security company, they might say, look, we're not giving any cluster-level permissions, we want to do role-based only to a namespace. But second, there's a lot of policies that are out there that you might want to control. Also, even though WebAssembly is secure by default and sandboxed by default, there still might be a policy that says it has to be inside a particular namespace or location when you deploy it, so that way it's right next to your pods.
+
+The whole idea also is, you know, I might have a team that only has namespace A and they have all these additional pods that are currently running today. And now you can say, okay, yes, now you had this one little pod over here, and you start stuffing it in with new WebAssembly components, and everything's still tightened, still controlled by that namespace network policy.
+
+**Colin Murphy** [32:44](https://youtu.be/0Ju3PCGyJqk?t=1964)
+
+Okay, yeah, that sounds good. I just — that last behavior where you got rid of the namespace in the YAMLs, and then you did the exact same action, and then it didn't deploy three quarters of the stuff.
+
+**Jeremy Fleitz** [32:56](https://youtu.be/0Ju3PCGyJqk?t=1976)
+
+Yeah, yeah. Like, I'd —
+
+**Colin Murphy** [32:58](https://youtu.be/0Ju3PCGyJqk?t=1978)
+
+I don't know, like, I didn't fully get it, so maybe it's perfectly fine. But I was like, oh no, that could be kind of frustrating.
+
+**Bailey Hayes** [33:04](https://youtu.be/0Ju3PCGyJqk?t=1984)
+
+Well, yeah, the idea being, if you don't have the available environment that you require to deploy to, we will tell you the status failed. You get a good error message.
+
+**Colin Murphy** [33:14](https://youtu.be/0Ju3PCGyJqk?t=1994)
+
+Got it, yeah?
+
+**Jeremy Fleitz** [33:15](https://youtu.be/0Ju3PCGyJqk?t=1995)
+
+Like, I just really just switched it back. I just redeployed the host. And so I'm assuming — yay. Okay, well, not ready yet, but hang on.
+
+**Colin Murphy** [33:23](https://youtu.be/0Ju3PCGyJqk?t=2003)
+
+Yeah, okay.
+
+**Jeremy Fleitz** [33:24](https://youtu.be/0Ju3PCGyJqk?t=2004)
+
+That's back, ready.
+
+**Colin Murphy** [33:25](https://youtu.be/0Ju3PCGyJqk?t=2005)
+
+All right. Okay, so it's just gonna say ready false. But where was —
+
+**Jeremy Fleitz** [33:31](https://youtu.be/0Ju3PCGyJqk?t=2011)
+
+If I do a describe, well actually, but if I did a describe, I can look at the logs and everything will — yeah, emit it.
+
+**Colin Murphy** [33:39](https://youtu.be/0Ju3PCGyJqk?t=2019)
+
+Yeah. Just it was — it definitely makes sense. If you don't have permissions, it shouldn't — I mean, it won't work. It just was like if there was something a little more clear, that was all. It was just a two-second impression I had. I was like, oh no. Why is it not ready?
+
+**Jeremy Fleitz** [33:57](https://youtu.be/0Ju3PCGyJqk?t=2037)
+
+Yeah, I get it. I get it.
+
+**Frank Schaffa** [34:02](https://youtu.be/0Ju3PCGyJqk?t=2042)
+
+I think this is great, because you want to have the CRD definition of course at the cluster level, but then the instances at namespace scoped. So this makes far more sense.
+
+**Jeremy Fleitz** [34:20](https://youtu.be/0Ju3PCGyJqk?t=2060)
+
+Yeah, thank you. And I was gonna say, since I have it now at namespace level, or multiple namespaces versus just the one, it did create individual roles for each namespace I had listed. And if you notice, it only has — this is where the pod role policy comes in, where it needs to add that finalizer hook onto the pod. This was the other thing that we changed, because if I just went back to the one model, this would be a cluster role RBAC that was required.
+
+**Frank Schaffa** [34:54](https://youtu.be/0Ju3PCGyJqk?t=2094)
+
+Very good.
+
+**Jeremy Fleitz** [34:55](https://youtu.be/0Ju3PCGyJqk?t=2095)
+
+Yeah. Thanks. Any other questions? All right, back to you, Bailey.
+
+**Bailey Hayes** [35:03](https://youtu.be/0Ju3PCGyJqk?t=2103)
+
+Thanks, Jeremy. All right, yet another demo. I'll go quick on this one, because I want us to have time for discussion.
+
+Added a new feature over the past week. We discussed this one in depth on the last community call, and then this is the implementation of that. And so this is the actual feature, adding it. And then I also, in draft — once we land this one, I also have this one which is a full demo exercising it. So I'm just going to show you, really quick, that demo running locally, essentially.
+
+Now, inside our config YAML, I can specify things that I'm going to use for my local development. So first up is this new field called workload, and that's where I can specify things like environment variables, WASI config fields, as well as secrets. So I expanded an existing demo that Jeremy had already made for showing off OTEL, mainly because OTEL is like a good way to plumb through and show all these fields being plumbed all the way through. And so I added a couple extra OTEL resource-specific types so I can say things like what cloud region I'm running in and what environment I might be running in, showing us going and making an outbound request to an allowed host of example.com, and then these — these are a bit contrived, I will totally admit that. But I also added the concept of application defaults, because usually you're going to kind of have a common set here, and these are not obviously sensitive, so I just have them as an env file committed in the repo.
+
+But then we've got another example here, which is let's actually do a secret and reference an API token. And so I have committed an `environment.example`, which is like, hey, you could do a demo token like this. But what is actually gitignored and what is actually referenced — this actual export is not committed in the repo. And so that's a fairly common pattern. So I figured I'd go ahead and document both routes.
+
+So inside our example, we basically give you Option A and Option B. So right now, what I'm using to run this demo locally is I ran `direnv allow`, and I allowed basically this envrc, and that's what has in my local shell the upstream API token being defined.
+
+And so I did a couple runs locally. I think the one I want to show first is I just cd'd into it and made no changes, so I didn't actually export the environment variable or anything. And when I do that, our example correctly fails and tells you, hey, I didn't have the secret that you said I need to have to be able to run this app. And it says it's the upstream API token and it's not set. So here I could have said `export` this API token like just directly in my shell, and that's fine, or I can use the direnv pattern. So that's what I did here. I copied over the example, I did `direnv allow`, which is going to export that API token. In theory, I would actually give it a real API token, but this is a demo. And so I ran `wash dev` again, and this time it worked, and I'm able to make some calls.
+
+Now, another thing that I expanded this example out to do — so let's actually just run the example. It's not exactly the cutest thing in the world. We're doing HTTP counter in the backend, we're talking to a key-value store, we're talking to a blob store, just enough interesting stuff to be able to basically create fun, interesting traces.
+
+So the next thing that I expanded this to do is to also document how you can bring up your own little Aspire dashboard. So if you want to run this demo end to end, you would `docker run aspire`, or whatever your OTEL-compliant dashboard of choice is. This one's just the easiest for local development. And then rerun `wash dev`. And so when I do that, I get a handle request here, and then I get to see all the different things that we're doing. We're messing around with the blob store, we're incrementing key-value. And so we get a completed trace here. And all of this is now wired up with a lot of those config values that I had plumbed through. And I can also see the resource definitions that I had passed on in our structured logs as well.
+
+So this is kind of a speedy quick version of that demo. But TLDR, I think this is ready for use if folks want to give it a try and give me a code review, that would be awesome.
+
+And yeah, Aditya — okay, we've got our discussion item now. So first thing, let me stage it with the example I just showed. Did you notice I added a field called allowed host that I plumb through on my workload?
+
+**Aditya** [40:17](https://youtu.be/0Ju3PCGyJqk?t=2417)
+
+Yeah.
+
+**Bailey Hayes** [40:18](https://youtu.be/0Ju3PCGyJqk?t=2418)
+
+I discovered something that I think was intentional, but I also think wrong. So we essentially enforce allowed hosts on HTTP client outbound. If you have allowed hosts as a field specified, then we say, okay, we're going to start enforcing allowed outbound hosts. But if you don't have it specified, we don't enforce it. And I think that was intentional, because it's like, you know, when you're doing local development, you don't want it to be frictionful, you don't want people to immediately start having to do configuration and that kind of thing. And we didn't have a way to specify this at the time in our dev config — but now we do, and I actually think we should change that.
+
+So the reason why I think it's wrong is that I believe that we should just always enforce allowed hosts no matter what. I'm comfortable — and this is actually an idea proposed by Jeremy — saying, okay, since this isn't behavior we had before, but we need to enforce this, and we want to just continue having the strongest zero-trust security posture we possibly can have in our project: when I read in a config, I think I'm going to also update the config, and what I'll do is, if no allowed host was specified before (which is basically all pre-existing config up to this point), say workload allowed host and then do star. And this is borrowing what we've seen in the wild from Lambda and other places. This is what they kind of start with for their local dev experience. And that is the dev config YAML, right? That's not your production YAML, so that's reasonable.
+
+And then also on our Helm chart, we just make sure it's always specified and it's empty. Now you always have to opt into it. Always have to edit it if you're doing outbound. So that way we'll have basically the most secure option we possibly can, and not have this accidental gap where what I'm doing in development is working, and then I went and did it in my Kubernetes environment, now it's not working, and I don't understand why. And the host is behaving differently between the two scenarios, and this will just kind of unify them and make that explicit. What do you think of that?
+
+**Aditya** [42:47](https://youtu.be/0Ju3PCGyJqk?t=2567)
+
+The allowed host, is that for the outgoing handler only?
+
+**Bailey Hayes** [42:52](https://youtu.be/0Ju3PCGyJqk?t=2572)
+
+Today it is, yes.
+
+**Aditya** [42:55](https://youtu.be/0Ju3PCGyJqk?t=2575)
+
+Okay. I just wanted to see how that would tie into the services that we have today.
+
+**Bailey Hayes** [43:02](https://youtu.be/0Ju3PCGyJqk?t=2582)
+
+Introduce what you've been working on.
+
+**Aditya** [43:04](https://youtu.be/0Ju3PCGyJqk?t=2584)
+
+Yes, so I'm not sure if everyone listening to this is aware, but services today work on a virtual loopback address that separates itself into a Wasm sandbox — not into a Wasm sandbox — and works besides the OS port system. So even if you connect to localhost port XYZ, it does not connect to your host's port but instead on a virtualized port mapping. So when we talk about adding long-living, long-running client connection pools through the service, it's never going to be able to actually connect to any underlying host port or any external addresses.
+
+So that was the problem that I ran into when I was creating my SQLX socket component. So just a TLDR — it's basically a component setup in which you have an HTTP incoming handler and a lead service-like service component which holds a long-running client socket connection to a MySQL database using a fork of SQLX, which I've been working on for the past few months. And the problem that I had was exactly that — it wouldn't connect. So I had to add port forwarding-like system using host magic, and it basically allowed my components under specific conditions in the `wash dev` config to actually connect to the MySQL database. And I wanted to get people's thoughts on actually adding such a port-forwarding measure only under explicit semantics for long-living socket-based connections within a service component.
+
+**Bailey Hayes** [45:21](https://youtu.be/0Ju3PCGyJqk?t=2721)
+
+Yeah. So basically, the idea is that just like port-forwarding, kind of port-mapping semantics that you would normally see in like when you run Docker or kubectl, we kind of want to see the same sort of thing but virtualized inside the host so it's not actual port forwarding, right? Basically, I think that's an important point, and would be a really nice feature for us to have inside wasmCloud so that we can kind of expose more things.
+
+And you know what Aditya has been working on, I think folks should know, is really freaking cool, because this is basically letting us have a component act as your stable connection pool, but also preserve tenancy within the workload deployment. So you can basically say I've got one proxy pooler for this tenant, and I've got another one for this other tenant, and you're able to do that in a sandboxed way by using basically the service component. And because you've made it work in sort of a general-purpose way, then you could basically have two different instances of the same thing, but basically serving for different tenants, right? And totally separate. And that's super powerful too.
+
+And so yeah, we want to propose this change for allowed hosts to be stricter, like always enforced. And we want to say we're going to add semantics around services having port forwarding.
+
+Yeah, Frank —
+
+**Frank Schaffa** [47:02](https://youtu.be/0Ju3PCGyJqk?t=2822)
+
+One thing I'm wondering, and this has to do with the way we do in Kubernetes — which is we use, in our case, we use SNI so that whatever your service requires, different ports and so forth, is completely independent of — it's related to your URL. And that helps, I mean, that's the way we resolve here, from the point of view of having the pods running on any particular port which is completely independent from whatever. So we have a common way you can only come in, so 443, and then through SNI it can be mapped to through other things. So I'm wondering if this is something which will be useful and so forth, because then it allows, let's say, for this, not really binding any ports, and then because then it comes into how do we manage ports and so forth.
+
+**Bailey Hayes** [48:29](https://youtu.be/0Ju3PCGyJqk?t=2909)
+
+Yeah, what Aditya is proposing here is actually like even a layer above, because it's not actually even at a networking layer. What we're really talking about is being able to expose the ability to say I'm connecting to different ports, basically to a component, even though actually none of those are actually real ports or exposed.
+
+Because ultimately, our end goal here is to avoid port exhaustion, right? We want to be able to run thousands of WebAssembly components on the exact same host. We want to be able to have them use basically a connection pooling mechanism, and have that be separate from the serverless component that spins up, services an HTTP request, gets a handle to do some CRUD operation on some database, and then spins back down. The CRUD operation is basically a capability that's being granted to it by the service here, which is indeed another component. It is technically holding on to a WASI socket handle that is technically the thing that is actually doing the egress.
+
+But from a design perspective, you would still in theory be able to make a host that only has one port that's ever in contention, and we're not talking about this being on the ingress side. So it wouldn't actually — I don't think we would run into SNI at this layer, basically. Although I think the call-out here is basically it would be helpful, Aditya, to see how you would identify — I'm a component and I want to make this binding. Right now, I think it would just — it's still just getting a WASI socket. It's getting a single connect, right?
+
+**Aditya** [50:15](https://youtu.be/0Ju3PCGyJqk?t=3015)
+
+Yeah, it is doing the single WASI socket.
+
+**Frank Schaffa** [50:19](https://youtu.be/0Ju3PCGyJqk?t=3019)
+
+I think that having this graphically — I mean, really, a picture — will really help in terms of what is the mapping, and even for just visually processing this. Okay, this is that's the path, what will be the limitations, and so forth. Yeah.
+
+**Bailey Hayes** [50:40](https://youtu.be/0Ju3PCGyJqk?t=3040)
+
+Aditya, you probably haven't drawn anything up yet, since this is something you ran into over — well, over my overnight, my time, your time, I imagine.
+
+**Aditya** [50:49](https://youtu.be/0Ju3PCGyJqk?t=3049)
+
+I barely managed to get a working piece of a component set up right now, so I haven't really drawn anything up, but I am going to work on it, and I'll probably bring that up on the next call.
+
+**Bailey Hayes** [51:02](https://youtu.be/0Ju3PCGyJqk?t=3062)
+
+Yeah, that sounds good. I do have this, which is an older version of where I was playing around with diagramming how this essentially works. Because today, basically what happens is you've got this guest component that, sort of like, you know, the thing that is serverless that we want to be able to scale down and not hold on to the connection. It has an import on a WASI socket, and it says basically I want to connect to this. And so to be able to have multiple different kinds of things that we support — more than just this — this is like treated specially right now, we're like, we know what that is, that's the service, you get one. And then that is how this kind of piece gets bound. And it's actually a virtual socket layer. It's not — as in, it's all in the service component's guest code that is saying I'm dealing with basically a WASI socket. The real host socket is basically sitting — let me draw this a little bit better — it's basically sitting here in the host, effectively. That is actually the thing that's calling it.
+
+But it will be helpful, I think, if we drew even a little bit more here, because I think showing sort of a fan-in would be really handy. Of course, in Aditya's example, the way I understand it, it's pretty similar to this one, in that nobody's actually —
+
+**Speaker 3** [52:30](https://youtu.be/0Ju3PCGyJqk?t=3150)
+
+It's exactly the way that you would create it, yeah.
+
+**Bailey Hayes** [52:33](https://youtu.be/0Ju3PCGyJqk?t=3153)
+
+Okay, good, yeah, I thought so. So basically, somebody is doing an HTTP call. They're not actually — nobody's externally doing any kind of TCP connection to this actual component here. They're actually doing it over HTTP, and then this internally, this component then does the CRUD operation against a database. Yeah, okay, good. I'm gonna — hey, I had a diagram. Yeah.
+
+**Aditya** [52:58](https://youtu.be/0Ju3PCGyJqk?t=3178)
+
+I do have the code, and I could just demonstrate it right now.
+
+**Bailey Hayes** [53:01](https://youtu.be/0Ju3PCGyJqk?t=3181)
+
+Yeah, go ahead.
+
+**Aditya** [53:18](https://youtu.be/0Ju3PCGyJqk?t=3198)
+
+Yeah, so this is the socket component, and inside it is an HTTP API and a service lead. Forgot to rename that, but anyways, here's a standard server, which you correctly pointed out handles the CRUD operation, but it mainly just creates a TCP stream to the connection of our service. And our service component is actually the one that binds to port 777. And there it binds via SQLX, using the MySQL pool and using a local URL. So this is the URL that we are actually connecting to, and our service is bound to the virtual port address, I believe. And our HTTP API is bound to the host HTTP handler, and the host HTTP handler relays that using the TCP stream, which thinks it's TCP, but it's just a call to the service anyway.
+
+So after connecting it, it executes this query or creating a table or not, and handles the command based on JSON payloads that it receives on the service's TCP stream.
+
+So if I can just demonstrate this, I have a local wash binary, and I had to implement this little flag because I didn't know how to enable WASI P3 in `wash dev`. But anyway, so if we get this to start — and we go to this URL — can you see this?
+
+**Bailey Hayes** [55:23](https://youtu.be/0Ju3PCGyJqk?t=3323)
+
+Yeah.
+
+**Aditya** [55:30](https://youtu.be/0Ju3PCGyJqk?t=3330)
+
+And it interacts. And even if you refresh it, it still persists. If you delete it — and I can even show you, yeah.
+
+**Bailey Hayes** [55:46](https://youtu.be/0Ju3PCGyJqk?t=3346)
+
+Cool.
+
+**Aditya** [55:47](https://youtu.be/0Ju3PCGyJqk?t=3347)
+
+All these persist locally on a `wash dev` instance.
+
+**Bailey Hayes** [55:53](https://youtu.be/0Ju3PCGyJqk?t=3353)
+
+Yeah, and Aditya, I think part of what you maybe ran into is where you have 777 — I think if you change it to 5432 you'll see that it treats that special and actually wires that up. But it doesn't — that's kind of not cool, right? And that's why I like the idea of being explicit about the ports that we can expose.
+
+**Bailey Hayes** [56:20](https://youtu.be/0Ju3PCGyJqk?t=3380)
+
+It's good. Still a real issue. I think that's the right move. So yeah, really cool demo. And yeah, I see that you've got it in the examples repos. So yeah, looking forward to that PR. We should make sure you brand it and say, like, built like CNCF wasmCloud, or, you know, get the wasmCloud branding on that thing. I mean, I wanted to talk — I literally showed an HTTP counter. But some of our examples, I think Blobby is the cutest one right now. So maybe you can borrow from that one. Just, you know, I think when people try our stuff out, I want to make sure that we've got our wasmCloud brand on it, because we're starting to very quickly become the easiest button to just get WebAssembly working in all kinds of contexts.
+
+**Aditya** [57:13](https://youtu.be/0Ju3PCGyJqk?t=3433)
+
+Yeah, couldn't agree more. I think I'll use those Excalidraw resources as well. Yeah, add in those SVGs. Get a really cool setup going.
+
+**Bailey Hayes** [57:23](https://youtu.be/0Ju3PCGyJqk?t=3443)
+
+Yeah, here, let me — I'm going to drop the Excalidraw link here. Hopefully you can get — I think everyone can view and edit. So I dropped that there. Aditya, I guess the other things that are in there is the how C++ works and has the SDK — is weirdly in that the LLVM with cooperative threads roadmap is in there. So you might — you could use that one too. I also have a pretty big diagram on how basically component model async works and WASI P3 sockets work as well. Although if you make better ones, share and feel free to edit in here too. You know, I want as many materials to help explain things. And the idea was, yeah, trying to get some stuff in so that we can get that on our wasmCloud docs as well.
+
+**Aditya** [58:18](https://youtu.be/0Ju3PCGyJqk?t=3498)
+
+Sounds good. Yeah, I'll help myself.
+
+**Bailey Hayes** [58:22](https://youtu.be/0Ju3PCGyJqk?t=3502)
+
+Nobody minds. Yeah, well, we have two minutes. One last thing — we had our first ever automated release, and it just worked. And that was yesterday. So whoo! That was v2.07, and there's some other additional goodies that landed in that, including all kinds of CI hardening. I've been on a kick. And I'm sure people like Aditya are real tired of all the PRs I've been putting in on that.
+
+And you know, I've got more actually. But, you know, folks, we have a lot of folks using us in the enterprise space and in regulated contexts, and so we've added things like zizmor for linting and auditing and having a strong security posture in our GitHub CI. We've added OpenSSF scorecard. So just looking at the overall health of the project and doing improvements that it calls out, making sure that we're applying basically all the GitHub best practices. And in the release that we just released, you can see that we've got signed attestations that are a part of every artifact that we're now putting out.
+
+So if you see other things, file issues, let me know. I am still on my CI kick, so I might stop next week. We'll see. I don't know, but definitely this week I'm still going to be all over it.
+
+All right, with that, we're at top of the hour. Thank you everybody for joining. See you next week.

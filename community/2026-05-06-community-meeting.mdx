@@ -1,62 +1,136 @@
 ---
 date: '2026-05-06'
-title: 'Meeting Agenda - 2026-05-06'
+title: 'WebGPU Demos, Namespace-Level Hosts & MySQL Connection Pooling'
+description: 'wasmCloud community call featuring WebGPU demos with TensorFlow.js and GPU compute, namespace-scoped Kubernetes host deployment, workload config with secrets, and WASI socket-based MySQL connection pooling.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - webassembly news
+  - wasm edge
+  - webgpu
+  - tensorflow js wasm
+  - wasi sockets
+  - platform engineering
+  - gpu multi-tenancy
+  - connection pooling
+image: https://i.ytimg.com/vi/0Ju3PCGyJqk/maxresdefault.jpg
+showTitle: true
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- DEMO: @MendyBerger Tensorflow.js and WebGPU
-- DEMO: Hosts at namespace level
-- DEMO: wash dev environment, config, and secrets.
-- DISCUSSION: allowedHosts
-- Release automation and recent CI enhancements
+<YouTube url="https://www.youtube.com/watch?v=0Ju3PCGyJqk" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=0Ju3PCGyJqk" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The May 6, 2026 wasmCloud community call packed in four demos showcasing WebGPU integration with TensorFlow.js and raw GPU compute, a major Kubernetes deployment change that moves wasmCloud hosts to namespace-level scope, a new workload configuration system for environment variables and secrets, and a MySQL connection pooling component built on WASI sockets. The call also covered the first successful automated release of wasmCloud v2.07 with CI hardening improvements.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **WebGPU + TensorFlow.js works off the shelf** — Mendy Berger demonstrated image restyling using TensorFlow.js running entirely in Wasm via JCO, with no changes to the TensorFlow.js library itself
+- **Raw WebGPU compute enables enterprise use cases** — Liam Randall showcased defense (satellite radar cross-referencing AIS data) and financial services (Monte Carlo options pricing) demos using WASI WebGPU
+- **GPU multi-tenancy stacks three layers deep** — WebGPU provides application-level tenancy, wgpu adds VM-level isolation, and hardware partitioning (Nvidia MIG, AMD SR-IOV) creates physically separate GPU slices
+- **Namespace-level hosts remove cluster permissions** — Jeremy Fleitz demonstrated a new model where wasmCloud hosts deploy into individual Kubernetes namespaces, eliminating the need for cluster-role RBAC
+- **Workload config now supports env vars and secrets** — Bailey Hayes showed a new `workload` field in the config YAML for specifying environment variables, WASI config fields, and secrets with `.env` file integration
+- **Allowed hosts should always be enforced** — The team proposed changing wasmCloud to enforce allowed-host restrictions even in development, defaulting to a wildcard for backward compatibility
+- **WASI socket connection pooling works** — Aditya demonstrated a MySQL connection pooling component using a service component with long-running TCP connections, separating stateful database connections from serverless request handlers
+- **wasmCloud v2.07 released automatically** — The first fully automated release included signed attestations, zizmor CI linting, OpenSSF Scorecard, and cargo audit
+
+## Chapters
+
+- [00:00 — Introduction and agenda overview](https://youtu.be/0Ju3PCGyJqk?t=0)
+- [05:31 — Meeting kickoff and demo lineup](https://youtu.be/0Ju3PCGyJqk?t=331)
+- [06:29 — Mendy Berger's WebGPU + TensorFlow.js image restyling demo](https://youtu.be/0Ju3PCGyJqk?t=389)
+- [08:53 — TensorFlow.js code walkthrough and dependency tree](https://youtu.be/0Ju3PCGyJqk?t=533)
+- [12:31 — Liam Randall's WebGPU demos: radar-AIS and options trading](https://youtu.be/0Ju3PCGyJqk?t=751)
+- [16:01 — TensorFlow vs raw WebGPU discussion](https://youtu.be/0Ju3PCGyJqk?t=961)
+- [19:16 — GPU multi-tenancy architecture and enterprise use cases](https://youtu.be/0Ju3PCGyJqk?t=1156)
+- [23:24 — Jeremy Fleitz: namespace-level host deployment in Kubernetes](https://youtu.be/0Ju3PCGyJqk?t=1404)
+- [35:03 — Bailey Hayes: workload configuration with env vars and secrets](https://youtu.be/0Ju3PCGyJqk?t=2103)
+- [40:18 — Allowed hosts enforcement and zero-trust security posture](https://youtu.be/0Ju3PCGyJqk?t=2418)
+- [43:04 — Aditya: MySQL connection pooling with WASI sockets](https://youtu.be/0Ju3PCGyJqk?t=2584)
+- [53:18 — SQLX socket component live demo](https://youtu.be/0Ju3PCGyJqk?t=3198)
+- [58:22 — wasmCloud v2.07 automated release and CI hardening](https://youtu.be/0Ju3PCGyJqk?t=3502)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### WebGPU Demos: TensorFlow.js and Raw GPU Compute
 
-### Topic 1
+**Mendy Berger** kicked off the demos with a **WebGPU** integration that runs [TensorFlow.js](https://www.tensorflow.org/js) entirely inside Wasm. The demo showcased image restyling — feeding in a photo and applying artistic styles like pen-and-ink — all processed server-side through a wasmCloud service component. The key insight is that TensorFlow.js requires zero modifications; it runs unaware that it's inside a Wasm sandbox rather than a browser. Mendy used **JCO** to compile idiomatic TypeScript with standard NPM packages, polyfilling only the `navigator` object (set to empty strings) to satisfy TensorFlow's browser checks. The service component pattern is important here: GPU warmup can take up to 30 seconds, so the model initialization runs once in a long-lived service, with a separate component serving the HTTP API and static assets.
 
-- Note 1
-- Note 2
+**Liam Randall** followed with two domain-specific WebGPU examples built in Rust. The first, a defense use case, cross-references **Sentinel-1 satellite radar** imagery (images up to 25,000 × 16,000 pixels) with AIS ship broadcast data to detect vessels that aren't transmitting their position — the kind of matrix math that maps perfectly to GPU acceleration. The second example, "wasmStreet," is an options trading platform that uses **Monte Carlo strategies** on the GPU to search across hundreds of strategy types and surface optimal risk profiles. Both examples run on wasmCloud with a fan-out pattern over [NATS](https://nats.io/), using a tiny ~390 KB API gateway with embedded map assets and sub-300 KB back-end components.
 
-### Topic 2
+Liam outlined the **GPU multi-tenancy stack** that makes these enterprise scenarios viable: WebGPU provides application-level isolation (like browser tabs sharing a GPU allocation), **wgpu** (the Rust WebGPU implementation used by wasmCloud) provides a VM-level tenancy layer comparable to what VMware VCF or OpenShift offer for compute. At the hardware level, Nvidia's **MIG**, AMD's **SR-IOV** (up to 16 virtual GPUs), and Intel's SR-IOV (up to 128 virtual GPUs) allow physical partitioning of discrete hardware into fully isolated slices.
 
-- Note 1
-- Note 2
+### Namespace-Level Host Deployment in Kubernetes
 
-## Weekly highlights
+**Jeremy Fleitz** presented a significant change to how wasmCloud deploys hosts inside **Kubernetes** clusters. Previously, wasmCloud created cluster-level Host CRDs, requiring cluster-role RBAC permissions — a non-starter for security-conscious organizations that restrict teams to namespace-level access only. The new model moves the Host CRD lifecycle into the same namespace as the runtime operator, using a new `environment` field on workload specs to target specific namespaces.
 
-### Issue of the Week
+The implementation adds a `namespace` field to the Helm chart's host group configuration. When specified, hosts deploy into individual namespaces with namespace-scoped roles instead of cluster roles. A backward-compatible `allowSharedHost` variable (defaulting to `true`) ensures existing deployments continue working without changes. Jeremy demonstrated cross-namespace scheduling — a workload in namespace A targeting a host in namespace B — and showed that workloads requiring an environment that doesn't exist correctly report a failed status rather than silently deploying nowhere. The change also enables [Open Policy Agent](https://www.openpolicyagent.org/) policies to restrict which namespaces a workload can target, and existing Kubernetes network policies apply naturally since everything stays namespace-scoped.
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+### Workload Configuration: Environment Variables and Secrets
 
-### Documentation of the Week
+**Bailey Hayes** demoed a new feature landing in wasmCloud that adds a `workload` field to the config YAML, supporting environment variables, WASI config fields, and secrets. The demo expanded an existing [OpenTelemetry](https://opentelemetry.io/) tracing example to show OTEL resource attributes (cloud region, environment name) plumbed through as config values, with secrets referenced via a `.env` file pattern — a committed `.env.example` with placeholder values and a git-ignored actual `.env` with real tokens.
 
-- [title](/docs/v1/intro)
-  - summary
+The demo used `direnv allow` to load the `.env` file, showed a clean error message when the required `UPSTREAM_API_TOKEN` secret was missing, and then walked through the full OTEL trace in a local [Aspire dashboard](https://learn.microsoft.com/en-us/dotnet/aspire/fundamentals/dashboard/overview). Bailey also introduced an `allowed_hosts` field on the workload config, proposing that wasmCloud should **always enforce** outbound host restrictions — even in development — rather than the current behavior of only enforcing when the field is present. The plan is to default to a wildcard (`*`) in dev configs and empty in Helm charts, borrowing a pattern from AWS Lambda, so that the security posture is consistent between local development and production Kubernetes deployments.
 
-## Community Updates
+### MySQL Connection Pooling with WASI Sockets
 
-### Tune in…
+**Aditya** demonstrated a component architecture for persistent database connections using wasmCloud's **service component** model. The setup separates concerns: an HTTP incoming handler (the serverless component) receives requests, while a service component maintains a long-running MySQL connection pool via a forked version of [SQLX](https://github.com/launchbadge/sqlx) adapted for **WASI sockets**. The service component binds to a virtual port (port 77 in the demo) on a virtualized loopback address — critically, this never touches the host's actual port space, avoiding port exhaustion when running thousands of components on the same host.
 
-{/* Add any upcoming events/streams/etc */}
+The architecture matters because it preserves wasmCloud's scale-to-zero model for request handlers while keeping stateful database connections alive in the service component. Bailey Hayes emphasized that this pattern generalizes beyond MySQL — any long-running socket-based connection (PostgreSQL, Redis, message queues) could use the same approach. The team discussed adding explicit **port-forwarding semantics** to make the virtual port binding more discoverable, and Frank Schaffa suggested exploring SNI-based service mapping to avoid port management entirely.
 
--
+### wasmCloud v2.07 Release and CI Hardening
 
-### Catch up…
+Bailey Hayes announced the first successful **automated release** of wasmCloud — v2.07 shipped via the new Tuesday train release process with no manual intervention. The release includes significant CI hardening work: **zizmor** for GitHub Actions workflow linting, explicit job permissions, **signed attestations** on all OCI artifacts, `cargo audit` for dependency vulnerability scanning, **OpenSSF Scorecard** for project health metrics, and Dependabot for automated dependency updates. Bailey noted more CI improvements are coming and encouraged the community to file issues for anything they'd like to see hardened.
 
-{/* Add any blog posts/articles that the community might find interesting */}
+## WebAssembly News and Updates
 
--
+This week's call highlighted the rapidly maturing **WebGPU** story for server-side WebAssembly. The combination of WASI WebGPU support with existing ML frameworks like TensorFlow.js running unmodified through JCO demonstrates that the [component model](https://component-model.bytecodealliance.org/) is reaching a practical tipping point for GPU workloads. Meanwhile, the namespace-scoped host deployment aligns wasmCloud more closely with Kubernetes-native patterns that platform engineering teams expect, and the WASI socket-based connection pooling shows the component model handling stateful workloads that were previously difficult in a serverless-first architecture. The [Bytecode Alliance](https://bytecodealliance.org/) continues driving the standards work that makes all of this possible.
 
-## Recording
+## What is wasmCloud?
 
-{/* Automated - No need to adjust this unless automation fails */}
+[wasmCloud](https://wasmcloud.com/) is a CNCF project for building and running WebAssembly applications across cloud, edge, and everything in between. It uses the [WebAssembly component model](/docs/concepts/components/) to let developers write portable, composable business logic in any supported language — Rust, Go, TypeScript, Python, C# — while the platform handles [deployment](/docs/deployment/), networking, scaling, and [observability](/docs/ecosystem/observability/) through OpenTelemetry. Applications are declared with [wadm](/docs/ecosystem/wadm/) manifests and can run on [Kubernetes](/docs/deployment/k8s/) or standalone, with built-in support for secrets, configuration, and capability-based security.
 
-<YouTube url="https://www.youtube.com/live/0Ju3PCGyJqk" />
+## Topic Deep Dive: WebGPU Multi-Tenancy for Enterprise GPU Platforms
+
+The WebGPU demos revealed something bigger than individual ML models running in Wasm — they showed a **multi-tenant GPU platform** architecture that stacks three isolation layers. At the top, **WebGPU** provides application-level tenancy, giving each Wasm component its own GPU context just as browser tabs share a GPU without interfering with each other. Below that, **wgpu** (the Rust WebGPU implementation used by wasmCloud) provides a VM-level tenancy layer comparable to what VMware VCF or OpenShift offer for compute. At the hardware level, Nvidia MIG, AMD SR-IOV, and Intel SR-IOV physically partition GPUs into isolated virtual devices.
+
+Combined with wasmCloud's existing multi-tenancy (separate workload deployments per tenant, namespace-scoped hosts, capability-based security), this creates a path to running thousands of GPU-accelerated Wasm components on shared hardware with full isolation. For organizations evaluating **WebAssembly on Kubernetes** for AI inference at the edge, this three-layer GPU isolation model — plus sub-millisecond component startup and the ~300 KB footprint demonstrated in the radar example — represents a fundamentally different economics model than container-per-model approaches.
+
+## Who Should Watch This
+
+Platform engineers evaluating how to bring **GPU workloads to Kubernetes** without cluster-level permissions should jump to [Jeremy's namespace-level host demo at 23:24](https://youtu.be/0Ju3PCGyJqk?t=1404). ML engineers curious about running existing TensorFlow.js models server-side in Wasm will want to start with [Mendy's demo at 06:29](https://youtu.be/0Ju3PCGyJqk?t=389). And backend developers looking for a pattern to handle **persistent database connections** in a scale-to-zero architecture should check out [Aditya's SQLX socket demo at 43:04](https://youtu.be/0Ju3PCGyJqk?t=2584).
+
+## Up Next
+
+Aditya committed to bringing a diagram of the port-forwarding and virtual socket architecture to the next community call, along with wasmCloud branding on the SQLX example. Bailey indicated she'll continue CI hardening work through the week, with more linting, auditing, and security checks landing. The team also plans to add the component model async and WASI socket diagrams from the shared Excalidraw repository into the wasmCloud documentation.
+
+**[← Previous meeting: April 29 — Template Refactor, Workload Config & Environment Variables, WASI TLS](/community/2026-04-29-community-meeting/)**
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-05-06-community-meeting-transcript/)**

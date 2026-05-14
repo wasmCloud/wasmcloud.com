@@ -1,60 +1,155 @@
 ---
 date: '2026-05-13'
-title: 'Meeting Agenda - 2026-05-13'
+title: 'wasmCloud CI Hardening, Cache Pre-Compilation & Benchmarking'
+description: 'wasmCloud community call covering CI security hardening with zizmor, OCI artifact publishing, cache artifact pre-compilation pipeline, Cranelift vs Pulley benchmarks, and the new "Are We Fast Yet?" performance dashboard.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasm edge
+  - webassembly news
+  - wasm runtime autoscaling
+  - ci security
+  - performance benchmarking
+  - cranelift
+  - pulley interpreter
+image: https://i.ytimg.com/vi/y6Zo09oqyJ4/maxresdefault.jpg
+showTitle: true
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- wasmCloud roadmap update
-- arewefastyet preview
-- https://wasmcloud.com/blog/wasmcloud-2-1-0-release/
+<YouTube url="https://www.youtube.com/watch?v=y6Zo09oqyJ4" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=y6Zo09oqyJ4" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The May 13, 2026 wasmCloud community call covers CI security hardening — including cryptographic attestations for OCI artifacts, zizmor-based workflow linting, and status gates — alongside a deep look at the new cache artifact pre-compilation pipeline that offloads CPU-intensive Cranelift AOT compilation to a dedicated process. Bailey Hayes demos the "Are We Fast Yet?" performance dashboard with Criterion and Cachegrind benchmarks, and the team discusses Pulley interpreter performance (10x vs native, compared to 60x for JS/Python interpreters), WASI TLS progress, and the path to WASI P3.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **Automated OCI artifact publishing** now triggers on every example version bump, and the automated Tuesday train release ran successfully for the first time
+- **CI hardening complete**: zizmor workflow linting, explicit job permissions, cryptographic attestations on all OCI artifacts, cargo audit, OpenSSF Scorecard, and Dependabot — all in place before the npm supply-chain scare hit this week
+- **Status gates pattern** adopted for GitHub CI, solving the long-standing problem of required checks on jobs that only run for certain file paths
+- **Cache artifact pre-compilation pipeline** moves Cranelift AOT compilation out of the workload host into a dedicated pre-compiler process, storing serialized cwasm in a shared cache for fast deserialization
+- **"Are We Fast Yet?" dashboard** launched with Criterion (wall-time) and Cachegrind/Valgrind (instruction-counting) benchmarks, backed by a dedicated Hetzner AMD Ryzen 5 box and S3-backed historical data
+- **Pulley interpreter benchmarks** show ~10x slowdown vs AOT native — dramatically better than JavaScript/Python's ~60x gap, making it viable for edge and microcontroller deployments
+- **WASI TLS implementation** for P3 socket connections landing this week, enabling components to create TLS wrappers without routing through host HTTP handlers
+- **WASI P3 vote imminent**: JCO reference implementation update tomorrow in WASI subgroup, followed by open discussion and final flush-out before the vote
+
+## Chapters
+
+- [0:00 — Roadmap overview and Q2 progress](https://youtu.be/y6Zo09oqyJ4?t=0)
+- [4:59 — CI hardening: zizmor, attestations, status gates](https://youtu.be/y6Zo09oqyJ4?t=299)
+- [11:56 — Outgoing handler and WASI TLS implementations](https://youtu.be/y6Zo09oqyJ4?t=716)
+- [14:20 — Cache artifact pre-compilation pipeline deep dive](https://youtu.be/y6Zo09oqyJ4?t=860)
+- [15:49 — cwasm architecture: Cranelift, Winch, and Pulley backends](https://youtu.be/y6Zo09oqyJ4?t=949)
+- [18:17 — Interpreted vs compiled WebAssembly performance](https://youtu.be/y6Zo09oqyJ4?t=1097)
+- [20:20 — Pulley interpreter: 10x vs native, memory footprint](https://youtu.be/y6Zo09oqyJ4?t=1220)
+- [21:19 — Async functions and Pulley limitations](https://youtu.be/y6Zo09oqyJ4?t=1279)
+- [24:00 — "Are We Fast Yet?" benchmarking dashboard demo](https://youtu.be/y6Zo09oqyJ4?t=1440)
+- [28:47 — Benchmarking infrastructure: Hetzner, S3, Criterion, Cachegrind](https://youtu.be/y6Zo09oqyJ4?t=1727)
+- [33:06 — WASI P3 status: JCO, cooperative threads, wazi SDK](https://youtu.be/y6Zo09oqyJ4?t=1986)
+- [35:11 — Hyper, sockets, and requests for P3 compatibility](https://youtu.be/y6Zo09oqyJ4?t=2111)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### CI Security Hardening and Release Automation
 
-### Topic 1
+Bailey walked through wasmCloud's CI hardening push, which landed largely this week. The team adopted [zizmor](https://github.com/woodruffw/zizmor), a Rust-based GitHub Actions linting tool that flags unsafe patterns like `pull_request_target` — the same vector used in this week's npm supply-chain attack. All zizmor errors are now fixed and the linter runs continuously on workflow changes.
 
-- Note 1
-- Note 2
+Other CI improvements include: disabling permissions by default on every workflow job with explicit per-job grants, cryptographic attestations on all OCI artifacts (previously only wash binaries), cargo audit, OpenSSF Scorecard integration, and Dependabot re-enabled.
 
-### Topic 2
+The team also implemented a **status gate pattern** to solve GitHub CI's limitation where required checks fail when a job doesn't run because irrelevant files were changed. Now a gate job validates that all applicable checks passed before allowing merge, making auto-merge safe to use.
 
-- Note 1
-- Note 2
+The automated **train release model** ran its first successful release, and OCI artifact publishing is now fully automated — any time an example gets a version bump, it publishes to OCI automatically.
 
-## Weekly highlights
+### Outgoing Handler and WASI TLS Implementations
 
-### Issue of the Week
+Aditya presented two changes expected to merge this week and ship in next Tuesday's automated release:
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+1. **Outgoing handler trait implementation** — allows custom outgoing handler implementations for the HTTP client, supporting custom CA certs and TLS configurations across both WASI P2 and P3 interfaces
+2. **WASI TLS implementation** — experimental support for TLS wrappers on WASI P3 socket connections (TCP), enabling components to interact with external TLS servers directly without routing through the host HTTP handler
 
-### Documentation of the Week
+Bailey noted that production usage reports for the TLS implementation will support advancing it to phase three in the WASI specification.
 
-- [title](/docs/v1/intro)
-  - summary
+### Cache Artifact Pre-Compilation Pipeline
 
-## Community Updates
+Currently, when a WebAssembly component first lands on a wasmCloud host, Wasmtime compiles it in-process using Cranelift AOT compilation, producing cwasm (compiled WebAssembly). This compile step is CPU-intensive and the resulting native code lives in anonymous mmap, both of which can impact co-located workloads.
 
-### Tune in…
+The proposed pre-compilation pipeline runs a **dedicated pre-compiler instance** whose sole job is to serialize WebAssembly bytes into cwasm and store them in a shared cache. The workload host then only needs to deserialize the cached cwasm — dramatically reducing startup time and CPU impact.
 
-{/* Add any upcoming events/streams/etc */}
+Key architectural consideration: cwasm is effectively machine code tied to the specific Wasmtime version, engine configuration, and host architecture. The team needs to ensure compatibility with future host types that may use different backends (Winch baseline compiler, Pulley interpreter) rather than Cranelift.
 
--
+### Performance Benchmarking and "Are We Fast Yet?" Dashboard
 
-### Catch up…
+Bailey demoed the new performance dashboard, inspired by Mozilla's "Are We Fast Yet?" project. The infrastructure includes:
 
-{/* Add any blog posts/articles that the community might find interesting */}
+- **Criterion benchmarks** for wall-time measurement of operations like component invocation
+- **Cachegrind/Valgrind benchmarks** for instruction counting with lower variance
+- A dedicated **Hetzner AMD Ryzen 5 box** configured following the Rust infrastructure team's performance benchmarking best practices
+- **S3-backed storage** with CloudFront CDN for historical benchmark data and cross-PR comparison dashboards
+- Plans to run benchmarks against every release as part of the automated release pipeline
 
--
+The team discussed the difference between micro benchmarks (Criterion/Valgrind for measuring specific operations) and macro benchmarks (k6-style for end-to-end network testing), with plans to add k6 macro benchmarks with Grafana dashboards in the future.
 
-## Recording
+### WebAssembly Runtime Performance: Cranelift vs Pulley
 
-{/* Automated - No need to adjust this unless automation fails */}
+Frank asked about performance differences between interpreted and compiled WebAssembly execution. Bailey shared that Pulley (the Wasmtime interpreter built by Nick Fitzgerald) shows approximately **10x slowdown compared to Cranelift AOT native execution** — which is remarkably good given that JavaScript and Python interpreters typically show ~60x gaps versus native code. Pulley's low memory footprint makes it particularly interesting for edge devices and microcontrollers.
 
-<YouTube url="https://www.youtube.com/watch?v=y6Zo09oqyJ4" />
+Sebastien noted that Pulley currently cannot run async functions, which is a known limitation. Bailey referenced a talk by Mikhail from Mimic about running Wasmtime in isolated environments where determinism is required, which is one of the design motivations for Pulley.
+
+### WASI P3 and Ecosystem Updates
+
+- **JCO** (JavaScript Component Tools) update on WASI P3 reference implementation scheduled for the next day in the WASI subgroup
+- **Cooperative threads** making significant progress — Colin confirmed he checks the upstream repo daily
+- New **WASI SDK** expected with cooperative thread support
+- Bailey plans to re-approach the abseil atomics change to make atomics work natively rather than removing them, simplifying the C/C++ WASI story
+- Discussion on **hyper/reqwest** compatibility with P3 — sockets implementation landed with P2 pollable async support and should compile with P3 without changes
+
+## WebAssembly News and Updates
+
+This week's wasmCloud community call coincided with a wave of activity in the WebAssembly ecosystem. A supply-chain attack in the npm space using the `pull_request_target` pattern underscored why CI security tooling like [zizmor](https://github.com/woodruffw/zizmor) matters for WebAssembly projects. The wasmCloud team had already hardened their workflows against this exact vector. Meanwhile, WASI P3 continues its march toward a vote, with the JCO reference implementation nearing completion and cooperative thread support advancing across multiple language toolchains. The [Bytecode Alliance's sightglass benchmarking suite](https://github.com/bytecodealliance/sightglass) remains the canonical source for Wasmtime and Cranelift performance data, and Nick Fitzgerald's Pulley interpreter is proving that WebAssembly interpretation can close the gap with AOT compilation far more effectively than traditional scripting language interpreters.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](/docs/concepts/components/) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, C#) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable provider architecture. wasmCloud's runtime is built on [Wasmtime](https://wasmtime.dev/) with Cranelift AOT compilation by default, and the project is actively working on support for alternative backends like the Pulley interpreter for [edge deployments](/docs/deployment/). With built-in [OpenTelemetry observability](/docs/ecosystem/observability/), [OCI artifact distribution](/docs/ecosystem/wadm/), and [Kubernetes integration](/docs/deployment/k8s/), wasmCloud bridges the gap between WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
+
+## Topic Deep Dive: WebAssembly Component Model
+
+This meeting's cache artifact pre-compilation discussion directly relates to how the [WebAssembly component model](https://component-model.bytecodealliance.org/) works in production. When a Wasm component is compiled to cwasm, the resulting native code is tied to the specific Wasmtime version, engine configuration hash, and host architecture — a tradeoff for the performance gains of AOT compilation. The component model's serialization format enables the pre-compilation pipeline pattern discussed in this call: compile once in a dedicated process, cache the result, and deserialize on every subsequent host that needs the same component. This is a significant optimization for platforms running the same [component](/docs/concepts/components/) across many hosts, which is exactly wasmCloud's deployment model. The component model's engine hash validation ensures that a cached cwasm is safe to load — if the engine version or configuration changes, the cache is automatically invalidated.
+
+## Who Should Watch This
+
+This call is particularly valuable for **platform engineers** evaluating CI hardening patterns for WebAssembly supply chains, **SREs** interested in the pre-compilation pipeline for reducing component startup latency, and **WebAssembly runtime developers** comparing Cranelift AOT vs Pulley interpreter performance characteristics. If you're building with the Wasm component model and care about production deployment performance, the benchmarking infrastructure walkthrough is worth watching from [24:00](https://youtu.be/y6Zo09oqyJ4?t=1440).
+
+## Up Next
+
+The next wasmCloud community call will cover updates from the WASI P3 vote and the JCO reference implementation progress. Colin Murphy has a demo in the works, and the team expects the outgoing handler and WASI TLS changes to ship in the automated Tuesday release.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-05-13-community-meeting-transcript/)**

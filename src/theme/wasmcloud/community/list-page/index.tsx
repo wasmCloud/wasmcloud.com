@@ -7,7 +7,7 @@ import BlogListPaginator from '@theme/BlogListPaginator';
 import SearchMetadata from '@theme/SearchMetadata';
 import type { Props } from '@theme/BlogListPage';
 import BlogPostItems from '@theme/BlogPostItems';
-import BlogSidebar from '@theme/BlogSidebar';
+import CommunitySidebar from '../sidebar';
 import BlogListPageStructuredData from '@theme/BlogListPage/StructuredData';
 import styles from './styles.module.css';
 import BlogPostListItem from '../list-item';
@@ -92,9 +92,7 @@ function BlogListPageContent(props: Props): JSX.Element {
 
             <div className="row">
               <div className={styles.sidebar}>
-                {/* // TODO(lachieh): Update to a custom sidebar with only dates once docusaurus@3.5.0 is released */}
-                {/* https://github.com/facebook/docusaurus/pull/10252 */}
-                <BlogSidebar sidebar={sidebar} />
+                <CommunitySidebar sidebar={sidebar} />
               </div>
               <div className={clsx('col', sidebar.items.length > 0 ? 'col--9' : 'col--12')}>
                 <div
