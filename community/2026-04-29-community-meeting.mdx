@@ -1,60 +1,141 @@
 ---
 date: '2026-04-29'
-title: 'Meeting Agenda - 2026-04-29'
+title: 'Template Refactor, Workload Config & Environment Variables, WASI TLS'
+description: 'wasmCloud community call covering Rust and TypeScript template refactoring with handler terminology, workload configuration for environment variables and secrets, microbenchmarking infrastructure, WASI TLS proposal, and host component plugin architecture.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - webassembly news
+  - wasm edge
+  - rust webassembly
+  - wasi secrets
+  - platform engineering
+  - webassembly development
+  - wasi tls
+image: https://i.ytimg.com/vi/BNxpgMFdcBo/maxresdefault.jpg
+showTitle: true
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- @ericgregory templates refactor
-- @ricochet https://github.com/wasmCloud/wasmCloud/issues/5088
-- Roadmap status review
+<YouTube url="https://www.youtube.com/watch?v=BNxpgMFdcBo" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=BNxpgMFdcBo" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The April 29, 2026 wasmCloud community call covered a template refactor bringing Rust language support into parity with TypeScript using new handler terminology, a detailed proposal for workload configuration supporting environment variables and secrets in the wash dev loop, roadmap updates on microbenchmarking infrastructure and automated releases, and discussions on WASI TLS adoption and host component plugin architecture.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **Rust templates now match TypeScript** — Eric walked through a refactor that brings Rust component templates and language support documentation into parity with the existing TypeScript guides, giving Rust developers the same building blocks
+- **"Handler" replaces "service" in template naming** — The team adopted "handler" for stateless component templates to disambiguate from wasmCloud's service model, aligning with the WASI HTTP handler interface naming
+- **New workload config section for env vars and secrets** — Bailey Hayes proposed a new `workload` section in the wash config YAML that supports environment variables, WASI config fields, and secrets with `.env` file integration and guardrails
+- **Security guardrails for secrets in dev** — The design enforces that `.env` files must be in `.gitignore`, prevents path traversal, types secrets explicitly so they never appear in logs, and supports environment variable references as a safer alternative
+- **Microbenchmarking infrastructure in progress** — Bailey is setting up a Hetzner bare-metal box for reproducible benchmarks, adding a Valgrind-based IOPS bench alongside existing micro benchmarks for deterministic CPU-level measurements
+- **WASI TLS added to the roadmap** — Aditya will pick up the WASI TLS proposal as an experimental opt-in feature, providing implementation feedback for the emerging standard while keeping it clearly flagged as early-stage
+- **Test binary build problem getting community attention** — Multiple contributors proposed solutions for preventing test binaries from building when wasmCloud is used as a downstream dependency, with a ghost crate approach and an xtask workflow under consideration
+- **New maintainers recognized** — Aditya was promoted to core and wash maintainer, Pavel to wash maintainer, and Jeremy Fleitz to go maintainer for the runtime operator
+
+## Chapters
+
+- [00:00 — Pre-show chat and agenda setup](https://youtu.be/BNxpgMFdcBo?t=0)
+- [05:26 — Meeting kickoff and agenda overview](https://youtu.be/BNxpgMFdcBo?t=326)
+- [06:02 — Eric's Rust template refactor and handler terminology](https://youtu.be/BNxpgMFdcBo?t=362)
+- [08:56 — Handler naming rationale and call for PR reviewers](https://youtu.be/BNxpgMFdcBo?t=536)
+- [11:42 — Workload config proposal: environment variables and secrets](https://youtu.be/BNxpgMFdcBo?t=702)
+- [17:51 — Security considerations and guardrails for secrets handling](https://youtu.be/BNxpgMFdcBo?t=1071)
+- [24:32 — Roadmap review: microbenchmarking and automated releases](https://youtu.be/BNxpgMFdcBo?t=1472)
+- [28:05 — Test binary build problem and proposed solutions](https://youtu.be/BNxpgMFdcBo?t=1685)
+- [33:10 — WASI TLS proposal and roadmap addition](https://youtu.be/BNxpgMFdcBo?t=1990)
+- [34:59 — WASI TLS deep dive: scope and Rust crate support](https://youtu.be/BNxpgMFdcBo?t=2099)
+- [42:01 — Host component plugins and native vs WASI plugin architecture](https://youtu.be/BNxpgMFdcBo?t=2521)
+- [45:41 — WIT interfaces vs wasi-http for host components](https://youtu.be/BNxpgMFdcBo?t=2741)
+- [52:18 — Wrap-up and closing](https://youtu.be/BNxpgMFdcBo?t=3138)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### Rust Template Refactor and Handler Terminology
 
-### Topic 1
+**Eric** presented a refactor of the wasmCloud component templates aimed at bringing **Rust** language support into parity with TypeScript. The TypeScript language guide and templates had gotten significantly ahead, so the effort focused on giving Rust developers the same set of building blocks and interface guides. During the process, the team identified a naming collision: wasmCloud uses "service" as a workload model concept, but the templates were also calling some stateless components "services." After discussion, Bailey Hayes and Eric settled on **handler** as the replacement term for stateless component templates, drawing from the WASI HTTP interface where the incoming request handler is literally called `handler`. Several new handler templates are landing in the wasmCloud monorepo, and interface guides for Rust components will follow shortly.
 
-- Note 1
-- Note 2
+Bailey also used the opportunity to call out a growing backlog of community PRs and encouraged anyone — even non-maintainers — to review incoming contributions. She formally congratulated **Aditya**, **Pavel**, and **Jeremy Fleitz** on their promotions up the [contribution ladder](https://github.com/wasmCloud/wasmCloud/blob/main/MAINTAINERS.md), recognizing their sustained contributions to the project.
 
-### Topic 2
+### Workload Configuration: Environment Variables and Secrets
 
-- Note 1
-- Note 2
+Bailey Hayes walked through a [GitHub issue](https://github.com/wasmCloud/wasmCloud) proposing a new `workload` section in the wash config YAML. The feature addresses a gap Colin Murphy hit while building the WebGPU demo — needing to pass environment variables in the `wash dev` loop. Today the only workaround is a host interface with WASI config, which works but is cumbersome for simple use cases.
 
-## Weekly highlights
+The proposal adds support for loading config values and secrets from literal values, environment variable references, or `.env` files. The design intentionally sits outside the existing `dev` section to keep the developer-facing configuration clean and eventually translatable to Kubernetes workload specs, without requiring deep Kubernetes knowledge. Bailey outlined the security guardrails: `.env` files used for secrets must be in `.gitignore`, file references are restricted to the project root to prevent path traversal, and secrets are explicitly typed so that the wash CLI never writes them to disk or logs. The team discussed Mozilla SOPs as an alternative encryption-based approach but decided it was too much scope for the initial implementation.
 
-### Issue of the Week
+**Frank Schaffa** raised the point that developers might bypass the secret type by putting sensitive values in regular config fields. Bailey acknowledged this but noted that the explicit typing still gives wasmCloud a stronger security posture than most tools in the space, since the runtime treats the `secret` type with special handling throughout the pipeline.
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+### Roadmap Review: Microbenchmarking, Releases, and CI
 
-### Documentation of the Week
+Bailey provided a status update on the active roadmap. On the **microbenchmarking** front, she has been setting up infrastructure on [Hetzner](https://www.hetzner.com/) for reproducible bare-metal benchmarks after finding that the open-source tier of Bencher only provides five minutes of execution time. She added an **IOPS Valgrind bench** for deterministic CPU instruction counts alongside the existing time-based micro benchmarks, and noted that k6-based network and Kubernetes benchmarks are a welcome future contribution.
 
-- [title](/docs/v1/intro)
-  - summary
+On the release side, the team is tracking toward **automated releases every two weeks on Tuesdays**. Recent work includes adding wasmCloud to the Windows Package Manager (winget) for automatic publishing, and switching Linux builds from musl/glibc to link against the correct system libraries for WebGPU support through Linux Homebrew.
 
-## Community Updates
+### Test Binary Build Problem
 
-### Tune in…
+**Aditya** brought up an ongoing issue where test binaries compile even when wasmCloud is used as a downstream dependency via `cargo build`. Multiple contributors have taken a swing at this. The two leading proposals are a **ghost crate** approach — an unpublished side crate referenced as a dev dependency so that `cargo test` picks it up via `build.rs` but regular builds skip it — and an **xtask workflow** where test setup is an explicit external command. Bailey noted that she tried cargo config flags first but that approach falls apart for `cargo bench` and other subcommands. The team asked for community feedback before committing to either path, with Aditya leaving the discussion open for another day.
 
-{/* Add any upcoming events/streams/etc */}
+### WASI TLS Proposal
 
--
+Aditya raised the question of adding **WASI TLS** support to the wasmCloud roadmap. Bailey confirmed she created an issue for it after seeing the proposal land in Wasmtime 44 via Dave Bakker's implementation work. The team agreed to bring it in as an **experimental, opt-in** feature — similar to how WebGPU is handled — with clear signaling that the spec is still pre-phase-two and may change. The rationale: exercising and providing implementation feedback on emerging WASI proposals is exactly the kind of community stewardship wasmCloud should be doing.
 
-### Catch up…
+Colin Murphy asked what Rust crates could be supported with WASI TLS today. Bailey noted the current focus is on the host-side implementation, with .NET being the first end-to-end guest implementation. She also mentioned upcoming work on **WASI crypto** from a research group at Université de Montréal that could further unlock the Rust HTTP ecosystem for Wasm.
 
-{/* Add any blog posts/articles that the community might find interesting */}
+### Host Component Plugins and WIT Interface Design
 
--
+The call closed with a discussion on **host component plugins** — the effort to provide WASI p3 sandbox-compatible versions of wasmCloud's native plugins. Bailey framed this as a large effort where converting all existing native plugins is out of scope for the quarter. Native plugins will continue to exist for use cases like WebGPU that require hardware-level access, but the major demand is for **client-style plugins** (secrets vaults, service mesh integrations) that benefit from sandboxing.
 
-## Recording
+Aditya asked whether it makes sense to build WIT interfaces for host components when a component could just make the call itself via wasi-http. Bailey offered a decision framework: if the plugin is HTTP-based with good upstream SDKs, lean toward wasi-http host components for maximum ecosystem compatibility. If the plugin uses its own socket-level protocol (like NATS) and benefits from connection pooling, rich types, and composition, a custom WIT interface is worth the additional SDK investment.
 
-{/* Automated - No need to adjust this unless automation fails */}
+## WebAssembly News and Updates
 
-<YouTube url="https://www.youtube.com/watch?v=BNxpgMFdcBo" />
+This week's call reflected the maturing developer experience story for WebAssembly. The template refactor and handler terminology alignment show the [component model](https://component-model.bytecodealliance.org/) ecosystem converging on consistent naming across languages and frameworks. The WASI TLS discussion highlights how projects like wasmCloud serve as proving grounds for emerging [WASI](https://wasi.dev/) proposals, providing implementation feedback that shapes the standards. Meanwhile, the benchmarking and CI hardening work continues building the kind of production-readiness infrastructure that enterprise adopters expect from a [CNCF](https://www.cncf.io/) incubating project.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project for building and running WebAssembly applications across cloud, edge, and everything in between. It uses the [WebAssembly component model](/docs/concepts/components/) to let developers write portable, composable business logic in any supported language — Rust, Go, TypeScript, Python, C# — while the platform handles [deployment](/docs/deployment/), networking, scaling, and [observability](/docs/ecosystem/observability/) through OpenTelemetry. Applications are declared with [wadm](/docs/ecosystem/wadm/) manifests and can run on [Kubernetes](/docs/deployment/k8s/) or standalone, with built-in support for secrets, configuration, and capability-based security.
+
+## Topic Deep Dive: Secrets Handling in Developer Workflows
+
+The workload config proposal revealed a design tension that every cloud-native developer tool faces: making secrets convenient without making them unsafe. Bailey's approach layers multiple guardrails — explicit secret typing, `.gitignore` enforcement, project-root scoping, and in-memory-only handling in the wash CLI — rather than relying on any single mechanism. The explicit `secret` type is particularly significant because it flows through the entire wasmCloud runtime: secrets are never written to logs, never serialized to disk, and get special treatment in the OTEL trace pipeline. This is a meaningful improvement over the common pattern in tools like Docker Compose or Terraform where secrets are just environment variables with no runtime distinction.
+
+The discussion also surfaced the **Vercel incident** as a cautionary tale — a recent security breach caused by environment variable exposure — and the trade-off between Mozilla SOPs (encrypted secrets committed to git) and `.env` files (convenient but easy to accidentally commit). For teams evaluating **WebAssembly for platform engineering**, wasmCloud's typed secrets model combined with the proposed guardrails offers a development experience that is both familiar (`.env` files, `direnv`) and meaningfully safer than the status quo in most container-based toolchains.
+
+## Who Should Watch This
+
+Rust developers building wasmCloud components should start with [Eric's template refactor walkthrough at 06:02](https://youtu.be/BNxpgMFdcBo?t=362) to understand the new handler terminology and upcoming interface guides. Platform engineers concerned about secrets management in developer workflows will want to watch [Bailey's workload config proposal at 11:42](https://youtu.be/BNxpgMFdcBo?t=702) and the [security guardrails discussion at 17:51](https://youtu.be/BNxpgMFdcBo?t=1071). And contributors interested in wasmCloud internals should catch the [WASI TLS and host component plugin discussion starting at 33:10](https://youtu.be/BNxpgMFdcBo?t=1990).
+
+## Up Next
+
+Bailey plans to finalize the workload config issue for "ready for work" status after collecting community feedback, and will continue setting up the Hetzner bare-metal benchmarking infrastructure. Aditya committed to picking up the WASI TLS implementation as an experimental feature and continuing work on the wasmCloud NATS interface. Eric will land the remaining Rust handler template PRs and interface guides. The team also flagged the need to update Kubernetes documentation from v2.03 to v2.04 to resolve a Helm ingress role-binding bug that Jeremy identified.
+
+{/* TODO: Link to previous meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-04-29-community-meeting-transcript/)**
