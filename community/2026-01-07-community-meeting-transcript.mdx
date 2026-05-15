@@ -1,0 +1,314 @@
+---
+date: '2026-01-07'
+title: 'Transcript: Path to wasmCloud v2 — RC6 Plan, gRPC, P2→P3 WIT Translator & WIT Map Support'
+description: 'Full transcript of the January 7, 2026 wasmCloud community call covering the RC6 plan, gRPC outbound as default, ossfellow''s P2→P3 WIT translator, and Yordis''s WIT map support work.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wash v2
+  - rc6
+  - wasi p3
+  - wit-bindgen
+  - wasm-tools
+image: https://i.ytimg.com/vi/WMUanmHsfKI/maxresdefault.jpg
+showTitle: true
+slug: 2026-01-07-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-01-07-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=WMUanmHsfKI" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=WMUanmHsfKI" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, January 7, 2026 · 57m 42s*
+
+**Speakers:** Bailey Hayes, Lucas Fontes, Aditya, Yordis Prieto, ossfellow, Frank Schaffa, Liam Randall
+
+---
+
+{/* truncate */}
+
+## Full Transcript
+
+**Liam Randall** [00:10](https://youtu.be/WMUanmHsfKI?t=10)
+
+It's my son's birthday — I took him to an escape room, and after they finished the first one (about an hour) they wanted to do another, so I probably ended up working until 9pm. I just sat in the lobby while they did escape rooms.
+
+**Schaffa, Frank** [02:42](https://youtu.be/WMUanmHsfKI?t=162)
+
+While we wait — can I add something for Lucas? Not this latest version, but the previous one I succeeded in running: when I change the **number of replicas to zero**, this curl will still respond. Have you looked into this?
+
+**Lucas Fontes** [03:10](https://youtu.be/WMUanmHsfKI?t=190)
+
+Good point. **Scale-to-zero is something we have not implemented**. As soon as you put zero, we assume you don't want to delete — you don't want to fully go to zero, because we don't have a way to go back to one automatically. The idea is to allow scale-to-zero to happen so you can use the **Horizontal Pod Autoscaler**. For that we need integration with the ingress so it surfaces metrics for the HPA to flip replicas from zero to a different number. Same way **Knative Serving** works.
+
+**Schaffa, Frank** [04:11](https://youtu.be/WMUanmHsfKI?t=251)
+
+I wasn't looking from the Knative side — more from the Kubernetes side.
+
+**Lucas Fontes** [04:18](https://youtu.be/WMUanmHsfKI?t=258)
+
+Right now what we do is **we don't allow you to put zero on replicas** — as soon as you try, the API server tells you it's invalid. But it's something we want to support — just requires more integration.
+
+**Bailey Hayes** [05:28](https://youtu.be/WMUanmHsfKI?t=328)
+
+Hello and welcome to wasmCloud — the New Year's edition. We are back from holiday — Happy New Year to everybody in 2026. I am still catching up. I took a nice disconnect, and I am still getting there. Most of the content today will be led by Lucas — I'm going to go off camera because I'm going to eat a sandwich.
+
+**Lucas Fontes** [06:22](https://youtu.be/WMUanmHsfKI?t=382)
+
+What are we talking about today? What's missing for **wash v2 to actually be released**. We created a **GitHub dashboard** — a subset of all the issues and pull requests in wash that, once complete, will let us cut the release.
+
+A lot of stuff has already been fixed. Many issues here already have fixes through pull requests, but the issue wasn't closed — we don't have the link between the issue and the PR, so they show up in this list and we do a validation pass on them. For example: **wash plugins** — when you try to execute the command it would give an error because the `--no-interactive` flag wasn't working. We fixed it but never updated this issue. No actual work needed — just validation and close. We have many issues in that state.
+
+Then we have **PRs that we want in this release because they're about correctness**. Important one: **"host interface is not being resolved properly"** — we have the explanation and fix in a PR, just need to walk the PR through completion.
+
+Most things to get v2 out the door: close all the open chapters already in flight. There's a question of things that will likely not make the cut for v2 — either because we need to talk about them more, or because they could go in a point release within a one-to-two month window.
+
+**Three items on the discuss table**:
+
+1. **Integration tests PR** — this is **adding integration tests for a feature that's already in and has been validated manually**. Not adding any features. We recently changed how we handle fixtures so the PR needs more code changes. Aditya — if this is important to you for this release we can rebase, but if it takes more of your time, focus on the other ones.
+
+2. **Component restart** — introduces the idea that you have a workload with five components and want to **reload one component inside the workload**. The conversation: what does this mean for **clustered environments where an orchestrator moves workloads around**? Useful for embedders and `wash dev`, but not so much for clustered environments where a restart is usually "new deploy + remove previous workload." The concept of restart doesn't map well to cluster environments. Proposal: do this at the **runtime layer only** — expose the ability to reload components, but **don't expose to the protobuf layer**. Orchestration schedulers wouldn't have to reason with this. Would likely land in a point release because even if we agreed, it's hard to test as a clustering change.
+
+3. **Virtual TCP/UDP loopback** — pretty much fulfilling the POC we showed a few weeks ago, where you open a TCP service on a service and have components connect within the same workload. The challenge: to do this programmatically we had to **use a different version of Wasmtime** — we have this new Wasmtime just for wash. It's a questionable pattern. It also feels like if we wait for **Wasmtime 41** things look better on top of 41 instead of 38. So we're thinking of making this a point release. Together with virtual loopback we have the Wasmtime 40 update ready, but 40 doesn't include a needed fix.
+
+**Lucas Fontes** [16:41](https://youtu.be/WMUanmHsfKI?t=1001)
+
+Instead of trying to fork Wasmtime in a different direction, let's punt on this feature until Wasmtime 41 is out, then bring it in properly without forking. The remaining is literally a bunch of PRs to review, rebase, and sequence. We give preference to the largest PRs — they're harder to rebase, and smaller PRs are easier to merge if they're simple.
+
+The intent: end of this week with **RC6**. Call-outs from my cheat sheet:
+
+- **Multi-Wasm for wash development** — develop services and components together
+- **NATS authentication** for both host and operator — security. Right now neither has NAT auth, pretty hard to deploy production without that
+- **Workload ID from Kubernetes** — resiliency
+- We identified yesterday that `wash dev` is **missing some key interfaces — Blobstore and `wasi-keyvalue`**. Impossible to run **Blobby** on release 5. RC6 brings those in. They'll be in-memory interfaces (just like v1) — filesystem-backed is future work
+- We have a **WIT package for wash** that has to be published with the release tag
+
+For TCP/UDP loopback is likely coming in the next point release aligned with Wasmtime 41. Any other questions from existing list of issues and PRs — anything you have not seen here or really important for your teams? We want to make sure we're bringing in the important things. Cherry on top later.
+
+**Aditya** [21:01](https://youtu.be/WMUanmHsfKI?t=1261)
+
+I mentioned a PR in chat — the **gRPC addition**. Just wanted to check if it's up as an option to include in the v2 release.
+
+**Lucas Fontes** [21:16](https://youtu.be/WMUanmHsfKI?t=1276)
+
+I was wondering — does this have to be modular, or could this be the **default behavior**?
+
+**Aditya** [21:32](https://youtu.be/WMUanmHsfKI?t=1292)
+
+Interesting. Would that not create overhead if we look at incoming requests being chained through the different outgoing interfaces — gRPC or any?
+
+**Lucas Fontes** [21:51](https://youtu.be/WMUanmHsfKI?t=1311)
+
+I think it'll be okay — the `wasi-http` interface already puts lots of overhead and framing on top of the original HTTP connection. As long as the protocol version (HTTP/1 or HTTP/2) makes it to the Wasm interface, we're okay. We don't need the ability to enable or disable HTTP/2 behavior. You don't send HTTP/2 to wasmCloud and then have no handling — the layer in front of us takes care of filtering HTTP/2 or HTTP/1 depending on what the customer wants to send.
+
+This would simplify the PR and get it ready to ship. I feel this should go in v2 — we fixed problems with buffer size and HTTP body size (can't be bigger than 2MB). Now it's mainly making it work and getting it in as the default behavior.
+
+**Aditya** [23:25](https://youtu.be/WMUanmHsfKI?t=1405)
+
+I had a Helm upgrade that translates the gRPC tonic protobuf into the wash side. We can chat offline.
+
+**Lucas Fontes** [23:40](https://youtu.be/WMUanmHsfKI?t=1420)
+
+Awesome.
+
+**Aditya** [23:46](https://youtu.be/WMUanmHsfKI?t=1426)
+
+I'll refactor the whole approach and make it default instead of modular. I can get that done by end of this week.
+
+**Lucas Fontes** [23:57](https://youtu.be/WMUanmHsfKI?t=1437)
+
+People involved in PRs in flight: mainly Aditya, myself, Bailey, Pavel, iPhone. About 4-5 of those will have back-and-forth, rest are on me and Bailey. We're getting close to packaging this and getting it out. **RC6 will be our last one before the final release** — we'll call it feature-complete, then go testing testing testing.
+
+**Schaffa, Frank** [25:27](https://youtu.be/WMUanmHsfKI?t=1527)
+
+On the **component restart** point of view — my take would be we want to be on the safe and more on the dynamic side. If there's a new component, whatever you put together should have **a new version**. If you move your workload from one place to another, you get the same behavior — no unexpected things. From a resiliency standpoint — there are so many dynamic things already, workloads can move from one place to another. It'd be nice to have this in a more stable way.
+
+**Bailey Hayes** [26:20](https://youtu.be/WMUanmHsfKI?t=1580)
+
+I really agree with that. You highlighted the key point — the **atomicity you expect of a workload**, the thing that tells you "is the whole thing working or not," and where is your declarative point to define that? At the **workload level**. What creates a workload version? The individual component specs inside it. But ultimately, the **atomic unit is the workload**.
+
+**Lucas Fontes** [26:56](https://youtu.be/WMUanmHsfKI?t=1616)
+
+This lines up exactly with the comments in the PR. The catalyst of doing component restart is when you're in `wash dev` and you know only one or more components are changing and you don't want to reinstantiate the others. It's an optimization. Not sure how much that really adds because we still have to recompute the entire world.
+
+The idea: maybe we have this just as the runtime layer. If anybody wants to implement this, they can. But all the properties about deployment — Canaries, blue-green — that we already use in Kubernetes, we want to keep that way. We don't want to mix clustered environments and local development.
+
+**Lucas Fontes** [28:15](https://youtu.be/WMUanmHsfKI?t=1695)
+
+TLDR: if we do it, we're not going to see any changes to Kubernetes. Mostly to the REST API.
+
+**ossfellow** [28:40](https://youtu.be/WMUanmHsfKI?t=1720)
+
+I have something to share — because of my needs, I've built what you could call a **WIT translator from P2 to P3 using LLMs**. Wondering — would that be useful on the **Bytecode Alliance side** for contributors that want to translate from the current version to the next? I built it as a **Goose recipe**.
+
+**Bailey Hayes** [29:46](https://youtu.be/WMUanmHsfKI?t=1786)
+
+Yeah — I love Goose. It's the only one that gives you good errors for MCP.
+
+**ossfellow** [29:52](https://youtu.be/WMUanmHsfKI?t=1792)
+
+It has a **rule book**, then a recipe that uses the rule book with a specification and looks into a WIT and says "okay, there is IO, I need to translate to this, blah blah" — gives you out a P3 WIT version.
+
+**Bailey Hayes** [30:25](https://youtu.be/WMUanmHsfKI?t=1825)
+
+The right place to start is **posting in the Bytecode Alliance Zulip** — people will be very excited. Really relevant to what I've been up to today. We had previously committed in the WASI proposals: you should always be able to know when a feature was introduced. We did this manually for P2 but didn't add automation or linting. Without that, we miss spots over time.
+
+I started, also with an LLM, creating a quick **linter to check for `@since` annotations**. Found cases. In `wasi-filesystem` we introduced another type and didn't say when. The error I got when cutting the RC yesterday — I got stuck on feature flags for versions that didn't exist yet. The way this acts is as a **feature gate** — if you're depending on a specific version and you say "I'm depending on 0.2.0," you can have directory entry. But if we added this in 0.2.1 and you say "I want to be pinned on 0.2.0," you'd get a real error: "directory entry not available for you at 0.2.0."
+
+To answer your question — the first place to post is **keep it in your personal repo**. Make sure it has a great open-source license. If it's ever something you plan to contribute to the Bytecode Alliance, I created a template called **BA template** — MIT — although I will say I have to get a board exception for everything that doesn't match exactly this license.
+
+**ossfellow** [33:08](https://youtu.be/WMUanmHsfKI?t=1988)
+
+MIT is fine.
+
+**Bailey Hayes** [33:32](https://youtu.be/WMUanmHsfKI?t=2012)
+
+This one is actually not just Apache 2 — it's **Apache 2 with the LLVM license exception**. The combination is generally the most permissive while protecting the foundation. If you're ever curious, go to the BA template and grab that license. That makes it easier — sometimes folks make amazing projects that get really excited contributors, and I have to relicense if we want to host in the Bytecode Alliance. That means getting every contributor to sign off on the license change.
+
+If it's a skill — I wonder if there are other ways to host it. A script that translates between P2 and P3 is a small scope, but there's potentially a very large scope here. **WebAssembly skills in general** that folks can apply.
+
+**ossfellow** [35:14](https://youtu.be/WMUanmHsfKI?t=2114)
+
+Recipes are things you want executed in some workflow with fixed instructions, and the LLM always follows the same approach. The more tooling you build this way for the **ecosystem of Wasm and WASI**, the more people can participate. Two nights ago I started thinking — why should I go through that painful experience of manually doing this translation? Maybe I can use an LLM to first **determine the translation rules**, which I gave it (the WASI proposals repo) and said "go through every WIT and every WIT-v3-draft, compare how things have changed." Out of that it created a rule book.
+
+Then I said "read the documentation about recipe creation, read this specification, make them as resources, create the recipe that does the translation of any P2 from a Git repository or local folder." Works for that purpose. Maybe it might inspire other people to start using LLMs for the ecosystem.
+
+**Bailey Hayes** [37:14](https://youtu.be/WMUanmHsfKI?t=2234)
+
+Absolutely. The space moves fast and changes fast — really hard to keep up. I'd suggest: put it in your personal public GitHub repo, share in **wasmCloud Slack**, share in the **Bytecode Alliance Zulip**. There's also the **WebAssembly Discord** with a #wit channel — folks would jump on that.
+
+When's the right time for a personal project to join a foundation? When the project is on the roadmap for what the foundation is building, or if it's something people are really depending on — foundational. Right now this is in early experimentation, but I can see how **migration tooling from P2 to P3 should be on the Bytecode Alliance roadmap**.
+
+One place where we share a lot of this work — and where this kind of migration strategy might live — is inside **`wasm-tools`**. wasm-tools can be a kitchen sink, but it's one of the core building blocks — Wasmtime, wit-bindgen, JCO all depend on it. The foundational pieces of what you're building and what I was showing about linting for `@since` annotations should actually live there. What is the migration path between a WIT P2 AST and a P3 — you can do the regex approach to start, which is totally fine. "Let's get something working and then make it good." But what we land there has to be rock solid because it rolls out to everyone and everything.
+
+**ossfellow** [40:15](https://youtu.be/WMUanmHsfKI?t=2415)
+
+I had it read the WIT specs, so it's up to date with the latest vocabulary and notations. Thanks for the information — I'll add documentation, publish, post to Slack and Zulip. If people are interested, they can use it in their personal capacity, and if it's solid, maybe it finds its way into the ecosystem.
+
+**Bailey Hayes** [41:02](https://youtu.be/WMUanmHsfKI?t=2462)
+
+Other pieces inside wasm-tools to be aware of — **wave** is in a similar vein. Representing WIT types in JSON — a lot of people depend on that, and CLIs build on top of it. Maybe your CLI might benefit.
+
+**Schaffa, Frank** [41:35](https://youtu.be/WMUanmHsfKI?t=2495)
+
+It'd be great if you're using the LLM and then asking "if you notice anything that failed, how did you check?" — to give additional confidence in the transformation process.
+
+**Bailey Hayes** [42:09](https://youtu.be/WMUanmHsfKI?t=2529)
+
+I love that. I've been playing around with **Claude skills**, which sounds like it might port over to Goose having skills. Having something for troubleshooting is really nice. When I'm like "I want this thing compiling to WebAssembly," there are mental things I always look for: "do you have these dependencies that I know don't work?"
+
+Just getting an LLM to understand basic troubleshooting things gets you going pretty well. I've also run into a bunch on trying to get wash and WIT dependency updates working correctly — the LLM getting to success on that, since there's been a lot of churn. Where I'd love us to be: share **skills across the community** for working with wash — high level "what's the development cycle on developing a new project with wash" — this should give you that full skill to get to success.
+
+**ossfellow** [43:56](https://youtu.be/WMUanmHsfKI?t=2636)
+
+Question about **building P3**. The reason I'm going through this WIT translation is I need NATS providers I built translated to host plugins. I want to have them created from scratch for P3, and I'll share them with the community as host plugins. I was looking for instructions about what crates I need and how to build for P3. What I found was a blog post from last year talking about going **P2 → P3, using compilation to `wasi-p1` and then using wasm-tools to translate to P3**. Is that still the approach? Why not compile into P2 and then translate?
+
+**Bailey Hayes** [45:36](https://youtu.be/WMUanmHsfKI?t=2736)
+
+A lot there — you've found one of the rough edges. It really depends on the language you're working on. Obviously Rust is the place. **Aditya** — you just did this most recently and wrote up a guide. Want to share?
+
+**Aditya** [46:01](https://youtu.be/WMUanmHsfKI?t=2761)
+
+You're putting me on the spot — but I believe we can **compile directly to P2** and that works with Wasmtime 37 onwards, or version 38 onwards. I could have a guide ready tomorrow and share it.
+
+**Bailey Hayes** [46:27](https://youtu.be/WMUanmHsfKI?t=2787)
+
+It's moving really fast. Aditya — I probably broke whatever workflow you're doing yesterday. The **syntax has evolved between the September RC and the one I cut yesterday**. **Breaking API changes to HTTP and clocks** — the clocks one is duration, which shows up in all the APIs. The second aspect: the way we identify async. If you want to read the motivation, there's a great PR where Lucas went deep on how and why we needed to make that change.
+
+Just dropped a thing — only 171 files changed, most actually just WIT, don't worry. The one to look at — it's not so bad. You'll see **client and middleware as API** — when you look at the example for middleware, it works out to be more digestible. Why we've introduced and clarified that we have **the interface you depend on if you're trying to create middleware, and the interface you depend on if you're trying to serve as a proxy**.
+
+The WASI HTTP 3 interfaces did change. To adapt is really not so bad, but we have to get the RC rolled out to all the different places where people depend on those APIs. Aditya, if you can provide a guide for some of this — we could drop it on wasi.dev. Eric here on wasmCloud is actually the maintainer over there. Another place we'd love more contributing guide info on **getting started developing with P3**.
+
+Yordis — tell us what you have.
+
+**Yordis Prieto** [50:29](https://youtu.be/WMUanmHsfKI?t=3029)
+
+Adding **map support to Wasmtime**.
+
+**Bailey Hayes** [50:33](https://youtu.be/WMUanmHsfKI?t=3033)
+
+Oh, okay.
+
+**Yordis Prieto** [50:34](https://youtu.be/WMUanmHsfKI?t=3034)
+
+I already finished the other things — forgot what the names are.
+
+**Bailey Hayes** [50:39](https://youtu.be/WMUanmHsfKI?t=3039)
+
+The other things — Yordis landed a major change to **wasm-tools** — a foundational piece. He rolled it out into there and then **wit-bindgen**, which works for both host and guest. There's a host bindgen different from guest bindgen — `wit-bindgen` is your guest bindgen. Other people can now start writing programs that use map types in WIT. Wasmtime also needs a host binding that knows how to take that WIT and generate correct bindings for it on its side. That's what you're working on now.
+
+**Yordis Prieto** [51:16](https://youtu.be/WMUanmHsfKI?t=3076)
+
+Thank you for the explanation. After that, when I went to tackle **struct**, somebody told me it's difficult because of the **cyclical recursive type thing** — structs allow for that.
+
+**Bailey Hayes** [51:33](https://youtu.be/WMUanmHsfKI?t=3093)
+
+New features in the component model — I saw you chimed in. You talked to Luke, he started addressing it in the spec already. Which is why **now is the time** — and why it would be valuable, Aditya, to get more people exercising this. As we use it, we find little things. The sooner everybody here gets their hands dirty, the sooner we can get P3 shipped.
+
+**Yordis Prieto** [52:09](https://youtu.be/WMUanmHsfKI?t=3129)
+
+Being fun. I'm getting lost in this — wash-time math pointers, multiply divide, plus. What has happened?
+
+**Bailey Hayes** [52:22](https://youtu.be/WMUanmHsfKI?t=3142)
+
+You're in real systems programming. It was awesome.
+
+**Yordis Prieto** [52:26](https://youtu.be/WMUanmHsfKI?t=3146)
+
+Funny thing — I'm just following the code. I feel I understand but at the same time don't, which is fine. I'm betting on over time you get it. Right now I'm like "copy-pasta here. The map list does this — I just need to do something similar."
+
+**Bailey Hayes** [52:49](https://youtu.be/WMUanmHsfKI?t=3169)
+
+Sounds like how I develop every day. Frank — working on getting a link to what I'm talking about from Luke, dropping in chat.
+
+**Aditya** [52:57](https://youtu.be/WMUanmHsfKI?t=3177)
+
+I was wondering about the **timeline to consolidate the wash runtime crate into wasmcloud/wasmcloud** — after RC6 or after the second point release?
+
+**Lucas Fontes** [53:21](https://youtu.be/WMUanmHsfKI?t=3201)
+
+We want to continue updates to **wasmCloud v1** as it is — people rely on it. The idea: get the current `wasmcloud/wasmcloud` code into a separate repository named something like `wasmcloud-v1`. Have all the code we have in wash moved over to `wasmcloud/wasmcloud` — pretty much `wasmcloud/wasmcloud` now has all the wash code. That completes the code move. From that point on we operate on `wasmcloud/wasmcloud`.
+
+Question we're not exactly sure on: **naming of the crate itself**. Right now it's `wash-runtime` because there's also a `wasmcloud-runtime`. At the moment we change — if we renamed it to `wasmcloud-runtime`, we'd need to make sure versions aren't stepping on each other. Somebody doing `cargo update` suddenly gets a completely different interface. The challenging part of moving repositories is **artifact names** — all the good names are taken.
+
+**ossfellow** [54:58](https://youtu.be/WMUanmHsfKI?t=3298)
+
+Thank you — it really bothers me that the host is called **wash-runtime**.
+
+**Lucas Fontes** [55:08](https://youtu.be/WMUanmHsfKI?t=3308)
+
+Exactly. We also realized by having the host as part of wash, we have **a single binary** — interesting property but at the same time something that's a server concern being on your local machine without much use. There are questions around having the host inside wash or as **its own binary**. As soon as we do the repo move, we might take another look. That's why we're keeping all artifacts we talk about pointing to Docker images for the wash host — if we rename the underlying binary, we won't rename the Docker artifact, so it won't affect anybody if we go back to separate binaries.
+
+**Aditya** [56:17](https://youtu.be/WMUanmHsfKI?t=3377)
+
+Thank you Lucas — one more PR I wanted to get by you, mentioned in chat. Really small change but fairly big blast radius.
+
+**Yordis Prieto** [56:46](https://youtu.be/WMUanmHsfKI?t=3406)
+
+Lucas — where can I buy your webcam right now?
+
+**Lucas Fontes** [56:53](https://youtu.be/WMUanmHsfKI?t=3413)
+
+It's a DSLR — Sony A6000. If I get out of the picture you should see it.
+
+**Yordis Prieto** [57:05](https://youtu.be/WMUanmHsfKI?t=3425)
+
+That quality shows through the roof.
+
+**Lucas Fontes** [57:10](https://youtu.be/WMUanmHsfKI?t=3430)
+
+I tried creating my career on Twitch streaming — short lived. Back to Rust.
+
+**Lucas Fontes** [57:27](https://youtu.be/WMUanmHsfKI?t=3447)
+
+That's it for today everyone. Thanks for joining and see you next Wednesday. Bye.

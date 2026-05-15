@@ -5,6 +5,7 @@ import Link from '@docusaurus/Link';
 import { useLocation } from '@docusaurus/router';
 import type { BlogSidebar, BlogSidebarItem } from '@docusaurus/plugin-content-blog';
 import styles from './styles.module.css';
+import { isTranscriptPermalink } from '../utils';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -56,10 +57,6 @@ function getDay(item: BlogSidebarItem): string {
   return String(day);
 }
 
-function isTranscript(item: BlogSidebarItem): boolean {
-  return item.permalink.includes('transcript');
-}
-
 function MonthGroup({
   month,
   items,
@@ -89,7 +86,6 @@ function MonthGroup({
           {items.map((item) => {
             const isActive = pathname === item.permalink;
             const day = getDay(item);
-            const transcript = isTranscript(item);
             const title = cleanTitle(item.title);
             return (
               <li key={item.permalink} className={styles.dayItem}>
@@ -101,9 +97,6 @@ function MonthGroup({
                   <span className={styles.dayNum}>{day}</span>
                   {title && (
                     <span className={styles.dayTitle}>{title}</span>
-                  )}
-                  {transcript && (
-                    <span className={styles.transcript}>(transcript)</span>
                   )}
                 </Link>
               </li>
@@ -162,7 +155,13 @@ interface Props {
 }
 
 function CommunitySidebar({ sidebar }: Props) {
-  const items = useVisibleBlogSidebarItems(sidebar.items);
+  const allItems = useVisibleBlogSidebarItems(sidebar.items);
+  // Hide transcript posts from the sidebar; they remain reachable from each
+  // summary page's "Read the full transcript →" link and via direct URL.
+  const items = useMemo(
+    () => allItems.filter((item) => !isTranscriptPermalink(item.permalink)),
+    [allItems],
+  );
   const grouped = useMemo(() => groupByYearMonth(items), [items]);
 
   // Sort years descending

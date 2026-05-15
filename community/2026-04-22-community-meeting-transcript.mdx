@@ -1,0 +1,450 @@
+---
+date: '2026-04-22'
+title: 'Transcript: WASI WebGPU Demo, Train Release Model, HTTP Reuse & NATS Interface Proposal'
+description: 'Full transcript of the April 22, 2026 wasmCloud community call covering WASI WebGPU, the train release model, HTTP reuse benchmarks, component composition, and the NATS WIT interface proposal.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasi webgpu
+  - rust webassembly
+  - nats messaging
+  - http reuse
+  - performance benchmarking
+  - cranelift
+image: https://i.ytimg.com/vi/18VFhGzObdY/maxresdefault.jpg
+showTitle: true
+slug: 2026-04-22-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-04-22-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=18VFhGzObdY" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=18VFhGzObdY" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, April 22, 2026 · 1h 48m (live stream ~1h 23m)*
+
+**Speakers:** Bailey Hayes, Colin Murphy, Aditya, Yordis Prieto, Frank Schaffa, Sebastien Guillemot, Dan Phillips, Liam Randall, ossfellow
+
+---
+
+{/* truncate */}
+
+## Full Transcript
+
+**Bailey Hayes** [00:54](https://youtu.be/18VFhGzObdY?t=54)
+
+Hey, Colin, you should have power to share. And I think I just finished updating. Yeah, all right, I'm gonna rebase some merge. So on the agenda, I just added you as our first agenda item.
+
+**Colin Murphy** [01:06](https://youtu.be/18VFhGzObdY?t=66)
+
+Awesome. For some reason my keyboard stopped working. This is a new one. It just — just now.
+
+**Bailey Hayes** [01:15](https://youtu.be/18VFhGzObdY?t=75)
+
+That's, that's the demo gods, okay.
+
+**ossfellow** [01:39](https://youtu.be/18VFhGzObdY?t=99)
+
+What are you demoing, Colin? Maybe — I'm anticipating.
+
+**Colin Murphy** [01:45](https://youtu.be/18VFhGzObdY?t=105)
+
+Yeah, yeah. So I'm demoing — there we go. I'm demoing WebGPU.
+
+**Bailey Hayes** [02:10](https://youtu.be/18VFhGzObdY?t=130)
+
+Okay, I'm hitting the button, but there's this awkward silence — from the time I hit the button to the time that it actually starts. Okay, awkward silence of 15 seconds commencing now.
+
+**Bailey Hayes** [02:39](https://youtu.be/18VFhGzObdY?t=159)
+
+Okay, hello and welcome to wasmCloud's community call for April 22. We're kicking off with a demo from Colin Murphy, who's been doing stuff with WebGPU. Colin.
+
+**Colin Murphy** [02:54](https://youtu.be/18VFhGzObdY?t=174)
+
+Hi everybody. So I hope to make up for my lack of preparation with enthusiasm. This is something I've been chasing for a while, and Mendy Berger has done all this — or at least it seems he's done everything. I've been chasing this kind of problem with WebAssembly: for really compute-sensitive tasks you take a performance hit. I gave a talk three or four years ago about SIMD — I was doing fast image resize, did some work on the fast image resize Rust crate — and ran into this thing where it's kind of an intractable problem. You compile a WebAssembly component to run on anything, and you don't know ahead of time if you're going to have NEON or AVX-512. You can't really do good LLVM optimization for SIMD instructions. The cool thing with WebGPU is that we have a nice interface that all of the architectures support. We don't have to have any architecture-specific instructions. We just have WebGPU, and we can pass SIMD-like instructions or heavy compute stuff to the host, and the host will have the shaders — have the WebGPU GPU shaders — do the work. We can essentially have native runtime, native execution.
+
+**Bailey Hayes** [05:24](https://youtu.be/18VFhGzObdY?t=324)
+
+This is great. You should probably describe what WebGPU is. Where is it supported?
+
+**Colin Murphy** [05:33](https://youtu.be/18VFhGzObdY?t=333)
+
+Yeah. So back in the early days of the death of Flash, that spawned WebAssembly. There also came a need to display graphics on the web, and so that started with WebGL — based on OpenGL, which is kind of an open-source version of DirectX. About four years ago WebGPU really took off because of limitations on WebGL with its OpenGL ancestry. There are similar parallels to Vulkan in the open-source world, and Metal too came out, plus lower-level APIs like DirectX 12. From that world comes WebGPU, which allows you to do a lot better stuff on the web in terms of graphics, shaders, displaying, animation. WebGPU is supported pretty much everywhere except for Safari — the typical support pattern. We use it at Adobe for things like Adobe Express and Photoshop Web. The nice thing is not only is it for 3D rendering, it's also used for machine learning and AI inference. We've got open-source models for watermarking photos that Adobe has open-sourced — TrustMark. I gave a talk about this last fall with the ONNX Runtime stuff.
+
+**Colin Murphy** [08:07](https://youtu.be/18VFhGzObdY?t=487)
+
+So I did get it working last fall — you could do WebGPU through a WebAssembly module, like a `p1` module. I could not get it working through components, and so it really wouldn't work with wasmCloud. I could only make it work as a CLI. I couldn't make it work as a component. That's where I hit a wall in November. Mendy helped a lot with getting it working at all. So if I actually want this to be a service that does watermarking, I need to have it really work as a component on Wasmtime. The past few days I had a little bit of time, and I got this WebGPU component working. I'll show you what I have — I've got a little `wash dev` setup with a single component I've made. It uses the WASI GFX work — some changes I made to WASI GFX. It uses my fork of ONNX Runtime, and the TrustMark model. I've got one that says "use WebGPU" and one that says "don't use WebGPU."
+
+**Colin Murphy** [11:10](https://youtu.be/18VFhGzObdY?t=670)
+
+Okay, so I'm using this test image. I'm curling it now. It's a little faster on the GPU — obviously you'd want to batch it. It's about 20% faster. This is also because, unlike the demo last year, I've done the optimizations, the runtime optimizations, so it would actually run fast. The CPU is quick. The GPU is quicker — about 20% faster. So it looks just like it did before, but there's a watermark in there. If I use the native CLI tool, I can give it the image and it'll find the watermark in it. The implications of this are pretty big — we can have native WebAssembly performance for workloads that consume all of the compute and memory in the world. We can expose WASI as a really viable and perfectly solved approach to the problems WebAssembly solves without the drawbacks of performance for AI workloads. I've been chasing this for a long time, and I think it's gonna be awesome.
+
+**Bailey Hayes** [14:42](https://youtu.be/18VFhGzObdY?t=882)
+
+That was awesome, Colin. Frank's got a question for you.
+
+**Frank Schaffa** [14:48](https://youtu.be/18VFhGzObdY?t=888)
+
+You're using p2 — just wondering if p3 will give you better performance.
+
+**Colin Murphy** [14:57](https://youtu.be/18VFhGzObdY?t=897)
+
+It will, yeah. There are definitely some asynchronous calls in GPU and WebGPU — it's made for the web, for JavaScript. There are also cooperative threads, which might give some bumps as well. But that's mostly in the pre-processing and post-processing, because libraries like OpenCV are made to do that when you give an AI model an image — that image has to be manipulated a bunch in order to pass it to a model. Once you get that tensor in the right shape and pass it through the WebGPU boundary, it's all on the host side. So there isn't really a lot to be gained from the Clang work and the p3 work once you get to that point.
+
+**Frank Schaffa** [16:15](https://youtu.be/18VFhGzObdY?t=975)
+
+So how does the runtime figure out what's available and how you do the binding?
+
+**Colin Murphy** [16:33](https://youtu.be/18VFhGzObdY?t=993)
+
+wasmCloud is the only thing that implements both `wasi-http` and `wasi-webgpu`. All I had to do is point Wasmtime at my fork of WASI GFX. I did some `wash` stuff to pass the environment, really trivial stuff. The host knows that it implements WebGPU and passes that capability to the guest as it would any other interface. The host can provide WebGPU; if a guest asks for WebGPU, it can provide it. How does the runtime know what's available on the hardware? That is actually a lot of the work that I was doing.
+
+**Frank Schaffa** [18:11](https://youtu.be/18VFhGzObdY?t=1091)
+
+There are different GPUs and different CPU-dependent instructions that you can use for acceleration. I'm wondering about this mapping — how does it get mapped from your Wasm code?
+
+**Colin Murphy** [18:42](https://youtu.be/18VFhGzObdY?t=1122)
+
+The Wasm code is just calling the WebGPU bindings, which are generated from these WIT files. If you generate C++, because I did everything in C++ — just to make it harder, no, not to make it harder, but because ONNX Runtime is written in C++ — the WIT gets converted into C header files, and these functions are now available to the guest.
+
+**Bailey Hayes** [19:40](https://youtu.be/18VFhGzObdY?t=1180)
+
+The guest here being the WebAssembly code.
+
+**Colin Murphy** [19:43](https://youtu.be/18VFhGzObdY?t=1183)
+
+Yeah, it's non-trivial. This is a fairly extensive WIT file, and the real challenge was that not all of this was implemented in the WASI GFX runtime.
+
+**Bailey Hayes** [20:05](https://youtu.be/18VFhGzObdY?t=1205)
+
+When we say WASI GFX runtime — essentially this is something that Mendy maintains, and these are Wasmtime bindings on the host side of that interface definition.
+
+**Colin Murphy** [20:23](https://youtu.be/18VFhGzObdY?t=1223)
+
+Yeah. I just had to add these for my stuff, for ONNX Runtime and my particular use of ONNX Runtime, plus associated header changes.
+
+**Bailey Hayes** [20:34](https://youtu.be/18VFhGzObdY?t=1234)
+
+In wasmCloud, we pull this in. Every time we update Wasmtime, this is one of the fun challenges that we have on our upgrade path — Mendy revs this for me to be on the latest version of Wasmtime, and then we pin directly to this as our dependency. Because these are host bindings, you bring all of your host bindings together at the same time, and in wasmCloud we have a feature flag for turning this on and off. On the Rust guest side of the world there's a crate called [`wgpu`](https://github.com/gfx-rs/wgpu), which has the bindings in it — so you're not navigating the headers like Colin did for his C++ demo. So it's potentially easier in Rust. But there's just so much existing code today that can just work if we get the C path ergonomic and nice.
+
+**Frank Schaffa** [22:03](https://youtu.be/18VFhGzObdY?t=1323)
+
+I'm wondering if anybody experimented with the Rust binding?
+
+**Bailey Hayes** [22:11](https://youtu.be/18VFhGzObdY?t=1331)
+
+You can actually look inside wasmCloud — we have a unit test for it with the Rust bindings. The Rust side is much better paved right now.
+
+**Dan Phillips** [23:09](https://youtu.be/18VFhGzObdY?t=1389)
+
+Thanks Colin, that was a really cool demo. Different types of hardware availability was touched on — and thinking about Wasm being this universal target, is there a way to discover capabilities at runtime? Is that baked into the spec?
+
+**Colin Murphy** [23:52](https://youtu.be/18VFhGzObdY?t=1432)
+
+That's the problem I was talking about with Mendy. The nature of WebAssembly: you can't know the instructions available in the host pre-compilation. There's been some work around relaxed SIMD to try to address that. In the browser, we need standards to allow querying of hardware specs, and those are going forward. We'd need similar if we were making runtime decisions on how to execute a workload. On the server side it's less of a question because we know the hardware in our setup, in our platform, and we can already make those decisions. It's when you don't know what it's running on — I would love a world in which WebAssembly runtimes are so ubiquitous you would not know ahead of time where a workload is running.
+
+**Bailey Hayes** [25:43](https://youtu.be/18VFhGzObdY?t=1543)
+
+Basically, the thing that was so hard in November — Colin's got drafts of PRs that have it working. There's a little bit more that we want to do on the wasmCloud side. Mendy put in an issue this morning where right now we're shipping musl binaries. We want, specifically because of GPU, to use glibc in our Wolfi-based images that we build on and ship for the wasmCloud hosts. The ONNX Runtime folks recommend glibc, and that should just work with the Docker containers/images we already build on. So first phase: create different binaries that we build as part of our release pipeline, then switch our Docker host images to those binaries. That way we don't have to do anything too tricky.
+
+**Sebastien Guillemot** [28:24](https://youtu.be/18VFhGzObdY?t=1704)
+
+Good to see you again. I've been playing a lot with this WASI GFX work — quite a few demos of different things. For some use cases we want deployments that don't have any UI because we just need WebGPU for acceleration, especially on cryptography. For some cases we do want users to be able to build an application with a UI. The problem is we need sandboxing, and it's very hard to tell people "just rewrite your entire UI in Rust." If you want to use HTML, you're kind of outside the canvas, so you can't easily apply WebGPU to it. You have to do a kind of hopping back and forth, where you lock down the HTML side and take screenshots and send them over to the canvas. But there's this new project called HTML-in-canvas that came on Chrome a week or two ago and allows you to pass HTML directly into the canvas, instead of the previous screenshot approach. So I'm really interested in trying to get this to build a safer container for rendering, where you can still render proper HTML, so you still get accessibility, text selection, those kinds of things.
+
+**Liam Randall** [30:10](https://youtu.be/18VFhGzObdY?t=1810)
+
+About that HTML thing — there is actually an HTML/CSS render being developed that is backed by `wgpu`. I've been wanting to get an experiment running it inside WASI GFX. It's called Blitz.
+
+**Sebastien Guillemot** [30:37](https://youtu.be/18VFhGzObdY?t=1837)
+
+I haven't seen it but I'd definitely be interested. I feel like a demo of this HTML-canvas stuff is doable this weekend.
+
+**Bailey Hayes** [31:51](https://youtu.be/18VFhGzObdY?t=1911)
+
+Part of the reason why this matters is — let's say you decide to use JCO to compile JavaScript as a component. The way that we're doing WASI P3 is with JSPI, so if Blitz is building with that, then we can have really nice, very performant bindings that feel ergonomic. If they're not using JSPI, then we're going to have to shim it, which isn't the worst thing — but if you don't have to shim things, that's nice.
+
+**Liam Randall** [33:41](https://youtu.be/18VFhGzObdY?t=2021)
+
+I should mention Colin when we stopped recording — 200 regular watchers of this community on YouTube — Colin's at colin.murphy@adobe.com.
+
+**Bailey Hayes** [33:54](https://youtu.be/18VFhGzObdY?t=2034)
+
+If folks want to share extra info, Colin is on our wasmCloud Slack — a good place to connect with him. So we've got a couple more agenda items. The next thing — I put up this proposal yesterday because I was asked to go ahead and cut another release; we had some really good bug fixes in. I was like, well, I don't want to be the only one that holds the button. There's always a little extra communication turn and people not knowing specifically when their fix is going to land and when it'll be available for end users. I want to add some expectations that people can have. What I'm proposing is **automated releases every two weeks on Tuesdays**. Tuesdays specifically because Mondays you're still getting back, you're still getting in the swing of things. Fridays — no-ship Fridays. So you ship on Tuesday, deal with any follow-up you might have to do during a normal work week. We can roll out a release and people can depend that it'll always be there. A pure train release model would never even have out-of-band releases unless it's a hot fix; I'm essentially saying I want us to be able to do hot fixes, so if there's a patch we need to make we can do that out of band, but you can also guarantee that we will always regularly ship every two weeks. We already have automated releases — today I manually bump all the versions and then I create a release; that's the step that goes and runs our release pipeline and puts out release images. The other key benefit about having regular automated releases is that you will always have automated releases because you're doing it — you're going to maintain the automation and the push button.
+
+**Bailey Hayes** [37:30](https://youtu.be/18VFhGzObdY?t=2250)
+
+I've chatted with some of the maintainers, so we think this is generally a good idea. I'll bring up our current roadmap to share where we are in the cycle. If we go to Projects and the wasmCloud roadmap, we've got a few different things we're building out. We have a couple of things already completed — Jeremy got this one over the line — and we've made it kind of separate from that, but in the same domain, of making sure we also have TLS support for when you're running `wash dev` locally, and aligning the experience between the two, including some chart updates. In the latest release in wasmCloud 2.04 you've got all of our Helm-chart patches that have been made so far. In progress: CI publishing for the wash runtime crate (we're not actually publishing that yet), Aditya's PR for the HTTP client plugin, my PR for microbenchmarks — and I still list this one as in progress because I have a couple of follow-ups for better p3 support. An end user reported performance differences they saw between p2 and p3 and between wasmCloud and Wasmtime, so I added microbenchmarks to have a baseline of what just `wasmtime serve` gives you, what you get with the way we actually use Wasmtime (which isn't through `wasmtime-serve` directly), and to compare that in a matrix between p2 and p3. I found some interesting things: there's a new awesome feature inside Wasmtime called **proxy handler reuse**. If you're using `wasmtime-serve` with p3 and you're using the reuse path, you get a pretty significant performance boost. So I want us to use that. I started working on it and ran into an issue — filed as HTTP reuse. We do cross-component linking at the host layer, and when you're trying to communicate over a store that's pushed down into a different async runtime, I can't talk to it. If you try, you'll get an error. To fix this I started looking at some options.
+
+**Bailey Hayes** [41:58](https://youtu.be/18VFhGzObdY?t=2518)
+
+The one I want to do is actually what we've always wanted to do. Our intention from the very beginning — a workload deployment has n components and a service. Your service is basically the root of your application, and all the other components are like a sub-tree. When you resolve this workload, it should act as one component, which is why it's one unit of tenancy. We didn't go ahead and do composition ahead of time because there's a really cool feature inside the component model being developed but not available yet, called **runtime instantiation**. With runtime instantiation it instantiates at runtime, so if I have a root component (a long-lived service) but never need to call into any of the sub-components, they're not instantiated until we actually need them. Fastly and other CDNs are super excited about this feature because they want to scale CRUD-style sub-paths to zero. I wanted to wait until that was available, but it's not, and I want to take advantage of reuse right now. So my idea: a service has its own lifetime, it's long-lived, it has a different lifetime than our stateless components in the workload. Why don't I do the first part of this composition — composing all the components in the workload deployment together — making one component, separate from the service. I'll still link with the service, but the service intentionally has a different lifetime so it can hold state like a connection pool. For things supposed to be serverless I keep them serverless, but treat them as a whole unit. The negative is I'm instantiating the whole thing — but my theory is most folks aren't yet making a ton of different components in a workload deployment, and if you are, you have an easy workaround: just make a separate workload deployment. They can talk to each other over HTTP. This is the bench I just ran with reuse — we make up the difference with Wasmtime. With microbenchmarks and HTTP reuse, we have really nice throughput; any difference is largely noise. I'm pretty happy with it. I'm going to do a PR probably tonight or tomorrow on doing the component composition as part of workload deploy. The HTTP reuse PR — easy peasy.
+
+**Sebastien Guillemot** [46:55](https://youtu.be/18VFhGzObdY?t=2815)
+
+We ran into similar issues. We're trying to have a proxy that accepts requests and proxies them to a list of possible components. The way we currently have this working today is that the top-level component receives the requests and then creates an in-memory wRPC connection to the components of choice — basically a one-shot client — and returns the result up. So we have to make some changes to wRPC to support this, but it doesn't do any clever reusing. This might be a better solution, especially if there's a way to natively instantiate these components at the component model level, because right now we have to hop through the host to have the host instantiate on our behalf.
+
+**Bailey Hayes** [47:46](https://youtu.be/18VFhGzObdY?t=2866)
+
+For HTTP reuse it's a 5x perf improvement, which is pretty big. I'm working on the benches for composition, but in the long term that is always going to be way more efficient than us constructing the linking ourselves. If I pass a `.wasm` to Wasmtime and then Cranelift, Cranelift is going to build machine code for that `.wasm` for the lifting and lowering instructions — which means it can also do optimization passes. For example, if a component and another component inside that one component tree are talking to each other over their interfaces, Cranelift can say "oh, that's doing a string representation in one component in Rust, and this is also doing that, so when I lift and lower these it's actually all the same opcodes, and I could eliminate those and just do basically a `memcpy`." That's the type of stuff you could get out of your runtime when the runtime is in charge of figuring out how to do that linking. Today there's a lot on the table that is not being done.
+
+**Sebastien Guillemot** [48:59](https://youtu.be/18VFhGzObdY?t=2939)
+
+One challenge I'd have to tackle is that if you have too many components to fit into memory — for our case we probably have millions of components — we'd have to cycle these somehow.
+
+**Bailey Hayes** [49:20](https://youtu.be/18VFhGzObdY?t=2960)
+
+I think for a lot of that it's about putting them on different hosts and creating an affinity via host labels for breaking down components that are chatting with each other. So there's probably a lot of different workload placement strategies you can take advantage of to be efficient about hardware. There is something else that came up this morning where another end user wanted to have an in-memory map routing between different workload deployments — not just inside one workload tenant where they talk automatically, but also being able to do that across workload deployments on the same host. That's a pretty cool, powerful feature for a serverless platform. I think it should be an optional plugin, because for a lot of reasons people have CNI and network policies in place, so they have an expectation that things drop to the network and back. But it's another cool place where we can get some pretty sweet performance gains.
+
+**Frank Schaffa** [50:48](https://youtu.be/18VFhGzObdY?t=3048)
+
+This would be like the service interface in Kubernetes — you don't have to go all the way up to the TCP stack?
+
+**Bailey Hayes** [51:13](https://youtu.be/18VFhGzObdY?t=3073)
+
+You're saying do DNS routing for this, effectively local — yep, that's how we would implement it, while still using the DNS name we've created with our operator. The operator makes sure you have these headless services, so you already have basically the DNS routing in the service. When you realize "oh I can't talk to this workload locally, let me do a call-out" — the difference here is that I'm saying maybe we're not even doing HTTP requests, maybe we're doing function-to-function requests. But if they're on a different host we can make an HTTP call straight to the headless service which would go to whatever your gateway controller is — say it's envoy — and route to a different host. So that's very much in scope for this roadmap.
+
+**Dan Phillips** [52:34](https://youtu.be/18VFhGzObdY?t=3154)
+
+I was curious where I could read more about the runtime instantiation that's going to be landing. I'm familiar with early discussions, but it was two or three years ago when it first came up. I was Googling it.
+
+**Bailey Hayes** [53:00](https://youtu.be/18VFhGzObdY?t=3180)
+
+Luke is awesome to work with — he's really good about planning multiple years in advance. Sometimes it feels like he can see into the future. This is the one he's using to track runtime instantiation. This feature is dependent on a couple of other features we're adding to the component model — so it's in a queue. The next one in the queue is called **child handles**, which is part of being able to do child callbacks with scope, which is a feature the browsers need for us to implement the component model. Once we have that, it's a lot easier to use it as your scope wrapper for doing an instantiation, so that one component can reference another component — and that's how you do runtime instantiation.
+
+**Dan Phillips** [53:54](https://youtu.be/18VFhGzObdY?t=3234)
+
+There are core Wasm dependencies on this too, right? Luke told me one time about a POSIX-spawn equivalent. It solves the deal-open dynamic linking problem and the fork-exec problem in a different way.
+
+**Bailey Hayes** [54:45](https://youtu.be/18VFhGzObdY?t=3285)
+
+His thoughts are roughly similar to what you just said. I wouldn't change anything other than: we have found that we can do canonical built-ins for all of these, so we don't actually have a core-wasm dependency. A lot of that came from the iteration we were doing on cooperative threads, which has been making awesome progress recently. Once we figured out we can do stack switching and threading at the canonical ops level for the component model, we can also do a couple of these others that we want to add as well.
+
+**Sebastien Guillemot** [55:22](https://youtu.be/18VFhGzObdY?t=3322)
+
+One issue we're blocked on for this is that currently you can't do recursive reentrancy. You can't have a call instantiate a child and then have that child come back and call the parent.
+
+**Bailey Hayes** [55:35](https://youtu.be/18VFhGzObdY?t=3335)
+
+There are thoughts on that. I'm going to have to defer to Luke for the full answer. I've heard him try to answer this and I'm not sure I grok enough to concretely imagine how the ABI will look. They're all kind of tied together — making it possible to reference. This is a cluster of several different features that all have to be designed in concert.
+
+**Frank Schaffa** [56:09](https://youtu.be/18VFhGzObdY?t=3369)
+
+I was wondering if you could add some more details on the new performance work.
+
+**Bailey Hayes** [56:17](https://youtu.be/18VFhGzObdY?t=3377)
+
+What I like about microbenchmarks is that you can make them exact to what you're trying to study versus having a lot of noise. I'm still doing network on this one, which isn't a pure microbenchmark. I created a bunch of other little ones to debug this — most I'm not going to contribute back. For example, a bunch around store instantiation, because part of the win here for proxy handler reuse is that the store is the thing you actually keep alive — by keeping the store alive, that's where a lot of object allocations happen. So the name of the game is no allocations. I haven't done a ton of Rust benchmarking — I've mostly studied what Nick Fitzgerald does in Wasmtime and tried to be more like Nick. Most of the Rust projects I was pointing at were using **Criterion**, but I learned today about IOPS from Valgrind, which will do CPU instruction counting, and that should give a more deterministic baseline.
+
+**Frank Schaffa** [58:07](https://youtu.be/18VFhGzObdY?t=3487)
+
+How many times did you run this — confidence intervals? Even if you take CPU, it'd be interesting to ask "what's the wait time?" because you might have swapping or other things that give latency.
+
+**Bailey Hayes** [58:43](https://youtu.be/18VFhGzObdY?t=3523)
+
+In terms of benchmarking science, it's still very early. I have a Linux box I play with sometimes — it's my old gaming PC. What I really want is to set us up with something on Hetzner — a dedicated Linux box that we can run over a long period of time. Bare metal so we're not getting noise from virtualization. I haven't set that up yet, so it's out of scope for this PR. I still think we want a benchmark like Criterion with wall time, even though it introduces noise, because it's the human-readable output of how this stuff works — versus the other one which is "number goes up or down" and you don't know what it means. With Criterion I can give you requests per second and everybody knows what that means.
+
+**Bailey Hayes** [59:58](https://youtu.be/18VFhGzObdY?t=3598)
+
+Basically all of this is built into the crate I'm using — Criterion. I create a benchmark group, set sample sizes. Measurement time, I did 15 seconds continuously. I broke down each of these invocations as cold and warm so I can measure what the instantiation cost is separately from once we've done a `pre`. Obviously for p2 there isn't a pre, so that behavior is the same between the two. I think all the questions you're asking, Frank, are all in this HTTP-invoke bench, and you can easily run it locally — say `cargo bench` and you'll get that output, basically the same as me. While I was running this I ran into a regression where we were dropping on a lock — we were trying to attain a lock and it wasn't blocking. I have that fix in this PR. Benchmarking is its own special rabbit hole. I do think if anybody's willing to dedicate bare-metal hardware that I could trigger workflows on, that would be super appreciated. I put in a ping to the CNCF Help desk to see if there were any resources or API keys. We used to be able to use Equinix Metal — that's not available anymore.
+
+**Frank Schaffa** [1:03:01](https://youtu.be/18VFhGzObdY?t=3781)
+
+We could use mini PCs for this, right?
+
+**Bailey Hayes** [1:03:06](https://youtu.be/18VFhGzObdY?t=3786)
+
+That would be really helpful. As long as it's consistent hardware that looks somewhat like what people would run in production — Linux of some kind — and we can consistently get a baseline. Another thing I really like about Criterion is its `--baseline` flag. I ran `cargo bench --baseline` and said pre-reuse, then ran again with my patch applied and said reuse as my baseline. It makes really nice HTML diagrams. I grew up closer to what Colin does — C++ data visualization, benchmarking — where I always use Valgrind. So the idea that there's actually a cooler Valgrind but also Rusty implementation is pretty interesting to me.
+
+**Yordis Prieto** [1:04:13](https://youtu.be/18VFhGzObdY?t=3853)
+
+Question for you — do you have a repo that is literally a clone or a Docker image, and ideally a Kubernetes manifest that I can just run in my home lab and report?
+
+**Bailey Hayes** [1:04:27](https://youtu.be/18VFhGzObdY?t=3867)
+
+We've got all kinds of stuff. You can just run `cargo bench` here — just straight up Rust will work. If you want to step it up a notch and you're on a home lab — say you have Talos — this should just work. We have a kind config and you would deploy our Helm chart on it.
+
+**Yordis Prieto** [1:05:07](https://youtu.be/18VFhGzObdY?t=3907)
+
+Okay, maybe we can follow up. If you make that easy, Bailey — I'm really isolated, I can just run in my home lab from time to time and report back.
+
+**Bailey Hayes** [1:05:18](https://youtu.be/18VFhGzObdY?t=3918)
+
+I'd like to think it's easy. Let me know if it's not. We ship a Helm chart, so I would do a Helm install. We definitely have good docs on this too.
+
+**Yordis Prieto** [1:05:37](https://youtu.be/18VFhGzObdY?t=3937)
+
+Do you have a Grafana dashboard or something like that I can also install to see things?
+
+**Bailey Hayes** [1:06:18](https://youtu.be/18VFhGzObdY?t=3978)
+
+Maybe you need to make the role WebAssembly-only — keep it locked down. So in terms of our agenda: we did Colin's demo, we talked about the train release model, I showed you where I'm at on benchmarking. The wasmCloud secret work is something Jeremy is looking to pick up this week. Aditya — you have an item for the NATS interface proposal.
+
+**Aditya** [1:07:15](https://youtu.be/18VFhGzObdY?t=4035)
+
+Yeah, I was wondering about the issue I put up regarding the wasmCloud NATS interface proposal. I want to get a few opinions from the community.
+
+**Bailey Hayes** [1:07:34](https://youtu.be/18VFhGzObdY?t=4054)
+
+I want to call out we are 11 minutes over, but we are recording and so you can hop on and watch this if you need to run. Totally understand.
+
+**Aditya** [1:07:50](https://youtu.be/18VFhGzObdY?t=4070)
+
+Today NATS is split across two different interfaces — wasmCloud messaging and `wasi-keyvalue` with the NATS backend. This proposal adds a completely first-nature implementation of the entire NATS stack with the core key-value store, the core pub/sub buses, and JetStream. What I'm confused about is what is the scope of this new interface we'd be adding? Obviously we have wasmCloud messaging. JetStream needs its own persistent handler and key-value store. I've mentioned a draft interface below, and I was wondering if the scope looked all right if we added the core and the KV interface along with JetStream, or if we'd encourage people to use the wasmCloud NATS interface alongside wasmCloud messaging and `wasi-keyvalue`. I also wanted thoughts on having a full consumer-based mechanism for JetStream as opposed to the more legacy push-based.
+
+**Bailey Hayes** [1:09:24](https://youtu.be/18VFhGzObdY?t=4164)
+
+First of all, thank you for putting in this work. This is something I've wanted to see for a while. Some people think Bailey's obviously chair, one of the co-chairs on WASI, so all I want to see are WASI interfaces. That's really not the case. The whole point of WASI was to do the minimum we have to standardize to bootstrap an ecosystem, and from there I want people to build modular interfaces with exactly what they need. There are benefits to making common-denominator interfaces so you have portability — but some of these things never change. You're not jumping around on databases — that's a whole operation, and having portability for that is somewhat questionable. When you pick a database or an event bus, you're picking it because it has a certain set of features you need. For a design goal I would want to see is that you've leaned in and said "this is the best way to interact with NATS" — that will be the key design goal for this one. For that reason I would say don't try to make it match wasmCloud messaging, which is our version of `wasm-messaging`. Go for your core and design it the way that would be most native to somebody who speaks NATS. The lingua franca of NATS is what's most important.
+
+**Aditya** [1:11:29](https://youtu.be/18VFhGzObdY?t=4289)
+
+To me, keep it the highest common denominator. Exactly. Yeah, NATS.
+
+**Bailey Hayes** [1:11:34](https://youtu.be/18VFhGzObdY?t=4294)
+
+Makes sense. The other side: what's amazing about components is if somebody wants to be portable and do the common denominator thing, you can always use components to virtualize other components. If somebody wants to write to wasmCloud messaging but as a platform team you want everybody on NATS messaging, you can always have a second component that's an intermediary between the two at a very low cost.
+
+**Yordis Prieto** [1:12:19](https://youtu.be/18VFhGzObdY?t=4339)
+
+Bailey, one thing I'll add because I agree with everything you said. The only caveat is what WIT files and software do not tell you is the capabilities and expected behavior behind it. For example: idempotency, deduplication. If you have batching, do you support atomic batching or not? That will be extremely helpful to document, because maybe your component is already pretending that whatever you're injecting behind, regardless of what it is, at the very least has to support n number of semantic guarantees behind it.
+
+**Bailey Hayes** [1:13:06](https://youtu.be/18VFhGzObdY?t=4386)
+
+What Yordis is saying is we want this to be very granular, so when they're importing an interface they're importing like the batch capability or the KV capability — and they may only be using one of those. Being able to make sure we write something up that's declarative about the resources you need: there's this design philosophy with building out your components — if I'm connecting to a database there's an import of a store, so now I'm operating off this store. Don't instantiate me unless you can give me this store. I'm being very declarative about the resources that have to exist for me to run. I don't want to figure that out dynamically at runtime.
+
+**Yordis Prieto** [1:14:20](https://youtu.be/18VFhGzObdY?t=4460)
+
+To follow up on that — sure, you could be specific and say "I need the key-value and I only need the put function." That's totally okay. But even further, from the put function, what type of capability should I expect from behind that call?
+
+**Colin Murphy** [1:14:39](https://youtu.be/18VFhGzObdY?t=4479)
+
+Can you give an example?
+
+**Yordis Prieto** [1:14:40](https://youtu.be/18VFhGzObdY?t=4480)
+
+Does a put function have optimistic concurrency update? Hey, put the thing as long as the revision is number 5. Is that required or not? Idempotency — if I do the call twice, am I under the assumption that the component implementing it would not actually create duplicates? Things like that, that the contract itself does not tell you. The contract just tells you "here's the messaging" but what to expect from the system behind is completely different. When people say KV — sure, KV — but what do you actually expect from it? What if you have JetStream with KV and you have a geo-replicated thing where when I do a `put` I don't care about locality because my cluster takes care of it, versus a Redis single-cluster thing which cannot do the geo-replication, so I cannot meet the requirements you expected. It's where actually the disagreement starts, where the every specific OPTION toggle starts for every single provider — the capability or the guarantees behind it are not the same. This is where you start putting custom parameters/flags to say "pass this one for this provider." Sadly the WIT by itself will not tell you that.
+
+**Bailey Hayes** [1:16:42](https://youtu.be/18VFhGzObdY?t=4602)
+
+If you are using WIT as it is today, would not tell you that — I wonder if we could get there, and the trick would be naming different worlds and each world defining the behavior profile of the capability.
+
+**Yordis Prieto** [1:17:03](https://youtu.be/18VFhGzObdY?t=4623)
+
+Exactly. I wrote the blog post like that — it's steering the conversation from the noun, which is KV, JetStream, stream, or whatever — that's too vague. We cannot just stop in `publish` and `pull`. What are the actual capabilities expected? A lot of people used to use RabbitMQ — that's not true anymore because RabbitMQ and Kafka both implement the same set of capabilities. But it used to be that if you want a queue, you use RabbitMQ; if you want a log, you use Kafka. Most people say "oh, I just need a pub/sub" and don't realize that if you have a log offset commit in Kafka, how do you ack messages? Sometimes you have poison messages. From the producer side it's "yes" but what about the consumer? What are the expectations from your perspective? Now NATS supports batch publishing, which wasn't true before. NATS has a limit of 1,000 messages — is that something you're going to run into? Ideally a specification would tell you whatever that means. The Protobuf WIT by itself today isn't clear on that.
+
+**Bailey Hayes** [1:18:51](https://youtu.be/18VFhGzObdY?t=4731)
+
+This definitely takes a good first step towards it because we're very explicit — this is JetStream semantics, we do exactly what JetStream does here. This definitely solves part of the concern. We're looking for a little bit more granularity, and potentially having different worlds for defining the different behaviors of what you've configured for this. Yordis, if you're interested, you also have a lot of expertise in this — if you'd be game to add ideas to the issue Aditya has proposed, that would be really helpful.
+
+**Yordis Prieto** [1:19:29](https://youtu.be/18VFhGzObdY?t=4769)
+
+No problem, I can leave some comments there.
+
+**Aditya** [1:19:35](https://youtu.be/18VFhGzObdY?t=4775)
+
+Thank you, Yordis. Can we agree on leaving out the admin part of creating NATS buckets, because we can leave that up to the infra?
+
+**Bailey Hayes** [1:19:51](https://youtu.be/18VFhGzObdY?t=4791)
+
+I would recommend as you implement this, do it one piece at a time. It's good to do the design as a composite, but then keep it to exactly what you need. That's always the best principle.
+
+**Frank Schaffa** [1:20:16](https://youtu.be/18VFhGzObdY?t=4816)
+
+I was going to add to what Yordis just mentioned — having non-functional requirements is key. It's easy to implement the interface, but the behavior is what's key in terms of what you expect, especially in failure modes. That's the difference between a POC and a product.
+
+**Bailey Hayes** [1:20:50](https://youtu.be/18VFhGzObdY?t=4850)
+
+For non-functional requirements specifically, Aditya, make heavy use of WIT documentation. We have this behavior challenge inside WebAssembly itself and WASI. Implementing things on Windows is hard — describing how that would work in `wasi-filesystem` is a good place where we've iterated a few times. If I open up the blame, you can see we've continued to tighten that language, especially around error conditions. Having this be part of the spec is incredibly valuable.
+
+**Aditya** [1:21:56](https://youtu.be/18VFhGzObdY?t=4916)
+
+I understood around 80% of that. I'll take a look at this video again and keep revising. Hopefully I have something next week.
+
+**Bailey Hayes** [1:22:13](https://youtu.be/18VFhGzObdY?t=4933)
+
+Of course, keep asking questions, Aditya. And feel free to throw agenda items here. Sometimes I feel like I gotta make content, and then we're 30 minutes over — I would much rather prioritize your stuff as you're actively working.
+
+**Aditya** [1:22:38](https://youtu.be/18VFhGzObdY?t=4958)
+
+Really sorry about today's extended time.
+
+**Bailey Hayes** [1:22:46](https://youtu.be/18VFhGzObdY?t=4966)
+
+This was awesome. Really good one for everybody that stayed extra for an extra 30 minutes. Thank you. I'm going to hit stop on the live stream now. It's now just us.
+
+**Aditya** [1:23:11](https://youtu.be/18VFhGzObdY?t=4991)
+
+That was really good. By the way, congrats Yordis on getting the map support integrated.
+
+**Yordis Prieto** [1:23:16](https://youtu.be/18VFhGzObdY?t=4996)
+
+Holy crap, yeah. Bailey has been listening to me for like three, four years by now. I want my Protobuf natively — this is my lifelong journey.
+
+**Bailey Hayes** [1:23:32](https://youtu.be/18VFhGzObdY?t=5012)
+
+In terms of feature development, once you started on it and got it shipped, for the number of things you touched, this was pretty damn fast. It probably didn't feel fast to you. Fast to me.
+
+**Yordis Prieto** [1:23:51](https://youtu.be/18VFhGzObdY?t=5031)
+
+I don't sleep — three or four in the morning on my weekends, "fuck it, I need to get this done." I'm so passionate about what you're doing in Bytecode Alliance and wasmCloud, and I'm so committed to make the experience that I have in my head — okay, whatever it takes, I'm just going to keep going. I don't want to trade off — I want exactly a very specific experience.
+
+**Bailey Hayes** [1:24:38](https://youtu.be/18VFhGzObdY?t=5078)
+
+We were having this conversation Dan and I this morning, where I was like "look, we have a customer requirement for this thing, and you could do it a sloppy way, which is strings. You can solve just about any problem in computer science if you just throw more strings at it. But if we actually did this right, made it be a formal part of your WIT definition, then we get that declarative property throughout the entire system, and we can build so many more things on top of that."
+
+**Yordis Prieto** [1:25:14](https://youtu.be/18VFhGzObdY?t=5114)
+
+That's exactly how I feel — the last three years like I rode your city and do nothing until I fix that problem.
+
+**Bailey Hayes** [1:25:22](https://youtu.be/18VFhGzObdY?t=5122)
+
+We need more reviews. A lot of people are too intimidated to go in there and touch the ABI. Yordis just went in and proposed the whole thing — "this is what I think it should be" — and then he wrapped it up into `wasm-tools` and bam, implementation. And Alex, of course, was like "let's make sure that's in the component model first." It's open source. It's just — you feel like you're walking among giants. It turns out we're all just people, and the whole software industry is just a human-built network.
+
+**Aditya** [1:26:04](https://youtu.be/18VFhGzObdY?t=5164)
+
+It's really inspirational, and I want to follow in your footsteps.
+
+**Yordis Prieto** [1:26:11](https://youtu.be/18VFhGzObdY?t=5171)
+
+Just do it. Ask Bailey to connect you with the proper people, and just do the work.
+
+**Frank Schaffa** [1:26:24](https://youtu.be/18VFhGzObdY?t=5184)
+
+And make sure you have enough coffee.
+
+**Yordis Prieto** [1:26:26](https://youtu.be/18VFhGzObdY?t=5186)
+
+Yeah — next one, Bailey, I want to talk back. I forgot to look again about the struct type, and then that's it. I'm done there. My goal is to make Protobuf one-to-one, a WIT to be a superset of Protobuf. That means absolutely everybody in the ecosystem on top of gRPC or Protobuf — for the sake of storage — already now have an entire WIT for them. People are even taking gRPC and putting it on top of NATS because they don't want gRPC; what they want is the specification aspect of it. For me, I don't want Protobuf per se. I'm okay with WIT — as long as the storage mechanism is optimized, I do want Protobuf at the storage and formatting level. I'm not going to give up until Protobuf is 100% done in WIT and I can just write a tool that translates one into the other at zero cost.
+
+**Bailey Hayes** [1:27:40](https://youtu.be/18VFhGzObdY?t=5260)
+
+Not to give you more work, but I wonder if you're not going to need structured annotations to realize that dream — because there's this whole interesting subset of Protobuf around forms, and they have annotations that describe all these different kinds of forms, which we don't allow yet. The moment you give somebody YOLO annotations of any kind, everything looks like a nail, and we would lose the semantic property we're aiming for. I wonder, for full Protobuf, maybe the server-side RPC is a good scope.
+
+**Yordis Prieto** [1:28:30](https://youtu.be/18VFhGzObdY?t=5310)
+
+I already hinted at that problem, Bailey. I disagree with you. The sooner you understand that here's the scapegoat for people to experiment around, the better you're going to make it for the ecosystem.
+
+**Bailey Hayes** [1:28:45](https://youtu.be/18VFhGzObdY?t=5325)
+
+It's in the WIT doc. If you parse your own WIT doc, you can do it.
+
+**Yordis Prieto** [1:28:50](https://youtu.be/18VFhGzObdY?t=5330)
+
+Yeah. I'm in the opposite realm — create chaos, it's fine, it's just contracting and over time it normalizes. Just don't put too many guardrails. If you do, just make sure the specification itself doesn't collide. For example, now I technically introduced a breaking change because `map` is a reserved word.
+
+**Bailey Hayes** [1:29:17](https://youtu.be/18VFhGzObdY?t=5357)
+
+Getting it in the spec is like getting it in the kernel. Getting it in WASI is more like getting it in the OS — still a barrier, but a little easier than doing it in the kernel. If you do your own interface that you defined, that's your user code — you can do whatever you want there. That's why I want more things out of the WASI space, for more experimentation. Make it free. Make WIT definitions with your structured annotations and see what happens. Frank, I think I heard you there.
+
+**Frank Schaffa** [1:29:53](https://youtu.be/18VFhGzObdY?t=5393)
+
+I like the idea of having — even if it is just a minimum — Protobuf supported by default. Then you can use gRPC as your common interface to pretty much everything. You gain that you're really talking binary, and if you want to encrypt payload, you can — so you get a lot of interesting things. And it doesn't matter if you're talking to storage, network, even within components. It doesn't impact what you mentioned to be open and let everybody make their own annotations or create their own protocols, but actually just having a mapping to the minimum set — if you just want to do this, it's part of the standard. I think this would be great.

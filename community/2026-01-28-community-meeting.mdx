@@ -1,53 +1,219 @@
 ---
 date: '2026-01-28'
-title: 'Meeting Agenda - 2026-01-28'
+title: 'wasmCloud v2 RC7 OTel Demo, Ten Years of Wasm Retrospective & WASI Socket Forking'
+description: 'wasmCloud community call covering Lucas Fontes'' RC7 OpenTelemetry host plumbing demo with Aspire (local and Kubernetes), Eric''s Ten Years of WebAssembly retrospective, and the wasmtime-wasi socket forking story behind wasmCloud''s service feature.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - opentelemetry
+  - wasi p2
+  - wasi sockets
+  - wasmcloud v2
+  - kubernetes
+  - aspire dashboard
+  - cargo-component
+  - rust webassembly
+chapters:
+  - { seconds: 0, label: "Pre-show: Eric's blog post edits, RC7 framing" }
+  - { seconds: 94, label: "Welcome, RC6 recap, RC7 preview" }
+  - { seconds: 138, label: "Why OTel: tracing plumbing existed, the collector wiring did not" }
+  - { seconds: 300, label: "Setting up Aspire as the OTel receiver" }
+  - { seconds: 390, label: "`wash dev` traces: hooks, build, load, plugin binding" }
+  - { seconds: 600, label: "HTTP request lifecycle and trace enrichment" }
+  - { seconds: 717, label: "Cross-boundary trace continuity into Blobstore" }
+  - { seconds: 936, label: "Automatic plugin instrumentation explained" }
+  - { seconds: 990, label: "Kubernetes demo: same traces, OCI pull dominates startup" }
+  - { seconds: 1320, label: "Eric's \"Ten Years of Wasm\" retrospective" }
+  - { seconds: 1483, label: "WebAssembly adoption curve discussion" }
+  - { seconds: 1653, label: "LLM-assisted Rust as enterprise unlock" }
+  - { seconds: 1794, label: "`cargo-component` deprecation and the road to 1.0" }
+  - { seconds: 1995, label: "Aditya: why does wash use a forked `wasmtime-wasi` crate?" }
+  - { seconds: 2034, label: "TCP loopback, the service feature, and the upstream story" }
+  - { seconds: 2376, label: "Jeremy: can I run a Kubernetes controller as a wasmCloud service?" }
+image: https://i.ytimg.com/vi/4zUisbs97C8/maxresdefault.jpg
+showTitle: true
+slug: 2026-01-28-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- DEMO: @lxfontes wasmCloud v2 host OTEL
-- v2 rc7
+<YouTube url="https://www.youtube.com/watch?v=4zUisbs97C8" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=4zUisbs97C8" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The January 28, 2026 wasmCloud community call lands on the **RC7 observability story**: **Lucas Fontes** demos the new **OpenTelemetry host plumbing** that ships with RC7, showing traces, logs, and metrics flowing into [Aspire dashboard](https://github.com/dotnet/aspire) from both `wash dev` and a Kubernetes deployment — with **automatic instrumentation** of any component that uses host-implemented WASI APIs (no plugin-author code needed). **Eric**'s "[Ten Years of WebAssembly: A Retrospective](https://bytecodealliance.org/articles/ten-years-of-webassembly-a-retrospective)" goes live as the doc of the week, with Bailey teasing what the next two months of WebAssembly adoption could look like as **cooperative threads** land and Python, Go, and TypeScript get first-class component compilation. Frank Schaffa drives an extended discussion on **LLM-assisted Rust adoption** as the real enterprise unlock. The call closes with Bailey and Aditya unpacking why wasmCloud has a forked `wasmtime-wasi` crate — the **TCP-loopback** enhancement needed for wasmCloud's **service feature** — and the upstreaming work that will eventually retire the fork.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **wasmCloud v2 RC7 is feature-complete and focused on observability + stabilization** — RC6 shipped last week, RC7 closes leftover threads instead of adding features
+- **OpenTelemetry plumbed throughout the host** — Lucas wired tracing, logs, and metrics into the host using the standard [OpenTelemetry SDK environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), so any standard OTel-compatible collector (Aspire, Jaeger, etc.) works
+- **Cleanly separates console logs from OTel** — `RUST_LOG` controls console output, OTel level controls what goes to the collector; in v1 the only way to get tracing was to set `RUST_LOG=debug` (or `trace`), which was unrunnable in production
+- **Automatic plugin instrumentation** — plugin authors don't sprinkle OTel instrumentation; the host binding layer instruments all plugin calls automatically. Any component using a WASI API implemented by the host gets observability for free
+- **End-to-end trace continuity across the Rust/Wasm boundary** — a single trace covers HTTP request arrival, component invocation (into Wasm), Blobstore plugin call (back into Rust), and back out — with workload ID, namespace, container name, and path as span attributes
+- **Same code path local and in Kubernetes** — the Aspire demo ran identically against `wash dev` and a kind cluster. In Kubernetes the **OCI image pull dominates startup time** (1.8s in the demo), surfaced clearly in the trace
+- **["Ten Years of WebAssembly: A Retrospective"](https://bytecodealliance.org/articles/ten-years-of-webassembly-a-retrospective)** — Eric's oral-history blog post from contributors who shipped Wasm across competing browser vendors went live this morning; this is the article that future "20 Years of Wasm" posts will reference
+- **WebAssembly is already in billions of devices** — modern TVs (Disney+), CDNs, Zoom background blur all run Wasm in the browser-side ecosystem. The adoption curve **on the server side** is what the team expects to turn in roughly two months with cooperative threads landing
+- **LLM-assisted Rust is becoming a real adoption driver** — Frank Schaffa flagged the pattern Bailey is seeing everywhere: enterprises that wouldn't have rewritten Python or Java to Rust by hand are doing it with Copilot/Claude, because Rust + WebAssembly + LLM is the safest sandbox + best assistant + portable target
+- **`cargo-component` is being deprecated** — Rust now supports `wasm32-wasip2` as a native compilation target, no SDK adapter needed; same model coming for P3
+- **`wasmtime-wasi` socket fork explained** — wasmCloud forked `wasmtime-wasi` to add **TCP loopback enhancements** that power the wasmCloud **service feature** (virtualized networking between component and long-lived service without dropping to the network stack). The team wants to upstream a more modular split so a future PR only needs to patch `wasi-sockets` rather than the whole crate
+- **Kubernetes controller as a wasmCloud service is feasible** — Jeremy asked, Lucas confirmed; do it as a service (long-lived), use `wasi-sockets` for the API server connection (not `wasi-http` outgoing handler), because the existing Kubernetes Rust libraries expect raw HTTP-over-TCP
+
+## Chapters
+
+- [00:00 — Pre-show: Eric's blog post edits, RC7 framing](https://youtu.be/4zUisbs97C8?t=0)
+- [01:34 — Welcome, RC6 recap, RC7 preview](https://youtu.be/4zUisbs97C8?t=94)
+- [02:18 — Why OTel: tracing plumbing existed, the collector wiring did not](https://youtu.be/4zUisbs97C8?t=138)
+- [05:00 — Setting up Aspire as the OTel receiver](https://youtu.be/4zUisbs97C8?t=300)
+- [06:30 — `wash dev` traces: hooks, build, load, plugin binding](https://youtu.be/4zUisbs97C8?t=390)
+- [10:00 — HTTP request lifecycle and trace enrichment](https://youtu.be/4zUisbs97C8?t=600)
+- [11:57 — Cross-boundary trace continuity into Blobstore](https://youtu.be/4zUisbs97C8?t=717)
+- [15:36 — Automatic plugin instrumentation explained](https://youtu.be/4zUisbs97C8?t=936)
+- [16:30 — Kubernetes demo: same traces, OCI pull dominates startup](https://youtu.be/4zUisbs97C8?t=990)
+- [22:00 — Eric's "Ten Years of Wasm" retrospective](https://youtu.be/4zUisbs97C8?t=1320)
+- [24:43 — WebAssembly adoption curve discussion](https://youtu.be/4zUisbs97C8?t=1483)
+- [27:33 — LLM-assisted Rust as enterprise unlock](https://youtu.be/4zUisbs97C8?t=1653)
+- [29:54 — `cargo-component` deprecation and the road to 1.0](https://youtu.be/4zUisbs97C8?t=1794)
+- [33:15 — Aditya: why does wash use a forked `wasmtime-wasi` crate?](https://youtu.be/4zUisbs97C8?t=1995)
+- [33:54 — TCP loopback, the service feature, and the upstream story](https://youtu.be/4zUisbs97C8?t=2034)
+- [39:36 — Jeremy: can I run a Kubernetes controller as a wasmCloud service?](https://youtu.be/4zUisbs97C8?t=2376)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### OpenTelemetry Host Plumbing for v2 RC7
 
-### v2 releases
+**Lucas Fontes** opened by framing where RC7 is at: feature-complete since RC5/6, RC7 is focused on **observability and codebase stabilization** — closing leftover threads, not adding features. Tracing was already plumbed throughout the codebase before this PR, but **OpenTelemetry was never wired up to surface those traces**, so all the spans were being emitted into the void.
 
-- v2.0.0-rc.6 was released last week
-- v2.0.0-rc.7 is in development with focus on observability and code base stabilization, not adding new features
-- The team is addressing leftover issues and closing open threads from previous releases
+The new plumbing uses the **standard OpenTelemetry SDK environment variables** to configure every aspect of how OTel interacts with wasmCloud. The architectural call-out: this means **no wasmCloud-specific flags conflict with console reporting** — console output (driven by `RUST_LOG`) is a totally different feed from OTel traces and logs. In v1, the only way to enable tracing was to set `RUST_LOG=debug` or `trace`, which generated an unrunnable volume of console output in production. With RC7 the two are fully separated.
 
-### DEMO: wasmCloud v2 host OTEL
+Lucas demoed the setup using [**Aspire dashboard**](https://github.com/dotnet/aspire) as the OTel receiver. Once the dashboard was up, he set `OTEL_EXPORTER_OTLP_ENDPOINT` and protocol (gRPC) in the environment and ran `wash dev` against `blobby` (the Blobstore demo component).
 
-- Lucas presented a comprehensive demonstration of the new OpenTelemetry (OTEL) observability features coming in rc.7
-- Demo used Aspire Dashboard as the OTEL receiver to visualize logs, traces, and metrics
-- Demonstrated both `wash dev` (local development) and Kubernetes environments
-- Showed complete request lifecycle tracing from HTTP requests through WebAssembly component execution and back
-- Traces show every step in the execution pipeline, including component builds, loading, plugin binding, and linking
-- Component parsing time is visible, with most time in local dev spent on parsing
-- In Kubernetes environments, OCI image pulling dominates the startup time (1.8 seconds in demo)
-- Traces maintain context across the Rust/WebAssembly boundary, tracking calls from components into plugins like blobstore
-- Rich contextual information is captured including workload IDs, namespaces, container names, and request paths
-- Plugin authors don't need to add instrumentation code - it's handled automatically by the engine
-- Any component using WASI APIs supported by the host gets auto-instrumentation
-- Works identically in local development and production Kubernetes environments
-- Logs link to their associated traces for drill-down analysis
+**Logs**: mirror what's on the terminal but carry **trace links** — clicking a log can drop you directly to the associated trace, with rich attributes for filtering in any observability system.
 
-## Community Updates
+**Traces**: Lucas walked through what `wash dev` looks like in OTel:
 
-### Catch up…
+1. `before-dev` hooks
+2. Component build (with `before-build`/`after-build` hooks)
+3. Component load into the runtime — this nested span shows **most local-dev startup time is parsing the component itself**
+4. **Plugin binding** — in this case Blobstore and `wasi-logging`, the two plugins blobby depends on
+5. Component link — at this point the component is up and ready
 
-{/* Add any blog posts/articles that the community might find interesting */}
+Then exercising blobby (loading the page, listing files in Blobstore) produced two more traces: one for the page HTML, one for the Blobstore list call. Lucas surfaced an interesting find — even the basic HTML page makes some extra Blobstore calls, exactly the kind of thing trace-level visibility makes obvious.
 
-- Our own @ericgregory blog post looking back at [Ten Years of Wasm](https://bytecodealliance.org/articles/ten-years-of-webassembly-a-retrospective)
+### Cross-Boundary Trace Continuity
 
-## Recording
+The most architecturally interesting part: **traces stay coherent across the Rust/WebAssembly boundary**. When the host receives an HTTP request in Rust and invokes a component (entering Wasm), and that component calls Blobstore (exiting Wasm back into Rust), the spans remain in a single trace with proper parent/child relationships. The span attributes get **progressively enriched** — first the host, then the workload ID, namespace, container name, then the request path.
 
-{/* Automated - No need to adjust this unless automation fails */}
+For platform engineers, this means you can build alerts on attributes like `namespace=my-team` and `trace-shape=http-handler` with thresholds like ">1 second" without writing custom OTel adapters per component.
 
-<YouTube url="https://www.youtube.com/watch?v=4zUisbs97C8" />
+### Automatic Plugin Instrumentation
+
+Bailey called out the second big design point: **plugin authors don't add OTel code**. blobby itself wasn't modified — the instrumentation lives in the host's binding layer for each plugin. Any component using a WASI API supported by the host gets auto-instrumentation for free. Lucas: "essentially, yes, pretty much" — drop in a component, get observability.
+
+### Kubernetes Demo
+
+Frank Schaffa asked whether this works in a Kubernetes environment. Lucas brought up a local kind cluster (NATS, operator, host), demoed deploying blobby, and showed the same traces flowing into Aspire. The differences are illuminating:
+
+- The trace now includes a `workload-start` span at the top from the operator scheduling the workload
+- **OCI image pull dominates startup time** — 1.8 seconds in the demo, dwarfing the parse time that dominated local dev
+- Workload ID, namespace, container name show through as span attributes
+
+Frank's follow-up: "if you have all those images cached, much faster?" Lucas: "you got it." OCI caching is the immediate optimization once you see the trace.
+
+### Eric's "Ten Years of WebAssembly: A Retrospective"
+
+Bailey introduced the doc of the week (a blog post, in this case): Eric's [**"Ten Years of WebAssembly: A Retrospective"**](https://bytecodealliance.org/articles/ten-years-of-webassembly-a-retrospective) on the Bytecode Alliance site, published this morning. The post is an oral history with contributors who shipped WebAssembly across competing browser vendors — including anecdotes like one team telling their manager they were on board even when management hadn't actually said yes, just to keep the coalition together long enough to ship.
+
+David Bryant sent Eric a "very nice email" about the piece; Bailey's read is that it'll be one of those articles referenced years from now. She's looking forward to the "20 Years of Wasm" post that points back to this one.
+
+### WebAssembly Adoption Curve
+
+Frank asked about the adoption curve. Bailey:
+
+- **Browser-side adoption is overwhelming**: modern TVs running Disney+, CDNs, Zoom background blur — billions of devices already running Wasm.
+- **Server-side adoption is the curve the team is trying to turn.** Why slow? On the web, browsers gave Wasm a sandboxed OS for free; on the server, the team is rebuilding that with WASI, and there's more to add. Enterprises expect lift-and-shift but didn't expect that for the web.
+- **The expected inflection: ~two months from now** when **cooperative threads** land. Threads are the biggest single pain point for lift-and-shift. They're also what unblocks Python, Go, and TypeScript getting **native component compilation** (vs. the Rust/C/C++ static-typed languages that have had great Wasm support already).
+
+### LLM-Assisted Rust as the Enterprise Unlock
+
+**Frank Schaffa** raised a forward-looking point: with LLM-assisted code gen, the language barrier matters less — "requirements to Rust, and that's it." Don't wait for Java-on-Wasm; let the LLM build it in Rust.
+
+Bailey is seeing this play out everywhere: large enterprises experimenting with WebAssembly have come to the same conclusion that **LLMs are very good at Rust** — the compiler tells them what's wrong, types are explicit, structured. She's seeing real Python-to-Rust conversions specifically to get something running in WebAssembly quickly. The expensive case is C++ codebases 20+ years old — those folks can drop into `wasi-sdk` directly today, but rewriting isn't on the table.
+
+The next unlock after enterprises adopting the pattern: getting **foundational libraries** (Reqwest, Tokio, etc.) to natively support WebAssembly compilation targets. **`cargo-component` is actively being deprecated** in the Bytecode Alliance — Rust supports `wasm32-wasip2` natively, no SDK adapter needed. P3 will follow the same pattern. What library maintainers need to merge those WebAssembly-target PRs is **confidence in stability**, which is what the post-P3 "road to 1.0" messaging in February's Bytecode Alliance Plumbers Summit will provide. No P4 is planned — the team is on the road to 1.0 from P3 onward.
+
+### The `wasmtime-wasi` Fork and the Service Feature
+
+**Aditya** asked about the forked `wasmtime-wasi` crate inside wash and why dependencies conflict (he's hitting this on his gRPC outbound handler PR). Bailey laid out the story:
+
+- wasmCloud has a forked `wasmtime-wasi` to **enhance TCP loopback** — needed to implement the wasmCloud **service feature** (a long-lived component a stateless component can talk to via TCP loopback, without dropping all the way down to the network stack)
+- The component imports `wasi-sockets` and wasmCloud **virtualizes that binding** with the service hosted in our host. The concept of a "service" is wasmCloud-specific, not something Wasmtime can know about
+- A lot of this exists because runtime instantiation in the component model isn't here yet; wasmCloud is bringing similar power inside the host today and will adapt as the spec evolves
+
+Bailey was also up-front about the cost: the `wasmtime-wasi` crate contains filesystem, clocks, and sockets all together, and she only wants to edit sockets. **The ideal upstream answer is a modular split** so a future PR could patch just `wasi-sockets`. Until then there's a [v2 upgrade guide](https://github.com/wasmcloud/wash) on `main` explaining the differences.
+
+**Lucas** added the meta point: the actual diff is ~1,020 lines, but getting changes into the WASI crate requires alignment with Windows, Mac, and Linux implementations — a much larger conversation than the patch itself. He compared it to early-Linux-kernel days when distributions like Red Hat carried custom kernels that took time to upstream. Forking is temporary, painful, and necessary to move fast.
+
+Bailey's practical advice for downstream contributors like Aditya: **refer to wasmCloud's `wasmtime-wasi` fork in your PRs**. The types are identical and never changed, so they're compatible with upstream; Rust will tell you if anything doesn't match.
+
+### Kubernetes Controller as a wasmCloud Service?
+
+Jeremy asked whether a Kubernetes controller could run as a wasmCloud service. Lucas's answer: yes, as a **service** (long-lived). Two implementation notes:
+
+1. First validate the path with a simple HTTP GET to the Kubernetes API server using a vanilla HTTP client
+2. For the actual controller, **don't use `wasi-http` outgoing handler** — use `wasi-sockets` directly. The existing Kubernetes machinery in Rust libraries assumes HTTP-over-TCP, and rebuilding that on top of `wasi-http` outgoing handler would mean rewriting too much
+
+It'll work as a service. It would not work as a component inside a workload.
+
+## WebAssembly News and Updates
+
+This call captures the WebAssembly story at a pivot point. The "[Ten Years of Wasm](https://bytecodealliance.org/articles/ten-years-of-webassembly-a-retrospective)" retrospective marks the inflection — the technology is ubiquitous on the browser side and on the cusp of mass server-side adoption. **Cooperative threads** in [WASI P3](https://github.com/WebAssembly/WASI), expected ~Q1 2026, are the single biggest missing capability for Python, Go, and TypeScript to compile cleanly to WebAssembly components. The [`cargo-component`](https://github.com/bytecodealliance/cargo-component) deprecation in favor of native `wasm32-wasip2` support reflects the broader ecosystem maturity — adapter layers are being retired. And LLM-assisted Rust development is reshaping which legacy applications get rewritten for Wasm, not because language support has changed, but because the *cost of rewrite* has collapsed.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project for building and running [WebAssembly components](/docs/overview/workloads/components) across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/). The v2 RC7 observability story demoed here gives platform teams **production-grade OpenTelemetry tracing, logs, and metrics across the host/component boundary** with **zero instrumentation work from plugin or component authors**. Combined with [wasmCloud's component model](/docs/overview/workloads/components), declarative workload deploys, signed/attested OCI artifact distribution, and the new **service feature** (long-lived stateful components in the same workload as stateless handlers), wasmCloud v2 is targeting the production-readiness bar most platforms expect.
+
+## Topic Deep Dive: Automatic Cross-Boundary OpenTelemetry
+
+The observability architecture Lucas demoed solves a problem that has been hard for every Wasm host runtime: **how do you trace a request that crosses the Rust→Wasm→Rust→Wasm boundary multiple times without making every component author add OTel SDK calls?**
+
+The wasmCloud answer: **instrument the binding layer, not the components.** When the host binds a plugin (Blobstore, `wasi-logging`, NATS, etc.), the binding logic wraps every plugin call with span creation. When a component calls into Blobstore via `wasi-blobstore`, the wrapper captures the call as a child span of whatever trace context is already active. Workload ID, namespace, container name, and request metadata get attached as span attributes automatically.
+
+For component authors, this is invisible. For plugin authors, this is invisible. For platform teams, this means **a component that does nothing special** drops into a wasmCloud host and instantly produces traces with the same fidelity as a hand-instrumented Go or Java service — including cross-host traces in a Kubernetes cluster.
+
+The architectural insight is that the **host plugin model** (vs. v1's separate provider processes) is what makes this clean. Plugin calls are function calls inside a single process, and the trace context is a parameter in that call chain. In v1, where providers were separate processes communicating over NATS, propagating trace context required custom plumbing per provider. In v2, it's automatic.
+
+## Who Should Watch This
+
+**Platform engineers evaluating wasmCloud observability** should start with [Lucas's RC7 OTel demo at 02:18](https://youtu.be/4zUisbs97C8?t=138) through the [Kubernetes section at 16:30](https://youtu.be/4zUisbs97C8?t=990). **WebAssembly contributors and adopters** want [Eric's retrospective at 22:00](https://youtu.be/4zUisbs97C8?t=1320) and the [LLM-and-Rust adoption discussion at 27:33](https://youtu.be/4zUisbs97C8?t=1653). **Rust contributors hitting the wasmtime-wasi dependency conflicts** should jump to [Aditya's question at 33:15](https://youtu.be/4zUisbs97C8?t=1995). **Kubernetes operator authors** want [Jeremy's controller-as-service question at 39:36](https://youtu.be/4zUisbs97C8?t=2376).
+
+## Up Next
+
+RC7 cuts soon with the OTel plumbing demoed in this call, plus the docs rev that includes the bug fixes Eric surfaced revving the docs for RC6. After RC7, the team is in the final hardening stretch before v2 launch — templates and examples are the next focus. Eric's TypeScript templates are landing imminently; the Bytecode Alliance Plumbers Summit on February 25-26 will set the public roadmap for WebAssembly P3 and the road to 1.0.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-01-28-community-meeting-transcript/)**

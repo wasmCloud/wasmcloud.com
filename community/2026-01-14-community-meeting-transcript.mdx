@@ -1,0 +1,194 @@
+---
+date: '2026-01-14'
+title: 'Transcript: Blobby UI Demo, wash build/dev Project Inference & v2 Service/Component Workloads'
+description: 'Full transcript of the January 14, 2026 wasmCloud community call covering the Blobby UI demo, project inference changes in wash build/dev, persistent dev-loop storage plans, and the v2 Quick Start docs.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wash dev
+  - blobby
+  - wasmcloud v2
+image: https://i.ytimg.com/vi/wyT5-QM4k00/maxresdefault.jpg
+showTitle: true
+slug: 2026-01-14-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-01-14-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=wyT5-QM4k00" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=wyT5-QM4k00" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, January 14, 2026 · 35m 1s*
+
+**Speakers:** Bailey Hayes, Lucas Fontes, Eric, Liam Randall, luk3ark
+
+---
+
+{/* truncate */}
+
+## Full Transcript
+
+**Liam Randall** [00:01](https://youtu.be/wyT5-QM4k00?t=1)
+
+Busy is good. Feel like I got a lot going on, but feeling pretty good. Lucas and I just got off a call, so I don't feel like I can ask him how he's doing again — I've asked him five times today. He's doing great. I'll report for him.
+
+**Lucas Fontes** [00:32](https://youtu.be/wyT5-QM4k00?t=32)
+
+Still doing great.
+
+**Bailey Hayes** [02:14](https://youtu.be/wyT5-QM4k00?t=134)
+
+We started at 1:05 — coming in hot. I've got notes up already. I'd appreciate somebody giving me a +2 on my PR so it's merged. Our Netlify is slow to update — it's our latest. It's merged to main, the agenda, but not yet on our website.
+
+**Bailey Hayes** [03:11](https://youtu.be/wyT5-QM4k00?t=191)
+
+I'm gonna share this and then kick off. Liam, will you sprinkle that co-host around?
+
+**Liam Randall** [03:29](https://youtu.be/wyT5-QM4k00?t=209)
+
+I would, except I gave all my hosts to you. I have no host. I'm the no-host with the most.
+
+**Bailey Hayes** [04:32](https://youtu.be/wyT5-QM4k00?t=272)
+
+Welcome to January 14 wasmCloud Community call. Today we're giving an update on our continued **wasmCloud v2 development**. We've got a nice beautified little demo to show that has a UI and everything — Lucas is going to walk through that. We've got a couple of docs of the week. Lucas, want to kick us off on where we are with the v2 update?
+
+**Lucas Fontes** [05:19](https://youtu.be/wyT5-QM4k00?t=319)
+
+Let me share my screen. v2 is going fine. We have plenty of new stuff being merged, and we have some key core changes to how `wash dev` and `wash build` work. Today I want to show two things — the bulk of the changes I'm talking about, which significantly change how `wash dev` is positioned as a local development tool, and a bit of giving one of our demos a facelift so it's a bit more presentable. I'll start with the demo, because then it'll be used as an introduction to the remaining changes.
+
+I'm on the wash repo. I'm going to do `cargo run -- -c examples/blobby dev`. This is analogous to having Blobby example under this directory. The `-c` is "change to use that project directory." Before wash does anything, one of the new things is **it switches the local process directory to the project directory** — from that point on, all paths you reason about in your build files assume the top-level project directory.
+
+**Lucas Fontes** [07:06](https://youtu.be/wyT5-QM4k00?t=426)
+
+`wash dev` is up. We built a component, started the HTTP server. What's new? The **Blobby example** that we know tells you to interact with Blobby — I'll open another terminal with curl commands. You go to port 1000 and check for the existence of a file. You can send files by interacting with Blobby as if it was an S3 frontend.
+
+The key difference here: instead of telling people to do all these curl commands and remember all the flags, we added **a little interface to Blobby**. So now Blobby looks like this. **The API is still the same**, but we changed a few things to make it more presentable. You can do exactly the same operations using curl, but now they're more visual. **This page is also being served by Blobby itself** — that's the other important thing here.
+
+From here I can upload files — one at a time or multiple. As we upload, they go through `wasi-blobstore` to place this data somewhere. In `wash dev` all this data is in memory, meaning if I restart `wash dev` this list clears. If we're deploying to a Kubernetes environment, `wasi-blobstore` is backed by **NATS Object Store**. Data goes straight to NATS, replicated however you configure NATS.
+
+We have a little **activity bar** which is local to the session. We added the **ability to copy links** — you upload to Blobby and want the URL for the file. Hit copy link, then I can curl that exact file. This shows Blobby in a better light and how you can host the **UI and the API on the same WebAssembly component**.
+
+Now, the changes to wash I was talking about — how is Blobby being built? Before the changes: the first thing we do is **look at the directory and poke it to identify key files**. If it has `Cargo.toml`, we assume it's a Rust project and build using cargo. If it finds `go.mod`, Go project, build with Go tooling. **What happens in a monorepo** when you have all these things at the top of your project? Wash fails — Rust was the preferred build method always, so as soon as you had a `Cargo.toml` anywhere in your top directory, you had no choice other than to build using Rust.
+
+What we've done in this PR — essentially called **project inference**: we were looking at files and determining how to build. We realized that's a **game of cat and mouse**. Every time there's a new flag in cargo, we'd have to come back to wash, add the flag, force everybody to upgrade. Similarly with JavaScript — yarn, pnpm, whatever else. All these assumptions were baked in code.
+
+We realized many of the codes people use today come from **templates**. What if we had the build command as part of the template, and also allow developers to override the build command and do whatever they want? That's the direction we went.
+
+Where before you could not control how wash builds the final artifact, **now you can tell wash to use a custom build command, and you can tell wash where your WebAssembly file is located once it's built**. We're not forcing you to place this Wasm artifact on a specific path.
+
+Sometimes I'm doing a debug build, sometimes a release build. So you can specify **a different command for `wash dev`** — likely for your debug builds. When `wash dev` runs, you'll have a WebAssembly artifact with debug symbols, and the command running is different than the build command. `wash build` and `wash dev` have different commands. If you don't specify one for dev, we assume you're okay taking the command from build.
+
+In this Go example, we don't want to constantly run `wit-bindgen go` because it takes a while. We leave `wit-bindgen` only when running `make build`. For Blobby, the command is `cargo build` — same as wash was inferring before. And we have the component path telling where that Wasm was built.
+
+**Lucas Fontes** [15:03](https://youtu.be/wyT5-QM4k00?t=903)
+
+Things get interesting when you realize **you have full control of this command**. You can do `;` and use environment variables from the wash environment to drive behavior at the build level. Any **secrets you set in CI will make it to your build commands**, any flags you want to set — `wash build` works. **Variable interpolation also works** in this command.
+
+I'll show a different example — the Go one. For Go we chose to use **Make**. We're not adding the build commands here — this allows building with wash or just bash if we wanted.
+
+The other aspect of configuration shows itself when developing **services and components together**. With wash v2 we have the concept of **service** — a long-running WebAssembly component that can be placed together with other stateless components. We have an example called cron, with `cron service` and `cron component`. For the cron component, in the wash config we have the build command, component path, and a section for **`wash dev` saying "bring another WebAssembly file into the workload"** and run it as part of the workload.
+
+When we `wash dev` on cron component, we're developing the component and bringing in the service — the thing constantly printing out. Any changes to the component, we reload the component under development and reattach the service. Similarly, `cron service` — we're developing a service (long-running component), and we bring in other components to the workload.
+
+We're looking at wash in terms of scope and realizing **wash should be really good at building components and bringing up a runtime for testing**. Controlling builds and telling you how to build WebAssembly used to be logic hardcoded in wash and a source of confusion and errors. We're now essentially working more **like a Makefile**: we need to run a build command, but you tell us what it is, and you tell us where the Wasm artifact is. We're no longer limited by our own ideas. If anybody has a better or faster way of building, they can implement it just by giving their own build command.
+
+**Bailey Hayes** [20:06](https://youtu.be/wyT5-QM4k00?t=1206)
+
+A couple of comments. **I'm really excited about the direction of moving toward explicit versus implicit** — that's going to help us avoid bugs and maintenance issues going forward.
+
+One of my favorite things about what you did with the Blobby demo and the cron service + cron component: you're highlighting that when you're doing a `wash dev` run, **we're assembling it as a workload**. A workload conveniently assembled for development — but still a workload, just like what you'd deploy to production into Kubernetes.
+
+On the Blobby one — it would be cool if you showed how it's backed up to a file system. That's what you ran here locally. I'm not sure we drove that one home.
+
+**Lucas Fontes** [21:04](https://youtu.be/wyT5-QM4k00?t=1264)
+
+Good point. The Blobby example right now in `wash dev` is essentially **in-memory plugins** — `wasi-keyvalue` is in memory, Blobstore in memory, config in memory. We want those **in-memory plugins to be backed by files**.
+
+Why? Show quickly — Blobby under development. When Blobby is running, we upload some files. Then I go back to the code and change one thing — the component is rebuilt. **When you go back, your files are gone**. Not a good experience — imagine reseeding your application every time you make a change. Imagine running `rails db migrate` every time you save a file.
+
+So we want to **move in-memory plugins to be backed by files**. For Blobstore, we'll create a directory in your home cache that serves as the backing store. For `wasi-keyvalue` we're thinking of using the filesystem too — fairly easy to map one-to-one **key names to file names**, where the value of each key is the content of the file. When you want to seed Blobby, simply copy files into a directory, fire up Blobby, and it has everything regardless of how many times you restart or change your source code.
+
+**Bailey Hayes** [23:52](https://youtu.be/wyT5-QM4k00?t=1432)
+
+Thank you. Anybody have questions for Lucas?
+
+**luk3ark** [23:58](https://youtu.be/wyT5-QM4k00?t=1438)
+
+I joined this because the architecture has changed a lot, and I'm trying to figure out what happens. When you said it could be backed by NATS — would it provide that backing using a **host plugin or service**? And if you could do both, what's the benefit of each?
+
+**Lucas Fontes** [24:21](https://youtu.be/wyT5-QM4k00?t=1461)
+
+You could bring in a component that's acting as your Blobstore interface — that's totally okay. The thinking: **the host comes with a set of capabilities**, and Blobstore is one. For production, the expectation is **state is not in the host itself** — not on the same hardware as the compute. When you start a new wasmCloud host, you don't have a choice — you're going to Blobstore NATS, or maybe S3, depending on the plugin. **You don't get to pick if it's going to be in-memory or Blobstore. The plugin used is decided by the platform administrator when they installed the host.**
+
+You don't have to care about credentials to access it anymore. You have a configuration saying these are the **buckets I need access to**.
+
+The challenge with local host: we don't want to bring up NATS for `wash dev`, which we were doing with wash v1. We want **wash now to be totally self-sufficient** — HTTP server, runtime, file watching, all inside the same process. But it doesn't have state.
+
+We thought for a while that in-memory state would be sufficient, because that's essentially what we had in wash v1. But in v1, most people were bringing their **own providers** and standing up NATS, Postgres, MySQL to get state — meaning we never really addressed the problem of in-memory state in v1. We implemented in-memory state in v2 but realized it's just not sufficient.
+
+**luk3ark** [26:42](https://youtu.be/wyT5-QM4k00?t=1602)
+
+Makes sense. One more question — say we have a more complicated scenario where we need a Blobby interface to store files, and we also need to take these files, embed them into chunks, and put them into a vector database — as a solid process. If I wanted to provide the interface for the vector database, **would I bring it inside the encapsulated service** that gets deployed with the workload? Or **create a plugin**? And can you have multiple plugins tightly coupled to that host?
+
+**Lucas Fontes** [27:23](https://youtu.be/wyT5-QM4k00?t=1643)
+
+You'd likely do a **plugin** in that case. By doing a plugin, you're writing Rust that's going to have **one instantiation per component** — each workload has its own instance of that plugin.
+
+**luk3ark** [27:42](https://youtu.be/wyT5-QM4k00?t=1662)
+
+So it's no longer one monolithic provider all components share. Okay, makes sense.
+
+**Lucas Fontes** [27:51](https://youtu.be/wyT5-QM4k00?t=1671)
+
+The trade-off: before you could bring in providers via **wRPC dynamically**, and any name goes. With host plugins, these are native Rust codes that you put in the host. **Less work, but you do need to build the host.**
+
+There's nothing preventing anybody from implementing a **wRPC gateway** — operates as a workload service, opens a TCP socket, gets wRPC from outside and calls a component inside. We can still do something like that. It's just not the default way anymore.
+
+**Bailey Hayes** [29:09](https://youtu.be/wyT5-QM4k00?t=1749)
+
+Quick TLDR: I hope to see many different components available in our GHCR that folks can use for local development — drop them in and have a nice ergonomic experience like what we just wrote with Blobstore and filesystem (and likely also working with NATS). You can iterate on what capabilities you want to provide on the service side and the component side.
+
+What we have left — doc of the week. We have **two** docs of the week. Eric — walk us through some of the updates you've made?
+
+**Eric** [29:58](https://youtu.be/wyT5-QM4k00?t=1798)
+
+We've got one **landed** and one **in progress**. We have an updated **Glossary** that adds a lot of our v2-specific terms and updates for general architecture changes since v1. That's out and live right now — probably the best quick reference for our top-level concepts for v2.
+
+In progress in a draft PR for wasmcloud.com — our new **Quick Start**. I'd love folks who are interested in the documentation side to have a look at this, maybe run through it and try it. It's a **three-page Quick Start** that mostly follows the v1 structure. Install wash, choose your language and get your tooling installed, create a new component, change the language as a first edit. Then move to add some functionality — respond with a name — and then show us how many times we've done that with **persistent storage**. The new piece that's more v2-specific: in our third step, **deploying a Wasm workload in a local Kubernetes environment**.
+
+The main piece missing right now: we need wash RC6 out, and we want to fold in **Lucas's excellent Blobby demo**. A great piece to show off how robust a wasmCloud workload can look. We're going to add that into the deployment in the local Kubernetes environment. Would love feedback on this and let people know this is coming very soon.
+
+**Bailey Hayes** [32:34](https://youtu.be/wyT5-QM4k00?t=1954)
+
+Any questions, folks? Thank you Eric for the excellent doc. Did you highlight that the next version is going to really rely on and show off Blobby?
+
+**Eric** [32:53](https://youtu.be/wyT5-QM4k00?t=1973)
+
+Yep, absolutely.
+
+**Bailey Hayes** [32:57](https://youtu.be/wyT5-QM4k00?t=1977)
+
+In terms of other wider community updates — we've rolled out the **next WASI P3 RC, now inside Wasmtime**. You have to use a newer version of `wit-bindgen`. That version of Wasmtime is not yet released — will be in the one coming out next month. Iteration basically continues.
+
+I feel like we've been really busy keeping our heads down and bringing a lot up. I really appreciate the PRs folks have been making on wash. We've been getting top-notch contributions. Thank you all.
+
+**Lucas Fontes** [33:53](https://youtu.be/wyT5-QM4k00?t=2033)
+
+One more thing — earlier this week, maybe last week — **we released a new Go component SDK** which is compatible with the latest tinygo, latest Go, and latest `wasm-tools`. It's been quite a while since that refresh — we were probably two versions behind on tinygo. Things are now back in order.
+
+**Bailey Hayes** [34:24](https://youtu.be/wyT5-QM4k00?t=2064)
+
+That's it for our agenda items. If anybody has other topics, feel free. If not, let's get back to it and keep working on getting wash out the door. Thank you everybody — appreciate you joining every week.
+
+**luk3ark** [34:58](https://youtu.be/wyT5-QM4k00?t=2098)
+
+See everyone soon. Bye.

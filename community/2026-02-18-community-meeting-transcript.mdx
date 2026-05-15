@@ -1,0 +1,205 @@
+---
+date: '2026-02-18'
+title: 'Transcript: wasmCloud v2 Templates with TCP Sockets, Excalidraw Tooling & WASI P3 Update'
+description: 'Full transcript of the February 18, 2026 wasmCloud community call covering v2 templates with TCP socket support, Excalidraw diagram tooling, WASI P3 progress, and the Plumbers Summit preview.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasi p3
+  - tcp sockets
+  - wasmcloud v2
+  - jco
+  - bytecode alliance
+image: https://i.ytimg.com/vi/-8FoV7pnWgg/maxresdefault.jpg
+showTitle: true
+slug: 2026-02-18-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-02-18-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=-8FoV7pnWgg" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=-8FoV7pnWgg" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, February 18, 2026 · 36m 4s*
+
+**Speakers:** Bailey Hayes, Lucas Fontes, Eric, Jeremy Fleitz, Liam Randall, Aditya
+
+---
+
+{/* truncate */}
+
+## Full Transcript
+
+**Jeremy Fleitz** [00:26](https://youtu.be/-8FoV7pnWgg?t=26)
+
+Hey Jeremy, how's it going? Been a while.
+
+**Bailey Hayes** [00:31](https://youtu.be/-8FoV7pnWgg?t=31)
+
+Long time no see — except an hour ago. Hey Eric, would you be game to talk about the Excalidraw tooling PR that you got?
+
+**Eric** [00:47](https://youtu.be/-8FoV7pnWgg?t=47)
+
+Sure. I think it's probably a good item for feedback and discussion in PR state. Good idea.
+
+**Bailey Hayes** [00:55](https://youtu.be/-8FoV7pnWgg?t=55)
+
+I figure we'll start with showing off the templates that have been in PR for a little bit and hopefully get merged, and then we'll do Excalidraw — that's basically doc of the week.
+
+**Eric** [01:10](https://youtu.be/-8FoV7pnWgg?t=70)
+
+That should probably be framed less as a feature share and more "what do you think of this — check it out, is it usable?"
+
+**Bailey Hayes** [01:24](https://youtu.be/-8FoV7pnWgg?t=84)
+
+Do you want to talk about v1-to-v2 migration as well?
+
+**Eric** [01:32](https://youtu.be/-8FoV7pnWgg?t=92)
+
+Let's wait to have a pass over that till it gets in a more finalized form. I want to make sure it's in the right shape.
+
+**Bailey Hayes** [01:44](https://youtu.be/-8FoV7pnWgg?t=104)
+
+Kind of in the right shape. It's a lot, and my scroll bar — cool. We're in that awkward three minutes before we actually go live.
+
+**Eric** [02:03](https://youtu.be/-8FoV7pnWgg?t=123)
+
+I'm gonna go off camera and sneak a little bit of lunch real quick.
+
+**Jeremy Fleitz** [02:18](https://youtu.be/-8FoV7pnWgg?t=138)
+
+Lucas, did you actually get another snowstorm? You might not be here yet.
+
+**Lucas Fontes** [02:26](https://youtu.be/-8FoV7pnWgg?t=146)
+
+Yeah, it's happening now. Freezing rain, snow. I'm just looking outside trying to figure out how I'm going to pick up my kids.
+
+**Bailey Hayes** [02:46](https://youtu.be/-8FoV7pnWgg?t=166)
+
+I've got another five or six years before I get to have a snowstorm again.
+
+**Bailey Hayes** [05:20](https://youtu.be/-8FoV7pnWgg?t=320)
+
+Hello and welcome to February 18, wasmCloud community meeting. We've got just a few things to run through today — short agenda but pretty cool stuff. First thing is, Lucas is going to show some of the templates and examples he's been putting up in wasmCloud. Lucas — I should be able to share your screen.
+
+**Lucas Fontes** [05:58](https://youtu.be/-8FoV7pnWgg?t=358)
+
+Today we're going to chat about the templates we're putting together for **wasmCloud v2** and some substantial differences in the scope of your project. Where before, with `wash`, everything was around developing a single component, now the focus is more on the **full application**. You have three components in the same application — no problem. You have a `cargo` workspace — no problem. There are a few things here that will make life easier, and sometimes might feel like "Oh, I thought you worked this way" — but we're doing a bit of course correction.
+
+The other important part is the feature set that wasmCloud v2 is bringing. Now we have the ability to **bind TCP sockets inside components**, and when you do that, we are boxing that component to a localhost just for the components you select. You can think of this like running two processes on your machine that want to communicate. If I bring in a third process, it will also see localhost — they're all on the same host. With wasmCloud v2, **each workload has its own localhost**. So you can bind to the same port in multiple workloads and it will still work.
+
+This `tcp-service` example shows how to get that going. We have a very basic API here. Once we press "send task," we just convert whatever text you sent over to leetspeak. When you're running it, you `wash dev` inside the directory or pass the directory. Wash compiles and brings up the HTTP server. You write anything in the UI, press the button — what's actually happening: the HTTP component opens a TCP connection to the **sidecar component** in the workload, sends the text, gets the response, reads the line, and presents it back. We also see the TCP connection reaching the workload service.
+
+So we have two components in this workload. One of them is **long-running** — it has a `main` function, binds to a TCP socket, listens in a loop. The other is a **`wasi-http` handler** which is not executed until an HTTP request comes in. This allows us to create **connection pools in WebAssembly** and use stateless components to communicate over that long-lived TCP connection in the other component.
+
+This is a Rust project. Where before we could only have one component per project, now you can have a regular **cargo workspace** with multiple components or components interleaved with your own binaries and crates. Inside your wash configuration, you specify which components to load from your workspace. When you `wash new` against this template, the first thing that happens is `cargo fetch` to get dependencies locally, then `wash dev` or `wash build` executes the build instruction for `wasm32-wasip2`. The TCP listener can be its own crate — using `std`, it turns out to be pretty simple. The HTTP component serves HTML, the UI, and a POST handler that opens the TCP connection to the sibling component.
+
+This is a very basic example, but you can imagine in the future you have any sort of **connection bouncer or connection aggregator** — PgBouncer or any database proxy — if you can compile that to Wasm, you can load it in your workload and bring your own PgBouncer. You get the WebAssembly properties (scale to zero, components not loaded in memory all the time) while still getting the connection pooling of containerized apps today.
+
+**Bailey Hayes** [13:30](https://youtu.be/-8FoV7pnWgg?t=810)
+
+Nice. I'm also working on an example I should get up later this week. For that reason, I added a **health check** because I was constantly taking myself down trying to get something else to compile. That's my new sanity check — really nice to have. I might add that to all our examples. Any other questions for Lucas? Otherwise we're going to move on to doc of the week. Eric, you did some stuff with Excalidraw. I also played around with Excalidraw. Let's talk about it.
+
+**Eric** [14:12](https://youtu.be/-8FoV7pnWgg?t=852)
+
+This is a little less doc of the week and more **documentation-tooling of the week**. I've put up a PR for adding **Excalidraw diagram tooling in wasmcloud.com**. As we're building out the v2 documentation, we've got a lot of places we want to create diagrams — architecture diagrams, build pipelines. We want to illustrate our docs richly, and historically we've had a wasmCloud project brand identity associated with the scratchy Excalidraw styling — that's been our primary tool. We have a common Excalidraw library for graphical elements.
+
+What we've been trying to figure out: how can we efficiently, effectively, and reproducibly leverage tooling like **Claude Code** to generate diagrams in a programmatic way that fit our brand identity, are smooth and clear and accurate, and make this something any contributor can do. This is a little work towards that.
+
+In this PR we're adding a **Claude skill for Excalidraw diagrams** into the `.claude` directory of the repo, plus a couple of small scripts that help export the Excalidraw files Claude can generate into a crisp PNG. That was a real challenge — this is a custom script for that. Along with those, we have info for Claude in a `Claude.md` file that helps Claude Code generate the kinds of diagrams we're looking for, and documentation in the README for humans — diagram workflow, wasmCloud brand colors, instructions for editing existing diagrams and creating new ones. We'd love some eyes on this PR — definitely a "let's get some feedback on this approach" initiative.
+
+**Bailey Hayes** [17:36](https://youtu.be/-8FoV7pnWgg?t=1056)
+
+I want to call out that a lot of what's on our web page today is art from Nick, and I built out a library that uses a lot of what he put together. If you have **Excalidraw open** and click the library link, that'll add the library to your Excalidraw — I submitted it to the marketplace, don't know if they'll ever merge it given how long things sit there, but it's pretty easy to just click that and get wasmCloud logos in Excalidraw form.
+
+The main thing I use out of that — it'll drop in a **legend**. This diagram was completely Claude-generated using the Excalidraw MCP skill. I handmade this other one a little prettier but largely generated using our color scheme. What's handy when you use the library: if I wanted to add wasmCloud branding, I can just drop in a label, change the background to one of our brand colors with the eyedropper, and so on. We've got the other art Nick created — or if you wanted to drop in a scaled-out version of the host, all kinds of things. If there's more we want to add, just let me know.
+
+**Bailey Hayes** [20:18](https://youtu.be/-8FoV7pnWgg?t=1218)
+
+In terms of WASI P3, the work continues. I cut a new release candidate, rolled it into Wasmtime, but we had **significant changes to how `wasi-cli` worked** that we got from implementation feedback. The changes meant we actually needed to make more changes in `wasm-tools` and `wit-bindgen` to support changing the way we did `stdout`/`stderr`, passing the error message around, and using it with futures — which uncovered a few bugs and we've fixed all of them. We've cut new versions of everything except Wasmtime — this will all land in the next release of Wasmtime.
+
+**Victor** landed a massive PR for supporting streams and the second reference implementation for JCO. Next week he's taking on what he says is "totally easier" so I totally believe him — streams was the hard one. Implementing futures should be a lot easier now that he's got streams. We're looking pretty good, and I'm not critically aware of any more changes we want to make to the WASI APIs. So this current release candidate is what we're pointing at, and it's getting pretty close to stable.
+
+Next week is the **Bytecode Alliance Plumbers Summit**. Two days — Wednesday and Thursday, three hours each. Agenda highlights:
+
+- **Day 1**: Luke Wagner keynote on the road to 1.0, Cy Brand on cooperative threads, roadmapping, Joel Dice on `componentize-py`, `componentize-go`, and all the languages, and Victor Adossi on JCO and the work to support browsers with the component model.
+- **Day 2**: Wasmtime side of the world — compile time, built-ins, guest debugging, OOM handling. Lightning talks: Yan Chen on component virtualization and component fuzzing with components ("component inception"), Till on starting to write really good specifications for WASI using a tool he created.
+
+Lots of good content, all leading up to settling our roadmap.
+
+**Jeremy Fleitz** [24:03](https://youtu.be/-8FoV7pnWgg?t=1443)
+
+If my time-zone math is correct, this is going to go into wasmCloud Wednesday since it's Pacific. So are we going to —
+
+**Bailey Hayes** [24:17](https://youtu.be/-8FoV7pnWgg?t=1457)
+
+Yes — somebody should sign in here. We've never canceled, so I don't want to cancel. Somebody should be like, "yo, you should listen to Victor."
+
+**Liam Randall** [24:36](https://youtu.be/-8FoV7pnWgg?t=1476)
+
+I'll take that. If somebody in the community wants to do it, more than happy to let them. I think everybody else should be paying attention to content. I can absolutely do that in the background.
+
+**Bailey Hayes** [24:51](https://youtu.be/-8FoV7pnWgg?t=1491)
+
+What's fun: I have all the Wasmtime folks talking, and I did that over their Wasmtime meeting — they let me know that today. So we are not the only community call getting interrupted, but it's for broader community. Hopefully you're able to attend — it's going to be on Zoom. I'll drop the link in wasmCloud Slack once we get closer next week, probably Tuesday.
+
+After that, in March — keep calm — there's **Wasm I/O**, loads of awesome talks. There's going to be some repeats, so if you want an early version come to the Plumbers Summit. Then **KubeCon EU**.
+
+**Liam Randall** [26:09](https://youtu.be/-8FoV7pnWgg?t=1569)
+
+We've got 120+ regular consistent viewers on these meetings. How can we help spread the word, get things out there?
+
+**Bailey Hayes** [26:38](https://youtu.be/-8FoV7pnWgg?t=1598)
+
+Follow along in Bytecode Alliance — we're pretty active there. There are plenty of to-dos within `wit-bindgen`. Amazing folks like Yordis are part of our wasmCloud community — he jumped in and implemented maps, which is fairly hardcore. The process was coming up with a design everybody agreed on in the component model repo. People were excited but said "listen, we're not going to take that on right now — our target is WASI P3." He said "but it matters to me, so I'm gonna go do it." And he got it done. That's a good way.
+
+Helping us expand out `wit-bindgen` is a big place we need lifting. If you look at any of my recent PRs, they almost always involve me sneaking into C# or C++, the more experimental states, and saying "also add this case." It's pretty easy — burn down the list.
+
+The **biggest call to action** is going to come from Victor: Chrome is evaluating whether they want to support the component model natively. The telemetry they'll look at is the **shim** Victor produces in JCO — basically the polyfill (the word the browser folks like) that shims component-model support into the web. Once they see critical mass of folks dependent on it, they'll decide it's worth bringing all the way into the browser. Getting people to use the shim is what will help us get more resources long term.
+
+**Liam Randall** [29:10](https://youtu.be/-8FoV7pnWgg?t=1750)
+
+Lucas, I loved your demo. The whole feature set — being able to sandbox TCP and constrain the side effects from leaking out into the host you're operating on, that's just such a superpower. Can't wait to see how that evolves.
+
+**Bailey Hayes** [29:48](https://youtu.be/-8FoV7pnWgg?t=1788)
+
+Looks like we're going to end early. Unless anybody has anything they want to talk about.
+
+**Aditya** [29:54](https://youtu.be/-8FoV7pnWgg?t=1794)
+
+I wanted to talk about the **`wasi-config` host plugin**. From what I understand, it fetches the configuration at runtime — it's essentially the hash map from the host plugin that gets populated when we load the local resources from the K8s side during initialization. What we were aiming to do was figure out a way to update those configurations **mid-deployment**. One way we figured was updating the host API and adding a `workload-update-config` function, plus a reconciliation condition for checking the config hash. I was wondering if there's a better way for the K8s-to-wash-runtime-host communication — without modifying the host API, since we'd like to keep it as clean as possible. Is that something we planned for the roadmap, like a dynamic config update flow?
+
+**Lucas Fontes** [31:25](https://youtu.be/-8FoV7pnWgg?t=1885)
+
+Good point. `wasi-config` in wasmCloud v1 was dynamic — you could update values and they'd pretty much reflect in the components once NATS reconciled. In wasmCloud v2, we looked at `wasi-config` and `wasi-cli`'s environment as kind of brothers from a different mother — they're both just a hash map trying to express configuration to the components. One is in the scope of environment, more like programs we're used to today; the other does the same thing in a stateless environment, so you use `wasi-config` and those values can be modified elsewhere.
+
+For v2 we started by mirroring values from `wasi-config` and the CLI environment from the same place to start asking questions. As you talk about having to change these values — one idea: **keep the CLI environment in the host API**, and on the `wasi-config` side, **use NATS again** so we have the KV mapping to KVs in NATS. This way you can update the value in NATS and it's reflected on the component — because we don't want to change the host API. It would introduce updates and break the idempotency we have right now with workload deploys. So getting one big and figuring out how that would look using a NATS connection is interesting to explore.
+
+**Bailey Hayes** [33:50](https://youtu.be/-8FoV7pnWgg?t=2030)
+
+I like that approach. Just to throw another on the table — you can also **virtualize the `wasi-config` API** with your own that is always there. When I say virtualize, in this scenario you could do something even more akin to what `wasi-vert` does, where there isn't some extra export sitting on the component — you just wrap it with your own thing you've bundled in. Like if you want a thing that totally statically and declaratively bundles in config and ships it with your component, you can do that. That will be supported straight out of the box — no wasmCloud host changes whatsoever. That's about how you build your component.
+
+**Aditya** [34:33](https://youtu.be/-8FoV7pnWgg?t=2073)
+
+I'll definitely take a look at `wasi-vert`. The `wasi-cli` environment, I believe, is statically linked with the WASI context — just once, you can't change it. Our best bet was the `wasi-config` change. The NATS thing where we link it to a NATS schedule — that's something I could take a deeper look into.
+
+**Lucas Fontes** [35:03](https://youtu.be/-8FoV7pnWgg?t=2103)
+
+And then we have the story for **local development** where there's no NATS. In that case we use the same pattern as Blobstore KV — we use the file system and convert files into wasmCloud KV maps.
+
+**Aditya** [35:20](https://youtu.be/-8FoV7pnWgg?t=2120)
+
+Good addition for developer experience. If I get enough time, maybe I can introduce that to the whole ecosystem. Thank you.
+
+**Bailey Hayes** [35:44](https://youtu.be/-8FoV7pnWgg?t=2144)
+
+Any other topics? Alrighty — hope everybody has a good Wednesday, and hopefully I see you all next Wednesday in the Plumbers Summit. See you there.

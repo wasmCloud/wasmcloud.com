@@ -11,6 +11,7 @@ import styles from './styles.module.css';
 import Layout from '@theme/Layout';
 import CommunityPostItem from '../post-item';
 import Link from '@docusaurus/Link';
+import VideoSEO from '../video-seo';
 
 function CommunityPostPageContent({ children }: { children: ReactNode }): JSX.Element {
   const { metadata, toc } = useBlogPost();
@@ -53,6 +54,11 @@ function CommunityPostPageContent({ children }: { children: ReactNode }): JSX.El
   );
 }
 
+function CommunityPostPageSEO(): JSX.Element | null {
+  const { metadata } = useBlogPost();
+  return <VideoSEO metadata={metadata} />;
+}
+
 export default function CommunityPostPage(props: Props): JSX.Element {
   const CommunityPostContent = props.content;
   return (
@@ -62,6 +68,7 @@ export default function CommunityPostPage(props: Props): JSX.Element {
       >
         <BlogPostPageMetadata />
         <BlogPostPageStructuredData />
+        <CommunityPostPageSEO />
         <CommunityPostPageContent>
           <CommunityPostContent />
         </CommunityPostPageContent>
