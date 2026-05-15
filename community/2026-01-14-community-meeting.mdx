@@ -1,96 +1,211 @@
 ---
-date: '2025-01-14'
-title: 'Meeting Agenda - 2025-01-14'
+date: '2026-01-14'
+title: 'Blobby UI Demo, wash build/dev Project Inference & v2 Service/Component Workloads'
+description: 'wasmCloud community call covering Lucas Fontes'' Blobby UI demo, the move from implicit to explicit project inference in wash build/dev with custom build commands and environment variable interpolation, persistent dev-loop storage plans, and the new v2 Quick Start docs.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wash dev
+  - wash build
+  - blobby
+  - wasi blobstore
+  - wasi keyvalue
+  - wasmcloud v2
+  - tinygo
+  - go sdk
+chapters:
+  - { seconds: 272, label: "Welcome and agenda overview" }
+  - { seconds: 319, label: "Lucas on v2 progress, framing for the demo" }
+  - { seconds: 426, label: "Blobby UI demo: uploads, copy-link, activity bar" }
+  - { seconds: 720, label: "Project inference: from implicit to explicit" }
+  - { seconds: 810, label: "Custom build commands and component output paths" }
+  - { seconds: 903, label: "Environment variable interpolation and Make integration" }
+  - { seconds: 1020, label: "Service + component co-development with cron example" }
+  - { seconds: 1206, label: "Bailey on explicit configuration as a maintenance win" }
+  - { seconds: 1264, label: "Filesystem-backed plugins for persistent dev-loop state" }
+  - { seconds: 1438, label: "luk3ark: backed by NATS via host plugin or component?" }
+  - { seconds: 1602, label: "Multiple plugins per workload, vector DB scenario" }
+  - { seconds: 1671, label: "wRPC gateway as a service for non-native plugins" }
+  - { seconds: 1798, label: "Eric on the v2 Glossary and draft Quick Start" }
+  - { seconds: 1973, label: "Next WASI P3 RC in Wasmtime and Go SDK refresh" }
+image: https://i.ytimg.com/vi/wyT5-QM4k00/maxresdefault.jpg
+showTitle: true
+slug: 2026-01-14-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- Demo: "Blobby" enhancements
-- Discussion: Changes to `wash build` and `wash dev`
+<YouTube url="https://www.youtube.com/watch?v=wyT5-QM4k00" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=wyT5-QM4k00" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The January 14, 2026 wasmCloud community call is anchored by **Lucas Fontes' Blobby UI demo and a deep architectural change to `wash build` and `wash dev`**. Blobby — the long-running Blobstore example — gets a proper web UI that uploads, downloads, copies links, and shows a recent-activity bar, with both the UI and the API served by the same WebAssembly component. Under the hood, `wash build` and `wash dev` move from **implicit file-sniffing project inference** to **explicit build commands in config** — solving the monorepo problem, enabling environment-variable interpolation in build commands, separate debug vs release commands, and direct integration with Make or any other build tool. Service-and-component co-development is now first-class through the new `wash dev` config that lets you bring additional Wasm files into the workload (demoed with a cron service + cron component). **Bailey Hayes** highlights the importance of explicit configuration as a long-term maintenance win. **luk3ark** asks how plugins compare to bringing in components for backend interfaces, and Lucas explains the host-plugin model. **Eric** introduces the new **v2 Glossary** and the **draft Quick Start guide** with a local Kubernetes deployment step. The team closes with notes on the next WASI P3 release candidate landing in Wasmtime and a refreshed Go component SDK compatible with the latest tinygo and `wasm-tools`.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **Blobby gets a UI** — the long-running Blobstore example now serves its own HTML UI from the same WebAssembly component as the API; uploads (single and multiple), downloads, copy-link, and a recent-activity bar all work without curl
+- **Both UI and API in one component** — Blobby's web interface is a clean demonstration of hosting frontend assets and backend API in the same Wasm component
+- **`wash build` and `wash dev` move from implicit to explicit** — the previous approach sniffed `Cargo.toml`, `go.mod`, etc. to infer the build method, which broke for monorepos and turned into a cat-and-mouse game tracking upstream toolchain flag changes
+- **Custom build commands per template** — templates can ship with their own `build` command, and developers can override it with anything (cargo, make, custom shell scripts). The component output path is now also configurable
+- **Separate dev vs build commands** — `wash dev` can run a fast debug build, `wash build` can run the slower release/wit-bindgen pipeline; if you only specify one, both share it
+- **Environment variable interpolation in build commands** — secrets from CI and shell environment forward through to your build; you can chain commands with `;` and use `$VAR` interpolation
+- **`-c` flag changes to project directory before executing** — paths in your build config are relative to the project root, not where you ran `wash`
+- **Service + component co-development is first-class** — the new `wash dev` config supports bringing additional WebAssembly files into the workload; cron service + cron component is the canonical example. The workload assembled during `wash dev` matches what you'd deploy
+- **Plan: back in-memory dev-loop plugins with the filesystem** — current in-memory Blobstore and `wasi-keyvalue` clear data on every rebuild, forcing re-seeding. Filesystem-backed plugins will let developers seed by copying files into a directory and persist across rebuilds
+- **Host plugins are per-workload, not shared monolithic providers** — each workload gets its own plugin instance, which luk3ark asked about explicitly. The platform admin picks the storage backend when they install the host (NATS, S3, etc.); the component just declares which buckets it needs
+- **v2 Glossary landed** with "Service" and "Workload" entries — the best quick reference for v2 concepts right now ([PR #1048](https://github.com/wasmCloud/wasmcloud.com/pull/1048))
+- **Draft Quick Start guide** in PR — three-page guide following the v1 structure: install wash, create a component with persistent storage, deploy to local Kubernetes ([PR #1049](https://github.com/wasmCloud/wasmcloud.com/pull/1049))
+- **Next WASI P3 RC landed in Wasmtime** — requires a newer `wit-bindgen`; will be in next month's Wasmtime release
+- **New Go component SDK** — compatible with the latest tinygo, latest Go, and latest `wasm-tools`
+
+## Chapters
+
+- [04:32 — Welcome and agenda overview](https://youtu.be/wyT5-QM4k00?t=272)
+- [05:19 — Lucas on v2 progress, framing for the demo](https://youtu.be/wyT5-QM4k00?t=319)
+- [07:06 — Blobby UI demo: uploads, copy-link, activity bar](https://youtu.be/wyT5-QM4k00?t=426)
+- [12:00 — Project inference: from implicit to explicit](https://youtu.be/wyT5-QM4k00?t=720)
+- [13:30 — Custom build commands and component output paths](https://youtu.be/wyT5-QM4k00?t=810)
+- [15:03 — Environment variable interpolation and Make integration](https://youtu.be/wyT5-QM4k00?t=903)
+- [17:00 — Service + component co-development with cron example](https://youtu.be/wyT5-QM4k00?t=1020)
+- [20:06 — Bailey on explicit configuration as a maintenance win](https://youtu.be/wyT5-QM4k00?t=1206)
+- [21:04 — Filesystem-backed plugins for persistent dev-loop state](https://youtu.be/wyT5-QM4k00?t=1264)
+- [23:58 — luk3ark: backed by NATS via host plugin or component?](https://youtu.be/wyT5-QM4k00?t=1438)
+- [26:42 — Multiple plugins per workload, vector DB scenario](https://youtu.be/wyT5-QM4k00?t=1602)
+- [27:51 — wRPC gateway as a service for non-native plugins](https://youtu.be/wyT5-QM4k00?t=1671)
+- [29:58 — Eric on the v2 Glossary and draft Quick Start](https://youtu.be/wyT5-QM4k00?t=1798)
+- [32:53 — Next WASI P3 RC in Wasmtime and Go SDK refresh](https://youtu.be/wyT5-QM4k00?t=1973)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### Blobby UI Demo
 
-### Demo: "Blobby" enhancements
+**Lucas Fontes** opened with a facelift to one of the long-running wasmCloud examples: **Blobby**. The API is the same as before, but now Blobby serves its own UI from the same WebAssembly component. Operations that previously required `curl` commands — file uploads (single or multiple), copy-link, downloads — are now available through a clean web interface, with a recent-activity bar showing what just happened.
 
-* Lucas demonstrated a refreshed version of the Blobby example with a new web interface, making it more presentable and user-friendly:  
-* The demo now includes a visual UI served by Blobby itself, replacing the need for curl commands
-* Users can upload files (single or multiple) through the interface
-* Added a copy link feature to easily get URLs for uploaded files
-* The UI includes an activity bar showing recent operations
-* The demo showcases hosting both UI and API in the same WebAssembly component
-* When you run the demo with `wash dev`, data is stored in-memory, while in Kubernetes environments it's backed by NATS Object Store
+Running `cargo run -- -c examples/blobby dev` from the wash repo brings up the demo. The `-c` flag changes wash to the project directory before running anything, so all paths in your build config are resolved relative to the project root. The UI is HTML/JavaScript served directly by Blobby; the API is identical to the old curl-driven version. Both endpoints — UI and API — live in the **same WebAssembly component**.
 
-### Discussion: Changes to `wash build` and `wash dev`
+In `wash dev`, Blobstore data is in-memory and clears on restart. In a Kubernetes deployment, Blobstore is backed by NATS Object Store with replication configurable through standard NATS settings.
 
-- The team implemented significant architectural changes to how `wash build` and `wash dev` work, moving from implicit to explicit configuration
-- Previously, `wash` would infer build methods based on files in the directory (Cargo.toml for Rust, go.mod for Go), which caused problems in monorepos
-- The new approach enables developers to specify custom build commands in their configuration
-- Developers can now control where the WebAssembly artifact will be located after build
-- Different commands can be specified for `wash dev` (debug builds) vs `wash build` (release builds)
-- Build commands now support environment variable interpolation and forwarding from the shell environment
-- Teams can use makefiles or any other build tool of their choice
-- The `-c` flag allows changing to a project directory before `wash` executes
-- No longer limited by hardcoded build logic - developers have full control
+### `wash build` and `wash dev`: From Implicit to Explicit
 
-### Discussion: Service and component development
+The bulk of the call was Lucas walking through a significant architectural change to how `wash build` and `wash dev` work. The previous approach was **project inference by file-sniffing**: if `Cargo.toml` is present, it's a Rust project and we run `cargo build`; if `go.mod` is present, it's a Go project; etc.
 
-- The new wash configuration supports developing services (long-running WebAssembly components) alongside stateless components
-- Developers can specify additional WebAssembly files to bring into the workload during `wash dev`
-- Example shown with cron service and cron component working together
-- The workload assembled during development matches the structure that would be deployed to production
+This broke for **monorepos** — a `Cargo.toml` anywhere in the parent tree would force a Rust build, even when you wanted to build a different language inside a subdirectory. It also became a **cat-and-mouse game**: every new cargo flag, every new TypeScript package manager (yarn, pnpm) needed an update in wash, with everyone forced to upgrade in sync.
 
-### Discussion: Storage and state management discussion
+The new approach: **wash is essentially a Makefile**. Templates and projects declare their own build commands, and developers can override them with whatever they want.
 
-- The team discussed improving local development storage  
-- Current in-memory plugins clear data on every code change, requiring re-seeding
-- Plan to back in-memory plugins with file system storage in the cache directory
-- This will allow developers to seed applications by copying files into a directory and persist data across code changes
-- In production, the host plugin approach means platform administrators decide the storage backend (e.g., NATS, S3)
-- Each workload gets its own instance of plugins, not a shared monolithic provider
+- **Custom build commands** — `cargo build`, `make`, custom shell scripts, anything
+- **Custom component output path** — tell wash where the `.wasm` file will land after the build
+- **Separate `wash dev` and `wash build` commands** — `wash dev` runs a fast debug build (no `wit-bindgen` regeneration); `wash build` runs the full release pipeline. If you only specify one, both share it
+- **Environment variable interpolation** — `$VAR` works inside the command, secrets and CI flags forward from your shell environment to the build
+- **Command chaining** — `;` and `&&` work as you'd expect
 
-## Weekly highlights
+For Blobby (Rust), the config is `cargo build` with a component path pointing at `target/wasm32-wasip2/release/blobby.wasm`. For a Go example, the config uses **Make** so the same artifact builds identically from `wash` or `bash`.
 
-### Issue of the Week
+### Service + Component Co-Development
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+The new `wash` config has a section for **`wash dev`** that lets you specify additional WebAssembly files to bring into the workload during development. This makes service-and-component co-development first-class.
 
-### Documentation of the Week
+Lucas demoed with the **cron** example — `cron service` + `cron component`:
 
-- **Completed:** [v2 Glossary](https://github.com/wasmCloud/wasmcloud.com/pull/1048)
-  - v2 Glossary with entries for "Service" and "Workload"
-  - Currently the best quick reference for top-level v2 concepts
-- **In Progress:** [Installation page re-work](https://github.com/wasmCloud/wasmcloud.com/pull/1049)
-  - New three-page QuickStart guide following the v1 structure
-  - Covers installing wash, creating components, adding functionality with persistent storage
-  - New addition: deploying Wasm workload in local Kubernetes environment
-  - This update is in draft, and feedback is always appreciated!
+- When `wash dev` runs against the **component**, the config loads the cron service alongside; the component is rebuilt on changes, the service stays attached
+- When `wash dev` runs against the **service**, the config loads the component into the workload; the service is rebuilt on changes, the component is reattached
 
-## Community Updates
+The workload assembled in `wash dev` matches what you'd deploy to production. There's no separate "dev rig" — what you build is what you ship.
 
-- New WASI P3 release candidate is now in Wasmtime (requires newer version of `wit-bindgen`, will be in next month's release)
-- New Go component SDK released, compatible with latest TinyGo, latest Go, and latest `wasm-tools`
+### Bailey on Explicit Configuration
 
-### Tune in…
+**Bailey Hayes** flagged this as one of the more important architectural shifts of the v2 work: **moving from implicit to explicit configuration**. The implicit file-sniffing logic was a continuous source of bugs and maintenance burden. Making the config explicit means fewer surprise breakages when upstream toolchains change, fewer assumptions about project layout, and a clear audit trail for what wash is doing during a build.
 
-{/* Add any upcoming events/streams/etc */}
+It also makes the "workload as a unit" story crisp: when you `wash dev`, you're assembling a workload — same structure as what gets deployed. The dev loop is no longer a special case.
 
-- v2 RC is out and in wasmtime
+### Filesystem-Backed Plugins for Dev Loop
 
-### Catch up…
+Current dev-loop plugins (Blobstore, `wasi-keyvalue`, config) are **in-memory** — when you rebuild your component, the data clears. That's a problem in practice: imagine running `rails db:migrate` every time you save a file.
 
-{/* Add any blog posts/articles that the community might find interesting */}
+The plan: **back in-memory plugins with the filesystem**. A directory in your home cache becomes the storage backing Blobstore. For `wasi-keyvalue`, file names map one-to-one with keys, file contents are the values. Seeding a new app becomes "copy files into the directory."
 
--
+This is a dev-loop-only convenience. Production hosts still use whatever the platform admin configured — NATS, S3, etc.
 
-## Recording
+### luk3ark Q&A: Plugins vs Components for Backend Interfaces
 
-{/* Automated - No need to adjust this unless automation fails */}
+**luk3ark** asked how this fits with the broader plugin/component architecture: when Blobby is backed by NATS in Kubernetes, is that via a **host plugin** or a **component**?
 
-<YouTube url="https://www.youtube.com/watch?v=wyT5-QM4k00" />
+Lucas's explanation:
+
+- **Host plugin model**: the host comes with a set of capabilities (Blobstore, `wasi-keyvalue`, etc.) that the platform administrator configures when they install the host. The component just declares "I need access to these buckets" — it doesn't carry credentials or care about the backend implementation.
+- In production, state lives outside the host (NATS, S3, etc.) — never on the same hardware as the compute. So the storage backend is a deployment-time decision, not a component-author decision.
+- In local dev, wash is self-sufficient — it brings up the HTTP server, runtime, file watcher all in one process. In-memory state was the v1 answer, but most v1 users brought their own NATS/Postgres anyway. So the in-memory state was never really exercised. The filesystem-backed dev plugins close that gap properly.
+
+luk3ark followed up: if you have a more complex scenario — Blobby + a vector database for chunking and embedding — do you bring multiple plugins, or do you compose components?
+
+Lucas: **multiple plugins**. Each workload gets its own instance of each plugin (not a shared monolithic provider). The trade-off vs v1 wRPC providers: host plugins are native Rust code, so adding a new plugin means rebuilding the host. The upside is less complexity at runtime and per-workload isolation.
+
+For someone who really wants the v1 wRPC dynamic-loading model, **a wRPC gateway as a service** is still possible — it operates as a workload service, opens a TCP socket, receives wRPC from outside, calls a component inside. It's just not the default anymore.
+
+### v2 Glossary and Quick Start Docs
+
+**Eric** introduced two doc updates:
+
+- **v2 Glossary** ([PR #1048](https://github.com/wasmCloud/wasmcloud.com/pull/1048)) — **landed**. New entries for "Service" and "Workload" plus updates for v2 architecture changes. The best quick reference for top-level v2 concepts right now.
+- **Quick Start guide** ([PR #1049](https://github.com/wasmCloud/wasmcloud.com/pull/1049)) — **in PR**, three pages following the v1 structure: install wash + language tooling; create a component, customize it, add persistent storage; **deploy a Wasm workload to local Kubernetes**. Waiting on wash RC6 to land before final polish; will incorporate the Blobby demo as a final showcase.
+
+Eric called for documentation contributors to run through the draft and provide feedback before launch.
+
+### WASI P3 and Go SDK Updates
+
+Bailey closed with two ecosystem notes:
+
+- **Next WASI P3 release candidate is now in Wasmtime** — requires the newer `wit-bindgen`; will be in next month's Wasmtime release
+- **New Go component SDK** — compatible with the latest **tinygo**, latest **Go**, and latest **`wasm-tools`**. The Go side was two tinygo versions behind; this catches it up
+
+## WebAssembly News and Updates
+
+The shift from implicit project inference to explicit build commands in [wash](https://github.com/wasmCloud/wash) mirrors a broader trend in build tooling toward declarative configuration with full developer control. [WASI P3](https://github.com/WebAssembly/WASI) continues to converge — the new RC landing in [Wasmtime](https://wasmtime.dev/) brings async/native streams within reach for downstream tooling. The Go ecosystem story is getting cleaner with the refreshed [Go component SDK](https://github.com/wasmCloud/go), aligning to current tinygo, Go, and `wasm-tools` releases. And the [component model](https://component-model.bytecodealliance.org/) is increasingly the lingua franca for "I want to host this thing in a sandbox with explicit capability declarations" — Blobby serving both UI and API in one component is a small example of what that unlocks.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project for building and running [WebAssembly components](/docs/overview/workloads/components) across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/). The v2 architecture demoed in this call introduces **services** (long-running stateful WebAssembly components) alongside the existing stateless component model, with both composable into a single **workload** via [`wash dev`](/docs/wash/developer-guide/) for local development and the same shape deployed via the runtime operator in production. The new project inference model gives developers full control over build tooling, while host plugins (for [Blobstore](/docs/runtime/), `wasi-keyvalue`, etc.) keep components stateless and portable — credentials and backends are platform-admin concerns, not component-author concerns.
+
+## Topic Deep Dive: Implicit vs Explicit Configuration as a v2 Theme
+
+Looking across the v2 changes Lucas and Bailey have been driving, one consistent theme stands out: **explicit configuration over implicit inference**. In v1 (and early v2), wash sniffed your project directory for indicator files and inferred what build tool to use, what flags to pass, what to do with the output. That was convenient for the 80% case but **broke catastrophically for the 20% that didn't match the assumption**.
+
+The new pattern: **templates ship the right build command**, developers override it freely, and wash stays a thin orchestrator that runs the command and looks at where you told it the artifact would be. This is the same lesson the broader build tooling ecosystem has learned the hard way: implicit magic is great until it isn't, and the cost of debugging implicit behavior dwarfs the cost of typing one line of config.
+
+The same pattern is showing up in **plugin configuration** (the platform admin picks the storage backend at host install time, the component just declares what it needs), **service definition** (the workload composition is explicit in `wash dev` config, matching production), and **OpenTelemetry plumbing** (the host configures via standard OTel SDK environment variables, no special wasmCloud flags). For platform engineers evaluating wasmCloud v2 against earlier impressions of v1, this is the most important architectural shift to track.
+
+## Who Should Watch This
+
+**wasmCloud developers tracking v2** should start with [Lucas's Blobby UI demo at 07:06](https://youtu.be/wyT5-QM4k00?t=426) and the [project inference walkthrough at 12:00](https://youtu.be/wyT5-QM4k00?t=720). **Anyone managing monorepos** or with non-standard build pipelines wants the [custom build command discussion at 13:30](https://youtu.be/wyT5-QM4k00?t=810). **Component authors thinking about services + components together** should watch the [cron example at 17:00](https://youtu.be/wyT5-QM4k00?t=1020). **Platform engineers asking how plugins compose** want luk3ark's [Q&A from 23:58](https://youtu.be/wyT5-QM4k00?t=1438). **Doc contributors** should check out the [v2 Glossary and Quick Start PRs at 29:58](https://youtu.be/wyT5-QM4k00?t=1798).
+
+## Up Next
+
+wash RC6 is coming, with the project inference changes and the filesystem-backed dev-loop plugins. The Quick Start guide will fold in Blobby and the local Kubernetes deployment step once RC6 lands. The next WASI P3 RC will roll out across Wasmtime and downstream tooling. Community contributors are encouraged to test the draft Quick Start guide and provide feedback or PRs.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-01-14-community-meeting-transcript/)**

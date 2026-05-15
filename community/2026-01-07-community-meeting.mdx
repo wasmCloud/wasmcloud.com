@@ -1,49 +1,244 @@
 ---
 date: '2026-01-07'
-title: 'Meeting Agenda - 2026-01-07'
+title: 'Path to wasmCloud v2: RC6 Plan, gRPC, P2→P3 WIT Translator & WIT Map Support'
+description: 'wasmCloud community call covering the path to wasmCloud v2 RC6: validating open PRs, NATS authentication, Kubernetes workload IDs, in-memory Blobstore/KV in wash dev, ossfellow''s LLM-driven P2→P3 WIT translator, and Yordis Prieto landing WIT map support in wasm-tools.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wash v2
+  - rc6
+  - wasi p3
+  - wit-bindgen
+  - wasm-tools
+  - grpc
+  - nats authentication
+chapters:
+  - { seconds: 162, label: "Frank Schaffa: replicas=0 behavior and scale-to-zero" }
+  - { seconds: 328, label: "Welcome and 2026 first call" }
+  - { seconds: 382, label: "Lucas on the RC6 dashboard: validate and close" }
+  - { seconds: 600, label: "Deferred to point release: integration tests, component restart" }
+  - { seconds: 840, label: "Virtual TCP/UDP loopback waiting on Wasmtime 41" }
+  - { seconds: 1001, label: "RC6 highlights: multi-Wasm, NATS auth, workload IDs, Blobstore/KV in dev" }
+  - { seconds: 1261, label: "Aditya: gRPC PR as default behavior" }
+  - { seconds: 1527, label: "Frank on component restart: resiliency and atomic workloads" }
+  - { seconds: 1720, label: "ossfellow's LLM-driven P2→P3 WIT translator" }
+  - { seconds: 2234, label: "Bailey on Claude skills for wash development" }
+  - { seconds: 2636, label: "ossfellow on building for P3 today" }
+  - { seconds: 2787, label: "WASI P3 syntax changes since the September RC" }
+  - { seconds: 2900, label: "Yordis on WIT map support in wasm-tools and Wasmtime" }
+  - { seconds: 3177, label: "Aditya: timeline for the wash → wasmCloud monorepo move" }
+  - { seconds: 3298, label: "wash runtime naming and the host-binary split question" }
+image: https://i.ytimg.com/vi/WMUanmHsfKI/maxresdefault.jpg
+showTitle: true
+slug: 2026-01-07-community-meeting
 ---
 
 import YouTube from 'react-player/youtube';
 
-## Agenda
+{/* Video hero — the whole point of this page */}
 
-1. [wash v2 Release](https://github.com/orgs/wasmCloud/projects/20)
-2. Pull request review
-3. New Docs
+<YouTube url="https://www.youtube.com/watch?v=WMUanmHsfKI" />
 
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=WMUanmHsfKI" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The first wasmCloud community call of 2026 — January 7 — focuses on the **release plan for wasmCloud v2 RC6**. **Lucas Fontes** walks through a GitHub project dashboard of the issues and PRs still open, what's validated vs needs validation, and which features land in v2.0 vs a fast-follow point release. The big additions targeted for RC6: **multi-Wasm dev** (services + components side-by-side), **NATS authentication** for the host and operator, **Kubernetes workload IDs** for resiliency, **in-memory Blobstore and `wasi-keyvalue`** in `wash dev`, and a published **WIT package for wash**. Deferred to point releases: **component restart** (semantics conflict with orchestrator behavior in clusters), **virtual TCP/UDP loopback** (waiting for Wasmtime 41 to avoid a Wasmtime fork), and integration tests with the new fixture handling. **Aditya** commits to refactoring the **gRPC PR** to be default behavior (not modular) by end of week. **ossfellow** shares his **LLM-driven P2→P3 WIT translator** built as a Goose recipe, which sparks a broader conversation about where this kind of tooling could live (personal repo first, possibly `wasm-tools` later). **Yordis Prieto** lands a major **WIT map type** addition to wasm-tools and is working on the Wasmtime host bindings for it next. Bailey closes with the v2 syntax changes from the latest WASI P3 RC and a discussion of the wash → wasmCloud monorepo move ahead.
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **Path to wasmCloud v2 is via RC6** — last RC before the final release, targeted for end of this week. Mostly validating and closing existing issues, not adding new features
+- **GitHub dashboard tracks what's left** — a subset of all wash issues and PRs that must complete before the release cut; many are already fixed but need validation passes
+- **Multi-Wasm dev (services + components)** lands in RC6 — develop a service and stateless components side-by-side in the same `wash dev` workload
+- **NATS authentication** for the host and operator in RC6 — currently neither supports any NATS auth, which is a blocker for production deployment
+- **Kubernetes workload IDs** in RC6 — improves resiliency by ensuring workloads aren't sent to the wrong host
+- **In-memory Blobstore and `wasi-keyvalue` in `wash dev`** for RC6 — `wash dev` release 5 can't run Blobby; RC6 fixes that with in-memory implementations matching v1's behavior. Filesystem-backed plugins are future work
+- **WIT package for wash** to be published with the release tag
+- **Deferred to a point release**:
+  - **Component restart** — reloading a single component in a workload is useful for `wash dev` and embedders but conflicts with cluster orchestrator semantics (restart = new deploy + remove previous workload). Discussion ongoing: support at the runtime layer but not the protobuf layer
+  - **Virtual TCP/UDP loopback** — depends on a Wasmtime fork right now; will land cleanly with Wasmtime 41
+  - **Integration tests PR** — adds tests without new features; needs rebasing for the new fixture handling, and Aditya's gRPC PR is the higher-priority work
+- **gRPC outbound: default, not modular** — Aditya will refactor the PR to make gRPC handling the default behavior (not opt-in) and target end of this week. The Wasm boundary already adds framing on top of HTTP, so the additional gRPC layer doesn't add meaningful overhead
+- **Frank Schaffa on scale-to-zero** — current behavior on `replicas=0` was a surprise; Lucas confirmed scale-to-zero is unsupported pending ingress integration that surfaces metrics for an HPA-style autoscaler (similar to Knative Serving). For now `replicas=0` is rejected at the API server
+- **Frank Schaffa on component restart semantics** — argued for treating a workload change as a new version with new deploy semantics, for resiliency. Bailey agreed: the workload is the atomic unit, and its version is composed from component specs
+- **ossfellow's LLM-driven P2→P3 WIT translator** — built as a Goose recipe with a rule book derived from the WASI proposals repo. Bailey suggested keeping it as a personal project for now, sharing in the Bytecode Alliance Zulip and WebAssembly Discord, and using the Bytecode Alliance template license (Apache-2.0 with LLVM exception) for any future Bytecode Alliance contribution
+- **Bailey is experimenting with Claude skills for wash troubleshooting** — looking at how to share component-model and `wash`-specific skills across the community
+- **Yordis Prieto landed major WIT map support in wasm-tools and wit-bindgen** — guest-side bindings work; the Wasmtime host bindings are next. Struct support is on his radar but blocked on cyclic-type discussion with Luke Wagner (now being addressed in the spec)
+- **WASI P3 syntax changed between Sept and Jan RCs** — HTTP and clocks have breaking API changes (duration shows up everywhere), and the async identification syntax evolved. Bailey's PR adapts wash to the new syntax — 171 files changed, but most are WIT
+- **wash → wasmCloud monorepo plan** — current `wasmcloud/wasmcloud` content moves to a new `wasmcloud-v1` repo; wash content takes over `main` of `wasmcloud/wasmcloud`. Naming conflicts (wash runtime vs wasmCloud runtime) are the open question; host binary may eventually separate from wash CLI
+
+## Chapters
+
+- [02:42 — Frank Schaffa: replicas=0 behavior and scale-to-zero](https://youtu.be/WMUanmHsfKI?t=162)
+- [05:28 — Welcome and 2026 first call](https://youtu.be/WMUanmHsfKI?t=328)
+- [06:22 — Lucas on the RC6 dashboard: validate and close](https://youtu.be/WMUanmHsfKI?t=382)
+- [10:00 — Deferred to point release: integration tests, component restart](https://youtu.be/WMUanmHsfKI?t=600)
+- [14:00 — Virtual TCP/UDP loopback waiting on Wasmtime 41](https://youtu.be/WMUanmHsfKI?t=840)
+- [16:41 — RC6 highlights: multi-Wasm, NATS auth, workload IDs, Blobstore/KV in dev](https://youtu.be/WMUanmHsfKI?t=1001)
+- [21:01 — Aditya: gRPC PR as default behavior](https://youtu.be/WMUanmHsfKI?t=1261)
+- [25:27 — Frank on component restart: resiliency and atomic workloads](https://youtu.be/WMUanmHsfKI?t=1527)
+- [28:40 — ossfellow's LLM-driven P2→P3 WIT translator](https://youtu.be/WMUanmHsfKI?t=1720)
+- [37:14 — Bailey on Claude skills for wash development](https://youtu.be/WMUanmHsfKI?t=2234)
+- [43:56 — ossfellow on building for P3 today](https://youtu.be/WMUanmHsfKI?t=2636)
+- [46:27 — WASI P3 syntax changes since the September RC](https://youtu.be/WMUanmHsfKI?t=2787)
+- [48:20 — Yordis on WIT map support in wasm-tools and Wasmtime](https://youtu.be/WMUanmHsfKI?t=2900)
+- [52:57 — Aditya: timeline for the wash → wasmCloud monorepo move](https://youtu.be/WMUanmHsfKI?t=3177)
+- [54:58 — wash runtime naming and the host-binary split question](https://youtu.be/WMUanmHsfKI?t=3298)
 
 ## Meeting Notes
 
-### Forthcoming `wash` v2 release
+### Frank Schaffa on Replicas=0 and Scale-to-Zero
 
-* Lucas outlined the remaining tasks to cut the `wash` v2 release, which mainly involve closing existing issues and pull requests, many of which are already fixed but require validation.
-* Several features were discussed as likely not making it into the initial `wash` v2 major release but potentially being included in subsequent point releases:
-  - Integration tests for existing features, as they don't add new functionality and require further code changes due to recent fixture handling updates.
-  - Component restarts, a feature that allows reloading a single component within a workload, is primarily useful for local development (wash dev) and embedders, but its applicability in clustered environments is still under discussion due to potential conflicts with orchestrator behavior.
-  - The virtual TCP UDP loopback feature is being deferred to align with the release of wasmtime 41, avoiding the need for a temporary wasmtime fork.
-* Key additions targeted for release candidate 6 (rc6) include:
-  - "Multi-Wasm" support for developing services and components side-by-side.
-  - Net authentication for enhanced security of the host and operator.
-  - Workload ID from Kubernetes for improved resiliency.
-  - The inclusion of blobstore and key-value interfaces in `wash dev`, initially as in-memory interfaces, with plans for filesystem backing in the future.
-  - The publication of a WIT package for `wash` alongside the release.
+**Frank Schaffa** opened the technical discussion before the official start: in a previous version he tried setting **replicas to 0** and found that curl still got a response. **Lucas Fontes** explained the current state: scale-to-zero isn't implemented yet — if you put `0`, the system assumes you don't actually want a full shutdown (because there's no way to automatically scale back up to 1). The intent is to support scale-to-zero via the **Kubernetes Horizontal Pod Autoscaler**, which requires the **ingress to surface metrics** so the HPA can flip replicas from 0 to N — same model as **Knative Serving**. Until that integration ships, the API server rejects `replicas=0` outright.
 
-### Community discussions
-* The potential inclusion of a gRPC addition as a default behavior in `wash` v2, aiming for simplification and readiness for shipment.
-* Massoud shared his project for a WIT translator from P2 to P3 using LLMs and discussed its potential utility for the Bytecode Alliance and the broader WebAssembly ecosystem.
-* The timeline for consolidating the `wash` runtime crate into the wasmCloud repository, addressing challenges related to artifact naming and potentially separating the host into its own binary.
+### Path to wasmCloud v2 via RC6
 
-## Weekly highlights
+**Lucas Fontes** walked through the [project dashboard](https://github.com/orgs/wasmCloud/projects/20) tracking what's left for v2. The list is a mix of:
 
-### Issue of the Week
+- **Already-fixed issues** that need validation passes and closing (many already merged via separate PRs but the original issue stayed open)
+- **PRs about correctness** (e.g., host interface resolution) that need to land
+- **Items deferred to a point release** that don't make the v2.0 cut
 
-- [wash v2 release](https://github.com/orgs/wasmCloud/projects/20)
+For example, `wash plugins` previously errored on the `--no-interactive` flag, which has been fixed but the issue is still open — just needs validation.
 
-### Documentation of the Week
+### What's Deferred to a Point Release
 
-[wasmCloud v2 Installation Guide](https://wasmcloud.com/docs/v2.0.0-rc/installation/)
+Three substantive items are being pushed to fast-follow point releases:
 
-## Recording
+**Integration tests PR**
 
+Adds integration tests for already-validated, already-shipped functionality. Doesn't add new features. The recent fixture-handling refactor means this PR needs further code changes to merge. Aditya is the author; Lucas suggested he can either rebase it for RC6 or focus on the higher-priority gRPC PR.
 
-<YouTube url="https://youtube.com/live/WMUanmHsfKI" />
+**Component restart**
+
+A new operation that reloads a single component inside a workload. **Useful for `wash dev` and embedders**; less clear for clustered environments where the orchestrator pattern is "send another workload start + send workload stop to previous workload." Lucas proposed: implement at the **runtime layer only**, don't expose in the protobuf layer that orchestrators use. The conversation is ongoing on the PR; if it lands, it's a point release.
+
+**Virtual TCP/UDP loopback**
+
+The POC that lets a component open a TCP service inside the workload and have other components connect over loopback. Implementation currently requires a forked Wasmtime. Wasmtime 41 has the fix that lets this work without a fork — much cleaner to wait one release than ship and maintain a fork. **Targeted for a point release after Wasmtime 41 lands.**
+
+### What's In for RC6
+
+Lucas's "cheat sheet" for RC6:
+
+- **Multi-Wasm dev** — develop services and components side-by-side
+- **NATS authentication** for the host and operator (currently neither supports any NATS auth, blocking production deployment)
+- **Kubernetes workload IDs** — improves resiliency by ensuring scheduling correctness
+- **Blobstore and `wasi-keyvalue` in `wash dev`** — release 5 couldn't run Blobby; RC6 fixes that with in-memory implementations matching v1's behavior. Filesystem-backed plugins are future work
+- **WIT package publication for wash** — gets tagged alongside the release
+
+About 8 substantive PRs remain to review and rebase. The plan is to give preference to larger PRs first (rebasing them is harder) and merge smaller ones quickly. Goal: feature-complete RC6 by end of this week, then testing/testing/testing until v2.0.
+
+### Aditya: gRPC as Default, Not Modular
+
+**Aditya** asked about his gRPC PR. **Lucas** asked if it could be the **default behavior** rather than a modular opt-in. Aditya was initially concerned about overhead — every incoming request would route through the gRPC handling.
+
+Lucas's argument: `wasi-http` already adds significant framing on top of the original HTTP connection. As long as the **protocol version (HTTP/1 vs HTTP/2)** makes it to the Wasm interface, the layer in front of wasmCloud filters HTTP/2 or HTTP/1 based on what the customer is sending. No enable/disable needed.
+
+Aditya committed to **refactor the PR to make gRPC default, not modular**, by end of this week. He also has a Helm chart upgrade that translates gRPC tonic protobuf into the wash side — to be coordinated offline.
+
+### Frank Schaffa on Component Restart Semantics
+
+**Frank Schaffa** weighed in on the component restart discussion: from a resiliency perspective, the safer model is to treat any component change as a **new version of the workload**. If you move a workload from one place to another, you get the same behavior — no unexpected drift to debug.
+
+**Bailey Hayes** agreed strongly: the **atomicity is at the workload level**. The workload is what tells you "is the whole thing working or not." Individual component specs compose into a workload version, but the workload is the unit of declarative truth.
+
+Lucas confirmed this is exactly the line of discussion in the PR. The counter-argument (the catalyst for component restart) is `wash dev`: if you know only one component is changing, why re-instantiate the others? It's an optimization. But the team is leaning toward keeping the cluster behavior unchanged — implement restart at the runtime layer for embedders, but the protobuf/orchestration layer stays orchestrator-friendly. The REST API may gain it; Kubernetes deploy semantics won't.
+
+### ossfellow's LLM-Driven P2→P3 WIT Translator
+
+**ossfellow** shared his project: **a P2→P3 WIT translator built as a Goose recipe using LLMs**. The recipe has a rule book derived from analyzing the [WASI proposals repo](https://github.com/WebAssembly/WASI) — comparing every WIT file against its `v3-draft` counterpart to derive translation rules. Given a WIT file or repo, it produces a P3 version following those rules.
+
+**Bailey's** advice on positioning it:
+
+- **Keep it as a personal public GitHub project** for now, with a clear open-source license
+- Share it in **wasmCloud Slack**, **Bytecode Alliance Zulip**, and the **WebAssembly Discord** (there's a #wit channel)
+- If/when it's mature enough that **the Bytecode Alliance wants to host it**, the team needs to relicense — getting every contributor to sign off on a license change is operationally painful. So if Bytecode Alliance hosting is the long-term destination, use the **BA template license (Apache-2.0 with LLVM exception)** from day one to make eventual migration easy
+- The deeper observation: this kind of P2→P3 migration tooling probably belongs in [**wasm-tools**](https://github.com/bytecodealliance/wasm-tools) long-term — that's where the AST parser for WIT lives, and migration strategies would live alongside [wave](https://github.com/lann/wave) and the lint tooling Bailey is building for `@since` annotations
+
+Bailey was also working on similar tooling that morning: a linter for `@since` annotations in WIT to enforce that **every feature is gated by the version it was introduced in**. The lack of that consistency surfaced bugs in the WASI P3 RC she was cutting — feature flags pointing at unreleased versions.
+
+**Frank Schaffa's** suggestion: have the LLM **validate its own output** — note any failures, give a confidence score on the transformation. Bailey agreed and pointed at her own experiments with Claude skills for wash development: skills for troubleshooting common dependency issues, skills for the full `wash` dev cycle, etc. The community could share these as a shared library of WebAssembly skills.
+
+### ossfellow on Building for P3 Today
+
+ossfellow asked for the current path to compile to P3 — he found a blog post from last year describing `compile to P1 then translate with wasm-tools`. Is that still the approach?
+
+**Aditya** offered to write a guide: **compile directly to P2** with Wasmtime 37/38 onwards, then run wasm-tools. Will share the next day.
+
+Bailey added important context: **the syntax has evolved between the September RC and the January RC**:
+
+- **Breaking API changes** to `wasi-http` and `wasi-clocks` — clocks added duration, which surfaces in many APIs
+- **Async identification syntax changed** — Lucas wrote up the motivation in a recent PR
+- Bailey's own adaptation PR is 171 files changed, but most are WIT, so it's tractable
+- The new pattern explicitly distinguishes the **client world** (you depend on this if you're calling out) from the **middleware world** (you depend on this if you're being interposed) from the **proxy world** (you depend on this if you're the service)
+
+Eric (on this call as the maintainer of wasmcloud.com docs) is the right person to help ossfellow drop guidance into the docs. Bailey suggested adding P3 getting-started content to both `wasi.dev` and the wasmCloud contributing guide.
+
+### Yordis on WIT Map Support
+
+**Yordis Prieto** has landed a major change: **adding map support to wasm-tools and wit-bindgen**. The **guest-side bindings** work, which means component authors can now use map types in WIT. The next piece is **host bindings in Wasmtime** — taking the WIT map type and generating correct host-side bindings for it. He's working on that now.
+
+Bailey contextualized this: wasm-tools is foundational — Wasmtime, wit-bindgen, JCO, and others all depend on it. Adding map support means new map-using programs work end-to-end across the stack. The struct type comes next, but it's **blocked on cyclic type semantics** (structs allow recursion in a way maps don't). Yordis flagged that conversation to Luke Wagner who is already addressing it in the spec.
+
+Yordis on the experience of contributing to Wasmtime: "I'm getting lost in wash-time math pointers, multiply, divide, plus — what has happened?" Bailey: "you were in real systems programming. It was awesome." Yordis's approach: "I'm just following the code. I feel that I understand, but at the same time don't, which is fine. I'm betting on over time you get it. Right now I'm like, copy-pasta here. The map list does this — I just need to do something similar."
+
+### wash → wasmCloud Monorepo Move
+
+**Aditya** asked about the timeline for the consolidation. **Lucas** confirmed the plan:
+
+1. **wasmCloud v1 codebase** moves to a new `wasmcloud-v1` repo (continued updates supported for users still on v1)
+2. **wash repo content** moves into `wasmcloud/wasmcloud`, taking over `main`
+3. From that point on, all work happens in `wasmcloud/wasmcloud`
+
+The hard part is **artifact naming**. Right now the crate is `wash-runtime` because there's also a `wasmcloud-runtime`. If they're consolidated as `wasmcloud-runtime`, a downstream `cargo update` would suddenly pick up an interface that's totally different — needs careful version handling.
+
+ossfellow added a +1: "it really bothers me that the host is called `wash-runtime`." Lucas: it's also worth reconsidering whether the host belongs in wash at all. Having a single binary is convenient but the host is a server concern, not really useful on a local dev machine. After the repo move, they may **split the host into its own binary**. Docker artifact naming was deliberately kept stable so any binary-name changes are invisible to downstream Kubernetes users.
+
+## WebAssembly News and Updates
+
+The transition to **wasmCloud v2** maps to the broader WebAssembly ecosystem inflection: [WASI P3](https://github.com/WebAssembly/WASI) is in final RC, [wasm-tools](https://github.com/bytecodealliance/wasm-tools) is gaining first-class **map** support (and struct support coming), and the [component model](https://component-model.bytecodealliance.org/) is settling its async story. The LLM-driven tooling experiments — ossfellow's WIT translator, Bailey's `@since`-annotation linter, the broader push toward Claude/Goose skills for WebAssembly development — are converging on a pattern where LLM tooling **derives migration rules from the spec itself**, then validates them against real components. That pattern likely won't replace `wasm-tools`, but it's a useful sketching tool that complements the canonical Rust implementations.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project for building and running [WebAssembly components](/docs/overview/workloads/components) across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/). The **v2 architecture** discussed in this call introduces **multi-Wasm dev** (services and components side-by-side in [`wash dev`](/docs/wash/developer-guide/)), **Kubernetes workload IDs** for scheduling correctness, **NATS authentication** for production deployment, and a published **WIT package for wash** so other projects can pin to wash's interfaces. The [component model](/docs/overview/workloads/components) is the foundation, with `wasi-http`, `wasi-keyvalue`, Blobstore, and other host plugins providing capabilities to components without leaking credentials or backend specifics.
+
+## Topic Deep Dive: Workload as the Atomic Unit
+
+The Frank Schaffa / Bailey Hayes exchange about component restart semantics captures something important about wasmCloud's deployment model: **the workload is the atomic unit, not the component**. When you think about "is my application working?" or "what version is deployed?" the answer is workload-level. Individual components compose into a workload version, but a change to any of them produces a new workload version, and the deploy semantics work at that level — new deploy, then old deploy retired.
+
+This matters for resiliency. If component restart were allowed at the cluster level, the same workload spec could behave differently depending on whether the host happened to have an older instance of one component still loaded. You'd lose the property that "deploying this manifest always produces the same observable behavior." That's exactly the property Kubernetes deploys, Argo CD, and every other GitOps pipeline relies on.
+
+The compromise emerging in the PR discussion is good: **restart at the runtime layer for embedders and `wash dev` (where you control the host)**, **don't expose in the protobuf layer that orchestrators use**. Embedders who want it can opt in. Cluster operators get the same atomic-workload semantics they have today.
+
+## Who Should Watch This
+
+**wasmCloud users tracking the v2 release** should watch [Lucas's dashboard walkthrough at 06:22](https://youtu.be/WMUanmHsfKI?t=382) and the [RC6 highlights at 16:41](https://youtu.be/WMUanmHsfKI?t=1001). **Cluster operators** want the [scale-to-zero discussion at 02:42](https://youtu.be/WMUanmHsfKI?t=162) and Frank Schaffa's [component-restart argument at 25:27](https://youtu.be/WMUanmHsfKI?t=1527). **WIT contributors and tooling builders** should catch [ossfellow's P2→P3 translator at 28:40](https://youtu.be/WMUanmHsfKI?t=1720) and [Yordis's WIT map support update at 48:20](https://youtu.be/WMUanmHsfKI?t=2900). **Anyone building for WASI P3 today** wants the [Aditya guide commitment at 45:36](https://youtu.be/WMUanmHsfKI?t=2736) and the [breaking syntax changes discussion at 46:27](https://youtu.be/WMUanmHsfKI?t=2787).
+
+## Up Next
+
+Lucas, Bailey, Aditya, Pavel, and iPhone will close the remaining ~8 PRs to land **RC6 by end of the week**. Aditya's gRPC refactor and P3 build guide. Yordis's Wasmtime host bindings for map types and a follow-up on struct support after Luke Wagner addresses the cyclic-type discussion. ossfellow publishes the WIT translator to public GitHub and shares in the Bytecode Alliance Zulip + wasmCloud Slack. The repo migration is staged for after RC6 lands.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-01-07-community-meeting-transcript/)**

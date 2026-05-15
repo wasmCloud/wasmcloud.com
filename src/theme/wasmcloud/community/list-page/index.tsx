@@ -14,6 +14,7 @@ import BlogPostListItem from '../list-item';
 import Layout from '@theme/Layout';
 import useIsLive from '@site/src/pages/_hooks/use-is-live';
 import { Links } from '@site/src/constants';
+import { isTranscriptPermalink } from '../utils';
 
 import SvgZoom from '@site/static/pages/home/icon/zoom.svg';
 import SvgYoutube from '@site/static/pages/home/icon/youtube.svg';
@@ -36,7 +37,12 @@ function BlogListPageMetadata(props: Props): JSX.Element {
 }
 
 function BlogListPageContent(props: Props): JSX.Element {
-  const { metadata, items, sidebar } = props;
+  const { metadata, items: allItems, sidebar } = props;
+  // Hide transcript posts from the main /community/ list; they remain
+  // reachable from each summary page's "Read the full transcript →" link.
+  const items = allItems.filter(
+    (item) => !isTranscriptPermalink(item.content.metadata.permalink),
+  );
   const { countdown, showLinks } = useIsLive();
   const isFirstPage = metadata.page === 1;
   return (

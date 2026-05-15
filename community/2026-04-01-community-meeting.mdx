@@ -1,60 +1,202 @@
 ---
 date: '2026-04-01'
-title: 'Meeting Agenda - 2026-04-01'
+title: 'wasmCloud v2 Launch, Pod Finalizer Demo, WASI P3 Q2 Planning & Cooperative Threads'
+description: 'wasmCloud community call covering Jeremy''s pod finalizer demo cutting reconciliation from 2 minutes to 4 seconds, the wasmCloud v2 launch, WASI P3 Q2 planning, JCO reference implementation, cooperative threads in LLVM, and KubeCon/Wasm IO takeaways.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasm runtime autoscaling
+  - kubernetes operator
+  - wasi p3
+  - cooperative threads
+  - jco
+  - webassembly news
+  - kubecon
+  - wasm io
+chapters:
+  - { seconds: 43, label: "Pre-show, GitHub notification bankruptcy, agenda" }
+  - { seconds: 310, label: "Jeremy's host pod finalizer demo: 2 minutes → 4 seconds" }
+  - { seconds: 556, label: "wasmCloud v2 scheduling: host pods, NATS, replicas" }
+  - { seconds: 745, label: "Runtime gateway and HTTP reverse proxying" }
+  - { seconds: 982, label: "Workloads, components, and per-request instances" }
+  - { seconds: 1243, label: "Multiple components per workload; migration to v2 docs" }
+  - { seconds: 1358, label: "wasmCloud v2 launched; Q2 planning kickoff" }
+  - { seconds: 1410, label: "WASI P3 tracking issue and feature flag plan" }
+  - { seconds: 1576, label: "Rust P3 toolchain status: wasi-rs, bindgen 54, nightly" }
+  - { seconds: 1897, label: "Joel's Tokio and Mio WASI socket changes merging" }
+  - { seconds: 2105, label: "Cooperative threads and component model in the browser" }
+  - { seconds: 2305, label: "Wasm IO, the asm.js talk, and 2026 predictions" }
+  - { seconds: 2343, label: "JCO reference implementation nearing the finish line" }
+  - { seconds: 2407, label: "Cooperative threads, LLVM July release, WASI crypto" }
+  - { seconds: 2672, label: "Emscripten and Wasm shim collaboration" }
+  - { seconds: 2927, label: "KubeCon and Wasm IO takeaways: the conversation has shifted" }
+  - { seconds: 3468, label: "Kubert, virtual clusters, and the Hyperlight comparison" }
+image: https://i.ytimg.com/vi/zaDiEcB-Lfc/maxresdefault.jpg
+showTitle: true
+slug: 2026-04-01-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- DEMO @jfleitz `HostPodReconciler`
-- wasmCloud v2 launched! Now time to roadmap plan for Q2
-- WASIP3 update
+<YouTube url="https://www.youtube.com/watch?v=zaDiEcB-Lfc" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=zaDiEcB-Lfc" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The April 1, 2026 wasmCloud community call opens with Jeremy Fleitz demoing a host pod finalizer change that cuts wasmCloud's reconciliation loop from over two minutes to roughly four seconds when a host pod dies — a bug found at KubeCon. Bailey Hayes walks through wasmCloud v2's scheduling architecture, kicks off Q2 planning with a tracked WASI P3 implementation behind a feature flag, and shares progress on the JCO reference implementation, cooperative threads in LLVM, and Joel's just-landed WASI socket support in Tokio and Mio. The call wraps with takeaways from KubeCon Europe and Wasm I/O, including a clear shift in the conversation from "what is WebAssembly?" to "how do I deploy it in production?"
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **Pod finalizer cuts reconciliation from 2 minutes to ~4 seconds** — Jeremy Fleitz's runtime operator change adds a finalizer to the host pod so workload reconciliation is triggered immediately on pod deletion instead of waiting for the unknown-state timeout, with no cluster-role permissions required when host and operator share a namespace
+- **wasmCloud v2 architecture clarified** — the runtime operator schedules workloads to healthy host pods over NATS, while the runtime gateway reverse-proxies incoming HTTP straight to component instances over `wasi-http`; HTTP requests are *not* published over the message bus in v2 for performance reasons
+- **WASI P3 implementation is the Q2 headline** — Bailey filed the tracking issue: P3 lands behind a `wasi-p3` feature flag and must coexist with P2 in the same workload, since the interfaces themselves changed when WASI rebased on native async APIs
+- **WASI P3 toolchain is ready to test today** — `wasi-rs` already builds against the latest release candidate, Wasmtime 43 ships it, the WASI Test Suite components work as a P3 sandbox, and `wit-bindgen` 54 is what most users need to switch to (nightly Rust still required)
+- **Tokio + Mio WASI socket support is merging** — Joel Dice's changes landed across `wasi-sdk`, `socket2`, and Mio with a Tokio PR close behind; the same `cfg(not(target_os = "wasi-p1"))` trick that wasmCloud uses means the support transitions to `wasi-p3` automatically once it ships
+- **JCO reference implementation nearing completion** — the second WASI P3 reference implementation inside JCO is on track to launch in roughly a month, unblocking a vote
+- **Cooperative threads coming with July's LLVM release** — Cy Brand's implementation has 100% passing tests in the open POSIX test suite; once LLVM stabilizes in July, Rust support follows shortly after
+- **WASI crypto picking up traction again** — a research group is taking on `wasi-crypto`, removing one of the last barriers preventing random-software-off-the-shelf from compiling to WebAssembly
+- **KubeCon and Wasm I/O takeaway: the conversation has shifted** — the team no longer has to explain "what is WebAssembly"; v2's Kubernetes-native architecture sells itself, and vibe-coding interest is driving "I don't care which language, just give me the safe sandbox" demand
+
+## Chapters
+
+- [00:43 — Pre-show, GitHub notification bankruptcy, agenda](https://youtu.be/zaDiEcB-Lfc?t=43)
+- [05:10 — Jeremy's host pod finalizer demo: 2 minutes → 4 seconds](https://youtu.be/zaDiEcB-Lfc?t=310)
+- [09:16 — wasmCloud v2 scheduling: host pods, NATS, replicas](https://youtu.be/zaDiEcB-Lfc?t=556)
+- [12:25 — Runtime gateway and HTTP reverse proxying](https://youtu.be/zaDiEcB-Lfc?t=745)
+- [16:22 — Workloads, components, and per-request instances](https://youtu.be/zaDiEcB-Lfc?t=982)
+- [20:43 — Multiple components per workload; migration to v2 docs](https://youtu.be/zaDiEcB-Lfc?t=1243)
+- [22:38 — wasmCloud v2 launched; Q2 planning kickoff](https://youtu.be/zaDiEcB-Lfc?t=1358)
+- [23:30 — WASI P3 tracking issue and feature flag plan](https://youtu.be/zaDiEcB-Lfc?t=1410)
+- [26:16 — Rust P3 toolchain status: wasi-rs, bindgen 54, nightly](https://youtu.be/zaDiEcB-Lfc?t=1576)
+- [31:37 — Joel's Tokio and Mio WASI socket changes merging](https://youtu.be/zaDiEcB-Lfc?t=1897)
+- [35:05 — Cooperative threads and component model in the browser](https://youtu.be/zaDiEcB-Lfc?t=2105)
+- [38:25 — Wasm IO, the asm.js talk, and 2026 predictions](https://youtu.be/zaDiEcB-Lfc?t=2305)
+- [39:03 — JCO reference implementation nearing the finish line](https://youtu.be/zaDiEcB-Lfc?t=2343)
+- [40:07 — Cooperative threads, LLVM July release, WASI crypto](https://youtu.be/zaDiEcB-Lfc?t=2407)
+- [44:32 — Emscripten and Wasm shim collaboration](https://youtu.be/zaDiEcB-Lfc?t=2672)
+- [48:47 — KubeCon and Wasm IO takeaways: the conversation has shifted](https://youtu.be/zaDiEcB-Lfc?t=2927)
+- [57:48 — Kubert, virtual clusters, and the Hyperlight comparison](https://youtu.be/zaDiEcB-Lfc?t=3468)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### Pod Finalizer Demo — 2 Minutes to 4 Seconds
 
-### Topic 1
+**Jeremy Fleitz** opened the call with a runtime operator demo addressing a bug found at KubeCon. When a wasmCloud host pod dies, the host custom resource heartbeat stops, but the existing logic waits a full minute before marking the host unknown, and another reconciliation cycle before flagging the workloads on that host as unhealthy — total time over two minutes. That's a long outage window for production.
 
-- Note 1
-- Note 2
+The fix adds a **finalizer to the host pod resource** so the runtime operator gets a synchronous hook when the pod is being deleted, triggering workload reconciliation immediately. In the live demo, deleting a host pod and watching the in-flight curl loop showed reconciliation complete in roughly four seconds. The change required a new RBAC role (not a cluster role) that grants patch permission on pods — and because the default wasmCloud deployment co-locates the host and the operator in the same namespace, no cluster-wide permissions are needed. For multi-namespace deployments, the role can be cloned with appropriate namespace permissions.
 
-### Topic 2
+### wasmCloud v2 Scheduling Walkthrough
 
-- Note 1
-- Note 2
+Colin Murphy used the demo to ask for a refresher on how v2 scheduling actually works, and the discussion that followed clarifies an important shift from v1. In v2:
 
-## Weekly highlights
+- The **runtime operator** treats wasmCloud hosts as Kubernetes pods (managed via a Deployment) and the workload deploy as a CRD. The operator finds a healthy host pod that matches the workload's host-group selector and schedules over NATS — same control-plane pattern as v1.
+- The **runtime gateway** is the data plane. Incoming HTTP requests hit your standard Kubernetes ingress (envoy, HAProxy, etc.), get routed by domain to the runtime gateway, and from there get reverse-proxied straight to a host pod where the workload is loaded. The host's built-in `wasi-http` server handles the request locally and invokes the component.
+- **HTTP requests do not go through NATS in v2.** This is a deliberate change from v1 for performance reasons — described in detail in Eric's [migration to v2](https://wasmcloud.com/docs/v2/migrate-to-v2/) doc, which Bailey called out as a recurring "doc of the week" pattern worth highlighting.
 
-### Issue of the Week
+Frank Schaffa asked how scaling and instance lifecycle work. The answer: each HTTP request creates a new component **instance** on whichever host has the workload deployed; there's no per-request replica spin-up because the host pre-loads the component. Replicas come from running the workload on multiple host pods, with Kubernetes ingress doing the load balancing. The runtime gateway maintains an internal mapping of domain → workload → host so it can reverse-proxy to a healthy endpoint.
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+### WASI P3 Q2 Plan: Feature Flag, Coexistence with P2
 
-### Documentation of the Week
+Bailey filed the WASI P3 tracking issue as the Q2 headline. The implementation plan:
 
-- [title](/docs/v1/intro)
-  - summary
+- **Feature flag**: `wasi-p3` ships behind a flag, allowing wasmCloud users to opt in while WASI P3 finishes stabilization
+- **P2/P3 coexistence in the same workload**: components built against P2 and P3 must be able to call each other within a single workload deploy — Bailey believes she has a solution, and wants this pattern to become the ecosystem default
+- **Examples and templates** for every supported language (starting with Rust), plus integration tests
+- **Documentation** — Eric is already taking on the docs work, including `wasi.dev`
 
-## Community Updates
+The P2 vs P3 interface changes are almost entirely the result of WASI rebasing on **native async APIs**. The reshuffling in `wasi-cli` and `wasi-http` is composability-driven: P3's async model needs interfaces that compose cleanly. The one exception is Colin's `wasi-clocks` time-zone additions, which is an unrelated feature addition.
 
-### Tune in…
+### Rust P3 Toolchain: Working Today
 
-{/* Add any upcoming events/streams/etc */}
+Colin asked for an easy way to test P3 from Rust without becoming a toolchain expert. Bailey's answer:
 
--
+- `wasi-rs` already builds against the latest WASI P3 release candidate
+- Wasmtime 43 (which wasmCloud updated to yesterday) includes the same release candidate, and the [WASI Test Suite](https://github.com/WebAssembly/wasi-testsuite) components compile and work end-to-end
+- **wit-bindgen 54** is the recommended version — picking the wrong wit-bindgen is the most common stumbling block
+- Nightly Rust is still required for now, but that's expected to change once language standard libraries land P3 support
 
-### Catch up…
+Practically, Colin can pull components straight from the WASI Test Suite as sample P3 components to validate against, and the wasmCloud team will publish examples and templates as part of the Q2 work.
 
-{/* Add any blog posts/articles that the community might find interesting */}
+### Tokio + Mio WASI Socket Support Landing
 
--
+Bailey shared one of the most exciting updates of the call: **Joel Dice's WASI socket support landed across socket2, Mio, and `wasi-sdk`**, with the Tokio PR close behind. The implementation uses the same `cfg(not(target_os = "wasi-p1"))` guard that wasmCloud uses, which means the moment WASI P3 ships, the support automatically transitions to P3 without any code changes. This is the missing piece that lets developers compile real Rust applications — anything that uses Tokio for networking — to WebAssembly components.
 
-## Recording
+### Cooperative Threads, JCO, and the LLVM Release
 
-{/* Automated - No need to adjust this unless automation fails */}
+The cooperative threads work coming from **Cy Brand** has 100% passing tests in the open POSIX test suite. The remaining blocker is LLVM stabilization, targeted for the **July 2026 LLVM release**. Once that lands, the rest of the work — Rust toolchain support, `wasi-sdk` integration, examples — follows in short order. The team is also building infrastructure in `wasi-sdk` to ship behind-the-flag releases that include exception handling, and soon cooperative threads, so the C/C++ side of the world can start testing within the next week or two.
 
-<YouTube url="https://www.youtube.com/watch?v=zaDiEcB-Lfc" />
+The **JCO reference implementation** for WASI P3 is the second reference implementation in flight (other implementations exist and are in production use, but they're not blocking the spec). JCO is nearing completion — most things work, bug reports are coming in, and Bailey expects the launch in roughly a month, unblocking the vote.
+
+**WASI crypto** also got a positive update: a research group is taking on the implementation, removing one of the last historical blockers preventing random off-the-shelf software (think: anything that does TLS) from compiling cleanly to WebAssembly.
+
+### Browser Support, Wasm Shims, and Emscripten
+
+The discussion turned to the **component model in the browser**. Victor's work on the JCO shim — which "unbundles" a component into Wasm modules and shims them into the browser via JSPI — is the practical path to running components in browsers before native browser support exists. Bailey called this "the XKCD-comic single bit" everyone will depend on. The shim is what generates the telemetry that convinces browser vendors (Chrome especially) to implement the component model natively. Bailey shared a blog post that's been making the rounds documenting browser performance wins from the component model, and noted that Googlers have started collaborating directly on the component model spec.
+
+Colin asked about Emscripten and pthreads — today, `Emscripten + pthreads` spawns full web workers, which is too heavy for green-thread / cooperative-thread workloads. JSPI is the lighter-weight alternative that maps closer to cooperative threads. Bailey is in conversation with Sam Clegg about revisiting Emscripten's WASI support to potentially share the same shim, which would mean Emscripten gets component-model support via JSPI as a side benefit.
+
+### KubeCon and Wasm I/O Takeaways
+
+Frank Schaffa asked for the team's KubeCon Europe and Wasm I/O updates. The unanimous observation: **the conversation has fundamentally shifted**. Jeremy: "I really can't even think of one person that left our booth confused." Eric saw "the light come on" when people heard the capability-driven sandbox pitch and the Kubernetes-native v2 architecture in the same breath. Bailey heard repeated questions about K-native vs wasmCloud — implying users now want them unified, not kept apart.
+
+The other thread from KubeCon was **vibe-coding adoption**. Liam summarized: organizations that have spent years waiting for Java to compile to WebAssembly are now saying "with vibe coding, I don't care about *how* it's done, I just care *what's* done — so why not Rust into WebAssembly?" Colin added the corollary: if you're going to vibe-code a product anyway, would you rather have the generated code in JavaScript without a sandbox, or in Rust running in a memory-safe Wasm sandbox with explicit capability declarations? Jeremy summed up the messaging that worked on Cosmonic's t-shirts at the booth: "sandbox that slop."
+
+The Wasm I/O highlight Bailey called out specifically was [Luke Wagner's "Road to 1.0" keynote](https://www.youtube.com/watch?v=qq0Auw01tH8) (definitive that there will not be a P4) and **Eric Rose from Fastly's introduction-to-WebAssembly-components talk**, which Bailey said is the best intro to components anyone has ever delivered.
+
+### Stunt Hacks
+
+Bailey closed with two community fun-facts: she vibe-coded a Chicory-based wasmCloud host that runs inside the JVM (so JVM-hosted Wasm with component model support is now a thing), and hung out with the GraalVM Wasm lead at Wasm I/O to get a Colin-implementation GraalVM build with component-model-`wasi-http` support working in real time. The takeaway, in Bailey's words: "the art of the possible now is a whole freaking lot."
+
+### Q&A: Kubert, V Cluster, Hyperlight
+
+Frank asked about **Kubert** and virtual cluster integration. Bailey hasn't dug into Kubert specifically, but flagged Microsoft's [Hyperlight](https://github.com/hyperlight-dev/hyperlight) as solving a similar class of problem — and Dan Kirloney's Wasm I/O talk on Hyperlight as one of her favorites from the event. The team would entertain a Kubert-flavored wasmCloud host once someone wants to drive it.
+
+## WebAssembly News and Updates
+
+This week's call connects to several pivotal moments in the WebAssembly ecosystem. [WASI P3](https://github.com/WebAssembly/WASI) is moving from experimental to first-class as Wasmtime 43 ships the release candidate. Joel Dice's [Tokio and Mio WASI socket support](https://github.com/tokio-rs/tokio) is the unlock that brings the Rust async ecosystem to WebAssembly components. [Cy Brand's cooperative threads work in LLVM](https://github.com/llvm/llvm-project) is approaching the July stable release, after which Rust support follows quickly. The [WebAssembly component model](https://component-model.bytecodealliance.org/) is increasingly Google-adjacent thanks to direct Chrome team collaboration on the spec, and Eric Rose's [intro-to-components talk](https://www.youtube.com/@wasmCloud) from Wasm I/O is the new canonical explainer. Together, these movements signal that **WebAssembly in 2026** is finally crossing from "interesting technology" to "production deployment platform."
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project for building and running [WebAssembly components](/docs/overview/workloads/components) on [Kubernetes](/docs/kubernetes-operator/), at the edge, or anywhere else. The wasmCloud v2 architecture, walked through in this call, runs as a [Kubernetes operator](/docs/kubernetes-operator/) that schedules workload deploys to host pods (your standard Kubernetes Deployments). Components are isolated by the [WebAssembly component model](/docs/overview/workloads/components) for capability-driven security, while the runtime gateway reverse-proxies inbound HTTP straight to host pods over `wasi-http`. Applications get [OpenTelemetry observability](/docs/kubernetes-operator/operator-manual/overview), declarative workload specs, OCI artifact distribution with cosign-backed attestation, and a Bytecode-Alliance-aligned path through WASI P3 and cooperative threads — all without giving up Kubernetes-native operations.
+
+## Topic Deep Dive: WASI P3 and the Coexistence Problem
+
+The most architecturally interesting commitment in this call is wasmCloud's plan to run **WASI P2 and WASI P3 components side-by-side in the same workload deploy**. WASI P3's break from P2 is not gratuitous — it's the cost of rebasing on native async APIs so that high-throughput interfaces like `wasi-http` and `wasi-cli` compose cleanly under load. But that means P2 and P3 components have genuinely different interface shapes, and a runtime that wants to support both has to bridge them rather than fork them.
+
+Bailey's argument is that this coexistence pattern is what the rest of the WebAssembly ecosystem should adopt: it makes P3 additive rather than a hard break, and it gives every guest language a long runway to update its toolchain without forcing flag days. The wasmCloud implementation will live behind a `wasi-p3` feature flag during Q2 with the explicit design goal of letting a P2 component invoke a P3 component (and vice versa) within a single workload. If that works — and the team is signaling confidence — it sets the template for how every other WebAssembly host runtime should approach the transition.
+
+## Who Should Watch This
+
+**Kubernetes platform engineers** running wasmCloud in production should start with [Jeremy's pod finalizer demo at 05:10](https://youtu.be/zaDiEcB-Lfc?t=310) and the [v2 scheduling architecture walkthrough at 09:16](https://youtu.be/zaDiEcB-Lfc?t=556). **Rust component developers** want the [WASI P3 toolchain status at 26:16](https://youtu.be/zaDiEcB-Lfc?t=1576) and the [Tokio/Mio update at 31:37](https://youtu.be/zaDiEcB-Lfc?t=1897). **Runtime contributors** should jump to the [cooperative threads and WASI crypto discussion at 40:07](https://youtu.be/zaDiEcB-Lfc?t=2407). And anyone tracking the broader **WebAssembly market** will want the [KubeCon and Wasm I/O takeaways at 48:47](https://youtu.be/zaDiEcB-Lfc?t=2927).
+
+## Up Next
+
+The team is preparing a blog post on Wasmtime 43 and the WASI release candidate as a call-to-action for ecosystem integrators to test ahead of the JCO reference implementation launch. Bailey will work with wasmCloud maintainers to propose Q2 roadmap items this week, with a collaborative roadmap session on next week's community call to finalize the plan. The community is invited to file concrete, actionable Q2 issues ahead of that session.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-04-01-community-meeting-transcript/)**

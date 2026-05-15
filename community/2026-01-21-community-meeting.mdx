@@ -1,98 +1,192 @@
 ---
 date: '2026-01-21'
-title: 'Meeting Agenda - 2026-01-21'
+title: 'wash RC6: Persistent Blobstore, Virtual TCP Loopback & The Path to wasmCloud v2'
+description: 'wasmCloud community call covering wash RC6 — one of the largest release candidates yet — with filesystem-backed Blobstore/KV, virtual TCP loopback between components, a new QR code generator example, and the three remaining issues before the v2 release: Kubernetes identifier, NATS authentication, and gRPC-aware HTTP.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasi blobstore
+  - wasi keyvalue
+  - wasi sockets
+  - tcp loopback
+  - wasmcloud v2
+  - nats authentication
+  - grpc
+chapters:
+  - { seconds: 234, label: "Welcome and RC6 framing" }
+  - { seconds: 276, label: "Lucas on RC6: behavior, API, cleanup" }
+  - { seconds: 330, label: "QR code generator example walkthrough" }
+  - { seconds: 540, label: "Filesystem-backed Blobstore and KV" }
+  - { seconds: 600, label: "Virtual TCP loopback between components" }
+  - { seconds: 690, label: "Three remaining items before v2 release" }
+  - { seconds: 898, label: "ossfellow: when does wash move into the main wasmCloud repo?" }
+  - { seconds: 972, label: "RC6 docs status and the version identifier" }
+  - { seconds: 1020, label: "API design conversation and clippy lints" }
+image: https://i.ytimg.com/vi/UKtDFuFXVfE/maxresdefault.jpg
+showTitle: true
+slug: 2026-01-21-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- wash rc.6 and update on next items
+<YouTube url="https://www.youtube.com/watch?v=UKtDFuFXVfE" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=UKtDFuFXVfE" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The January 21, 2026 wasmCloud community call covers **wash RC6** — one of the largest release candidates yet — with significant behavior and API changes focused on simplicity and a narrower scope for the v2.0 release. **Lucas Fontes** walks through the RC6 highlights: a **filesystem-backed Blobstore and `wasi-keyvalue`** (so data persists across `wash dev` restarts), **virtual TCP loopback** between components in the same workload (so two workloads can both bind port 80 with no collision), and significant correctness improvements in service-to-component context passing. A new **QR code generator example** in 71 lines of Rust demonstrates HTTP, POST handling, error handling, and PNG generation server-side. The team identifies three remaining items before the v2 release: an internal Kubernetes identifier change, NATS authentication support in the operator and `wash host`, and gRPC-aware outbound transport. **Eric** has the RC6 doc rev in PR; **ossfellow** asks about the wash → wasmCloud repo move and Bailey confirms the plan: v1 goes to its own repo, v2 takes over the main `wasmcloud/wasmcloud` repo, artifacts release from there.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **wash RC6 is out** — one of the largest release candidates so far, with significant behavior and API changes in `wash dev` (not `wash host`)
+- **Filesystem-backed Blobstore and `wasi-keyvalue`** — replaces the previous in-memory implementations; data **persists across `wash dev` restarts**, and you can configure which directory backs each
+- **Virtual TCP loopback between components** — components can now connect to services over `127.0.0.1`; long-running components can open TCP ports only accessible to other components in the **same workload**; multiple workloads can bind the same port (e.g., port 80) without conflict because the interfaces are virtualized
+- **Service/component communication correctness** — proper Wasm context passing is now in, fixing subtle bugs around how state flows between long-lived services and stateless components
+- **Codebase cleanup** — extensive linting and removal of `expect`/`unwrap` calls so there are no possible panics in critical paths (a requirement for 24/7 software)
+- **QR code generator example** lands at [`examples/qrcode`](https://github.com/wasmCloud/wash) — 71 lines of Rust showing component HTTP handling, POST processing, error handling, and server-side PNG generation
+- **Three remaining items before v2 release**:
+  1. **Internal Kubernetes identifier** — use a single internal identifier across the runtime so workloads are never scheduled to the wrong host
+  2. **NATS authentication** — neither the runtime operator nor `wash host` support NATS auth today; the team will add at minimum **client cert** support, possibly tokens/credentials files, with security-aware Helm chart updates
+  3. **gRPC-aware outbound transport** — host auto-detects gRPC by inspecting HTTP headers and switches to a gRPC-compliant HTTP library to handle trading headers cleanly
+- **RC6 docs are in PR** — Eric completed the first pass; should land tomorrow. Includes config changes including an **optional version identifier** that helps spot drift
+- **Repo migration plan confirmed** — current `wasmcloud/wasmcloud` (v1) moves to a new `wasmcloud-v1` repo; `wash` repo content takes over `main` of `wasmcloud/wasmcloud`; artifacts release from there
+- **API design conversation** — Lucas and Pavel had a productive thread on API refinements ([wash issue #230](https://github.com/wasmCloud/wash)); much of it has already landed via context correctness PRs
+- **Clippy lints as background work** — Bailey is iterating on [issue #235](https://github.com/wasmCloud/wash) for code-quality lints with Claude in the background; non-blocking for v2
+
+## Chapters
+
+- [03:54 — Welcome and RC6 framing](https://youtu.be/UKtDFuFXVfE?t=234)
+- [04:36 — Lucas on RC6: behavior, API, cleanup](https://youtu.be/UKtDFuFXVfE?t=276)
+- [05:30 — QR code generator example walkthrough](https://youtu.be/UKtDFuFXVfE?t=330)
+- [09:00 — Filesystem-backed Blobstore and KV](https://youtu.be/UKtDFuFXVfE?t=540)
+- [10:00 — Virtual TCP loopback between components](https://youtu.be/UKtDFuFXVfE?t=600)
+- [11:30 — Three remaining items before v2 release](https://youtu.be/UKtDFuFXVfE?t=690)
+- [14:58 — ossfellow: when does wash move into the main wasmCloud repo?](https://youtu.be/UKtDFuFXVfE?t=898)
+- [16:12 — RC6 docs status and the version identifier](https://youtu.be/UKtDFuFXVfE?t=972)
+- [17:00 — API design conversation and clippy lints](https://youtu.be/UKtDFuFXVfE?t=1020)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### wash RC6 Is Out
 
-### `wash` rc.6 release
+**Lucas Fontes** opened with what shipped in **RC6** — released yesterday — and it's one of the largest release candidates to date. The changes are concentrated in **`wash dev`** (developer-loop side); `wash host` is unchanged. Major themes:
 
-- rc.6 represents one of the largest release candidates to date, with significant changes in both behavior and API
-- Changes focused primarily on `wash dev` rather than `wash host`
-- Team completed extensive code cleanup including linting and removal of expect/unwraps to prevent panics in critical paths
-- Release includes changes to configuration, build environment expectations, and `wash dev` behavior
-- New features include:
-  * **Persistent Storage**: Blobstore and key-value plugins now backed by filesystem instead of memory
-  * Data persists across `wash dev` restarts
-  * Users can configure which directory backs blobstore and key-value
-  * **Virtual TCP/IP Loopback**: Components can now connect to services over localhost (127.0.0.1)
-  * Long-running components can open TCP ports only accessible to other components in the same workload
-  * Multiple workloads can open the same port (e.g., port 80) due to interface virtualization
-  * **Service/Component Communication**: Improvements in correctness and Wasm context handling
+- **Configuration and build environment expectations** updated
+- **`wash dev` behavior** modified in several places
+- **Codebase cleanup** — extensive linting, removal of `expect`/`unwrap` calls so there are no panics in critical paths. This is non-negotiable for software that has to run 24/7.
 
-### New QR code generator example
+### QR Code Generator Example
 
-- New example added to demonstrate WebAssembly component development
-- Located in `wash` repository under [`examples/qrcode`](https://github.com/wasmCloud/wash/tree/main/examples/qrcode)
-- Demonstrates HTTP request processing, including POST requests
-- Generates PNG images server-side (not SVG rendered in browser)
-- Showcases components, HTTP handling, static HTML serving, and error handling in just 71 lines of code
-- Used as a test case for `wash dev` development cycle
+Between RC5 and RC6, a new example landed in the wash repo under [`examples/qrcode`](https://github.com/wasmCloud/wash). It's a **QR code generator** that accepts URLs via HTTP POST and returns server-side-rendered PNG images (not SVG-in-browser).
 
-### Next steps to wasmCloud 2.0 release
+Why it matters as an example: in **71 lines of Rust**, it shows how to handle HTTP requests with POST, parse input, do meaningful work in the component (QR generation), serve static HTML for the UI, and handle errors properly. Lucas has been using it as a dev-loop test case for `wash dev` — exactly the kind of "small but real" example that reveals dev-experience issues.
 
-Team identified three critical items needed before final release:
+### Filesystem-Backed Blobstore and `wasi-keyvalue`
 
-**1. Internal Kubernetes identifier PR**
+The previous Blobstore and `wasi-keyvalue` plugins were **in-memory**. In RC6 they're **backed by the filesystem**. When you run `wash dev` and add things to Blobstore, you can stop wash, restart, and **the data is still there**. You can configure which directory backs each.
 
-- Needs revision and discussion to finalize
-- Requires changes in multiple places
-- Ensures workloads are never sent to the wrong host
+This changes the dev-loop dramatically: you can iterate on a component, restart wash freely, and your dev data state persists.
 
-**2. NATS authentication support**
+### Virtual TCP Loopback Between Components
 
-- Currently neither runtime operator nor `wash host` support NATS authentication
-- Team needs to investigate whether to support additional authentication methods (tokens, credentials files, etc.)
-- Changes must be reflected in Helm chart with security concerns in mind
+The most architecturally interesting change: **virtual TCP/IP loopback** between components within the same workload. Components can connect to services over `127.0.0.1`. A long-running component can open a TCP port, and **only components in the same workload can reach that port**.
 
-**3. Outbound transport system for gRPC** 
+This makes a multi-component pattern simple: stateless `wasi-http` handlers calling into a long-lived service component that holds a connection pool, all via TCP loopback to localhost — no network stack hop, no port collisions between unrelated workloads. Even better: **two different workloads can both bind port 80** with no collision, because the interface is virtualized per workload.
 
-- Makes HTTP calls gRPC-aware
-- Host will automatically detect gRPC environment by checking HTTP headers
-- Will make gRPC on top of components essentially transparent
-- Currently causes issues with trading headers when using gRPC clients
+The next-meeting-onward demos build on this primitive to show patterns like compiling PgBouncer or a connection bouncer to Wasm and bundling it with your workload.
 
-**Additional validation items**
+### Three Remaining Items Before v2
 
-- Several open items need verification rather than new code
-- Focus on confirming expected behavior is correct after recent changes
+Lucas walked through what's left before the team can call this a release. Three concrete items:
 
-**Repository structure changes**
+**1. Internal Kubernetes identifier**
 
-- Team plans to move wash repository into main `wasmCloud` repository
-- Current `wash` repo will become `wasmcloud-v1`
-- Main `wasmcloud` repo will become the primary repository
-- Artifacts will be released from the main `wasmcloud` repository
+A PR has been open for a while — needs rebasing and a discussion. The substance: switch from generating an identifier on the fly to using a single internal Kubernetes identifier consistently across the runtime. The motivation is consistency and the guarantee that **workloads are never sent to the wrong host**.
 
-## Weekly highlights
+**2. NATS authentication**
 
-### Issue of the Week
+Neither the runtime operator nor `wash host` currently support **any form of NATS authentication**. The straightforward path is client-certificate-based auth (TLS certs). The investigation work is whether to also support tokens, credentials files, etc. — and reflecting those choices in the **Helm chart** with security best practices baked in. Getting the auth code into the host isn't the hard part; making the Helm chart safe-by-default is.
 
-- [Clippy lints](https://github.com/wasmCloud/wash/issues/235)
-- [API Design](https://github.com/wasmCloud/wash/issues/230)
+**3. gRPC-aware outbound transport**
 
-### Documentation of the Week
+Currently if you try to use a gRPC client in a component, you hit issues with trading (trailer) headers. This PR makes the host **auto-detect gRPC** by inspecting HTTP headers and route through a more gRPC-compliant HTTP library underneath. With this, **gRPC on top of components becomes essentially transparent**.
 
-- [rc6 updates](https://github.com/wasmCloud/wasmcloud.com/pull/1042)
+Beyond these three, there are a few open validation items — not "go write code," more "verify the expected behavior is still correct after recent changes." But the substance is the three above.
 
-- Documentation for rc.6 being updated
-- Eric completed first pass already in PR
-- Updates expected to land tomorrow
-- Includes important config changes, particularly version identifier (which is optional)
-- Link will be posted in wasmCloud Slack once documentation lands
+### Repo Migration Plan
 
-## Recording
+**ossfellow** asked whether RC6 is along the way of moving wash into the main wasmCloud repo (Lucas had mentioned the plan a few calls back).
 
-{/* Automated - No need to adjust this unless automation fails */}
+Bailey confirmed:
 
-<YouTube url="https://www.youtube.com/watch?v=UKtDFuFXVfE" />
+- We're still doing the best we can to not impact v1 while iterating
+- Once v2 is officially the latest supported major version:
+  - Current `wasmcloud/wasmcloud` content (the v1 codebase) moves to its own repo, likely `wasmcloud-v1`
+  - Current `wash` content moves into `wasmcloud/wasmcloud` and takes over `main`
+  - **All v2 artifacts release from `wasmcloud/wasmcloud`** from that point forward
+
+### RC6 Documentation and Version Identifier
+
+**Eric** finished a first pass of the **RC6 documentation rev** for [wasmcloud.com](https://wasmcloud.com/). It's up in PR and should merge today or tomorrow — Bailey will post the link in the wasmCloud Slack once it lands.
+
+The main practical change users need to make: **update their config to match RC6**. Lucas added a **version identifier** to the config schema (optional, so it doesn't break existing configs) that helps spot drift. As the v2 schema stabilizes, the version identifier becomes a useful versioning anchor.
+
+### API Design and Background Lint Work
+
+Bailey called out [**wash issue #230**](https://github.com/wasmCloud/wash) — Lucas and Pavel have been having a productive thread on API refinements. Much of what they discussed has already landed as part of the context-correctness PRs Lucas reviewed and merged. Worth reading for anyone tracking the v2 API shape.
+
+She also flagged [**wash issue #235**](https://github.com/wasmCloud/wash) for additional clippy lints. The high-priority panic-prevention lints already landed in RC6. The remaining lints are for code quality, not correctness, so they're **non-blocking** for v2 release. Bailey is iterating on them with Claude in the background.
+
+## WebAssembly News and Updates
+
+This week's call locks in what RC6 means for the [WASI](https://github.com/WebAssembly/WASI) and [component model](https://component-model.bytecodealliance.org/) story. **Virtual TCP loopback** in wasmCloud v2 — between components in the same workload, with proper port-virtualization — is the kind of primitive that previously required containerization with sidecar networking. Filesystem-backed `wasi-keyvalue` and Blobstore make `wasi-p2` storage stories meaningfully more useful for the developer loop. And the gRPC-aware outbound transport will make Wasm a more natural fit for service-mesh-heavy environments. Combined with the upcoming wash → wasmCloud monorepo move, [wash](https://github.com/wasmCloud/wash) is converging on the v2.0 release.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project for building and running [WebAssembly components](/docs/overview/workloads/components) across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/). The RC6 release demoed in this call introduces **persistent storage** (filesystem-backed Blobstore and `wasi-keyvalue`), **virtual TCP loopback** between components in the same workload, and significant correctness improvements in service/component communication. Components are built and developed with [`wash dev`](/docs/wash/developer-guide/), composed with the [WebAssembly component model](/docs/overview/workloads/components), and deployed declaratively to host pods via the runtime operator. The v2 architecture targets production Kubernetes deployments with native operator-pattern scheduling, runtime gateway routing, and signed/attested OCI artifact distribution.
+
+## Topic Deep Dive: Virtual TCP Loopback and Per-Workload Localhost
+
+The virtual TCP loopback feature in RC6 is the architectural primitive that unlocks several patterns the wasmCloud team has been targeting for v2. The mental model: **each workload gets its own private localhost**. Inside a workload, a long-running service component can `listen` on `127.0.0.1:8080`; stateless `wasi-http` handlers in the same workload can `connect` to that loopback and talk to the service. Outside the workload, that port doesn't exist.
+
+That gives you two things at once:
+
+1. **No port collisions between workloads.** Two different workloads can both bind port 80 on their respective loopbacks. No coordination, no port-allocation service, no sidecar config.
+2. **Stateless + stateful composition.** The traditional cloud-native pattern of "stateless HTTP handler + stateful service holding a connection pool" used to require either two separate deployments (with the network stack between them) or a sidecar pattern. With per-workload localhost, both live in the same workload — same OS process — and talk over a virtualized loopback. **No network stack between them.**
+
+For platform engineers, this matters because the per-request overhead of "go through localhost virtualization" is dramatically smaller than "go through the kernel TCP stack" or "go through a sidecar." For component authors, the model is just `wasi-sockets` — same code as if you were talking over real localhost. The runtime makes the virtualization transparent.
+
+## Who Should Watch This
+
+**wasmCloud developers tracking the v2 release** should watch [Lucas's full RC6 walkthrough at 04:36](https://youtu.be/UKtDFuFXVfE?t=276) through the three remaining items at [11:30](https://youtu.be/UKtDFuFXVfE?t=690). **Rust component developers** wanting a real-but-small example should jump to [the QR code generator at 05:30](https://youtu.be/UKtDFuFXVfE?t=330). **Platform engineers** thinking about per-workload networking want the [virtual TCP loopback explanation at 10:00](https://youtu.be/UKtDFuFXVfE?t=600). **Users following the repo migration** should catch [ossfellow's question and Bailey's answer at 14:58](https://youtu.be/UKtDFuFXVfE?t=898).
+
+## Up Next
+
+The team will close the three remaining items (Kubernetes identifier, NATS auth, gRPC-aware HTTP) and validate the open items. If those land, RC6 could be the basis for v2.0 directly. Eric's RC6 docs PR lands tomorrow. Next week's call will likely cover RC7 stabilization work, the OpenTelemetry plumbing Lucas has been building, and progress on the wash → wasmCloud repo migration.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-01-21-community-meeting-transcript/)**

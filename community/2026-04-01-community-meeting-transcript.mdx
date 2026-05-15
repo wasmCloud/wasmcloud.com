@@ -1,0 +1,455 @@
+---
+date: '2026-04-01'
+title: 'Transcript: wasmCloud v2 Launch, Pod Finalizer Demo, WASI P3 Q2 Planning & Cooperative Threads'
+description: 'Full transcript of the April 1, 2026 wasmCloud community call covering Jeremy''s pod finalizer demo, v2 scheduling architecture, WASI P3 Q2 planning, Tokio/Mio WASI support, JCO progress, and KubeCon takeaways.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - kubernetes operator
+  - wasi p3
+  - cooperative threads
+  - jco
+  - tokio wasi
+image: https://i.ytimg.com/vi/zaDiEcB-Lfc/maxresdefault.jpg
+showTitle: true
+slug: 2026-04-01-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-04-01-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=zaDiEcB-Lfc" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=zaDiEcB-Lfc" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, April 1, 2026 · 1h 0m*
+
+**Speakers:** Bailey Hayes, Colin Murphy, Jeremy Fleitz, Frank Schaffa, Liam Randall, Eric
+
+---
+
+{/* truncate */}
+
+## Full Transcript
+
+**Eric** [00:43](https://youtu.be/zaDiEcB-Lfc?t=43)
+
+Hey, what's up, Eric — hello, hello, not too much about yourself.
+
+**Jeremy Fleitz** [00:49](https://youtu.be/zaDiEcB-Lfc?t=49)
+
+Nope, the same.
+
+**Bailey Hayes** [02:54](https://youtu.be/zaDiEcB-Lfc?t=174)
+
+Hey y'all, how you doing? Hi Colin, how's it going?
+
+**Colin Murphy** [03:27](https://youtu.be/zaDiEcB-Lfc?t=207)
+
+How are you? I've been very deep in my regular job. KubeCon — that already happened?
+
+**Bailey Hayes** [03:43](https://youtu.be/zaDiEcB-Lfc?t=223)
+
+I got back Monday from travel. I did yesterday catching up. I think I'm caught up — if there's a lot of other stuff, if people see things that I missed, I'm not ignoring you. I just had two weeks of conferencing and I was not able to keep up with all of it. I did the mistake of accidentally clicking on things on my phone, and now it's red.
+
+**Bailey Hayes** [04:18](https://youtu.be/zaDiEcB-Lfc?t=258)
+
+I feel like I have to call GitHub-notification bankruptcy once a month or something — there's got to be a solution there. I'm going to pull up the agenda. Jeremy, are you ready if I pass it straight to you?
+
+**Jeremy Fleitz** [05:10](https://youtu.be/zaDiEcB-Lfc?t=310)
+
+Welcome to wasmCloud Wednesday. I'm going to start off with a demo. This got merged yesterday. It's an update to how host pod reconciliation works inside wasmCloud. We found this bug last week at KubeCon while doing some demos and updates on the finalizers used inside the runtime operator. If one of the hosts disappears, the reconciliation loop for all the workloads that are deployed took roughly two and a little over minutes. The reason: when a host is running inside your cluster that creates a host custom resource that is cluster-scoped, not namespaced. Inside this host custom resource is where the status lives — kernel, memory, workload count, and whether it's healthy. When the host dies the heartbeat stops and after one minute it'll be updated to an unknown state, so nothing else gets deployed to the host because it's not healthy. The next loop around it finally goes around and says "oh I got some workloads that are out there that are also in an unhealthy state." That takes roughly two minutes — not a great problem to have.
+
+What this change does is add a **finalizer to the pod of the host**. If I look at it, there's a finalizer added to the pod resource itself. For this to be allowed, there's a new role created — not a cluster role. It has the patch permission given to the runtime operator. This works because by default wasmCloud deploys the host and the runtime operator in the same namespace, and we wanted to avoid having a cluster role by default, which would give too many permissions. If you have the host running in other namespaces you can clone this role and give the appropriate permissions.
+
+Quick demo: I've got a Hello World running. A curl statement loops forever, returning 200 if good. I'm going to delete the pod — like I said, before it took about two minutes for it to reconcile. As you notice — let me stop that — yeah, that's roughly about four seconds. Way faster than two minutes. Everything's healthy. The new host is reporting it's ready to go.
+
+**Colin Murphy** [09:16](https://youtu.be/zaDiEcB-Lfc?t=556)
+
+So when you say host, you obviously mean wasmCloud host? Like a node — and the problem was that the host wasn't able to accept anything after you deleted the pod. How is it scheduling? How has it changed?
+
+**Jeremy Fleitz** [09:44](https://youtu.be/zaDiEcB-Lfc?t=584)
+
+Yeah, let me share my screen again. Inside the workload you specify where the OCI image is, what interfaces you need, and a host selector — host group. The hosts that are deployed are a Kubernetes Deployment. In the deployment, this host-group "default" has three replicas. When the workload goes out, the operator says "oh, I need to schedule this." It finds the right host, connects over NATS to let the host know what needs to be scheduled, schedules it, and CRDs all the way through.
+
+**Colin Murphy** [11:03](https://youtu.be/zaDiEcB-Lfc?t=663)
+
+It makes sense now. We can have multiple hosts, and the problem was that it was scheduling on hosts that didn't exist anymore.
+
+**Jeremy Fleitz** [11:14](https://youtu.be/zaDiEcB-Lfc?t=674)
+
+It was that, but also because obviously pods can fail. Anything can fail. We wanted to take into consideration that this pod is running all these workloads — if it goes down from a catastrophic event, we want those rescheduled as fast as possible so there's no production outage.
+
+**Bailey Hayes** [11:46](https://youtu.be/zaDiEcB-Lfc?t=706)
+
+The only other thing I'd add: for something where you have an SLA behind you, you'd also be using our replicas — that would be on multiple host pods. The work gets scheduled across them.
+
+**Colin Murphy** [12:00](https://youtu.be/zaDiEcB-Lfc?t=720)
+
+If a request comes in, you should not have hit this anyway. Yeah — because you're still using NATS being put on the message bus? Or has that changed?
+
+**Bailey Hayes** [12:25](https://youtu.be/zaDiEcB-Lfc?t=745)
+
+We're not publishing HTTP requests over the message bus. The load balancing here is whatever you put in front of your ingress, and then that will route to the host DNS.
+
+**Colin Murphy** [12:37](https://youtu.be/zaDiEcB-Lfc?t=757)
+
+Because we're doing `wasi-http` directly. wasmCloud is doing that, or Wasmtime is doing it directly.
+
+**Bailey Hayes** [12:50](https://youtu.be/zaDiEcB-Lfc?t=770)
+
+They'll have a gateway, some configuration for envoy that's going to do routing.
+
+**Jeremy Fleitz** [13:09](https://youtu.be/zaDiEcB-Lfc?t=789)
+
+And inside wasmCloud, the runtime gateway handles the reverse proxy from there into the corresponding host for that workload.
+
+**Colin Murphy** [13:22](https://youtu.be/zaDiEcB-Lfc?t=802)
+
+I'm just thinking — it's kind of like early days of Kubernetes before application load balancers, you'd have to have an ELB for every service. So each HTTP service is going to have its own load balancer, but that's going to have to come up healthy in the load balancer for traffic to get routed to it.
+
+**Jeremy Fleitz** [13:55](https://youtu.be/zaDiEcB-Lfc?t=835)
+
+The workload has to be in a healthy state, and when that's healthy, the runtime gateway updates its internal mapping. It's a hash map of "I see this domain, let me see what workload is registered to it, and reverse-proxy back to it." It's not a separate ALB for each thing — it's just one runtime gateway running.
+
+**Colin Murphy** [14:30](https://youtu.be/zaDiEcB-Lfc?t=870)
+
+So there's one runtime gateway and the response gets executed independently. How does the translation from HTTP into whatever NATS needs happen?
+
+**Bailey Hayes** [14:55](https://youtu.be/zaDiEcB-Lfc?t=895)
+
+In this scenario, there's an HTTP server inside the host that's effectively built in.
+
+**Colin Murphy** [15:01](https://youtu.be/zaDiEcB-Lfc?t=901)
+
+Common for every workload.
+
+**Bailey Hayes** [15:04](https://youtu.be/zaDiEcB-Lfc?t=904)
+
+Common for every workload. A request comes in, hits somebody's load balancer or HAProxy, hits our runtime gateway. Our dead-simple reverse proxy will be enriched with what the workload is, who we want to talk to, and that is routed to the host. Inside the host it's HTTP all the way through. The component itself, if it's a REST microservice, has an export for `wasi-http`.
+
+**Frank Schaffa** [16:22](https://youtu.be/zaDiEcB-Lfc?t=982)
+
+So does this follow what Kubernetes does — checking the health of the components and if they're okay?
+
+**Jeremy Fleitz** [16:43](https://youtu.be/zaDiEcB-Lfc?t=1003)
+
+If you go through the documentation Bailey dropped, there are really two operators working. One is the runtime operator that schedules all the workloads to the right hosts — that's checking the host state. The gateway is the one that gets the status info from the workload that's been deployed and routes traffic coming in based on that. The way we were describing it at KubeCon: wasmCloud is an extension for Kubernetes to run Wasm components exactly like K8s pods do.
+
+**Frank Schaffa** [17:36](https://youtu.be/zaDiEcB-Lfc?t=1056)
+
+This is for long-running. But if it is to spawn a new replica — for a function — how is the decision made? Does the gateway decide it needs a new replica?
+
+**Colin Murphy** [18:11](https://youtu.be/zaDiEcB-Lfc?t=1091)
+
+There are two different things going on. You're making a new instance of the component on every request. The health of the workload — is my Hello World, every time it gets called, returning a 200? If suddenly every time Hello World kicks off it fails, somehow doesn't send a response, you need to be aware of that at the wasmCloud level. And you also have to be aware of the health of the wasmCloud hosts themselves at the orchestration level. For long-running it doesn't really matter — same idea.
+
+**Jeremy Fleitz** [19:09](https://youtu.be/zaDiEcB-Lfc?t=1149)
+
+And then this change was back to the original — if a host goes down, those workloads also need to be marked unhealthy. That's the health of the workload.
+
+**Frank Schaffa** [19:41](https://youtu.be/zaDiEcB-Lfc?t=1181)
+
+Every request will create its own replica?
+
+**Colin Murphy** [19:52](https://youtu.be/zaDiEcB-Lfc?t=1192)
+
+Replica — meaning workload. A workload is the fact that you have the component on the host.
+
+**Frank Schaffa** [20:05](https://youtu.be/zaDiEcB-Lfc?t=1205)
+
+What is the terminology — a component is just an object, but to run it?
+
+**Bailey Hayes** [20:12](https://youtu.be/zaDiEcB-Lfc?t=1212)
+
+That's an instance.
+
+**Frank Schaffa** [20:15](https://youtu.be/zaDiEcB-Lfc?t=1215)
+
+So every request will bring up an instance.
+
+**Colin Murphy** [20:21](https://youtu.be/zaDiEcB-Lfc?t=1221)
+
+And you have to make sure you have the component, or components, for that workload on the host in order for it to respond. It can pull it down, because they're fairly small.
+
+**Colin Murphy** [20:36](https://youtu.be/zaDiEcB-Lfc?t=1236)
+
+Can you do multiple components in a workload?
+
+**Bailey Hayes** [20:40](https://youtu.be/zaDiEcB-Lfc?t=1240)
+
+Sure can.
+
+**Bailey Hayes** [20:43](https://youtu.be/zaDiEcB-Lfc?t=1243)
+
+A workload deployment looks a whole lot like a `wadm` YAML in v1. Maybe we do a recurring "doc of the week" here — Eric wrote a doc on migration to v2 that shows side-by-side comparison between v1 and v2. The pictures are very similar; there are slight differences and good reasons for them. We talk about how we're not really shoving every single request on NATS. The main motivation: performance. In our architecture you've got your workload deployment that we're scaling — it's the runtime operator that reconciles it and tells which hosts to load the workload. What we don't have in this is the runtime gateway — probably another feature enhancement we could make to clarify the different parts. There's a difference between what's declarative — resources defined throughout the system state — and the path of an ingressing request.
+
+**Bailey Hayes** [22:38](https://youtu.be/zaDiEcB-Lfc?t=1358)
+
+We released wasmCloud v2 and that's pretty cool. There are a couple last-mile things we've been landing — small, minor fixes, getting the actions toolkit to point to the latest release. All that is out now, which means it's time for Q2 planning. I've started creating a couple of issues that I think will be great candidates for Q2. I encourage other folks to file issues — make sure they're qualified, like if it's very abstract, the concrete issue would be "we work together to come up with a design," not "schedule work to be done in Q2." So qualified work that we can do and action on, ideally get done in Q2, separate from the higher-level things we want to explore.
+
+For example, I went ahead and created one for **WASI P3**. We've been tracking that for a long time, it's important, and it's a big chunk of work. The way I think we should implement this is to put it behind a `wasi-p3` feature flag. Yesterday we updated to Wasmtime 43. Wasmtime 43 has the release candidate I cut in the lead-up to Wasm I/O, and it might be the last one. Next week my game plan is to get up a blog post on WASI and the Bytecode Alliance — that's basically a last call. Please try things, integrate. If you've been hanging out waiting for almost no churn, now's the time.
+
+One important thing I want to call out as part of the design: we're going to make this work simultaneously — p2 components and p3 can coexist. They can call each other in the same workload even. That's a fun, challenging problem, but I think I have a solution. That's also what I want to see the rest of the ecosystem adopt for p3. p3 is additive — it's not even really a breaking change, except the interfaces change between p2 and p3, and the main reason they change is because the WASI P3 interfaces have been rebased on native async APIs. The rejiggering in things like `wasi-cli` and `wasi-http` was completely because when you introduce native async, we want to make sure it composes cleanly. So the changes there were almost all entirely motivated by native async, with the exception of Colin's changes which add time zones in `wasi-clocks`.
+
+**Colin Murphy** [26:16](https://youtu.be/zaDiEcB-Lfc?t=1576)
+
+Do we have a preview of a Rust target? That would be really nice — I can't test p3 without my Rust toolchain working.
+
+**Bailey Hayes** [26:37](https://youtu.be/zaDiEcB-Lfc?t=1597)
+
+Started in nightly — still in nightly, technically. But `wasi-rs` is what a lot of people use, already building against the latest release candidate. Wasmtime 43 has the latest release candidate, and the WASI Test Suite has the latest release candidate, and all that builds and works. You can use the components in the WASI Test Suite if you want something early to play with.
+
+**Bailey Hayes** [27:30](https://youtu.be/zaDiEcB-Lfc?t=1650)
+
+If you look at where I changed these bindings, this doesn't use `wasi-rs` directly — it doesn't have a dependency there. I just pinned to those bindings directly in the test suite. If you're using `wit-bindgen`, you can build your own components. All of these are little components that do all the different things you might want to do with file-system, clock, CLI, HTTP. We've got a p3 Rust native toolkit you can use for your sample components. Part of what I filed in that issue is that we need to have our own examples and templates starting with Rust, but all of our supported languages in the wasmCloud space as well, so people can find it. With our service feature I want to show a more interesting end-to-end use case versus the WASI Test Suite stuff, which is more "operationally proving it works." This would be a great place for people to contribute once we get the bones landed. Eric has signed up to help with documentation — he owns wasi.dev docs. And making sure we've got solid integration tests is another place I'll take a pass. I've assigned this to me but I welcome collaboration.
+
+**Colin Murphy** [29:22](https://youtu.be/zaDiEcB-Lfc?t=1762)
+
+Do we still need nightly for the standard library APIs?
+
+**Bailey Hayes** [29:39](https://youtu.be/zaDiEcB-Lfc?t=1779)
+
+I need to run a couple things to double check. I always look at what `wasi-rs` is doing and copy that. This was the rev a couple weeks ago — main trick: make sure you're using `wit-bindgen` 54. It's pretty obvious when you're not.
+
+**Bailey Hayes** [31:37](https://youtu.be/zaDiEcB-Lfc?t=1897)
+
+Have you seen this? I've got cool stuff for you, Colin. All of this stuff has landed. This is now released — `socket2` has `wasm32-wasi-p2` support. One cool thing to call out: I did a trick — I said `cfg(not(target_os = "wasi-p1"))`, which means the moment we have p3, this just works. It uses p3. The next thing is in Mio — Joel has landed and merged changes to both Tokio and Mio. There's one more PR remaining and then that is good to go for p2. He used the same trick as me, so when we move to p3, yes, there are better, more performant ways we can do this stuff — and also it will just work, which is ultimately what everybody cares about right now.
+
+**Bailey Hayes** [33:07](https://youtu.be/zaDiEcB-Lfc?t=1987)
+
+A big long series of changes — this is a more recent one where Joel landed changes in the `wasi-sdk`. Those are percolated. He's able to depend on them here. This is merged. I believe there are a few more — at least one more — that I'm aware of.
+
+**Colin Murphy** [33:39](https://youtu.be/zaDiEcB-Lfc?t=2019)
+
+That should be mentioned in his Tokio PR too.
+
+**Bailey Hayes** [33:44](https://youtu.be/zaDiEcB-Lfc?t=2024)
+
+Tokio is the end of the chain. It's close.
+
+**Colin Murphy** [33:55](https://youtu.be/zaDiEcB-Lfc?t=2035)
+
+It's still open, okay, but that's what I thought.
+
+**Bailey Hayes** [34:00](https://youtu.be/zaDiEcB-Lfc?t=2040)
+
+We're going to celebrate from the rooftops when that one is released. It just works for p2, so what everybody's doing today will just work for p3 because — again — p3 better, hopefully. It'll start just working the same as p2 initially, then work better. Calling out some of those big rocks for Q2 planning — there are other things we should get on the roadmap. This week, please file issues. I'll make a pass with wasmCloud maintainers and propose what I think should be in Q2 in our initial pass. Plan on a collaborative roadmap session next week in the next community call.
+
+**Colin Murphy** [35:05](https://youtu.be/zaDiEcB-Lfc?t=2105)
+
+Everyone's very excited for cooperative threads over here.
+
+**Bailey Hayes** [35:13](https://youtu.be/zaDiEcB-Lfc?t=2113)
+
+Have you seen Cy Brand's talk on it?
+
+**Colin Murphy** [35:16](https://youtu.be/zaDiEcB-Lfc?t=2116)
+
+I did, it was great. Every time we meet with the web browser people, everyone's asking — I'm getting them all asking for component model in the browser. I know it's tangentially related to all this.
+
+**Bailey Hayes** [35:41](https://youtu.be/zaDiEcB-Lfc?t=2141)
+
+The shim that Victor has been working on in the JCO side of the world is going to be the shim that everybody depends on. It's going to be the bit in that XKCD comic where they have the one bit everybody depends on. The bit lets you take a component, unbundle it (make it into Wasm modules), shim it into the browser. That shimming is going to be really important — it's going to be the motivating factor. Getting telemetry on that and proving people care about it and are using it is going to motivate folks like Chrome to actually go implement the component model natively. The other fun thing browsers do is they compete with each other. Nobody wants to be the slower one.
+
+**Bailey Hayes** [36:42](https://youtu.be/zaDiEcB-Lfc?t=2202)
+
+Share this blog post around to Colin — especially when you're talking to Googlers. They've done the math: it is faster and better and great, and they're very excited right now.
+
+**Colin Murphy** [37:07](https://youtu.be/zaDiEcB-Lfc?t=2227)
+
+Already on there — I already posted it. Somebody else posted it. I commented on it.
+
+**Bailey Hayes** [37:13](https://youtu.be/zaDiEcB-Lfc?t=2233)
+
+This is a big deal — signaling intention and support. And since then a couple of Googlers have been posting and collaborating over on the component model spec, which is really good, all in line with trying to solve this problem.
+
+**Colin Murphy** [37:36](https://youtu.be/zaDiEcB-Lfc?t=2256)
+
+I'll put this — I don't know if you guys are fans. It's even making its way into YouTube's algorithm. They're bringing back the talk from "Destroy All Software" — which you have referenced yourself. It's a talk from 2014 — asm.js — and we're predicting 2026 was his prediction for it to really be a thing in the browser. I think we're a little behind. He predicted there was going to be a World War from 2022 to 2025 that would delay it. There was COVID, so we're a little behind, but it's happening.
+
+**Bailey Hayes** [39:03](https://youtu.be/zaDiEcB-Lfc?t=2343)
+
+That was basically most of our agenda. p3 — we're in the middle of completing the second reference implementation inside JCO. The end is in sight. Most things are working now. We're getting good bug reports. People are exercising it. We have other reference implementations that other people have created in production — software today is unlikely, so we're not going to use them as a reference implementation, but the one we support in the Bytecode Alliance is nearing completion. Very hopeful — in a month-ish we can launch this thing.
+
+**Colin Murphy** [39:55](https://youtu.be/zaDiEcB-Lfc?t=2395)
+
+Then we'll get into wasmCloud. People can just compile their stuff with Tokio and it's going to work in wasmCloud — so much easier to talk to people about getting their stuff running in wasmCloud.
+
+**Bailey Hayes** [40:07](https://youtu.be/zaDiEcB-Lfc?t=2407)
+
+Three months from now — and we should include this in our quarter planning — **cooperative threads** landing. We're aiming for the full stable release to come out with the **July release of LLVM**, because that's really what we're blocked by. The implementations are complete. Cy Brand has 100% passing tests in the open POSIX test suite. I helped just a little bit by doing 17 code reviews, but Cy did all the work. Once that happens, you're really cooking, because basically all of the things that kept people from being able to compile WebAssembly are gone. One more thing — Colin, I've been talking to a research group that is interested in taking on `wasi-crypto` and starting on that work soon.
+
+**Colin Murphy** [41:06](https://youtu.be/zaDiEcB-Lfc?t=2466)
+
+That'd be great. Rust-crypto has come such a long way since I started asking for that — but definitely great to have.
+
+**Bailey Hayes** [41:15](https://youtu.be/zaDiEcB-Lfc?t=2475)
+
+That's probably the only other thing keeping just random software off-the-shelf from compiling.
+
+**Liam Randall** [41:27](https://youtu.be/zaDiEcB-Lfc?t=2487)
+
+Question around the LLVM work — has it landed in a branch? Is there a world where we set up a build or a container with a build system so that people have an easy way to play with all this stuff together?
+
+**Bailey Hayes** [41:57](https://youtu.be/zaDiEcB-Lfc?t=2517)
+
+It's already merged in a lot of places. The Open POSIX Test Suite stuff is pinned to a branch that works. The other aspect: we've been building infrastructure inside `wasi-sdk` to enable behind-a-flag releases that include exception handling and soon cooperative threads. Cooperative threads is iterating still with the LLVM side, so we're not quite at the point where we'd add the LLVM patches into `wasi-sdk` yet, but I'm thinking in the next week or so probably will be. Then we'd do the same thing we did with exception handling — take the things we want in LLVM, patch them in, having that behind a flag that says "got to enable this because it's not stable yet" — but that will give you a `wasi-sdk` with a wasi libc and an LLVM that has both exception handling and cooperative threads enabled.
+
+**Colin Murphy** [43:00](https://youtu.be/zaDiEcB-Lfc?t=2580)
+
+Then we'd need a Rust build to use that LLVM.
+
+**Bailey Hayes** [43:06](https://youtu.be/zaDiEcB-Lfc?t=2586)
+
+The Rust work is slotted for after LLVM.
+
+**Colin Murphy** [43:13](https://youtu.be/zaDiEcB-Lfc?t=2593)
+
+If we wanted to demo it... How's your C++?
+
+**Bailey Hayes** [43:28](https://youtu.be/zaDiEcB-Lfc?t=2608)
+
+Cy is famous in the C space, and that's where they are going to build a ton of examples exercising this with a lot of commodity software that people use today. The open POSIX test suite compliance test is sufficient to say this is a rock-solid pthread implementation. The feedback loop is just about landing the things in LLVM. We don't need any more feedback on that — it's done.
+
+**Colin Murphy** [44:14](https://youtu.be/zaDiEcB-Lfc?t=2654)
+
+We just have all of our examples — for people to play around and use our examples or use the wasmCloud examples, we probably want a Rust build. But in terms of proving it out, we don't need to do any Rust stuff in terms of proof of concepts.
+
+**Bailey Hayes** [44:32](https://youtu.be/zaDiEcB-Lfc?t=2672)
+
+We're happy with the spec there too. So it's already landed inside `wasm-tools`, wasmCloud — they're all just on branches waiting for stabilization to be turned on.
+
+**Colin Murphy** [44:45](https://youtu.be/zaDiEcB-Lfc?t=2685)
+
+For the shim stuff, once we have cooperative threads, is that going to ship as a web-worker spawn or not?
+
+**Bailey Hayes** [45:04](https://youtu.be/zaDiEcB-Lfc?t=2704)
+
+At least at first, I don't have a resource that's on the hook for getting that over the line yet. Our first stab is just **JSPI**, and that's what our shim is going to do. Web workers more akin to a whole thread, whereas a cooperative thread is more like a green thread or coroutine.
+
+**Colin Murphy** [45:29](https://youtu.be/zaDiEcB-Lfc?t=2729)
+
+I'm just saying — we've been frustrated around the fact that it spins up the whole web worker. JSPI is what I just read about. I don't think it has something you can do other than spawn a web worker right now?
+
+**Bailey Hayes** [46:02](https://youtu.be/zaDiEcB-Lfc?t=2762)
+
+JSPI would not be like spawning a whole web worker, but it is taking advantage of the async-ness in the browser and us being able to do that pretty efficiently. You're still effectively bound to one thread in that scenario, and you're essentially doing work-stealing.
+
+**Colin Murphy** [46:32](https://youtu.be/zaDiEcB-Lfc?t=2792)
+
+So it's like green threads, but with a single process.
+
+**Colin Murphy** [46:47](https://youtu.be/zaDiEcB-Lfc?t=2807)
+
+When I do pthreads in Emscripten, when I enable that, that's spawning web workers. But I don't think there's another option besides pthreads.
+
+**Bailey Hayes** [47:03](https://youtu.be/zaDiEcB-Lfc?t=2823)
+
+They don't have another option because they don't have an ABI to describe how that's supposed to work right now. This is completely up to the Emscripten maintainers, but it would be cool if we shared the same shim. I talked to Sam Clegg — he's pretty into the idea of us revisiting the WASI support inside Emscripten, potentially sharing our shim. That would mean it would be with JSPI, with component-model support.
+
+**Colin Murphy** [47:44](https://youtu.be/zaDiEcB-Lfc?t=2864)
+
+That's probably what we're going to have to do eventually.
+
+**Bailey Hayes** [47:48](https://youtu.be/zaDiEcB-Lfc?t=2868)
+
+I'm personally very into server-side.
+
+**Colin Murphy** [47:52](https://youtu.be/zaDiEcB-Lfc?t=2872)
+
+I am too. It's just people don't want to pay me to work on server-side WASI. People want to pay for the other side.
+
+**Bailey Hayes** [48:15](https://youtu.be/zaDiEcB-Lfc?t=2895)
+
+We went places, that was awesome — because there aren't many other forums to talk about this. I gave the opening and closing remarks for Wasmcon and tried to go through some of this there. The Wasm I/O talks from Luke Wagner and Cy Brand are also worth a watch if you haven't seen them — they go into great detail.
+
+**Frank Schaffa** [48:47](https://youtu.be/zaDiEcB-Lfc?t=2927)
+
+I was going to ask in terms of wasmCloud and KubeCon if you guys can do any updates.
+
+**Bailey Hayes** [48:55](https://youtu.be/zaDiEcB-Lfc?t=2935)
+
+Both were really exciting. My biggest takeaway from KubeCon was that I'm no longer explaining "why Wasm, what Wasm" — those types of things. Everybody I talked to seems to get it and they want it. The question is more about the *win* than it is about the introduction tour we normally have to do.
+
+**Jeremy Fleitz** [49:34](https://youtu.be/zaDiEcB-Lfc?t=2974)
+
+100% right. I've only been with Cosmonic for almost a year — that's pretty cool. wasmCloud v1 to v2 is so much easier to sell. How it works at KubeCon this past time — everybody was getting the idea of "this runs as an operator, hosts are our pods, we stuff the host as much as possible." They get the idea of density, the whole sandboxing approach. I really can't even think of one person that left our booth confused, which was amazing. Atlanta KubeCon I felt there was some struggling. So yeah.
+
+**Bailey Hayes** [50:36](https://youtu.be/zaDiEcB-Lfc?t=3036)
+
+Eric, you were there too. Any other observations to add?
+
+**Eric** [50:41](https://youtu.be/zaDiEcB-Lfc?t=3041)
+
+I'd reiterate what Jeremy said. You really saw the light come on talking to people about the capability-driven sandbox. You really saw the light come on talking about the Kubernetes-native designs of wasmCloud v2. I've been to a few of these now, and that felt new.
+
+**Bailey Hayes** [51:03](https://youtu.be/zaDiEcB-Lfc?t=3063)
+
+At the wasmCloud booth, we had a lot of people curious about K-native versus wasmCloud. Before, people just felt like Kubernetes is this whole separate world and they didn't want to union them together. Now with wasmCloud v2 they're like "but could I…" so that's worth exploring — should we do a K-native scheduler for wasmCloud? How would they interact?
+
+For Wasm I/O — the best-ever intro to what WebAssembly components are was by Eric Rose from Fastly. I don't think there's ever been a better one. I really recommend watching that and sharing with people trying to grapple with this. Luke's talk made me happy because he's like "there's not going to be a p4," and I'm like "it's on a slide, I can screenshot it now." He went deep into the road to 1.0. That was the keynote on Wasm I/O. I did some fun stunt hacks with people there — I vibe-coded a Chicory host for wasmCloud. We could run a wasmCloud host inside the JVM. I hung out with the GraalVM Wasm lead and chatted with him — we pointed it at the Colin implementation that now has component-model support for `wasi-http` and he was able to successfully get a component-model GraalVM thing working while we were hanging out. The art of the possible now — the answer is a whole freaking lot.
+
+**Colin Murphy** [53:36](https://youtu.be/zaDiEcB-Lfc?t=3216)
+
+It would be kind of poetic if all the AI attention that sucked away attention from WebAssembly comes back around and AI ends up making it letting people migrate onto WebAssembly much easier than before.
+
+**Liam Randall** [53:53](https://youtu.be/zaDiEcB-Lfc?t=3233)
+
+Colin, that's my biggest insight — the sheer number of organizations that have told me they're waiting for Java to compile to WebAssembly came back around and now say "with vibe coding, I don't really care about how it's done, I just care what's done. Since I don't really trust the code, why not Rust into WebAssembly?" That felt like a really profound insight.
+
+**Frank Schaffa** [54:32](https://youtu.be/zaDiEcB-Lfc?t=3272)
+
+I've been on the same path — Copilot and all those things, cloud-code, will be able to take our requirements and build the function. So less and less we need Java because it will take a long time. Meanwhile, we can build components with the AI tools.
+
+**Colin Murphy** [55:02](https://youtu.be/zaDiEcB-Lfc?t=3302)
+
+You can turn it all the way around: if you're going to vibe-code your way to products, what would you rather be doing — vibe-coding it in JavaScript or vibe-coding it in Rust and Wasm? You want the sandbox, the memory safety, the type checker.
+
+**Jeremy Fleitz** [55:46](https://youtu.be/zaDiEcB-Lfc?t=3346)
+
+You want to sandbox that slop.
+
+**Colin Murphy** [55:48](https://youtu.be/zaDiEcB-Lfc?t=3348)
+
+Sandbox the slop.
+
+**Liam Randall** [55:51](https://youtu.be/zaDiEcB-Lfc?t=3351)
+
+Jeremy, if you want to share the t-shirt we have for the cosmonauts.
+
+**Liam Randall** [56:08](https://youtu.be/zaDiEcB-Lfc?t=3368)
+
+It was definitely popular. Cosmonic will be releasing a white paper about this shortly. This is where we've been spending our time — what does it look like, how do you approach this systematically.
+
+**Bailey Hayes** [57:22](https://youtu.be/zaDiEcB-Lfc?t=3442)
+
+I was a little unsure — over in the project pavilion it's a little more serious. Less marketing stuff. We were talking about cooperative threads at a deep level. Over at the Cosmonic booth, good times were had by all.
+
+**Frank Schaffa** [57:48](https://youtu.be/zaDiEcB-Lfc?t=3468)
+
+Different question — I saw the announcement of Kubert, and I'm wondering if anybody is looking into how to extend the capabilities of the operator with Kubert.
+
+**Bailey Hayes** [58:12](https://youtu.be/zaDiEcB-Lfc?t=3492)
+
+I personally haven't played with Kubert, but there's no reason we couldn't make this work essentially for a host. My wish-list item: instead use Hyperlight. I haven't evaluated Kubert deeply, but Hyperlight from Microsoft solves the same types of problems. Dan Kirloney did a great deep-dive on Hyperlight at Wasmcon — one of my favorite talks. Kubert might slot in a little more naturally into a Kubernetes deployment, which could be a win in Kubert's book. As far as I'm concerned, if I can vibe-code a host that runs inside the JVM, I think we can figure out how to run inside a VM just fine. We could totally set that up. Are you using Kubert, Frank?
+
+**Frank Schaffa** [59:24](https://youtu.be/zaDiEcB-Lfc?t=3564)
+
+No, I saw the announcement. I've been following Kubert and virtual cluster, and I think those are the things that could help with scalability.
+
+**Bailey Hayes** [59:39](https://youtu.be/zaDiEcB-Lfc?t=3579)
+
+V-Cluster is awesome. I have hands-on experience with that. I'll look into Kubert more. Thanks for sharing.
+
+**Frank Schaffa** [1:00:00](https://youtu.be/zaDiEcB-Lfc?t=3600)
+
+Okay, I need to drop, but this was interesting.

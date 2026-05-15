@@ -1,0 +1,251 @@
+---
+date: '2026-01-28'
+title: 'Transcript: wasmCloud v2 RC7 OTel Demo, Ten Years of Wasm & WASI Socket Forking'
+description: 'Full transcript of the January 28, 2026 wasmCloud community call covering the RC7 OpenTelemetry host plumbing demo, the ten-years-of-Wasm retrospective, and the wasmtime-wasi socket fork.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - opentelemetry
+  - wasi sockets
+  - wasmcloud v2
+  - rc7
+image: https://i.ytimg.com/vi/4zUisbs97C8/maxresdefault.jpg
+showTitle: true
+slug: 2026-01-28-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-01-28-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=4zUisbs97C8" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=4zUisbs97C8" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, January 28, 2026 · 41m 40s*
+
+**Speakers:** Bailey Hayes, Lucas Fontes, Frank Schaffa, Aditya, Jeremy Fleitz
+
+---
+
+{/* truncate */}
+
+## Full Transcript
+
+**Bailey Hayes** [00:00](https://youtu.be/4zUisbs97C8?t=0)
+
+Coming in a little hot — I was making fast edits on Eric's wonderful blog post. Shout out during the call. I just felt like I was final reviewer. So good, so good. I hope you're enjoying all the praise. Did you read David Bryant's very nice email to you? Get a little ego boost, then we'll get this started.
+
+**Bailey Hayes** [01:34](https://youtu.be/4zUisbs97C8?t=94)
+
+Hello and welcome to wasmCloud Weekly, the last one for the month of January. We've got some really nice updates. Last week we released **RC6**, found some stuff, fixed some stuff, and we're getting close to cutting **RC7**. RC7 has some pretty cool other goodies inside it. Lucas, talk about what you built.
+
+**Lucas Fontes** [02:18](https://youtu.be/4zUisbs97C8?t=138)
+
+This week we are really focusing on **observability and stabilizing the code base**. We added many features between RC5 and RC6 — with RC7 we're just addressing leftover stuff and closing open threads. Focused on completion, not adding more features. One of those is observability.
+
+We previously threaded **tracing throughout most of the code base**, but we didn't wire up OpenTelemetry to it — so all the traces were happening but there was no way to get that information out of wash or from the host. The PR I have open here is the OpenTelemetry setup.
+
+Key thing: OpenTelemetry will be configured using the **OpenTelemetry SDK environment variables**, which are really well documented. Important call-out: you're not going to have many flags inside wasmCloud that conflict with the reporting that goes to your console outputs — the logs you get when you run wasmCloud — and also the traces/logs that go to OpenTelemetry. They are **totally different feeds** in wasmCloud v2.
+
+When you manipulate `RUST_LOG` — the environment variable most people use to debug Rust applications — you're dealing with the console outputs. So `wash dev` here, default info. If we go to debug, way more output — this is how most people likely debug wash issues locally.
+
+But we also have to consider the amount of data being sent to OpenTelemetry. It would be kind of impossible to run a system with this level of tracing enabled 24/7 in production. Tying the flag that drives observability to the flag that handles debugging is a problem we're addressing.
+
+In v1, the only way to enable tracing in wasmCloud was to set `RUST_LOG=debug` or `trace`. Now you don't need any of this — tracing respects whatever value you request here. If you want information in your console, use `RUST_LOG`. If you want to control what goes to OpenTelemetry, use the log level there.
+
+Now how does it look? We need to stand up an OpenTelemetry receiver — we're going to use [**Aspire dashboard**](https://github.com/dotnet/aspire). Copy and paste — gives us a place to see logs, traces, metrics. Open up a port.
+
+Back to wash, tell wash we now want to use OpenTelemetry — send OpenTelemetry spans to this address, use the gRPC protocol, these environment variables documented in the OpenTelemetry docs. Once we do this, we're ready. Let's start a `wash dev` on **blobby**.
+
+The setup is pretty easy to get going. It gives you a pretty good idea of what observability looks like in production because the runtime is exactly the same — traces, naming, all those things remain stable.
+
+**Logs**: kind of mirror what we see on the terminal. The interesting thing: if there's a trace associated with that log, we're also linking it — drill down on that thing. You get more context too — filter on these things in your observability system.
+
+**Traces**: gives us a pretty good overview of all the steps wash takes throughout execution. The very first thing when you run `wash dev`: we call all hooks of type `before-dev`. Right after, we do a **component build**. The component build also calls hooks — `before` and `after`. We load the component into the runtime. This is interesting because it gives us a pretty good idea of where time is being spent — a nested trace. You can see we spend a lot of time just **parsing the component itself**, and after parsing, everything else is pretty quick.
+
+As we bring up the workload, we might also have to **bind external plugins**. Here we have an example of two plugins binding to this workload: **Blobstore** and **wasi-logging**, because the component we loaded uses both. At the end, we link all the components — the component is up and ready to receive requests.
+
+Now let's exercise the component — reload blobby. Two extra traces — one HTTP request for the page, one for the list of files in Blobstore. The first one (just returning HTML) — even though it's just returning HTML, blobby is doing some extra Blobstore calls, which is an interesting find. Regardless, when we handle the HTTP request, we're extracting the host method and the path.
+
+**Lucas Fontes** [11:57](https://youtu.be/4zUisbs97C8?t=717)
+
+As we learn more about the request, we **enrich the trace**. First span: we know the host. Second span: workload ID, name, namespace. This allows you to construct dashboards and observability targets that compose these traces. If you want alerts for a specific team when something is slow, you can put an alert on `namespace=my-team-name` — every time there's a trace of this shape taking more than one second, alert.
+
+The other interesting part: this stuff is being executed by the **runtime in Rust**. There's a **hop into WebAssembly and back** that's important to call out. We receive an HTTP request in Rust, invoke the component (this is WebAssembly), and within that call the component uses **Blobstore** for `get-container` and `container-exists`. Even though we're going into WebAssembly and coming back, **the trace stays aligned and within the correct context**. So `container-exists` will tell us "this component used Blobstore — they were trying to get the container blobby."
+
+All this information happening inside plugins and inside the runtime is easily traceable with this pattern. Logs are also there, but they don't carry as much rich information as traces.
+
+We have **not added metrics** yet, but most of the instrumentation is already in place. Another situation where it's a matter of plumbing to OpenTelemetry and starting to emit. With this level of information we're in a pretty good spot to know when things are happening inside the runtime, inside a component, when they're being executed by plugins.
+
+We also made sure to **not enforce any observability requirements on plugin authors**. As a plugin developer, you don't need to sprinkle instrumentation throughout your plugin. Most of the binding operations are **instrumented from the outside — from the engine**. It becomes pretty easy to create new plugins and get instrumentation out of the box.
+
+**Bailey Hayes** [15:36](https://youtu.be/4zUisbs97C8?t=936)
+
+Worth highlighting — you don't have extra work on plugin authors because a lot of this is happening automatically. But what you added to the host — did you have to add any OTel instrumentation to **blobby** to make any of this work?
+
+**Lucas Fontes** [15:56](https://youtu.be/4zUisbs97C8?t=956)
+
+No — blobby is the same blobby as before. The interesting thing: blobby uses Blobstore, and Blobstore is a wasmCloud plugin. We have the instrumentation in the wasmCloud plugin, and we take care of the context on our side.
+
+**Bailey Hayes** [16:15](https://youtu.be/4zUisbs97C8?t=975)
+
+So if I'm using any WASI API that's already supported by the host, I drop in my component and it's basically auto-instrumented for me?
+
+**Lucas Fontes** [16:24](https://youtu.be/4zUisbs97C8?t=984)
+
+Essentially, yes. Pretty much.
+
+**Frank Schaffa** [16:30](https://youtu.be/4zUisbs97C8?t=990)
+
+Does this work, as you're showing, in a **Kubernetes environment**?
+
+**Lucas Fontes** [16:38](https://youtu.be/4zUisbs97C8?t=998)
+
+Good question — it does. I'll try to bring up the cube environment here. A lot of people might laugh at how I bring up the cube environment locally. Took down wash, keeping Aspire up. Open another terminal — bring up **NATS**. Another — bring up the **operator**.
+
+**Lucas Fontes** [17:52](https://youtu.be/4zUisbs97C8?t=1072)
+
+Now bring up the host — HTTP address, host group. As this comes up — there you go, we just saw connections to NATs. Notice the difference: as we booted up the host, the host is doing things in the back — sending workload start operations, getting workload status. It's sending workload start because I already had workloads deployed.
+
+Yes — I was testing blobby before. We just exercised that. Let's take a look at the traces it emitted. We're connected to NATS. We receive `workload-start`, and you can see exactly what's going on during workload-start — kind of mind-blowing. Notice that during workload-start for the host case, **most of our time is actually spent here pulling the component from OCI**.
+
+All that time that looked significant in `wash dev` regarding parsing the component is not the culprit anymore. We **spent 1.8 seconds getting the component from OCI**, then went on to bind plugins. From workload-start downwards the trace looks the same, but because we're running in Kubernetes we have this extra layer — the NATS API. Same for workload-status. We also pass which workload ID we're requesting status about — although it should be nice to not have this "sum" here, going to remove that.
+
+The path is exactly the same for component request traces. The host name is going to be the namespace, default workload name, the Kubernetes name and so on. Does that answer your question?
+
+**Frank Schaffa** [20:42](https://youtu.be/4zUisbs97C8?t=1242)
+
+Yes — looks really great. The question on loading the OCI image — is this locally starting? Cached? Or still retrieving from the registry?
+
+**Lucas Fontes** [20:57](https://youtu.be/4zUisbs97C8?t=1257)
+
+This one is retrieved. Which is amazing — because this is one of the questions you'd have when looking at this trace: what is this coming from? We know we're pulling a component from this OCI image.
+
+**Frank Schaffa** [21:16](https://youtu.be/4zUisbs97C8?t=1276)
+
+So in theory if you have all those images cached, they'd be much faster?
+
+**Lucas Fontes** [21:22](https://youtu.be/4zUisbs97C8?t=1282)
+
+You got it. Yes.
+
+**Bailey Hayes** [21:34](https://youtu.be/4zUisbs97C8?t=1294)
+
+Thank you Lucas, that's awesome. I really enjoyed seeing how you test locally. Great to have on video — I might refer back to it later.
+
+**Frank Schaffa** [21:48](https://youtu.be/4zUisbs97C8?t=1308)
+
+Same thing — I use the video to do installation because the documentation is outdated.
+
+**Bailey Hayes** [21:57](https://youtu.be/4zUisbs97C8?t=1317)
+
+That's not on Eric, I'll say that — 100% on me. Eric got the PR up. We had merged it because Eric's updates showed me we had bugs. I didn't want to doc the bugs — confuse people. So went and fix the bugs, they'll be fixed in **RC7**, that's when we'll rev the docs again. Sorry about that.
+
+I want to do a special doc of the week — a **blog post Eric worked on with a lot of people**. The oral history of the past, how did WebAssembly come to be, what have we done over the last 10 years. A really wonderful read. Eric, you did such a good job. If you haven't read it, please go read it. I gave a talk from my perspective with all of this — but you can also read tidbits where people were like "we told each of our managers they're on board, even though they maybe might not have said that, just to keep that coalition together to get this thing out the door." A really cool story.
+
+**Bailey Hayes** [24:14](https://youtu.be/4zUisbs97C8?t=1454)
+
+Thank you Eric. The pull request for it said "this is going to be one of those articles people refer to years from now." Yeah, 100% will be. I can't wait to see the 20 years of Wasm post that points back to this one.
+
+**Frank Schaffa** [24:43](https://youtu.be/4zUisbs97C8?t=1483)
+
+Would be interesting to see the **acceptance curve**. Great to see after we're over the hump — looks like we're still in the "this is not really being adopted in general." There's some pockets. Nice to see the evolution.
+
+**Bailey Hayes** [25:12](https://youtu.be/4zUisbs97C8?t=1512)
+
+We have telemetry to say it's **used in billions of devices today** — if you're using a modern TV watching Disney+, if you're using CDNs, if you're on Zoom blurring the background right now, you're using WebAssembly. As a technology being adopted in web environments, it couldn't be more ubiquitous.
+
+The adoption curve is very much on the **server side** — where are we going to turn this curve? The web gives you a sandboxed operating system; we've been building our own equivalent with WASI. There's a lot more to add. Folks are expecting to be able to lift and shift, but they didn't have that expectation for moving to the web. That's part of why the curve has been slow.
+
+What I'm expecting: **in about two months**, a massive adoption shift when we have **threads in WebAssembly**. One of the biggest pain points for lift and shift. It's a pain point both for existing code that uses threads, and on the language side. A lot of people had to use statically typed languages — C, C++, Rust — which had amazing Wasm support. But mere mortals often weren't able to write in those. We're more comfortable in Go, TypeScript, scripting languages. As those get better support — specifically with **cooperative threads in the component model** that allows languages like Python to have a really nice native compilation experience — we're going to have so much more adoption. That's been the big hold-back.
+
+**Frank Schaffa** [27:33](https://youtu.be/4zUisbs97C8?t=1653)
+
+One thing — probably interesting: right now we're stuck with languages because that's how you bridge requirements to something that could run. But with all the automation with LLMs, I think it becomes — requirements to **Rust**, and that's it. Probably interesting to have a thread on how you take existing problems and not wait for Java to be there. Just what's the function you're trying to do, then have your tools put something together in Rust. Probably an interesting trend.
+
+**Bailey Hayes** [28:26](https://youtu.be/4zUisbs97C8?t=1706)
+
+It's actually something I'm seeing play out with a lot of folks I'm talking to. Anybody in a large enterprise experimenting with WebAssembly has come to the same conclusion: **LLMs are really good at writing Rust code**. Makes sense — the compiler tells you what you did wrong, very explicit about what to fix. Structured types. When you're solving a problem with an LLM and Rust, you can do it efficiently.
+
+A lot of people have done conversions from Python to Rust so they could have something working in WebAssembly quickly. I really expect that to be a major trend this year. It's hard though to expect enterprises to convert massive code bases — if somebody wrote C++ code 20 years ago, the thought of changing is scary. So I get the folks who want to stay where they are. But if they're in C++, they can drop in and build with `wasi-sdk` easy peasy right now.
+
+**Frank Schaffa** [29:43](https://youtu.be/4zUisbs97C8?t=1783)
+
+In our environment, they're really pushing for people to use more and more automation on code development.
+
+**Bailey Hayes** [29:54](https://youtu.be/4zUisbs97C8?t=1794)
+
+Specifically using code-gen from LLMs. This year might be the big unlock — mere mortals can write Rust very easily because they've got tools to do it. That means access to the great ecosystem in WebAssembly.
+
+The next big unlock would be about getting things like **Reqwest and Tokio** and all the common dependencies to have a **WebAssembly target natively supported** — and a language like Rust where we actually have a formal target. You don't have to add a special SDK on top.
+
+An example: **I'm actively deprecating our once-supported SDK called `cargo-component`** inside the Bytecode Alliance, because you don't need it anymore. You just say `wasm32-wasip2` — you don't need a special adapter. Rust just supports `wasi-p2` as a compilation target. You don't need extra tools to cobble it together. The standard language library just supports what you need.
+
+The next step: get all the different ecosystem libraries to support `wasi-p2` as a target, and eventually `wasi-p3`. They just come down and compile. What library maintainers need is **stability**, and I'm hoping with some of the presentations we're building over the next month — talking about our **road to 1.0**, which is post WASI P3 — that we're not going to create a P4. We are on the road to 1.0, which means stability. I think we can get more confidence from folks maintaining things that we're not going to turn a lot on them.
+
+**Frank Schaffa** [32:11](https://youtu.be/4zUisbs97C8?t=1931)
+
+On the Rust side they can even evaluate how stable, how good the crates are.
+
+**Bailey Hayes** [32:19](https://youtu.be/4zUisbs97C8?t=1939)
+
+It's near and dear to me. How do you make the world a better place by making people write secure software that can be sandboxed? One of the most important missions — make the software we use every day better just by compiling to WebAssembly and not have double-after-free. Pretty exciting.
+
+Anybody else have topics? Otherwise we're through our agenda items.
+
+**Aditya** [33:15](https://youtu.be/4zUisbs97C8?t=1995)
+
+I wanted to ask — what happened with the **`wash-wasi` crate** and why does it point to `wasmtime-wasi`? Also points to our own internal implementation. I think that was regarding TCP/UDP lookup, because I'm facing a lot of issues with my pull request for the gRPC outbound handle.
+
+**Bailey Hayes** [33:54](https://youtu.be/4zUisbs97C8?t=2034)
+
+I'll say a few things and hopefully Lucas can fill in. Essentially we have one crate that we **forked from `wasmtime-wasi`** and brought inside wash, largely because we're dramatically enhancing what it does with **TCP loopback** — so we can implement our **service feature** inside wash.
+
+Now you can have a component connect via TCP loopback with our service — kind of like virtualized networking without having to drop all the way down to the network stack. Extremely efficient, and we can do a lot on top of that. The reason it needed to be in the `wasi-sockets` implementation is that the component says "I want to talk to `wasi-sockets`," and then we virtualize that binding with our service hosted in our host.
+
+The concept of a service is **wasmCloud-specific** — not something Wasmtime knows about. A lot of that exists because there's a lot in the component model that hasn't been realized yet — like **runtime instantiation** — but we're bringing all that power inside the wasmCloud host today, building it out ourselves. As the standard evolves, we'll obviously adapt.
+
+With our service that's more long-lived and has a different lifetime from individual components, we have to do something a little different. It is a problem — you can see my chunker of a PR to update to Wasmtime 41. I created an **upgrade guide** so it's clear. One challenge: this `wasmtime-wasi` crate is a large thing with file system, clocks, and sockets, and I only really want to edit sockets.
+
+In an ideal world we'd be able to upstream **breaking this into something more modular** — a crate that's only the piece I want, either with hooks or by breaking the crate apart, so I could just patch in a crate for `wasi-sockets`. That would get me much further than a fork. But we wanted to get this feature in as soon as possible because we're driving as fast as we can to release v2.
+
+**Aditya** [36:30](https://youtu.be/4zUisbs97C8?t=2190)
+
+Thank you. I'll take a look at the upgrade guide. There's a lot of conflicting dependencies — two dependencies pointing to two different `wasmtime-wasi`s. Yeah, thank you for clarifying.
+
+**Lucas Fontes** [36:53](https://youtu.be/4zUisbs97C8?t=2213)
+
+The interesting situation: we need like a 1,020-lines change in the WASI crate. But to get that 1,020-line change inside the WASI crate, we need to align with a lot of people — plenty of conversations about how this will be addressed in Windows, Mac, Linux. The scope is large, and we really wanted to move fast.
+
+The change itself is tiny, but all the dependencies that change brings — that's what hurts, hurts a lot. Feels like early days of Linux when you get everybody on the same kernel, but Red Hat comes along and has their custom version. People expected Red Hat to upstream those changes so everybody could benefit. That's kind of what's going on here — we're trying to move fast. The amount of communication and alignment to get this in the mainline is significant. So we forked. But in forking we created headaches for ourselves — you try to bring in `wasmtime-http`, suddenly it doesn't work because it relies on the WASI crate, which is now a different crate. We're really aware and we don't like the situation. It's really **temporary** — that's how we're seeing it.
+
+**Aditya** [38:48](https://youtu.be/4zUisbs97C8?t=2328)
+
+Thank you. Makes sense. We need to iterate fast.
+
+**Bailey Hayes** [38:56](https://youtu.be/4zUisbs97C8?t=2336)
+
+I feel your pain. So TLDR: refer to **our crate** in your changes. In most cases the types are identical and never changed, so it's compatible with the `wasmtime-wasi` crate. The cool thing about Rust is it'll let you know if it doesn't match and doesn't work — and you iterate from there.
+
+**Jeremy Fleitz** [39:36](https://youtu.be/4zUisbs97C8?t=2376)
+
+Lucas — you had a question inside the chat: can you run this as a **K8s controller**?
+
+**Lucas Fontes** [39:47](https://youtu.be/4zUisbs97C8?t=2387)
+
+If the service itself is a Kubernetes controller, it should work. Interesting one — as long as you can do TCP toward the Kubernetes API server. First thing I'd try: a simple HTTP GET with the vanilla HTTP client just to see how you get there.
+
+The other important thing: after testing with the HTTP client, **don't use the HTTP client for the Kubernetes integration**. I'm assuming you want to use existing Kubernetes libraries, and you have to do HTTP using `wasi-sockets`, not via `wasi-http` outgoing handler. If you try to go `wasi-http` outgoing handler, you're going to have to change a lot in Kubernetes machinery.
+
+So you can run a Kubernetes controller as a **workload service**. You'd have bigger challenges trying to run it as a **component inside a workload**, but as a service it might work.
+
+**Bailey Hayes** [41:13](https://youtu.be/4zUisbs97C8?t=2473)
+
+Let us know if it's working — that would be pretty cool. Anybody else? It's been a good discussion today. All right, let's get back to merging these things. Hope you have a good Wednesday. Bye.

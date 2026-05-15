@@ -1,0 +1,151 @@
+---
+date: '2026-03-04'
+title: 'Bytecode Alliance Summit Recap, Named Interfaces & wasmCloud v2 Plugin Simplification'
+description: 'wasmCloud community call covering the Bytecode Alliance Summit road-to-1.0 talks, the new named interfaces feature for wasmCloud v2, the wash CLI plugin system simplification, and the repo migration plan for the v2 release.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - bytecode alliance
+  - cooperative threads
+  - jco
+  - named interfaces
+  - wash cli
+  - wasmcloud v2
+  - kubectl
+chapters:
+  - { seconds: 175, label: "Pre-show: Bytecode Alliance Summit feedback survey" }
+  - { seconds: 268, label: "Bytecode Alliance Summit recap" }
+  - { seconds: 355, label: "Eric on upcoming Component Model 1.0 and JCO blog posts" }
+  - { seconds: 385, label: "Bailey's WASI P3 changes blog post" }
+  - { seconds: 441, label: "Lucas on v2: named interfaces and the final blocking PRs" }
+  - { seconds: 709, label: "ossfellow's question: why remove the wash plugin system?" }
+  - { seconds: 916, label: "Bailey on API stability and component-as-plugin via wash dev" }
+  - { seconds: 1080, label: "Repo migration: wash → wasmcloud, separate wasmcloud-v1" }
+  - { seconds: 1283, label: "Eric on new docs: operator and gateway overviews, diagrams" }
+image: https://i.ytimg.com/vi/pehuX0gewdk/maxresdefault.jpg
+showTitle: true
+slug: 2026-03-04-community-meeting
+---
+
+import YouTube from 'react-player/youtube';
+
+{/* Video hero — the whole point of this page */}
+
+<YouTube url="https://www.youtube.com/watch?v=pehuX0gewdk" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=pehuX0gewdk" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The March 4, 2026 wasmCloud community call recaps the Bytecode Alliance Summit (Luke Wagner's road to component-model 1.0, Cy Brand on cooperative threads, Joel Dice on guest languages, Alex Crichton on landing proposals, Victor Adossi on JCO), introduces wasmCloud v2's **named interfaces** feature for using the same WIT interface multiple times under different names, explains why the **wash CLI component-plugin system** is being removed in favor of shell hooks, and walks through the repo migration from `wasmcloud/wash` into `wasmcloud/wasmcloud` with a separate `wasmcloud-v1` repo for the v1 branch.
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **Bytecode Alliance Summit was packed** — Day 1 was the road to component-model 1.0, with Luke Wagner's keynote, Cy Brand on cooperative threading, Joel Dice on guest-language progress, Alex Crichton on landing proposals, and Victor Adossi on JCO; videos and a feedback survey are live
+- **Two follow-up blog posts incoming** — "Road to Component Model 1.0" and an in-depth "JCO from five angles" piece are planned for the lead-up to Wasm I/O
+- **Bailey is drafting a WASI P3 changes blog post** — focused on the specific changes WASI made for P3
+- **Named interfaces land in wasmCloud v2** — components can import the same WIT interface multiple times under different names (e.g., `wasi-keyvalue` as `sessions` and `cache`), letting you bind each name to a different backend (Memcache, Redis, etc.); fully backwards-compatible — name is optional
+- **`wash` component-plugin system removed** — the host plugin system stays; what's removed is the *wash CLI* plugin model where you could write a WebAssembly component invoked before/after `wash build`. The replacement: **shell hooks in `wash` config** that run any command around the build, plus loading multiple WebAssembly components in a single `wash dev` to fill the same need
+- **Stable API is the priority for v2** — Bailey: rather than ship a plugin WIT now that P3 will force breaking, the team is shipping a smaller, simpler surface that can stay stable; if there's a real need post-v2, the plugin system can come back built on P3 from the start
+- **Local development vs cluster admin separation** — wash is for local development in v2; cluster administration uses `kubectl`. Removing the wash plugin model avoids reimplementing kubectl in Rust
+- **Repo migration imminent** — the `wasmcloud/wash` repo's content moves into `wasmcloud/wasmcloud` (taking over `main`); the existing `wasmcloud-v1` content moves into a new `wasmcloud-v1` repo so v1 and v2 CI/publishing flows stay separate; the original wash repo stays in place so contributor history and stars are preserved
+- **New docs landed** — expanded "What is wasmCloud?" page for v2, new operator and runtime-gateway overviews, roles/role-bindings docs, and a deep stash of architecture diagrams thanks to Jeremy's work
+
+## Chapters
+
+- [02:55 — Pre-show: Bytecode Alliance Summit feedback survey](https://youtu.be/pehuX0gewdk?t=175)
+- [04:28 — Bytecode Alliance Summit recap](https://youtu.be/pehuX0gewdk?t=268)
+- [05:55 — Eric on upcoming Component Model 1.0 and JCO blog posts](https://youtu.be/pehuX0gewdk?t=355)
+- [06:25 — Bailey's WASI P3 changes blog post](https://youtu.be/pehuX0gewdk?t=385)
+- [07:21 — Lucas on v2: named interfaces and the final blocking PRs](https://youtu.be/pehuX0gewdk?t=441)
+- [11:49 — ossfellow's question: why remove the wash plugin system?](https://youtu.be/pehuX0gewdk?t=709)
+- [15:16 — Bailey on API stability and component-as-plugin via wash dev](https://youtu.be/pehuX0gewdk?t=916)
+- [18:00 — Repo migration: wash → wasmcloud, separate wasmcloud-v1](https://youtu.be/pehuX0gewdk?t=1080)
+- [21:23 — Eric on new docs: operator and gateway overviews, diagrams](https://youtu.be/pehuX0gewdk?t=1283)
+
+## Meeting Notes
+
+### Bytecode Alliance Summit Recap
+
+Bailey kicked off the call with a recap of the recent Bytecode Alliance Summit. Day 1 focused on **the road to component-model 1.0**. Luke Wagner gave the keynote. **Cy Brand** spoke on **cooperative threading** and the timeline/roadmap for that work. **Joel Dice** walked through where each guest language sits (Rust, Go, TypeScript, Python, C#, and the rest) in component-model adoption. **Alex Crichton** explained what it actually takes to land proposals in the component model — Bailey called it gold for maintainers and gave a shout-out to **Yordis Prieto**, whose name came up directly. **Victor Adossi** walked through the JCO changes that are landing — what each piece is doing and how they fit together.
+
+There's a feedback survey live in the Bytecode Alliance events channel — anonymous or named — and the team is using it to plan the next summit's format.
+
+**Two follow-up blog posts** are coming from the summit in the lead-up to Wasm I/O: one walking through the road to component model 1.0, and another a deep, five-angle breakdown of JCO as a project (it's a multi-tool with very different roles depending on which slice of the ecosystem you look at it from). Bailey is also drafting a **WASI P3 changes** blog post focused specifically on what was changed in WASI to support P3 and why.
+
+### Named Interfaces in wasmCloud v2
+
+**Lucas Fontes** walked through where wasmCloud v2 stands. The release is in its last minutes. Two notable PRs remain:
+
+1. **Named interfaces** — a feature alignment with the [WebAssembly component model](https://component-model.bytecodealliance.org/). New WIT instructions let you **import the same interface multiple times under different names**. A component can now declare it imports `wasi-keyvalue` twice — once as `sessions`, once as `cache` — and bind each name to a different backend implementation (e.g., Memcache for sessions, Redis for cache). At runtime the binding stays declarative; at build time, the component just uses the name it cares about.
+
+   wasmCloud is **paving the path** in the runtime, operator, and configuration layers so when the spec feature lands across `wasmtime`, `wasm-tools`, and the rest of the WebAssembly tooling, wasmCloud will be ready to use it on day one. It's optional (no name required) and fully backwards-compatible. The motivation is to move away from wasmCloud's old "link" concept and onto a primitive that works the same way in every runtime.
+
+2. **wash CLI plugin removal** — Lucas was careful to distinguish between two separate plugin systems in wasmCloud. **Host plugins** (Blobstore, KV, NATS, etc.) are *not* being removed — they're the core extensibility model. What's being removed is the **wash CLI component-plugin system**: WebAssembly components that could be invoked before/after `wash build` or `wash fetch`. After writing a few internal examples to validate the ergonomics, the team concluded it felt forced and didn't add enough beyond what shell scripting already provides.
+
+### Why Remove the Wash Plugin System?
+
+**ossfellow** pushed back: for users like him, wash provided a convenient extension mechanism, especially valuable in the era of agentic coding — if you teach an LLM the wash plugin API, it can generate small utilities specific to your installation. Why drop it?
+
+Lucas gave two answers:
+
+1. **"Stronger together" with the broader tooling sandbox.** wash could try to do everything other tools do, or it could play nicely and use shell hooks to compose with them. The team chose composition. The new `wash` config supports a build command that can be any shell script — chain commands with `;` and `&&`, or extract to a script and invoke it. Most users are already used to `npm build` workflows, so wash doesn't force a single tool — it integrates with whatever build flow you use, including straight `go build`.
+2. **Administration belongs in `kubectl`, not in wash.** In wasmCloud v2, the separation is explicit: wash is for local development; cluster administration happens over `kubectl`. The original direction of letting wash talk directly to Kubernetes turned into writing `kubectl` in Rust, which is the wrong abstraction.
+
+Bailey added the third reason — **API stability**. The team has been trying to align v2 with WASI P3 for months. P3 is roughly one month out, but they don't want to delay v2 any longer. To ship a v2 with a stable API surface, the plugin WIT would need to be redesigned for P3-native async — something they don't want to ship and then break. Without an MVP need for plugins in v2, the simpler answer is to pull them out, ship a stable surface, and revisit (P3-native) if real demand emerges.
+
+She also showed how the same need — "compose multiple WebAssembly components in your dev loop" — is now served by **loading multiple components in `wash dev`**, mapped one-to-one with how they'd run in production. That gives the same composition story without a custom plugin framework. It's the slimmed-down version of what you'd put in a workload deployment, which is a meaningful simplification.
+
+### Repo Migration
+
+Lucas then outlined the repo changes. Everything currently in `wasmcloud/wash` moves into `wasmcloud/wasmcloud` and takes over `main`. The `wasmcloud/wash` repo itself stays — settings, stars, contributor history are all preserved. Bailey added that the existing content on `wasmcloud/wasmcloud main` (the v1 codebase) moves into a new `wasmcloud-v1` repo. The motivation: the v1 and v2 build/publish flows are so different that intermingling them in one CI is painful, and a clean split lets v1 patch releases continue independently if needed. The migration will pause the project for a day or two; the team will announce the timing in the wasmCloud Slack.
+
+### New Documentation
+
+Eric closed with a tour of new docs. The [What is wasmCloud?](https://wasmcloud.com/) page has been expanded for v2 with new graphics, a deeper "why" breakdown, and a much fuller "what." Jeremy has been on a tear in the **operator manual** — new operator overview, **runtime gateway overview** (a real gap in the docs before), and roles/role-bindings docs. Bailey mentioned the team now has a deep set of architecture diagrams — she counted eight just covering different angles of one user question — and the v2 launch is in an excellent place documentation-wise.
+
+## WebAssembly News and Updates
+
+This call sits at the peak of the [Bytecode Alliance](https://bytecodealliance.org/) Summit aftermath, with all the road-to-1.0 work that came out of it. [Cooperative threads](https://github.com/WebAssembly/stack-switching) progress is unblocking the rest of the [component-model](https://component-model.bytecodealliance.org/) queue. [JCO](https://github.com/bytecodealliance/jco) is approaching production-ready P3 support. Named interfaces are about to land across `wasmtime`, `wasm-tools`, and the rest of the WebAssembly tooling — and wasmCloud is timing v2 to be ready on day one. [Wasm I/O Barcelona](https://wasmio.tech/) and [KubeCon EU Amsterdam](https://events.linuxfoundation.org/kubecon-cloudnativecon-europe/) are weeks away, with the team launching v2 to coincide with the run.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project for building and running [WebAssembly components](/docs/overview/workloads/components) anywhere — cloud, edge, or Kubernetes. The v2 architecture walked through in this call runs wasmCloud hosts as Kubernetes pods (managed by the runtime operator) and reverse-proxies inbound HTTP straight to host pods through the runtime gateway. **Named interfaces** are the new v2 primitive that lets components declare multiple bindings of the same WIT interface — perfect for the "I want NATS *and* Redis as separate `wasi-keyvalue` backends in the same workload" use case. The platform supports components written in Rust, Go, TypeScript, Python, and C#, with built-in [OpenTelemetry](/docs/kubernetes-operator/operator-manual/overview), declarative workload deploys, and signed/attested OCI artifact distribution.
+
+## Topic Deep Dive: Named Interfaces and the Component Model
+
+The named-interface feature is a small spec change with a meaningful product impact. Today, if a component imports `wasi-keyvalue`, it gets *one* `wasi-keyvalue` — bound to one backend at deploy time. If your workload needs both a fast session cache *and* a durable KV store, you either pick two different WIT interfaces (and lose portability) or you bolt naming into the implementation (and lose declarative-ness).
+
+**Named interfaces** solve this at the WIT level. A component can declare two imports of `wasi-keyvalue` — named `sessions` and `cache` — and the runtime can bind each name to a different backend. The component code doesn't change; the binding does. That preserves the [component model](https://component-model.bytecodealliance.org/)'s declarative property (no string-based dispatch, no runtime sniffing) while solving a real workload need. For platform engineers, it means you can deliver "give me NATS and Redis, both as KV, with policy at the host level" without forking the WIT or rolling a custom dispatcher. The wasmCloud team is paving the runtime side of this so the feature works the moment the spec ships.
+
+## Who Should Watch This
+
+**Bytecode Alliance ecosystem watchers** should start with [Bailey's summit recap at 04:28](https://youtu.be/pehuX0gewdk?t=268) and Eric's [follow-up blog post preview at 05:55](https://youtu.be/pehuX0gewdk?t=355). **wasmCloud v2 contributors and adopters** need [Lucas's named-interfaces walkthrough at 07:21](https://youtu.be/pehuX0gewdk?t=441), and **anyone using or considering wash plugins** should watch the [ossfellow Q&A at 11:49](https://youtu.be/pehuX0gewdk?t=709) and [Bailey's API-stability reasoning at 15:16](https://youtu.be/pehuX0gewdk?t=916).
+
+## Up Next
+
+The team is locking in the last v2 PRs: named interfaces, the wash CLI simplifications, and the repo migration. v2 is on track to ship in the lead-up to Wasm I/O Barcelona, with the team at both Wasm I/O and KubeCon EU Amsterdam. Watch for the Component Model 1.0 blog post, the JCO five-angle deep dive, and Bailey's WASI P3 changes piece in the next couple of weeks.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-03-04-community-meeting-transcript/)**
