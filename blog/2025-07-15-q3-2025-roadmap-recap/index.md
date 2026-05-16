@@ -37,7 +37,7 @@ As Brooks discussed in [Charting the path forward for wasmCloud](/blog/charting-
 
 It's already possible for components to "share" capability providers by adding a shared annotation, but it's an awkward fit: swimming upstream to represent a *platform* capability in an *application* model. 
 
-![application vs platform](./../2025-07-01-charting-the-next-steps-for-wasmcloud/images/platform-application-diagram.png)
+![application vs platform](./../2025-07-01-charting-the-next-steps-for-wasmcloud/images/platform-application-diagram.webp)
 
 This initiative aims to remove the "application" concept from the equation altogether and support configuration of **hosts** with connections to shared capability providers/wRPC servers that will provide platform-level capabilities.
 
