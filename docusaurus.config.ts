@@ -147,10 +147,15 @@ const config = (async (): Promise<Config> => {
 
                 // v2 docs (current, no version prefix) — high priority
                 if (path.startsWith('/docs/') && !path.startsWith('/docs/v1/') && !path.startsWith('/docs/0.82/')) {
+                  // Docs landing — top priority alongside homepage
+                  if (path === '/docs/') {
+                    return { ...item, priority: 1.0, changefreq: 'weekly' };
+                  }
+                  // SEO-critical: component model, kubernetes, quickstart, overview
                   if (
-                    path === '/docs/' ||
                     path.startsWith('/docs/quickstart/') ||
-                    path.startsWith('/docs/overview/')
+                    path.startsWith('/docs/overview/') ||
+                    path.startsWith('/docs/kubernetes-operator/')
                   ) {
                     return { ...item, priority: 0.9, changefreq: 'weekly' };
                   }
@@ -168,17 +173,22 @@ const config = (async (): Promise<Config> => {
                   return { ...item, priority: 0.7, changefreq: 'monthly' };
                 }
 
-                // Community meeting notes
+                // Community meeting notes & transcripts
                 if (path.startsWith('/community/') || path === '/community/') {
                   if (path === '/community/' || path === '/community') {
-                    return { ...item, priority: 0.7, changefreq: 'weekly' };
+                    return { ...item, priority: 0.7, changefreq: 'monthly' };
                   }
-                  return { ...item, priority: 0.5, changefreq: 'weekly' };
+                  // Pagination/tag archives — low priority
+                  if (path.startsWith('/community/page/') || path.startsWith('/community/tags/')) {
+                    return { ...item, priority: 0.3, changefreq: 'weekly' };
+                  }
+                  // Individual meeting notes & transcripts
+                  return { ...item, priority: 0.5, changefreq: 'monthly' };
                 }
 
-                // v1 docs — deprioritized
+                // v1 docs — archived
                 if (path.startsWith('/docs/v1/')) {
-                  return { ...item, priority: 0.3, changefreq: 'monthly' };
+                  return { ...item, priority: 0.3, changefreq: 'yearly' };
                 }
 
                 // 0.82 docs — already disallowed in robots.txt, minimal priority
