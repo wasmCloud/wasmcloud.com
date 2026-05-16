@@ -18,8 +18,8 @@ import { Cncf } from './_components/cncf';
 function ContactForm() {
   return (
     <Layout
-      title={`wasmCloud - A CNCF Project`}
-      description="Build secure, cloud-native platforms and applications with WebAssembly"
+      title={`The WebAssembly Application Platform`}
+      description="wasmCloud is the leading WebAssembly application platform for cloud-native distributed apps. CNCF project with Kubernetes-native deployment."
       wrapperClassName="navbar-glass"
     >
       <main className={styles.main}>

@@ -11,7 +11,7 @@ function ContactForm() {
   }, []);
 
   return (
-    <Layout title={`Contact`} description="wasmCloud - Why stop at the Edge?">
+    <Layout title={`Innovation Day — Gather Hangout`} description="Redirecting to the wasmCloud Innovation Day Gather hangout — meet maintainers and build WebAssembly applications together.">
       <main style={{ margin: '0 auto', width: 'max-content', paddingTop: '10vh' }}>
         <Heading
           as="h1"
