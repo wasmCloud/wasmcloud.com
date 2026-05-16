@@ -4,7 +4,7 @@ authors: [ericgregory]
 slug: 2025-07-15-q3-2025-roadmap-recap
 image: './images/q3-2025-roadmap-recap.webp'
 date: "2025-07-15"
-description: "Recapping the major initiatives that emerged from the Q3 2025 roadmap planning meeting."
+description: "Recapping wasmCloud's Q3 2025 roadmap: a slimmer host, rethinking capability providers as wRPC servers, and a cleaner WebAssembly developer experience."
 ---
 
 ![Q3 2025 Roadmap Recap](./images/q3-2025-roadmap-recap.webp)

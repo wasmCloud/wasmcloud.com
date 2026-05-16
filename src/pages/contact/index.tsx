@@ -6,8 +6,8 @@ function ContactForm() {
 
     return (
         <Layout
-            title={`Contact`}
-            description="wasmCloud - Why stop at the Edge?">
+            title={`Get in Touch — Contact Sales & Support`}
+            description="Contact the wasmCloud team for sales, support, or community questions about our WebAssembly application platform and Kubernetes integration.">
             <main>
                 <div style={{ display: "flex", flexDirection: "row" }}>
                     <div style={{ width: "25%" }}></div>
