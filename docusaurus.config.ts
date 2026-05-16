@@ -256,6 +256,10 @@ const config = (async (): Promise<Config> => {
 
     themeConfig: {
       image: '/logo/wasmcloud-social.png',
+      metadata: [
+        { property: 'og:type', content: 'website' },
+        { name: 'twitter:site', content: '@wasmcloud' },
+      ],
       navbar: {
         title: 'wasmCloud',
         logo: {
