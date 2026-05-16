@@ -19,7 +19,7 @@ function ContactForm() {
   return (
     <Layout
       title={`The WebAssembly Application Platform`}
-      description="wasmCloud is the leading WebAssembly application platform for platform engineering teams — build cloud-native Wasm components and IDPs on Kubernetes."
+      description="wasmCloud is the leading WebAssembly application platform for platform engineering teams — Sandbox Vibe Coded Apps, Functions, Agents, Triggers, Apps, and more on Kubernetes."
       wrapperClassName="navbar-glass"
     >
       <main className={styles.main}>
