@@ -1,6 +1,5 @@
 ---
 title: 'API Reference — wasmCloud Kubernetes Operator'
-title: 'API Reference — wasmCloud Kubernetes Operator'
 hide_title: true
 sidebar_label: 'API Reference'
 sidebar_position: 3
