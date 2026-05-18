@@ -1,9 +1,13 @@
 ---
 title: 'API Reference — wasmCloud Kubernetes Operator'
+title: 'API Reference — wasmCloud Kubernetes Operator'
+hide_title: true
 sidebar_label: 'API Reference'
 sidebar_position: 3
 description: 'Full API reference for the wasmCloud Kubernetes operator — every Custom Resource Definition, field, and configuration option used to run Wasm workloads.'
 ---
+
+# API Reference
 
 ## Packages
 - [runtime.wasmcloud.dev/v1alpha1](#runtimewasmclouddevv1alpha1)
