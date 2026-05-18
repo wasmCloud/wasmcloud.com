@@ -252,6 +252,15 @@ const config = (async (): Promise<Config> => {
         } satisfies PluginReoAnalyticsOptions,
       ],
       customPostCssPlugin, // PostCSS plugin function registration
+      [
+        'docusaurus-plugin-llms',
+        {
+          generateLlmsTxt: true,
+          generateLlmsFullTxt: true,
+          docsPluginIds: ['default'],
+          blogPluginIds: ['default'],
+        },
+      ],
     ],
 
     themeConfig: {
@@ -383,6 +392,44 @@ const config = (async (): Promise<Config> => {
     },
 
     headTags: [
+      {
+        tagName: 'script',
+        attributes: { type: 'application/ld+json' },
+        innerHTML: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          '@id': 'https://wasmcloud.com/#organization',
+          name: 'wasmCloud',
+          url: 'https://wasmcloud.com',
+          logo: {
+            '@type': 'ImageObject',
+            url: 'https://wasmcloud.com/logo/wasmcloud_green.svg',
+          },
+          description:
+            'wasmCloud is an open source CNCF project that enables teams to build, manage, and scale polyglot Wasm applications across any cloud, Kubernetes, or edge.',
+          foundingDate: '2020',
+          sameAs: [
+            'https://github.com/wasmCloud',
+            'https://twitter.com/wasmcloud',
+            'https://www.linkedin.com/company/wasmCloud/',
+            'https://www.youtube.com/wasmcloud',
+            'https://www.cncf.io/projects/wasmcloud/',
+          ],
+        }),
+      },
+      {
+        tagName: 'script',
+        attributes: { type: 'application/ld+json' },
+        innerHTML: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          '@id': 'https://wasmcloud.com/#website',
+          name: 'wasmCloud',
+          url: 'https://wasmcloud.com',
+          publisher: { '@id': 'https://wasmcloud.com/#organization' },
+          inLanguage: 'en-US',
+        }),
+      },
       {
         tagName: 'link',
         attributes: { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
