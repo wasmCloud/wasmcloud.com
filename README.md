@@ -33,43 +33,61 @@ npm run serve
 
 The wasmCloud docs use [Excalidraw](https://excalidraw.com/) for diagrams. Source `.excalidraw` files live in `versioned_docs/version-next/images/` alongside the exported PNGs.
 
-#### wasmCloud brand colors
+#### Brand colors and the wasmCloud Excalidraw library
 
-All diagrams should use the wasmCloud brand palette for consistency.
+Colors, typography, and the official wasmCloud Excalidraw library are defined in the [`brand-guidelines` skill](https://github.com/cosmonic-labs/skills/tree/main/brand-guidelines). The skill covers both Cosmonic and wasmCloud brands — for this repository, use the **wasmCloud** sections.
 
-| Color  | Stroke    | Background |
-|--------|-----------|------------|
-| Green  | `#00bc8e` | `#e6f9f3`  |
-| Blue   | `#005799` | `#e6f0f7`  |
-| Navy   | `#002e5d` | `#e6ecf3`  |
-| Purple | `#6741d9` | `#f0ecff`  |
-| Gold   | `#d4a017` | `#fff8e6`  |
-| Red    | `#e03131` | `#ffe6e6`  |
-| Gray   | `#788591` | `#f3f4f6`  |
-| Teal   | `#099268` | `#e0f5f0`  |
+The wasmCloud palette in brief:
+
+| Color       | Hex       | Use                                |
+|-------------|-----------|-------------------------------------|
+| Green Aqua  | `#00C389` | Primary brand color, main elements |
+| Space Blue  | `#002E5D` | Dark backgrounds, outlines         |
+| Gunmetal    | `#253746` | Text, secondary backgrounds        |
+| Light Gray  | `#768692` | Secondary text                     |
+| Gainsboro   | `#D9E1E2` | Light backgrounds, borders         |
+| Yellow      | `#FFB600` | Highlights, CTAs                   |
+
+The `brand-guidelines` skill is the canonical source; defer to it when the palette here conflicts with the skill content.
+
+To load the [wasmCloud and Wasm Excalidraw library](https://excalidraw.com/?addLibrary=https%3A%2F%2Fraw.githubusercontent.com%2Fexcalidraw%2Fexcalidraw-libraries%2Fricochet-wasmcloud-and-wasm-1770917744834%2Flibraries%2Fricochet%2Fwasmcloud-and-wasm.excalidrawlib%3Fraw%3Dtrue) in the Excalidraw web UI, click the link and confirm the library install.
+
+#### Installing the brand-guidelines skill locally
+
+The skill ships as a project-level Claude Code skill, pinned in `skills-lock.json`. To install or restore it on a fresh checkout:
+
+```bash
+npx skills experimental_install
+```
+
+If you prefer to add the skill manually (or to a different agent):
+
+```bash
+npx skills add cosmonic-labs/skills --skill brand-guidelines --agent claude-code
+```
+
+The installed skill content is gitignored; only `skills-lock.json` is committed.
 
 #### Editing existing diagrams
 
 Two options:
 
-1. **VS Code Excalidraw extension** - Install the [Excalidraw extension](https://marketplace.visualstudio.com/items?itemName=pomdtr.excalidraw-editor) and open `.excalidraw` files directly in VS Code.
-2. **excalidraw.com** - Open [excalidraw.com](https://excalidraw.com/) and drag-and-drop the `.excalidraw` file onto the canvas. Save by downloading the file back (hamburger menu > Save to disk).
+1. **VS Code Excalidraw extension** — install the [Excalidraw extension](https://marketplace.visualstudio.com/items?itemName=pomdtr.excalidraw-editor) and open `.excalidraw` files directly in VS Code.
+2. **excalidraw.com** — open [excalidraw.com](https://excalidraw.com/) and drag-and-drop the `.excalidraw` file onto the canvas. Save by downloading the file back (hamburger menu > Save to disk).
 
 #### Creating new diagrams with Claude Code
 
-Use the `excalidraw-diagrams` skill to generate diagrams programmatically:
+With the `brand-guidelines` skill installed, ask Claude Code to create a diagram and the skill will surface the wasmCloud palette, typography, and Excalidraw library to use. For example:
 
 ```
-/excalidraw-diagrams Create a flowchart showing the component deployment pipeline
+Create an Excalidraw flowchart showing the component deployment pipeline, using the brand-guidelines skill.
 ```
-
-The skill uses the `excalidraw_generator.py` library (in `.claude/skills/excalidraw-diagrams/`) which provides `Diagram`, `Flowchart`, and `ArchitectureDiagram` classes. Reference the brand colors from `CLAUDE.md` when specifying colors in your prompt.
 
 #### Exporting to PNG
 
 Diagrams must be exported as **transparent PNGs at 3x scale** before committing.
 
-#### Automated export (Playwright)
+##### Automated export (Playwright)
 
 One-time setup:
 
@@ -87,7 +105,7 @@ node export-excalidraw-png.js <input.excalidraw> [output.png]
 
 If no output path is given, the PNG is written next to the `.excalidraw` file with the same name.
 
-### Manual export (No Playwright)
+##### Manual export (no Playwright)
 
 If you don't want to install Playwright:
 
