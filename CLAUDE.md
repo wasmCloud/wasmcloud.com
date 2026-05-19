@@ -6,7 +6,7 @@ This project uses [Excalidraw](https://excalidraw.com/) for diagrams. Source fil
 
 ### Brand guidelines skill
 
-Colors, typography, and the official wasmCloud Excalidraw library are defined in the `brand-guidelines` skill (managed via `skills-lock.json`; see [README.md](README.md#diagram-workflow) for setup). The skill covers both Cosmonic and wasmCloud brands — for this repository, follow the **wasmCloud** sections.
+Colors, typography, and the official wasmCloud Excalidraw library are defined in the `brand-guidelines` skill (managed via `skills-lock.json`; see [README.md](README.md#diagram-workflow) for setup). The skill is open source and donated by Cosmonic — for this repository, follow the **wasmCloud** sections.
 
 The wasmCloud palette in brief:
 
