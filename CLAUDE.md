@@ -4,24 +4,26 @@
 
 This project uses [Excalidraw](https://excalidraw.com/) for diagrams. Source files (`.excalidraw`) are stored alongside docs in `versioned_docs/version-next/images/` and exported as transparent PNGs at 3x scale.
 
-### wasmCloud Brand Color Palette
+### Brand guidelines skill
 
-Use these colors for diagram elements (stroke / background):
+Colors, typography, and the official wasmCloud Excalidraw library are defined in the `brand-guidelines` skill (managed via `skills-lock.json`; see [README.md](README.md#diagram-workflow) for setup). The skill covers both Cosmonic and wasmCloud brands — for this repository, follow the **wasmCloud** sections.
 
-| Color  | Stroke    | Background |
-|--------|-----------|------------|
-| Green  | `#00bc8e` | `#e6f9f3`  |
-| Blue   | `#005799` | `#e6f0f7`  |
-| Navy   | `#002e5d` | `#e6ecf3`  |
-| Purple | `#6741d9` | `#f0ecff`  |
-| Gold   | `#d4a017` | `#fff8e6`  |
-| Red    | `#e03131` | `#ffe6e6`  |
-| Gray   | `#788591` | `#f3f4f6`  |
-| Teal   | `#099268` | `#e0f5f0`  |
+The wasmCloud palette in brief:
 
-### Creating Diagrams with Claude Code
+| Color       | Hex       | Use                                |
+|-------------|-----------|-------------------------------------|
+| Green Aqua  | `#00C389` | Primary brand color, main elements |
+| Space Blue  | `#002E5D` | Dark backgrounds, outlines         |
+| Gunmetal    | `#253746` | Text, secondary backgrounds        |
+| Light Gray  | `#768692` | Secondary text                     |
+| Gainsboro   | `#D9E1E2` | Light backgrounds, borders         |
+| Yellow      | `#FFB600` | Highlights, CTAs                   |
 
-Use the `excalidraw-diagrams` skill (`/excalidraw-diagrams`) to generate diagrams programmatically with the brand palette above.
+The `brand-guidelines` skill is the canonical source; defer to it when the palette here conflicts with the skill content.
+
+### Creating diagrams
+
+Load the [wasmCloud and Wasm Excalidraw library](https://excalidraw.com/?addLibrary=https%3A%2F%2Fraw.githubusercontent.com%2Fexcalidraw%2Fexcalidraw-libraries%2Fricochet-wasmcloud-and-wasm-1770917744834%2Flibraries%2Fricochet%2Fwasmcloud-and-wasm.excalidrawlib%3Fraw%3Dtrue) and apply the wasmCloud palette. The `brand-guidelines` skill has more detailed guidance for diagrams created with the Excalidraw MCP server.
 
 ### Exporting to PNG
 
@@ -30,4 +32,4 @@ cd scripts && npm install && npx playwright install chromium
 node export-excalidraw-png.js <input.excalidraw> [output.png]
 ```
 
-See [docs/diagrams.md](docs/diagrams.md) for the full contributor workflow.
+See [README.md](README.md#diagram-workflow) for the full contributor workflow.
