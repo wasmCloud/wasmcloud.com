@@ -136,9 +136,22 @@ const config = (async (): Promise<Config> => {
             createSitemapItems: async (params) => {
               const { defaultCreateSitemapItems, ...rest } = params;
               const items = await defaultCreateSitemapItems(rest);
-              return items.map((item) => {
+              const COMMUNITY_YEAR_RE = /^\/community\/(\d{4})[-/]/;
+              return items.flatMap((item) => {
                 // Use pathname so priorities work on deploy previews too
                 const path = new URL(item.url).pathname;
+
+                // Community meeting/transcript dated content:
+                //   2026 → priority 0.9 (current cadence we want indexed)
+                //   pre-2026 → noindex (handled in CommunityPostPage swizzle); drop from sitemap
+                const communityYearMatch = path.match(COMMUNITY_YEAR_RE);
+                if (communityYearMatch) {
+                  const year = Number(communityYearMatch[1]);
+                  if (year >= 2026) {
+                    return [{ ...item, priority: 0.9, changefreq: 'monthly' }];
+                  }
+                  return [];
+                }
 
                 // Homepage — highest priority
                 if (path === '/') {
