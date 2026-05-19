@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
 import clsx from 'clsx';
+import Head from '@docusaurus/Head';
 import { HtmlClassNameProvider, ThemeClassNames } from '@docusaurus/theme-common';
 import { BlogPostProvider, useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import BlogPostPageMetadata from '@theme/BlogPostPage/Metadata';
@@ -12,6 +13,21 @@ import Layout from '@theme/Layout';
 import CommunityPostItem from '../post-item';
 import Link from '@docusaurus/Link';
 import VideoSEO from '../video-seo';
+
+// Community meetings & transcripts older than 2026 are no longer current. Tell
+// search engines not to index them, but keep `follow` so they still pass link
+// equity to current pages they reference. Sitemap config (docusaurus.config.ts)
+// drops these URLs from sitemap.xml in parallel.
+function NoindexIfArchived(): JSX.Element | null {
+  const { metadata } = useBlogPost();
+  const year = new Date(metadata.date).getUTCFullYear();
+  if (year >= 2026) return null;
+  return (
+    <Head>
+      <meta name="robots" content="noindex, follow" />
+    </Head>
+  );
+}
 
 function CommunityPostPageContent({ children }: { children: ReactNode }): JSX.Element {
   const { metadata, toc } = useBlogPost();
@@ -68,6 +84,7 @@ export default function CommunityPostPage(props: Props): JSX.Element {
       >
         <BlogPostPageMetadata />
         <BlogPostPageStructuredData />
+        <NoindexIfArchived />
         <CommunityPostPageSEO />
         <CommunityPostPageContent>
           <CommunityPostContent />
