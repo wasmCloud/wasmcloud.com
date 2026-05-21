@@ -112,6 +112,31 @@ let engine = Engine::builder()
 The pooling allocator is automatically enabled on machines with sufficient virtual memory. You can override this behavior with the `with_pooling_allocator()` method.
 :::
 
+### TLS for `wasi:tls` components
+
+`wash-runtime` 2.2 added support for the WASI Preview 3 [`wasi:tls`](https://github.com/WebAssembly/wasi-tls) interfaces, letting components terminate TLS connections themselves over `wasi:sockets`. This is distinct from [host-side HTTPS termination](../recipes/tls-bring-your-own-certificates.mdx) — `wasi:tls` is the option to reach for when a component needs to own the TLS session (for example, to connect to a third-party service or a database that requires TLS).
+
+To enable it, build `wash-runtime` with the `wasi-tls` Cargo feature:
+
+```toml
+[dependencies]
+wash-runtime = { version = "2.2", features = ["wasi-tls"] }
+```
+
+The feature is opt-in while the underlying WIT interfaces (`wasi:tls/client` and `wasi:tls/types@0.3.0-draft`) stabilize. When enabled, the engine wires `wasmtime-wasi-tls` into the linker and uses its default `rustls`-backed provider.
+
+To override the provider — to install a custom root store, pin a specific certificate, or bridge to an HSM-backed key — register a `SharedTlsProvider` on the engine builder:
+
+```rust
+use wash_runtime::engine::Engine;
+
+let engine = Engine::builder()
+    .with_tls_provider(my_custom_provider)
+    .build()?;
+```
+
+If the `wasi-tls` feature is enabled but no provider is set, the runtime falls back to the `wasmtime-wasi-tls` default and logs a warning recommending `EngineBuilder::with_tls_provider`.
+
 ## Building the Host
 
 Use `HostBuilder` to construct a host with your desired configuration. All capabilities (HTTP, key-value, configuration, etc.) are provided as plugins:
@@ -156,6 +181,33 @@ let host = host.start().await?;
 | `with_label(key, value)` | Add metadata labels for identification |
 | `with_http_handler(Arc<dyn HostHandler>)` | Register the HTTP handler (`HttpServer` implements `HostHandler`, not `HostPlugin`) |
 | `with_plugin(Arc<dyn HostPlugin>)` | Register a plugin (can be called multiple times; IDs must be unique) |
+
+### Customizing outgoing HTTP requests
+
+By default, every outbound HTTP request from a component flows through `wasmtime-wasi-http`'s `default_send_request`. For most embedders that's the right behavior — but if you need to thread custom TLS configuration through outgoing calls, swap in an alternative transport (an internal RPC system, for example), or insert middleware-style policy at the egress boundary, `wash-runtime` 2.2 introduced the `OutgoingHandler` trait as a pluggable extension point on the HTTP server.
+
+Implement `OutgoingHandler` on your own type, then supply it to `HttpServerBuilder::outgoing_handler` when constructing the HTTP server:
+
+```rust
+use wash_runtime::host::http::{HttpServer, DevRouter, OutgoingHandler};
+
+struct MyEgressHandler { /* ... */ }
+
+impl OutgoingHandler for MyEgressHandler {
+    // ...
+}
+
+let http_handler = HttpServer::builder()
+    .router(DevRouter::default())
+    .bind_address("127.0.0.1:8080".parse()?)
+    .outgoing_handler(MyEgressHandler { /* ... */ })
+    .build()
+    .await?;
+```
+
+The runtime calls into your handler for every outbound HTTP request from any component the host runs. If you don't register one, `DefaultOutgoingHandler` is used, which delegates to `wasmtime_wasi_http::p2::default_send_request` (or the P3 equivalent for P3 components).
+
+`OutgoingHandler` and `wasi:tls` are complementary: `wasi:tls` lets *components* own their TLS session, while `OutgoingHandler` lets the *host* shape egress uniformly across every component it runs.
 
 ## Managing workloads
 
