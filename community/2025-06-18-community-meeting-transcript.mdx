@@ -1,0 +1,211 @@
+---
+date: '2025-06-18'
+title: 'Transcript: wasmCloud Postgres Transactions & the Monorepo CI Debate'
+description: 'Full transcript of the June 18, 2025 wasmCloud community call covering wasmcloud:postgres transaction support and the monorepo, Nix, and CI discussion.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly news
+  - postgres
+  - monorepo
+  - ci/cd
+  - capability providers
+image: https://i.ytimg.com/vi/zELxAv7jInE/maxresdefault.jpg
+showTitle: true
+slug: 2025-06-18-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-06-18-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=zELxAv7jInE" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=zELxAv7jInE" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Jun 18, 2025 · 64 minutes*
+
+**Speakers:** Brooks Townsend, Yordis Prieto, Bailey Hayes, Liam Randall, Taylor Thomas, ossfellow
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [00:59](https://youtu.be/zELxAv7jInE?t=59)
+
+Oh no, well, I'm getting my demo ready and I ran out of space on my computer. It's fun. Thanks, Rust.
+
+**Yordis Prieto** [01:18](https://youtu.be/zELxAv7jInE?t=78)
+
+I also want to mention — was that Rust? It ate a little of an entire hard drive, like one terabyte. That's for indexing Rust. Cargo, whatever, built it, and I put it on the entire disk just for that.
+
+**Brooks Townsend** [02:34](https://youtu.be/zELxAv7jInE?t=154)
+
+I'm sorry, folks, give me just a minute to figure out my demo. Something dumb happened. It's not wasmCloud's fault. We get to five fast — oh no, if we get to six past, then I'll just start it and scramble. It's gonna be fun.
+
+**Brooks Townsend** [06:59](https://youtu.be/zELxAv7jInE?t=419)
+
+It's totally my fault. Well, no, it's not. It's actually Docker's fault. This is ridiculous, but whatever — I'm just kidding. I just need SQL help, so dumb.
+
+**Brooks Townsend** [08:24](https://youtu.be/zELxAv7jInE?t=504)
+
+All right, well, we can do a live thing, and people can just help me out, and it'll be more fun that way. People, help me out with SQL as we get started. Bailey, please. Oh, hey everybody, welcome to wasmCloud Wednesday for Wednesday, June 18 — the wasm-cloudiest day of the week. Let me share. We've got a pretty fun agenda for you today, starting out with something that we don't always do, but it'll be really fun, and — as we discussed in the pre-call — it's only partially my fault.
+
+So if we look at the agenda for this week, I have a pretty cool demo to talk about: transaction support in the wasmCloud Postgres interface. The wasmCloud Postgres interface right now supports querying, batch queries, and preparing statements. We had a nice feature request to add transaction support, and I wanted to show what this looked like. I have a PR up for this now, just to get some additional feedback. And then I threw on a discussion item: I think Taylor should be here a little bit later, but I just wanted to talk generally about our wasmCloud repository — see if people had opinions and thoughts about the monorepo setup. It's something we've been doing for a little while now, and I want to be able to talk about it.
+
+So the really cool thing that we're going to do right at the beginning — that I'll time-box, because it feels stupid — is you all are going to help me query. I set up my password as `postgres`, but nobody should worry about that. My question is: shouldn't this work? I just need to insert this value into the description column of this table. `INSERT INTO ... description VALUES ...` — am I doing too much?
+
+**Brooks Townsend** [11:25](https://youtu.be/zELxAv7jInE?t=685)
+
+Okay, Postgres is stupid. Hello, everybody, thanks for coming. So I have a really dumb table here — it's just an ID, a description, and `created_at`. This is the same table we use for the example Postgres component in the wasmCloud repo. I inserted a couple of rows so you can see row one, two, and three all have a description. So let's say I wanted to go through this demo: I want to update all three of these rows — the description of every single row to be the same thing — and I only want it to take effect if all of them succeed.
+
+<img src="/img/community/2025-06-18/image001.webp" alt="The example Postgres table with id, description, and created_at columns" />
+
+I am no SQL expert, as you can tell by me fumbling with these quotes, but transactions are a great way to do this. So I can curl this component and say, "hey, I want my text to be `wasmCloud demo`," and as soon as we do that, you can see on the left — let me scroll out a little — all three of my rows have been updated via transaction. What this is actually doing: I have a tiny Go component, and it's grabbing two little X-headers so I can send different information into each request. And then I have an invalid SQL one, which I'll show you in a second.
+
+<img src="/img/community/2025-06-18/image002.webp" alt="All three rows updated atomically through a single transaction" />
+
+Here is the transaction resource inside the component. This works pretty similarly to a lot of Postgres libraries I've seen — you create a transaction object, or you initiate a transaction on your client. So I have this transaction `t`, and the only difference from the regular wasmCloud Postgres library is that instead of calling `query` regularly, you call the `query` method on this transaction. It has the exact same signature, so if you wanted to convert some of your existing code to transactions, you'd just modify it to call on this `t` object instead. And then at the end, it's very similar to working with WASI HTTP directly — we call `transaction.commit`, and if there's an error we can return that.
+
+**Brooks Townsend** [16:24](https://youtu.be/zELxAv7jInE?t=984)
+
+The properties of this transaction: when you commit it, you're saying "I'm not adding any more queries to this" — you take ownership of the transaction, we commit it, and if it doesn't work, if there are any problems, we'll roll back. That's really cool, because if I wanted to do something like change the row text to `foobar` but I have this invalid SQL header — this actually tries to prepare a statement that's just not valid SQL — it can't execute. When I do that, you get a nice actionable error coming back to the component: you couldn't commit the transaction, there was invalid SQL. And you can see that nothing was affected in the SQL table at all, even though we actually sent off all of the queries in the first place before we added that invalid one.
+
+<img src="/img/community/2025-06-18/image003.webp" alt="An invalid SQL statement rolls the whole transaction back, leaving the table unchanged" />
+
+So that's how transactions work in Postgres, and this is how it looks when you put them into the wasmCloud Postgres library. This should be really useful for folks who are just trying to execute a bunch of different SQL instructions at the same time. It has a nice benefit: when you call this query, nothing needs to resolve instantly. You send it to the provider, the provider inserts it into the transaction and gives you an ACK, so the process is very quick. By the time the provider actually executes and commits the transaction, it has all of your queries right there. The downside is that you can't get the specific return values of any of these queries — but that's how transactions work.
+
+I'd like to sync up with Roman and Victor on the wasmCloud side to make sure I'm not introducing any issues when I add this transaction interface, since it'll be a new version of the SQL interface. Maybe I add it as a `0.1.2` so it wouldn't be an issue. The actual interface is not very complicated, and it's a great example of using a **resource** in a provider to have a unique object that you keep calling methods on. This was one of the first times I was able to come back and work with a resource on the wRPC provider side, so I'd love to talk through how that code works and then maybe throw it into our documentation, because that's something we have on the roadmap — or at least we should.
+
+**Brooks Townsend** [19:21](https://youtu.be/zELxAv7jInE?t=1161)
+
+That's the demo. Thank you all for dealing with my initial frustrations about not understanding how SQL works — but using the right kind of quote is a universal problem in programming, so I don't feel too bad about it. With the wasmCloud Postgres interface, what we'll do is validate that we're not making any breaking changes by properly gating the version in WIT. The good news is wasmCloud Postgres is actually not built into the wasmCloud host at all — it's a completely separate lifecycle, just a custom interface in wasmCloud — so we won't need a host upgrade for this to roll out, which is pretty cool.
+
+Beyond that, the only other discussion item on the agenda today was the structure of the wasmCloud project. When I say "structure" I don't mean anything huge or administrative — just the organization of our repository. `wasmcloud/wasmcloud` is pretty much the home of all our development; it is, for all intents and purposes, a monorepo. However, there are a couple of repositories we've moved out, namely the Go and TypeScript repositories. The broad-brush reason: when you're working in a specific language repository, there are usually broad conventions that language expects. Go expects to be the main thing in the repository; if you're using a Go workspace, you configure that separately too. And wasmCloud is a Rust repository, which assumes a certain structure — a `Cargo.toml`, a `Cargo.lock` — and all the CI cascades from there. So especially for Rust and TypeScript, where we're trying to provide nicer experiences around the component SDKs and examples, having them in the right repo makes it easier, and it also makes it easier to set up maintainer teams.
+
+<img src="/img/community/2025-06-18/image004.webp" alt="Brooks walks through the structure of the wasmcloud/wasmcloud monorepo" />
+
+**Brooks Townsend** [22:51](https://youtu.be/zELxAv7jInE?t=1371)
+
+There's a lot in here. This is the project home for all intents and purposes on GitHub, so it hosts our license, release process, roadmap, security, and contributing documents — people coming to view the project for the first time should see that. From this repo we produce wasmCloud, wash, all nine or ten of our capability providers, all the crates that power the providers, and we host all of our examples (with the exception of Go and TypeScript). To manage the vast amount of things in this repository, we use a cargo workspace for the Rust bits, and we use Nix for the complex CI: building, releases, image creation, building for different language tool chains and a variety of targets.
+
+Sorry that this turned into a project-layout explainer — I'm just trying to set the stage for what some of us maintainers have been talking about internally, which is: it's a lot, and it would be nice if it were simpler. Making CI simpler is no small feat. The way I see it, we have two options. Either we lean further into the monorepo setup and use monorepo tools to ensure we're not wastefully building things and running CI to test everything when one particular dependency changes — that would involve more Nix expertise (Roman is by far our expert there) or adopting something like Buck. Or we simplify by separating out different repositories. I don't have a proposed structure, and the hardest part is that it takes time — time we'd be putting toward examples, documentation, or development — just to shuffle everything around.
+
+I've seen a lot of people struggle to contribute to wasmCloud because of the structure and layout of this repository. I don't want to fall into the trap of thinking that if we just changed it, everything would be better, because there's definitely a reason we moved to this in the first place: if you needed to change something in wasmCloud core that affects all capability providers and wash, you could do that all in one PR. That's the biggest benefit of the current setup. I have a couple of proposals, but I don't want to seed the conversation — I'm curious what you folks think.
+
+**Yordis Prieto** [27:56](https://youtu.be/zELxAv7jInE?t=1676)
+
+I maintain one mega, gigantic monorepo with as many languages as you wish. What I found is that if you're going to add and remove a lot of things to the layout constantly, it becomes a nightmare to maintain — that's where I'd move away from it. But if you say the initial cost is figuring out what layout is going to be beneficial for your infrastructure, then I've found it's not that problematic. It's a pain you pay ahead of time, one time. Most of the time after that, the changes are really minor.
+
+The way we somewhat figured out how to do it: assume you have different roles as a programmer — most likely you wear one or two hats at a time, not many. How would you set up the **sparse checkout** for a developer who never cares about anything else? It could be based on clients, providers, the CLI, the port. So we analyze how Git sparse checkout would work to figure out the hierarchical structure, and from there we move to CI. I think it's worth it to keep going with this setup. CI is always going to be frustrating, but it's not changing all the time.
+
+**Brooks Townsend** [30:23](https://youtu.be/zELxAv7jInE?t=1823)
+
+I appreciate that, Yordis — that makes a lot of sense. Bailey, you had a comment in the chat about our layers changing.
+
+**Bailey Hayes** [30:23](https://youtu.be/zELxAv7jInE?t=1823)
+
+Yeah. The part where our layers keep changing is that the way to produce Wasm keeps changing, and I think it's going to keep changing for the next six months as well. So what I'd propose is that you lean into a monorepo with `wasmcloud/wasmcloud` being Rust, and lean into the language for maintaining it as a monorepo — basically doing cargo-workspace-style development — and then everything that's not that, you pull out.
+
+And if you're going to do a monorepo, you have to invest in it. It's hard with a community-maintained repo. I just commented on this — I was updating Helm charts, and then I failed wash unit tests. I'm like, "what are you doing in there, wash unit tests? I just changed charts. Come on, man." It's possible if you have the right patterns established, but this project is getting large. It's really large. So it's a big technical Death Mountain that we've got to figure out how to burn down.
+
+**Brooks Townsend** [31:49](https://youtu.be/zELxAv7jInE?t=1909)
+
+Yeah, and I put some effort into this — I can't remember if it was the beginning of this year or late last year — trying to make some of our GitHub Actions properly gated by "only run the wash tests if these specific crates change." That sort of worked. We're only supposed to run the wash action at all if the wash workflow changed, if the install action changed, or if any dependencies change. But nothing in the PR you added, Bailey, which is in charts, affects wash — so I don't know why that's happening. That's bad.
+
+<img src="/img/community/2025-06-18/image005.webp" alt="GitHub Actions workflow gating for the wash tests on the wasmcloud repo" />
+
+**Yordis Prieto** [33:06](https://youtu.be/zELxAv7jInE?t=1986)
+
+That's what I'm saying — if you figure out what happened and you maintain that list, and if that's all the time changing and adding, that's the cost, and it's not worth it. But that's going to stabilize real quick; you're going to run out of these. And especially if we do the trick of a sparse checkout, even more granular at the root of the project — you can no longer favor a given tool. You have to give up: "let me open the entire repository from the root in my IDE," because now it's like, is your IDE for Rust, or Go, or TypeScript? We have to give that up — open it from something lower to avoid the problems of everybody wanting something at the root, which sometimes isn't worth it.
+
+**Brooks Townsend** [34:18](https://youtu.be/zELxAv7jInE?t=2058)
+
+Yeah, definitely. There are some less desirable aspects of GitHub Actions. GitHub Actions is dope, but one thing you can't do: when you have an action that you want to pass — say wash and wasmCloud tests — you need it to pass 100% of the time to merge if anything modified wash or wasmCloud. But if nothing modified wash or wasmCloud, don't worry about it. There is no way to express that in GitHub Actions, and it's the "if it doesn't run" part that's the hard part — which is why we have this whole setup, where inside the action it always runs, but it checks whether it needs to run the full action. So we need to audit that a little. I like Bailey's idea that the main wasmCloud repo, if we can constrain it to be our Rust things, makes it less complex — we can work with just the cargo workspace set of tools. There are cargo workspace tools like cargo-hakari that help.
+
+What I certainly want at all times is to be able to press a button and have wash release without releasing wasmCloud — focusing a repository around a binary release makes a lot of sense in my brain. If you're going to contribute to wasmCloud, you go to the wasmCloud repository, contribute, and then it gets released in the next version of the binary. Yordis, I don't use sparse checkout in any of my development workflows, and I don't use submodules either. My initial thought: if people are coming to the repository to contribute, the only thing we can really ask them to do is `git clone`. Could just throwing this in a `DEVELOPMENT.md` or `CONTRIBUTING.md` work?
+
+**Yordis Prieto** [38:35](https://youtu.be/zELxAv7jInE?t=2315)
+
+Most programmers like me don't bother with sparse checkout. I'd say you can always direct people: "remember that this is a feature," based on the roles and how people maintain things. You could give a command that says "first checkout into core development" or whatever. You definitely need to educate your people — the maintainers — but other people don't care; clone the whole thing, I'm not even bothered by it.
+
+You also mentioned releases — that's a pain in GitHub too. In GitHub you have different channels for releases, so when you tag something, what does "latest" mean? You may have different release schedules for multiple binaries. And the auto-generated release notes from GitHub itself become a mess, so to fix that part we use **release-please**. It creates a changelog and even opens pull requests for you to merge, which eventually end up in a release. So we don't use the GitHub release UI per se — keep that in mind.
+
+**Brooks Townsend** [39:56](https://youtu.be/zELxAv7jInE?t=2396)
+
+That makes sense. Different CI tools — CircleCI, GitLab — have things for that too. With our auto-generated releases, since we use conventional commits and auto-labeling, that's really nice, but we can't have different templates for release notes for wasmCloud and wash if they live in the same repository — it's the same template.
+
+So I tend to agree that keeping the Rust structure — a binary plus a set of libraries that power it, all in the same repo so you can work on them together — is really nice. I haven't used release-please, but I'll pull it up; it's from Google. One thing that's complex about our setup is we use Nix for a lot of the building, composing, and publishing, for pretty solid reasons — we build a lot of different language tool chains. In theory you can use it locally for development; I don't personally, maybe I should. Somebody asked in the community Slack the other day: "how do I build the wasmCloud Dockerfile? Where's the Dockerfile?" That's not directly related to our monorepo, more our choice of tools. I'd love to evaluate simpler tools like release-please. At the end of the day, I don't want to fight the GitHub model too hard — Actions are going to power our CI.
+
+**Yordis Prieto** [43:34](https://youtu.be/zELxAv7jInE?t=2614)
+
+Brooks, my question for you is: what from the monorepo requires the exact same release cycle? That's where the whole shebang is — moving repositories around for the USA, the cost of synchronizing, releasing here, then over there, then coming back. In the worst case it's not technically a breaking change, but the release cycle forces you to deal with "I cannot release anymore because there's a cyclic dependency," and that's one of the worst things that could happen. So before you move anything around, figure out the release-cycle dependencies between them — they always have to point in one direction. As soon as you have a cyclic dependency, you're better off leaving it there until you prove it's worth moving.
+
+**Liam Randall** [44:44](https://youtu.be/zELxAv7jInE?t=2684)
+
+I've done a lot of thinking about this, because lately I've been somewhat inundated with all the different PRs. When I'm working on wasmCloud in my spare time, the problem right now is there are flaky tests and a whole bunch of things going on. I feel like we're at an inflection point, and it would take the same amount of work to go either way: we either fully commit to our monorepo and do the work to make it work well, or we break it apart. Based on everything I can look at, it would be the equivalent amount of work either way — so it's more a choice of what we prefer.
+
+I'll say that regardless of which way we go, I'm not a huge fan of keeping Nix around as our primary build engine. For context, I've given Nix a fair shake — I use it entirely for my package management locally, home-manager, and I love using a Nix shell, `nix develop`, on everything; I find that much better than using a container for a development environment. I don't mind keeping the flake around to build stuff with. But we have this mixture of "where's the Dockerfile?" so nobody knows how to build the image. I'd rather have the Dockerfile, and honestly it's going to be faster to do it with `buildx` — the time to run Nix derivations, pull the cache, and do all that adds much more time. Even our wash tests, which we can all admit are probably our most terrible set of tests, are still shorter than the Nix stuff with all its hermetically-sealed fetching.
+
+So no matter which way we go, we need to switch back to normal pipelines. That can be a pretty easy off-ramp: we create the new pipelines, run them in parallel, and once we're confident, we cut the Nix pipeline. I want to keep the flake and the development environment around — that's good to have. Then we need the community conversation: do we stick with the monorepo or not? I actually think I want to stick with the monorepo, but we need to invest in tooling. Buck, Bazel — those are the two big ones; I don't care which, but I think that'll also solve a lot of the releasing problem, because you get the whole dependency graph from those.
+
+**Brooks Townsend** [48:40](https://youtu.be/zELxAv7jInE?t=2920)
+
+Taylor put a little link to his blog, which I did read, and it was good. This whole wasmCloud Wednesday is sponsored by Taylor Thomas. I definitely tend to agree on the workflows being GitHub Actions, because we're on GitHub — that's where Actions experts come in and help us out. There's a lot of tooling there; it's not free, we'd have to write it too, but generally people are a lot more comfortable with GitHub Actions than Nix. I have reservations about adopting Buck or Bazel — not because I think you're wrong, but because I don't know how to use them, so it'd be a lot of initial knowledge we'd have to learn and then maintain expertise in.
+
+**Yordis Prieto** [50:27](https://youtu.be/zELxAv7jInE?t=3027)
+
+Also, for Bazel to take advantage of it, you have to do the trick I'm telling you about — the sparse checkout — and figure out the layout. Because if you don't figure that out, Bazel isn't going to help you, and you'll be all over the place. So the structure of how you're going to release and maintain it, and the dependencies between things — you normalize that first. That's why I'm saying step one is figuring that out first.
+
+**Liam Randall** [51:04](https://youtu.be/zELxAv7jInE?t=3064)
+
+The only advantage of Bazel and Buck — and why I hesitate, because I played with some experiments and that's why I hesitated to suggest it before — is that they're meant for monorepos. Nix really is not; you have to do a whole bunch of filtering. But cargo-hakari was something I found out about via Nix, because they recommend it. The cargo-hakari part, I feel, could be a really good solution: we could have the workspace-hack crate and then just build with cargo, because cargo workspaces actually work pretty well. That could be all we need. With some of the stuff we've done making the provider builds optional via features, that could speed things up too. I'm fine if we want to try that first before going to any other tool — we kind of went to a monorepo and never fully invested.
+
+I want to finish it up or take it out, and right now I'm leaning toward finishing it up so we can have a better experience for everybody. I think there are people who'd be willing to help out, add things to CI pipelines, if it were easier. Bailey, I think if we keep them along language lines, it makes our life easier if we ever have to combine — fast-forward five years, wasmCloud's taken over the world, and then we can talk about combining things. I was going to start toying around with replacing some of the pipelines, even without the workspace-hack, and then start looking into the workspace-hack — but anyone else who wants to do that, like Yordis who's expressed a lot of interest, we can collaborate and get it done. I just want to make sure that follows what people want — we can dump this in Slack after, so people who weren't here can add their thoughts. Maybe just link to this discussion.
+
+**Brooks Townsend** [53:46](https://youtu.be/zELxAv7jInE?t=3226)
+
+Yeah. I'd reiterate that we're making no decision in this call — just trying to throw out some options and get what people think. The heuristic I'm operating off of is: if it builds faster and it's easier to contribute to, then do that.
+
+**Liam Randall** [54:13](https://youtu.be/zELxAv7jInE?t=3253)
+
+Honestly, Brooks, I think the action here is to link a timestamped version of this recording on YouTube in Slack and say, "hey, we talked about this, here's where we're heading, what are people's thoughts?" Give it a week, then make a final decision next week. That way it's out and committed in public. I actually have to head out now, so please feel free to continue, but I'll look forward to next week.
+
+**Brooks Townsend** [56:19](https://youtu.be/zELxAv7jInE?t=3379)
+
+That sounds good — that'll coincide pretty well with the Q3 roadmap. With how complex the current repository structure is, we probably need to explore replacing some of the Nix-related actions with just GitHub Actions, and we should draw a dependency graph, as horrible as that may be, just to understand our dependencies-of-dependencies. There's some work we could do simplifying some of the crates and maybe just module-gating instead of making them totally separate. To throw out a straw man: it'd be really nice if all providers just needed the provider SDK and didn't have to depend on anything else. Right now there's `test-util`, tracing, and so on — I'd prefer a three-deep tree to whatever we've got.
+
+**Liam Randall** [56:19](https://youtu.be/zELxAv7jInE?t=3379)
+
+There's an example in that Guppy thing I just found that uses a print-out representation. I'm not sure it would work, but I'm pretty sure we could programmatically create something to show it, just to keep it all straight for people. I think cargo-hakari uses Guppy under the hood. We'll figure this out — GitHub Actions, cargo, zig builds would do our cross-builds for us really easily. I'll look forward to next week, and to Slack if there's anything to follow up on.
+
+**ossfellow** [58:10](https://youtu.be/zELxAv7jInE?t=3490)
+
+You touched on the important points — things that complicate repo management, testing being one of them. I don't find the repository structure in particular complicated; it's more the CI that the project has that's complicated. Right now I more or less know a lot about it because I've gone through it multiple times, but for newer users and contributors it poses a significant challenge to understand what is what, how things are built, and where they can find something. You gave that example well — the container, the image of wasmCloud — it's not readily discoverable for people to understand where it's built and what the dependencies are.
+
+**Bailey Hayes** [59:36](https://youtu.be/zELxAv7jInE?t=3576)
+
+So we should probably sketch what outcome we're aiming to achieve before we start slicing and dicing. One of those would be: I click on a thing and I want to know where it was released from, or if it was off of a SHA, and go back to the build that produced it. That's the kind of information I need. There are lots of ways to do that, including a lot of the stuff we've explored in the signing world. But I'm also just talking about the basic CI side and making it easy to track that artifact going through.
+
+**Brooks Townsend** [1:00:29](https://youtu.be/zELxAv7jInE?t=3629)
+
+Maybe just to restate some of my high-level and specific goals, so we can think about it going forward. I feel like we've identified that the current CI and the process of contributing to wasmCloud is complex and has likely turned away maintainers before — at least provided a friction-full experience contributing, even for our seasoned contributors.
+
+Specifically, I'd love a more predictable release pipeline. Right now we use cargo-smart-release, which doesn't actually have workspace support, and we hack around that with our own custom branch. I'd like a push-button release for each of the binaries we host in the main wasmCloud repo, so we can say "new version of wasmCloud is ready, let's release it" — and in that process, package managers get pushed, GitHub gets auto-generated releases, a container is built and tied back. But the vast majority — my biggest goal — is that when you contribute to a specific area of the wasmCloud repo, the CI runs for that area and only that area. That's probably the biggest problem we have now: a bunch of different actions that run on every PR.
+
+**Yordis Prieto** [1:02:29](https://youtu.be/zELxAv7jInE?t=3749)
+
+One thing that may be required regardless of what we do is that the existing contribution guide needs an explanation on how to contribute, based on those roles you're mentioning — which most likely will be the ones you'd organize the new repos around anyway. So if you centralize it, the existing contribution guide doesn't help me contribute in a task-oriented sense.
+
+**Brooks Townsend** [1:03:35](https://youtu.be/zELxAv7jInE?t=3815)
+
+Folks, that puts us — with my SQL floundering at the beginning of the call — right at about two. Thanks, everybody, for coming and discussing the super-fun things of running a project, like monorepos. If we have any more discussion here, we can keep chatting about it, but yeah — have a great day, everybody. We'll see you next week.

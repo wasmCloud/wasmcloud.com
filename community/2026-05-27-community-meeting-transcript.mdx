@@ -1,0 +1,247 @@
+---
+date: '2026-05-27'
+title: 'Transcript: Endive Java Wasm Host, JCO WASI P3 & the Component Model'
+description: 'Full transcript of the May 27, 2026 wasmCloud community call covering the Endive Java WebAssembly host, JCO WASI P3, and the component model.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - java webassembly
+  - jco
+  - wasi p3
+  - quickjs
+  - bytecode alliance
+image: https://i.ytimg.com/vi/QyVyD37cvrw/maxresdefault.jpg
+showTitle: true
+slug: 2026-05-27-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-05-27-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=QyVyD37cvrw" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=QyVyD37cvrw" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, May 27, 2026 · 54 minutes*
+
+**Speakers:** Bailey Hayes, Liam Randall, Eric Gregory, Victor Adossi, Aditya
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [01:37](https://youtu.be/QyVyD37cvrw?t=97)
+
+Make Otter not be there.
+
+**Liam Randall** [01:40](https://youtu.be/QyVyD37cvrw?t=100)
+
+Yeah, let me… that's weird. I thought that was on purpose. I think I clicked the button last time so that they auto-join. That's annoying. Let me figure this out, Bailey. Worst case, we can just boot Otter and I can upload the video later for notes.
+
+**Bailey Hayes** [03:15](https://youtu.be/QyVyD37cvrw?t=195)
+
+Hey Eric, do you mind going in and adding "docs update," and then also "hotel demo," "hotel example"?
+
+**Eric Gregory** [03:24](https://youtu.be/QyVyD37cvrw?t=204)
+
+No problem — docs update, and hotel. Got the PR up for adding those items.
+
+**Bailey Hayes** [05:27](https://youtu.be/QyVyD37cvrw?t=327)
+
+It's cute. It hasn't offended me or anything. Anybody else need Otter to be booted? Look at that face. You're really gonna tell him to go away?
+
+**Liam Randall** [05:59](https://youtu.be/QyVyD37cvrw?t=359)
+
+Okay, I'll work on getting them fixed. It's helpful — it's where the meeting notes come from.
+
+**Bailey Hayes** [06:38](https://youtu.be/QyVyD37cvrw?t=398)
+
+All right. Live stream. Hello, and welcome to our wasmCloud community call for May 27. I'm going to kick us off with kind of a POC — very, very POC, emphasis on all the POC — but it's kind of fun, and my team enjoyed it, and I figure maybe some other people might spark some more ideas on top of it.
+
+So yesterday the Bytecode Alliance announced **Endive** as its newest hosted project. It is a fork of an existing project which was called **Chicory**. This one is basically that, plus it's been working on a really interesting compiler story where it's actually building in **Cranelift** as its backend and giving it a really nice performance boost. Now, one thing I want to call out here is that it doesn't yet support WASI P2 or the component model. Right now they are actively working on that Cranelift project, and there's also additional spec conformance work that needs to happen — including further WasmGC support and a couple of other types of alignment.
+
+However, it is pretty cool to use, and you can build something with it today. The reason I think people would be interested is that it is a zero-native-dependency install. It's all packaged up for you. It's really easy to add to an existing JVM application, and it brings in all of those cool properties from WebAssembly — like being able to write a component in WebAssembly, or in Rust compiled to WebAssembly, and then run it inside your Java application. So for the most part, this project will interest people who have things like large Java monoliths, or who are using serverless frameworks like Vert.x.
+
+<img src="/img/community/2026-05-27/image001.webp" alt="Endive project website" />
+
+So I wanted to take it through its paces. I created this project called **Endive Host** — a wasmCloud host written in Java, running on top of the Endive WebAssembly runtime. Unlike our Rust host, which embeds Wasmtime, this one embeds Endive. The first primary thing it does is implement our scheduling protocol, so it registers itself as a host resource to the wasmCloud runtime operator over NATS. That lets us do heartbeats and workload scheduling — start, stop, and status — all the exact same protobuf API as our Rust-based host. The second thing is a layer where it pulls the Wasm module from an OCI registry. This is just a POC, so I didn't implement authentication handling at this layer, although that's trivial to add — right now it's just plain HTTP for a local registry. And the third thing is some dark-magic hackery I had to get working: because it doesn't support the component model or WASI P2 yet, I added a shim where I said, "okay, this is a WASI P1 module, it's got an `_start` command, I'm just going to invoke it as if it were a WASI HTTP incoming handler" so I can call it externally. Once it adds the component model, that layer goes away and it's just nice and native.
+
+<img src="/img/community/2026-05-27/image002.webp" alt="Endive Host architecture" />
+
+So let's do some running. Since it's Java, we're going to use Maven to package it up. This is packaging two Maven modules: the library — the Endive Host Core library, where the Wasm engine, the NATS control plane, the OCI fetcher, the HTTP server, and my silly trigger layer live — and the Endive Host app, which is just a super-thin CLI on top of that library so I can run this as a standalone host. I took exactly our existing Docker Compose and changed it just slightly so that it loads the Endive Host and also has a local Docker registry. While that's starting up: the stack is essentially a Kubernetes API server — we're not bringing in all of Kubernetes here, just the API server — and I'm using our runtime gateway so that I don't have to do Kubernetes networking like services and endpoint slices. The runtime gateway is a really simple Go reverse proxy that we drop in front.
+
+<img src="/img/community/2026-05-27/image003.webp" alt="Docker Compose bringing up the Endive Host and registry" />
+
+Now that all the services are up, I'll export a kube config and check if my host is ready. It is. So this is basically saying, "hey, wasmCloud runtime operator, it can see this Endive Host, it's reporting healthy, but we haven't shipped any code to it yet." Let me cd into our examples. I've already built this `.wasm`, and I'm going to push it to this registry. Just so you know, I have the world's smallest Wasm running here — it's `wasm-tools print hello.wasm`, a 166-byte Wasm function. How do you get that? You write hand-rolled WAT. This is part of the test corpus of Endive — one of their most basic golden-path tests that must always work. There's a little bit of WASI P1 in there so I can write to the console. All it has is the `start` function that we call using my little trigger layer.
+
+<img src="/img/community/2026-05-27/image004.webp" alt="Pushing the 166-byte Wasm module to the local registry" />
+
+Now I'll apply the workload. Let's take a look at it — nothing special about Endive, it's just like any other workload we deploy with wasmCloud, because a Wasm is portable. It figures out where it should go based on namespace, and I deployed this in the default namespace — even though I'm not really running Kubernetes, as far as things are aware it's got namespace-level tenancy. Let's see if it's up and running. It is. So what can I do? I can curl it and get back `hello world`. Our operator picked up our workload and did workload-start on our new Endive Host using our already-standard protobuf API. If I threw another wasmCloud host in here as part of the same host group, it would round-robin which one it deployed to, and we'd be none the wiser whether it did a JVM one or a regular wasmCloud Rust host one.
+
+<img src="/img/community/2026-05-27/image005.webp" alt="Curling the standalone Endive Host returns hello world" />
+
+Now, I don't think this angle is actually the most interesting, so I'm going to take this one down and do something more fun. I think the main reason somebody would be excited about Endive is that they're probably already leaning into existing frameworks, or they have legacy JVM applications they'd like to extend — or even do a strangler-fig pattern to start whittling away at their Java codebase and moving toward languages like Rust. So if I go to the **Vert.x** demo — the Eclipse Vert.x framework, a way to write serverless Java functions all inside one JVM — in this scenario I'm doing five routes: one shared HTTP server, two plain Java handlers (Hello and Time), and two Wasm handlers (Hello and a Markdown handler).
+
+<img src="/img/community/2026-05-27/image006.webp" alt="Eclipse Vert.x serverless routes" />
+
+Let me open the Wasm invoker. There are really only three relevant lines, and the rest is Java stuff: get an instance of the Endive Wasm engine — this is straight off-the-shelf Endive — then load our Wasm bytes, and then invoke it in the Vert.x parlance. That's the whole story in three lines. All that other stuff I showed a second ago — being attached to NATS, the operator, OCI pulling — none of that is on the call path in this demo. The idea here is that you've probably come up with a way for how you want all of that handled, maybe even your own way of doing a front door. So this shows it from a library perspective.
+
+<img src="/img/community/2026-05-27/image007.webp" alt="The three-line Endive Wasm invoker in Java" />
+
+I'll build it, another Maven package — a single Vert.x app — and run it with `java -jar`. It registered those handlers, and you can see which one's Java and which is Wasm. Let's try that same 166-byte Wasm again — boom, it runs with no problems. Now let's spice it up. We've got Java functions and Wasm functions all answering on the same port from the same Java application. First, a slightly more interesting payload: on my Wasm I'll pass a markdown body, and I'm using a Rust library that converts it to HTML — so I passed it markdown and out came HTML. Now the equivalent on the Java side: I've got a `/render` function, I pass it a markdown body, and out comes HTML. You might think, "okay Bailey, that was the same thing," but it's interesting: I had a Java entry point, it composed that input, handed it to that same Wasm module that takes markdown and outputs HTML, and then composed it together with a server-side JVM timestamp. All of this happened inside one process, one event loop, two different languages. The Wasm side is fully sandboxed, and — probably more importantly — the Java function is none the wiser that it was talking with WebAssembly. From the outside you don't see any difference; it's just another serverless function you're able to call. That is basically the embedded story. Any questions?
+
+<img src="/img/community/2026-05-27/image008.webp" alt="Java and Wasm handlers intermixed in one Vert.x app" />
+
+**Liam Randall** [21:09](https://youtu.be/QyVyD37cvrw?t=1269)
+
+That's awesome, Bailey. There's a lot there, and it's just amazing. Really excited to see where this goes over the next few months. But what do you need from the community in order to accelerate and get this moving faster?
+
+**Bailey Hayes** [21:27](https://youtu.be/QyVyD37cvrw?t=1287)
+
+I think the biggest blocker for me is not having component model support in Endive right now. Adding our scheduling API was a one-shot with Claude in 10 minutes, and I was immediately able to schedule Wasm workloads. The tricky bit that required some tinkering was faking it as a WASI HTTP incoming handler, as a P2 handler. If it had full component model support and WASI P3, that would be really awesome, because it would be able to take advantage of all the other ecosystem tooling we've been building out, and really nice language bindings — you could write one API once and have SDKs for free for Java and every other language.
+
+**Liam Randall** [22:18](https://youtu.be/QyVyD37cvrw?t=1338)
+
+Is there a place where folks can go to get involved?
+
+**Bailey Hayes** [22:21](https://youtu.be/QyVyD37cvrw?t=1341)
+
+I'd say go to the Bytecode Alliance Endive project, and from there we also link out to the Zulip channel. If you want to get in touch with the maintainers and me, we hang out on the Bytecode Alliance Zulip — there's an Endive channel there.
+
+And just to be clear, this is on the host side of the world — I demoed with a JVM host. A lot of folks, when we talk about Java, want to talk about the other direction: "I have a lot of legacy Java code, I want to turn that into WebAssembly." For that, I recommend folks check out **GraalVM's Web Image**. It's an open-source compiler that has native-image AOT already built in, so you can take a JVM app, compile it to GraalVM's native-image ahead-of-time compiler, tell it to use the Wasm target, and it'll emit Wasm. It doesn't fully support the component model yet, but I hung out with the technical lead on that project at KubeCon in March, and together we got WASI HTTP GraalVM Web Image output working. They're prioritizing WebAssembly 3.0 completeness, just like Endive, but once they're far enough along I think they'll look toward the component model next.
+
+**Liam Randall** [24:36](https://youtu.be/QyVyD37cvrw?t=1476)
+
+It's amazing. Thank you so much, Bailey. What's next on the agenda — is it Eric?
+
+**Bailey Hayes** [24:42](https://youtu.be/QyVyD37cvrw?t=1482)
+
+I actually have another demo. We've got a PR up here on wasmCloud. I had to make runtime updates that I need to land independently, so I revved us to use the latest **wasi-otel RC2**. Victor had some really awesome suggestions on the PR — where I demoed this new example on a previous community call — about how we can simplify and refactor it, so I did that too. I'm going to break this up into two PRs; it's already broken into two commits.
+
+Let me demo where I'm at. I'll run `wash dev` off this, using the wasi-otel release candidate. This opens a UI I added last time — it was doing HTTP counter incrementing and arbitrarily calling out to other things. It still calls out to arbitrary things, but it has a UI now that's wasmCloud-branded, and it gives a pro tip: run this and you get your own Aspire dashboard.
+
+<img src="/img/community/2026-05-27/image009.webp" alt="wash dev running the wasi-otel example UI" />
+
+Let me run that. I'll go to my traces and refresh a few times, bumping up that counter. It produces a bunch of spans, and now I can inspect my OTel data. The other thing I wanted to highlight: one of the changes we landed this past week is prefixing for a lot of these types. Previously we just had things like `get-container` bare, which could cause problems if somebody else has an implementation for `get-container` — like a competing blob store plugin. Some were even more generic, like `write-data`. So this prefixes all of the WASI and wasmCloud APIs we've implemented via host plugins with the `wasi.<package>` prefix, and now you get pretty nice handling in OTel around that. This demo arbitrarily writes things to a blob store and bumps a key-value, so if anybody wants to make it cuter by doing something that looks like real work, that's a good place to make it better.
+
+<img src="/img/community/2026-05-27/image010.webp" alt="OpenTelemetry traces in the Aspire dashboard with prefixed API names" />
+
+**Liam Randall** [28:59](https://youtu.be/QyVyD37cvrw?t=1739)
+
+I mean, did you just Steve Jobs this?
+
+**Bailey Hayes** [29:04](https://youtu.be/QyVyD37cvrw?t=1744)
+
+Nah — I probably should have inverted the order, because the Vert.x thing is pretty freaking cool. I had to do some pretty nasty hackery to make that work all the way there.
+
+**Liam Randall** [29:16](https://youtu.be/QyVyD37cvrw?t=1756)
+
+That was awesome. Thank you. What's next on the agenda? Eric, are you up?
+
+**Eric Gregory** [29:22](https://youtu.be/QyVyD37cvrw?t=1762)
+
+I believe so, and I don't have any nasty hackery, unfortunately, but I do have some docs pages I want to highlight. Two big pages, significant for different reasons. The first is under our recipe guide: we now have a **plugin-or-service** page. This is intended as a decision framework for users trying to think about how they want to provide capabilities to a wasmCloud application — do they want to extend the host with a plugin, or ship a service inside a workload? These are both kind of new concepts that folks are grappling with. So we walk through an introduction to the concepts, which links out to our more extensive overview pages, then a comparison chart breaking down the plugin and the service, and a handy decision tree. This also knocks out one of the items on our roadmap — it was the big docs item for this quarter, so we've got that closed now.
+
+<img src="/img/community/2026-05-27/image011.webp" alt="Plugin-vs-service decision framework docs page" />
+
+The other page I wanted to highlight is a new **operator-oriented troubleshooting** page. Previously we had a debugging-components page, which we still have, and the developer guide that's developer-focused for when you're building a component, but this is really where we want to collect and make discoverable all of the errors that operators might encounter. We have a few common foot-guns we've discovered over the course of v2 deployments, documented with the errors you'll get and the solutions to pursue. This is very much a living document — if you hit some mysterious error, that's a great thing to bring to the wasmCloud Slack so we can document it and make it easy for other users to find on a search.
+
+<img src="/img/community/2026-05-27/image012.webp" alt="Operator-oriented troubleshooting docs page" />
+
+**Aditya** [32:16](https://youtu.be/QyVyD37cvrw?t=1936)
+
+Yeah, we love it, Eric.
+
+**Bailey Hayes** [32:33](https://youtu.be/QyVyD37cvrw?t=1953)
+
+It's awesome, Eric. Maybe we'll do a quick refresher on where we are on our roadmap. I'll bring that up. We're doing pretty good — we basically have one month left. Aditya got the TLS stuff done. Actually, Victor, do you want to say the news that you shared with us this morning? If you're by a mic, otherwise I'll steal your thunder.
+
+<img src="/img/community/2026-05-27/image013.webp" alt="wasmCloud Q2 roadmap board" />
+
+**Victor Adossi** [33:20](https://youtu.be/QyVyD37cvrw?t=2000)
+
+Sorry, I was muted. So, a lot of this work has actually been done by Tomas from Microsoft, who's been working on JCO along with me. At this point we have all the tests from upstream Wasmtime for WASI P3 working — and they're released as of right now. So **JCO version 1.20** is out, and this includes a new package called **Preview Three Shim**. For those familiar, this is just like the Preview Two Shim, but it's a shim for using WASI P3 interfaces with P3 components.
+
+Now, to be clear, you can't yet create a P3 component from JavaScript with ComponentizeJS and StarlingMonkey — that's on the way and coming soon. It's actually possible right now, but it's not polished; there's more work that needs to happen on the StarlingMonkey side and be merged into the new ComponentizeJS, which is fully in Rust — it's a Rust rewrite. But you can create a P3 component in Python or Rust or any other language with P3 support — with async, streams, and futures — and run it in JCO. By "run it in JCO" I mean run `jco transpile` on that guest binary and get a JavaScript ES module that you can run, for right now, in Node. So we've come a long way. We still have more tests to hammer out and make sure aren't broken, but at this point it's a pretty big milestone.
+
+**Bailey Hayes** [35:41](https://youtu.be/QyVyD37cvrw?t=2141)
+
+So I heard you say 46 out of 46 tests?
+
+**Victor Adossi** [35:45](https://youtu.be/QyVyD37cvrw?t=2145)
+
+Yeah, for the WASI test suite upstream in Wasmtime. There are a lot of tests in there — a lot of HTTP tests, as one might imagine. So that's pretty exciting. And I saw the comment in chat about folks using QuickJS. **QuickJS** is a small but relatively efficient and fast JavaScript engine developed by Fabrice Bellard. There's a blessed fork called **QuickJS-ng** (QuickJS Next Generation), which is actually the basis for our `quickjs`, a Rust binding around the underlying C codebase. This is one of the things that **Javy** is built on — Javy is a separate JavaScript-to-WebAssembly guest environment, and it doesn't support the component model, which is why we can't use it.
+
+There's actually a ComponentizeJS that is made out of QuickJS — Tomas did some work on this, because it recently became much easier thanks to a project called **wit-dialib**. This makes it easier to implement guest toolchains in languages that can conform to a standard FFI interface — mostly intended for interpreted languages or languages with runtimes. If you have an interpreted language and can adhere to a very specific FFI interface, you can get support for everything up to P3. So **ComponentizeJS-QJS** actually exists — you might think of it as an alternative to Javy that does support the component model, and a lot of the component model, which is the hard part. It's somewhat easy to just make a component; it's harder to make a component that properly does the right things when you interact with resources, streams, futures, or async calls.
+
+**Bailey Hayes** [39:53](https://youtu.be/QyVyD37cvrw?t=2393)
+
+Victor, can you talk a little bit about your ideas around extending JCO, so you could potentially make this pluggable, where you can use some of these different "hosty" things?
+
+**Victor Adossi** [40:09](https://youtu.be/QyVyD37cvrw?t=2409)
+
+Yeah. There's a proliferation on both sides. There's proliferation on the guest side for how you can make a JavaScript guest that's conformant to the component model — ways to build a WebAssembly binary from JavaScript. Right now StarlingMonkey and ComponentizeJS are the kind of blessed way, the way most people do it; ComponentizeJS-QJS is an option that will get better in the future. The idea is to have JCO sit as a toolkit across all these options. There are also alternative runtimes on the host side — a couple of other projects have implemented pure-JavaScript logic for parsing components and turning them into something runnable in Node or the browser.
+
+Those host-side alternatives are equivalent to `jco transpile`. Under `jco transpile` we have one implementation that uses a lot of the Rust tooling and turns a WebAssembly component into JavaScript code runnable in a browser or Node. Other projects do the same thing slightly differently, and a bunch of them are vibe-coded — but the code is high quality, just very skilled engineers who wanted to do this kind of project. One thing I really like about **WC-JS** is that it's TypeScript by default, something we've wanted in JCO for a long time but hasn't happened, because right now the JCO codebase is JS split out by Rust. So we're looking forward to being able to use WC-JS or others from inside JCO to do the transpilation — taking advantage of different ways to build a JS component for `jco componentize` and different ways to generate a host in JCO.
+
+**Bailey Hayes** [44:05](https://youtu.be/QyVyD37cvrw?t=2645)
+
+The big headline here is that we're basically on track to launch **WASI P3 in two weeks**, because this is our second reference implementation that Victor — and now Tomas — have nearly gotten over the line. With them showing up with a second reference implementation that fully passes compliance tests, we could have used things like WC-JS or JSCO if they had full compliance; they don't yet, but these guys do. So we've got Wasmtime and this other implementation that'll run and build a host in a Node JS environment with the WASI P3 shim, which is awesome.
+
+That means on the wasmCloud side I have that cleanup issue with a lot of things I wanted to roll back on. Aditya, you hit a rough edge on WASI P3, like needing to build your own host with it and not having a flag like in dev. Honestly, in two weeks we should probably have it enabled by default — I do think we should keep the flag in case somebody wants to disable it for some regression, but once it's the standard it should be on by default. On that note, I put up a PR for updating us to **Wasmtime 45**. I think it was the first time I didn't have an API change to adapt to, which was cool, but it had internal updates relevant to our P3 support. So we land that, then do a hardening pass on the P3 route — that should probably be what we plan for this sprint.
+
+If you look at our roadmap, getting P3 over the line this quarter was our biggest thing. A couple features depend on it, like host components. The other big epic was the TLS work and the outgoing handler — Aditya got all those in, and because you made the outgoing handler replaceable, I was able to shim it to not actually go out to the network and get rid of a flaky test. There's another major epic I've been working on: benchmarking. I landed the PR last week and I've been running it. I'm going to run it against our current release versions to get data populated, and I've started on a k6 benchmark. So I think we'll get the benchmarking suite done this month too. The ones at risk are host component plugins — feels risky, but I actually think it's well in hand, we just need a full week.
+
+**Aditya** [48:16](https://youtu.be/QyVyD37cvrw?t=2896)
+
+My only doubt was the wRPC spike. It still needs the propagation spec figured out.
+
+**Bailey Hayes** [48:39](https://youtu.be/QyVyD37cvrw?t=2919)
+
+Right now we don't have wRPC on our roadmap, though. We've debated it — some people want it, but not all; some explicitly don't want it. So that one's still in a holding pattern. If we get more feedback that it's needed, we can prioritize it, but right now I don't see it on the roadmap we built here.
+
+**Aditya** [49:12](https://youtu.be/QyVyD37cvrw?t=2952)
+
+Yeah, I must have seen the normal issues list and mixed it up.
+
+**Bailey Hayes** [49:20](https://youtu.be/QyVyD37cvrw?t=2960)
+
+Yeah, it's out there. It's killing Victor — he's like, "can we just close these issues, Bailey?" We've been hovering at 30 for so long, and many of them are bots; I just haven't done the due diligence to triage them. We've been whittling, doing a pretty good job — we crept up to 36 at one point, and I'm like, "oh no, I gotta get that back down."
+
+**Victor Adossi** [49:52](https://youtu.be/QyVyD37cvrw?t=2992)
+
+Also, feels like that benchmarking-suite issue might be closable. I don't know how much was left in there.
+
+**Bailey Hayes** [50:02](https://youtu.be/QyVyD37cvrw?t=3002)
+
+I've got k6 to throw in — I have micro but not macro. Maybe I'll make two separate tickets. Going back to the roadmap: this one I think we can do; this one we're doing, hell or high water. This one I need to do to enable P3 by default. This one's harder than it looks — `wash runtime` depends on WebGPU, the Wasm graphics runtime, and because that's not published to crates.io we can't publish it. That one bit me. Right now it's a runtime flag but we always build it in, so unless we change that and extract it out, it's not easy.
+
+On that note, Mindy's been doing a big pass on revving WebGPU for P3 — taking the existing WebGPU API, which was built on WASI P2, and getting it to be a native async API. It's nice because WebGPU as the web-standard API is designed to be async, so a lot of the rough edges fade away by upgrading to P3, and he's largely made it through. For wasm-graphics in particular, Mindy and I were talking yesterday about maybe contributing the wasm-graphics suite of libraries to the Bytecode Alliance, and having a way to build that in with Wasmtime. We didn't want to do the Wasmtime work while we were still changing the API, but with the native async API — and the WebGPU web API not having changed in a couple years — it's super stable, so it might be a good time. We might not hit that one, and it's not the end of the world.
+
+I did all the CI hardening stuff, so I think we're complete there. We're close — really close.
+
+**Aditya** [53:02](https://youtu.be/QyVyD37cvrw?t=3182)
+
+Pretty much, yeah, but I'm not sure about the pooling we have set up for the sockets plugin.
+
+**Bailey Hayes** [53:19](https://youtu.be/QyVyD37cvrw?t=3199)
+
+There's the answer — there's not much there. Hence, more work.
+
+**Aditya** [53:27](https://youtu.be/QyVyD37cvrw?t=3207)
+
+Yeah, if I find time, I should be able to help out with a few of the observations you've mentioned in the socket implementation.
+
+**Bailey Hayes** [53:41](https://youtu.be/QyVyD37cvrw?t=3221)
+
+I saw you in there, deep. Anybody else have any items or anything else to talk about? I think we're out of things. All right, let's get back to it. Let's ship P3. Let's go. Bye bye.

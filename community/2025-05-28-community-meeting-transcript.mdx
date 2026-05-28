@@ -1,0 +1,276 @@
+---
+date: '2025-05-28'
+title: 'Transcript: Testing Wasm Component Model Functions with wasmtime run'
+description: 'Full transcript of the May 28, 2025 wasmCloud community call covering wasmtime run --invoke, WebAssembly Value Encoding, wash call, the Q2 roadmap, and an HTTP overload deep dive.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasmtime webassembly runtime
+  - rust webassembly
+  - wash call
+  - wasi
+image: https://i.ytimg.com/vi/BWlfrXOXALc/maxresdefault.jpg
+showTitle: true
+slug: 2025-05-28-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-05-28-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=BWlfrXOXALc" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=BWlfrXOXALc" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, May 28, 2025 · 72 minutes*
+
+**Speakers:** Brooks Townsend, ossfellow, Taylor Thomas, Victor Adossi, Florian Fürstenberg
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [00:50](https://youtu.be/BWlfrXOXALc?t=50)
+
+Yeah, quick moment of silence. Figure we'll just wait for a minute or two for folks to roll in.
+
+**ossfellow** [02:01](https://youtu.be/BWlfrXOXALc?t=121)
+
+No, but just joking, you know — because you started the recording and then said nothing.
+
+**Brooks Townsend** [02:10](https://youtu.be/BWlfrXOXALc?t=130)
+
+Yeah, everybody, welcome to wasmCloud Wednesday, silent edition. We're just all gonna appreciate each other.
+
+**Taylor Thomas** [02:17](https://youtu.be/BWlfrXOXALc?t=137)
+
+We're gonna mime. We're gonna mime everything — talk about the issue of the week using miming only. Just get all of our YouTube thumbnails.
+
+**Brooks Townsend** [02:39](https://youtu.be/BWlfrXOXALc?t=159)
+
+Alrighty. Well, I think it's probably good to do the thing, so let's do the thing. Before I get started — is there anything we don't have on the agenda that folks wanted to talk about today? We can just bring it up later, but I wanted to check if we should amend anything.
+
+Okay, cool. Hey everybody, welcome to wasmCloud Wednesday for Wednesday, May 28. We've got a pretty short and sweet agenda for you today. On the agenda, I did want to bring attention to something that released — I think it was at the end of last week. I saw it, then took a little holiday around the long weekend here in the US, so I actually just got to play with it pretty recently, and it's pretty cool. I think we should really consider adding this to our dev toolbox with `wash`, if that's possible. And then, since we're at the end of May and going into the last month of quarter two, we should do a bit of a roadmap update — consider where we are and what we want to do for the rest of the quarter. Then we can talk about anything else, because it's a community meeting.
+
+So let's get started with the demo and discussion. I'm not sure if you all have used this before for running WebAssembly, but the **Wasmtime** engine is the one we use underneath wasmCloud to actually execute the WebAssembly components that we run — interpret the instructions, all that fun stuff. Wasmtime is the Bytecode Alliance WebAssembly runtime, and they release on a very frequent, pretty much monthly cadence for the engine, and we update that as a library inside of wasmCloud. So if you're using wasmCloud, you don't really ever need to interface with this directly. But you can actually execute WebAssembly modules — and now components — directly from the command line. You can install Wasmtime as a binary and invoke components directly without loading them into an embedding or into wasmCloud.
+
+I played with it this morning and had a really nice experience — this is exactly what I've wanted `wash call` to be like for quite a while. I think the `wash call` utility would essentially be an enhancement of this. Let me show the project I was working on.
+
+<img src="/img/community/2025-05-28/image001.webp" alt="VS Code showing the WIT and parse-config component for the wasmtime run --invoke demo" />
+
+**Brooks Townsend** [05:30](https://youtu.be/BWlfrXOXALc?t=330)
+
+Everybody should see my VS Code window now. I have a little WIT here that I generated from `wash new` package — it just exports a single function, so a very simple WebAssembly component. It's a function that translates from the shape you get back from `wasi:config/runtime` when you call `get-all`. That returns a `list<tuple<string, string>>`, which is basically a map of string to string. I thought it'd be really cool to have a function that converts this map structure into a strongly typed configuration record — something I define in my WIT as a developer, or something defined in a library like a WASI Redis library.
+
+So I did a little vibe coding, and now I have a compiled WebAssembly component. If I inspect it and look at the WIT, it's got a bundle of imports that I could probably virtualize away, but it exports my one function. The implementation is fairly simple: we take the properties, convert them into the Rust representation of a JSON value, and then deserialize those specific values as my strongly generated type. It's basically a config round trip — nothing too crazy, but I coded some Wasm in Rust.
+
+Now, where would you go to test this? If I were writing this in Rust, I'd start writing unit tests and calling the function directly. That's notoriously a little more challenging with WebAssembly, because some of the generated code is specifically for the `wasm32-wasip2` target, so you can't run it on your local machine. So maybe you skip that step and just want to run the component and give it a try — you'd do something like `wash dev` and stand it up in wasmCloud. But then, how do you call this function? Unfortunately, `wash call` only supports two kinds of functions: either HTTP, or a function that doesn't take any arguments and returns a string — which is extremely inflexible.
+
+So this is where `wasmtime run --invoke` comes in, and it's super cool. The syntax is just `wasmtime run --invoke`, and `--invoke` tells Wasmtime you're going to be invoking an export on the component that's not the WASI CLI `run` export. You're calling a function on a reactor component. The really cool thing is, all you need to do is write the function you're calling — inside the WIT I have `parse-config`, so I call `parse-config`, and then you provide arguments directly using the **WebAssembly Value Encoding**, or WAVE, syntax for representing all your complex types. Booleans are `true`/`false`, integers are normal, and tuples, lists, and records are all supported. If I hit enter here, we passed in a list of string/string configuration values — two were strings and one was a boolean (a stringly-typed boolean) — and out comes the parsed configuration with the correct types.
+
+**Brooks Townsend** [12:48](https://youtu.be/BWlfrXOXALc?t=768)
+
+You can do this with a more complex setup too. You can pass in a whole bunch of complex types — a string, a number, a boolean, a nested record or struct, a variant, an optional value — and you'll get out the parsed config.
+
+<img src="/img/community/2025-05-28/image002.webp" alt="Terminal output showing complex types parsed into a typed configuration record via WAVE" />
+
+So this is really cool — not because of the config thing, that's basically just an experiment, but because you can build a WebAssembly component, and if you know what input you want to give a specific function, it's really easy to iterate on this quickly. This demo was meant to spur discussion. I really want to explore how we could use this with `wash dev` or `wash call`. The inherent challenge isn't just running and calling the component's export — it's runtime dependencies. If my function wanted to do some caching in a key-value store, I'd need something that implements that key-value store. If I wanted to store it in an S3 blob store, that's an extra dependency I can't just test in a stateless way on the command line.
+
+In the meantime, if folks want to try this out, let me link the blog. This is available now in **Wasmtime 33**. I'm curious whether it just works nicely for you, and whether we could maybe embed this in `wash` to make `call` better. So — any thoughts or questions about `wasmtime run --invoke`?
+
+<img src="/img/community/2025-05-28/image003.webp" alt="Wasmtime 33 release blog post and the WebAssembly Value Encoding reference" />
+
+**ossfellow** [15:53](https://youtu.be/BWlfrXOXALc?t=953)
+
+I thought this was already available, because I had seen examples. But irrespective — remote function calls are something that any sort of dependency would immediately complicate, right? So if you want to do unit testing with this, something that seems reasonable is stubbing the dependencies. If `wash` wants to provide any features, that would be a stubbing capability to just test that component. Because if you say, "now I want to run a component outside wasmCloud but do everything I can do on wasmCloud," then the question is: what's the purpose of wasmCloud, you know what I mean?
+
+**Brooks Townsend** [16:59](https://youtu.be/BWlfrXOXALc?t=1019)
+
+Yeah, I think you kind of hit at the heart of the issue. As soon as you get to actually running this in wasmCloud — this is a component that just implements parsing, very simple — but as soon as you get to the actual cloud-connection piece, it's not a thing you can just invoke out of nowhere. So that's a good point. It makes the difference between `run` and `call` more apparent, because `call` is for something that's already running.
+
+**ossfellow** [17:52](https://youtu.be/BWlfrXOXALc?t=1072)
+
+There is an MCP server version of this example — a component that is run directly by Wasmtime. So it's a good example of a use case that runs just by Wasmtime but provides a feature that some people find very interesting to use.
+
+**Taylor Thomas** [18:30](https://youtu.be/BWlfrXOXALc?t=1110)
+
+I mean, I'm technically working on one too, with a wasmCloud maintainer. It takes the component, uses the WIT, exports that as the function. We've just been working on it in private — we just need to open it up, but we have some stuff for it.
+
+**Brooks Townsend** [18:58](https://youtu.be/BWlfrXOXALc?t=1138)
+
+Well, shame on both of you for letting me do this whole demo and think I found something cool.
+
+**ossfellow** [19:02](https://youtu.be/BWlfrXOXALc?t=1142)
+
+But Taylor, it wasn't about showing the other one. I just wanted to indicate that, aside from testing, there are some useful cases for it — because I saw on the Slack chat somebody asking a couple of weeks ago about MCP.
+
+**Taylor Thomas** [19:25](https://youtu.be/BWlfrXOXALc?t=1165)
+
+I was agreeing with you, for what it's worth — I'm just saying there are multiple use cases here. I am curious though, Brooks: I would love to have this kind of invoke functionality in `wash`, like you're saying — just pull it in. We might have to adapt it for some of the stuff you can do on wasmCloud, but I think we can take some of the principles.
+
+**Brooks Townsend** [19:48](https://youtu.be/BWlfrXOXALc?t=1188)
+
+Yeah, it's a delicate balance. I don't want `wash` to be this super-monolithic thing that just includes a bunch of different utilities from the Wasm ecosystem — because things like `wasmtime serve`, `wasmtime run`, `wasm-tools component inspect` or `print` are all super useful, and I use them all the time when developing for wasmCloud. I want those available for people trying out wasmCloud for the first time, so we don't have to say "install Wasmtime, install wasm-tools, install `wash`, install all this stuff." I'm not sure what the exact balance is, because there's no general consensus — it's not like everybody uses dev containers or Nix shell.
+
+Maybe there's a better solution, like vendoring in Wasmtime and wasm-tools the way TinyGo downloads some of those binaries when you install the toolchain. I don't want to reinvent the wheel, but these utilities can be super valuable for debugging.
+
+**Brooks Townsend** [20:51](https://youtu.be/BWlfrXOXALc?t=1251)
+
+Maybe that's the ultimate takeaway here. One of the things that was super valuable — and Masood, if you're in a space to talk, feel free to come off, but I'll highlight it — you said `wash call` could use a more flexible function I/O format, to not be limited to non-parameterized, string-only results. That might be one of the best takeaways: the WAVE WebAssembly Value Encoding is a really simple but flexible approach to providing parameters to a function. Adopting that in `wash call` would give a lot more power to folks trying to test their currently running application, because you can pass parameters.
+
+That reference I pulled up for the value encoding actually just looks like a library we could import and use the same way `wasmtime run` does. It would be really neat to take this `wasmtime run` config and replace it with something like `wash call` — I think we'd need the component ID instead, maybe `--invoke` — but if we could support the same structure, that would provide a really nice, consistent experience, from basic component testing to calling a more complex function.
+
+**Brooks Townsend** [23:41](https://youtu.be/BWlfrXOXALc?t=1421)
+
+I really wanted to bring this up, because there's always a barrier between me having an idea, putting it into WebAssembly, and then testing it. I feel like I default to an HTTP-invoked component just because I can curl it and work with something I recognize. It's frustrating to develop a custom interface and then not have a good way to call it. So this might be something that's easy to parse and pull out — we can file a feature request in the wasmCloud repo, because that would be a neat way to do the `wash call` thing. I'm not sure how urgently this needs to get done — maybe it goes on the next roadmap — but `wash call` is a pretty limited utility, so it would be great to extend it. Please feel free to speak out if you think this is a horrible idea.
+
+**Victor Adossi** [25:43](https://youtu.be/BWlfrXOXALc?t=1543)
+
+I wanted to say, regarding that, there is an issue that's been open since 2024 — not 2004, not that long. We basically avoided moving forward on any kind of advanced inputs for `wash call`, because we were waiting for WAVE to mature and then swap it in. So if you want to work on this, there's actually no need to make an issue — it already exists, and it got reopened this year as well. So whoever wants to work on it, it's out there. The stale bot's gone now, so it shouldn't happen again.
+
+**Brooks Townsend** [26:47](https://youtu.be/BWlfrXOXALc?t=1607)
+
+Good call. I remembered that we wanted more complex types, but that seemed hard.
+
+**Victor Adossi** [27:00](https://youtu.be/BWlfrXOXALc?t=1620)
+
+I remember, because this came up when I wanted to add some intermediate types for some known interfaces. Right now we basically have two: one that does HTTP, and a generic one that just calls a function with no arguments and returns a string. There was another case — I think messaging — where we were going to try and put that in, and WAVE existed back then but it just wasn't as polished as it is now. But it looks like it, quote-unquote, "should be easy." We'll see.
+
+**Brooks Townsend** [27:51](https://youtu.be/BWlfrXOXALc?t=1671)
+
+This would take, like, two seconds. HTTP is the stickler — I don't know if `wasmtime run` has an example with HTTP.
+
+**Victor Adossi** [28:06](https://youtu.be/BWlfrXOXALc?t=1686)
+
+I don't know that WAVE can do that, quite. That would be very impressive if it could. The reason I'd be surprised is that WASI HTTP uses resources and stuff. You could imagine an HTTP request as basically textual — if you're dealing with HTTP/1 or even HTTP/2, you could think of a serialization that would work. But in Wasm, when you're actually using a WASI HTTP request, you have to create resources and put a whole bunch of things together. As far as I know, WAVE supports basic types — the types that are not resources, or the new streams and stream stuff. So I'd be surprised if it were really straightforward.
+
+It's not impossible, though. If you wrote a simpler HTTP abstraction in WIT — one that would fit in WAVE — you could do that. Think of HTTP/1.1, something super simple: you can technically encode the entire request as a string. You could take a component that imports the fully-formed WASI HTTP and write an adapter that turns it into one that takes a really simple representation, doing all the advanced resource stuff and the full robustness of WASI HTTP. WASI HTTP is hard to serialize because it tries to be very robust in how it handles asynchrony and moving bytes around. You could write a little shim layer that lets people put in a simple request — a record, an enum, a string, whatever — turn it into an HTTP request in that middle layer, and then feed that to a component expecting the fully-formed WASI HTTP request. But that's a whole lot of theoretical work, and I don't think people necessarily need it, because we already support that in `wash call` — we send the request over the wRPC layer. There are ways to send more complex types over WAVE; you just need to do a little conversion first.
+
+**Taylor Thomas** [33:10](https://youtu.be/BWlfrXOXALc?t=1990)
+
+I see this as a mixture of things. There are a couple of raw types that are probably pretty easy to get without too much massaging. I was only half joking when I said "new CLI type parser," because that's the kind of thing we'd need. And for the complex types, we'll just have to say "these are the subtypes we support."
+
+Even better — and I know I'm in pie-in-the-sky mode — if we had it, this could almost be done via Wasm plugins that add in all the parsing. For example, with WASI HTTP we could say "here's a body, here's my headers," and make it similar to curl — an extension to the CLI that you plug in, parsing it inside that Wasm plugin. Even if we started with just a specific common subset, like the WASI cloud interfaces, that would allow us to have the complex types and say "here's your parsing options." You can't express everything — you probably can't express sending a stream in our first draft of doing this with HTTP — but you can send a body, just like you would with curl.
+
+**Victor Adossi** [35:03](https://youtu.be/BWlfrXOXALc?t=2103)
+
+I just typed out what you're saying, Taylor, in chat. That would be a really good place for plugins to fit — we could define some simple representation of the complex thing and then use a plugin to process that WAVE serialization into the more complex thing. You'd have to do them one by one, but I think incoming requests and probably messaging are the most important bits. The WebAssembly Value Encoding plugin.
+
+**Brooks Townsend** [36:04](https://youtu.be/BWlfrXOXALc?t=2164)
+
+I feel like we always end up with — WAVE plugins is a better way to say that, but we always end up with a silly name. Actually sounds cool.
+
+Well, I think that's probably enough on that one today. I added some of the information we talked about to the issue — "hey, we could do it this way, and it would be a really consistent experience with `wasmtime run`." As Victor pointed out, we can already call the HTTP export with `wash call`, so we can keep that and add this in — and aside from messaging, where the body needs to be bytes, we'd almost have something that can call everything. So another messaging mode would be cool too. I'll leave this on the roadmap board as good future inspiration for what we may want for quarter three, but anybody's welcome to take it at any time.
+
+**Brooks Townsend** [38:21](https://youtu.be/BWlfrXOXALc?t=2301)
+
+All jokes aside — that was a fun discussion, thanks for brainstorming. The only other thing on the agenda today is to take a look at the **quarter two roadmap** and see how we're doing. We brainstormed this at the beginning of May, so we were a little shorter on time than usual, but we've been making good movement.
+
+A couple of things are completed — great stuff from Eric on the docs for error handling, which speaks to a broader effort of adding the error handling in the first place. We had a community member come in and take on showing available updates for `wash`/NATS when available — that's completed, and Victor, I think you're going through the motions of releasing everything right now, so with the new `wash` release this will show up. A couple of things are good and in progress: another community member is working on `wash dev` having an option for standing up the **washboard**, which would be really nice to have the dashboard alongside the development environment. And Rabel, who's been really active over the last couple of weeks, has a PR open for replacing the RPC and control flags with `--nats`, so that'll be really nice.
+
+**Victor Adossi** [40:41](https://youtu.be/BWlfrXOXALc?t=2441)
+
+And Brooks, there's one more — a fix that went in for a context not being used, I believe by `wash dev`. If you had a `wash` context locally, it wouldn't respect it when you were doing that. That came up relatively recently, so that's also going to make it in once this new version of `wash` is out.
+
+**Brooks Townsend** [41:16](https://youtu.be/BWlfrXOXALc?t=2476)
+
+Nice, awesome. Thank you, Amanda Cameron, for opening that issue, and Victor for knocking it out. Really awesome stuff — and that'll be included in your release, right, Victor?
+
+**Victor Adossi** [41:38](https://youtu.be/BWlfrXOXALc?t=2498)
+
+As soon as we get the release out, yeah.
+
+**Brooks Townsend** [42:22](https://youtu.be/BWlfrXOXALc?t=2542)
+
+I've got a fix for "allow latest not taking effect" that I dove into the other day, which is nice. And just as a reminder: we've got a couple of good issues on the roadmap for folks looking to contribute for the first time, or returning contributors. The items in **good first issue** in the **ready for work** tab are great places to start — they deal with examples, smaller components, things that are quicker but very impactful lifts in the wasmCloud host or CLI tooling. There are also items in the Development tab that anybody should feel welcome to take; they generally require a bit more knowledge around wasmCloud.
+
+Generally, we intentionally planned this roadmap a little smaller — it doesn't mean we have lower velocity. We always have a big number of PRs, commits, and contributions going in; we're just trying to keep the roadmap nice and scoped. We really wanted to create that good-first-issue column, because — I won't speak for all the maintainers — but the best part of my experience in open source is when people come and contribute to the project. It's really fun. So I'm happy about where we're at with the quarter two roadmap, and I think we can just keep doing the thing. Do folks have any questions or comments about the tickets or some work in progress they have going on?
+
+All right, sounds good. Well, that's the end of the planned agenda for today. Does anybody have any other items they'd like to talk about — wasmCloud, WebAssembly, anything in general? We've got another 10–15 minutes left for free time.
+
+**Florian Fürstenberg** [45:32](https://youtu.be/BWlfrXOXALc?t=2732)
+
+Yeah, if it's fine, I would raise an additional topic. It's about an investigation I'm currently doing — it'll maybe take longer than 10 or 15 minutes. On Slack we started to discuss briefly the case I described in our Quick Guide: if you overload the Hello World component described in the Quick Guide, then the entire application actually breaks. This includes the HTTP server provider as well as the Hello World component. I'm currently trying to look into it, and I struggle a little to understand all the async magic implemented in wasmCloud — which context is used for what.
+
+So far I found that somehow the handshake magic is breaking. If you overload a component — meaning you send more requests in parallel than the replica count defined in the application manifest — then you break it. And there's a magic number: if you define one replica, sending three requests in parallel is totally fine. Sending four breaks the application already, but the lock mechanism is still working — the async semaphore for ensuring no more invocations can be handled than defined still works. But if you send five requests in parallel, even that doesn't work anymore, and the handshake isn't working between the provider and the component. Let me share my screen so we can discuss in more detail.
+
+**Florian Fürstenberg** [49:46](https://youtu.be/BWlfrXOXALc?t=2986)
+
+Okay, I hope you see the diagram now. On the left-hand side is what I've called the provider context — in our Quick Guide, the HTTP server provider — and on the right-hand side, the HTTP Hello World component. These represent the NATS clients, sometimes also called the wRPC clients, including the subjects/prefix and the associated inboxes used for exchanging messages, plus the overall application subject described in our documentation.
+
+<img src="/img/community/2025-05-28/image004.webp" alt="Florian's diagram of the provider context, component context, NATS/wRPC subjects, and inboxes" />
+
+For the Hello World component, that's a nice long string that boils down to the incoming-handler export of the component. The problem is that the HTTP server provider tries to publish a handshake that includes the request itself — the path of the request — and because there's a subscription on that subject, it automatically triggers the component's context, which creates additional inboxes and then publishes the response. And this publishing of the response is what's not working anymore. The entire logic for creating new inboxes — this whole async block — is not executed if you overload the component.
+
+My current assumption is that if you overload the component, the handshake succeeds, the component is invoked, handles the request, and sends the result back, and for sending it back, these result inboxes are used. You can see in the trace logs that there's no subscriber anymore if you overload the component too much, and my assumption is that this somehow blocks the asynchronous execution of additional requests. The questions I wanted to raise: first, is my current understanding correct, especially about the context? And second, any help or hints would be appreciated — especially on how the response of the component is actually handled within wasmCloud and the NATS magic, because the logs aren't very good there currently.
+
+**Brooks Townsend** [53:04](https://youtu.be/BWlfrXOXALc?t=3184)
+
+Yeah, I think your understanding is pretty spot on. I really appreciate the effort you put into that diagram, because it's accurate. The way **wRPC** initiates an invocation and sends a handshake, it does an optimization where it'll send the payload with the first message if it's small enough, and that continues out into the rest of the application. wRPC works similarly for different transports, but this would belong directly in the wRPC NATS transport documentation. Hopefully nobody ever has to really worry about this. But this feels like something tracing should be able to help us out a lot more on — you should be able to stand up wasmCloud in trace mode with Tempo or Aspire running and see some of these steps in the wRPC output. I can't say whether it's all there, but I agree our current logs don't always expose "oh, you've got all these things running, and that's why this didn't work."
+
+**Florian Fürstenberg** [54:52](https://youtu.be/BWlfrXOXALc?t=3292)
+
+I definitely traced it down to the NATS wRPC transport package — I customized it to have more debug information, so that's definitely the problem. I'm still not sure if it's an issue in the wRPC part or something we can improve on the wasmCloud side. What I'm also wondering is that it seems no one else is facing this issue. I assume in production people use very high replica counts, because this scales — if you set the replica count to two, those magic numbers scale up too. If you define 1000 replicas, you're fine to receive 4000 invocations in parallel and nothing breaks. So I'm really curious about these magic numbers, because they seem to be somehow hard-coded.
+
+**ossfellow** [56:03](https://youtu.be/BWlfrXOXALc?t=3363)
+
+I have two quick comments — Florian already alluded to one. When it comes to tracing, when we get to the wRPC level, things become a bit opaque, even inside wasmCloud itself. Especially for people who might not know the codebase very well, it becomes challenging to use tracing in the internals of the system. The other thing tangentially relates to a topic that Lucas brought up. I was looking into HTTP in wasmCloud — WASI HTTP in wasmCloud is quite complicated. There are so many hops, so many things involved, and when you're trying to trace through that, especially for something so widely used, it's difficult. The topic Lucas was putting on the table wasn't about tracing — it was about how we can make it more straightforward, or improve the implementation. That was just an exploration; not necessarily a magic solution, but something that probably needs to be looked at.
+
+**Brooks Townsend** [58:10](https://youtu.be/BWlfrXOXALc?t=3490)
+
+I totally agree HTTP is certainly complex. Going back to that item on the roadmap, it would be really nice to do a deep dive into HTTP with our tracing on, and start breaking different pieces of the system. If you can look at a trace dashboard and understand where the problem is coming from, then we did a good job. But if you know what the problem is and you couldn't find it, then we don't have adequate enough logs.
+
+I raised my hand to say — Florian, link to a PR, because we actually had something a few weeks ago. Milan came on demoing some Hono JS stuff and ran into a problem that sounds really similar. He was running a component with a max replica of 10, and would occasionally see the component not responding at all. Digging into that, we could see the HTTP server got the request, tried to send it to the host, and got nothing back. Let me steal your screen sharing real quick to show what the change was.
+
+<img src="/img/community/2025-05-28/image005.webp" alt="The not-yet-released PR adding an invocation timeout that releases the host's semaphore permit" />
+
+Essentially, we spawn a task for the exports, and as long as we have a permit to acquire on that semaphore, we invoke the component by awaiting this future. What was happening is, if that future never completes, it never releases the semaphore, so incoming requests always get blocked trying to acquire a new permit. This fix implements a timeout — including some metrics for tracking — so that if the component doesn't finish executing in the time you've configured when you start wasmCloud, we time out and release the semaphore. To test whether it's this, set the invocation timeout to something small like one second; then after a couple of seconds of the app freezing up, you should see those get released back. My theory is that with the way we've implemented this, there's no limit to the number of invocations we'll accept coming in — they'll all queue up waiting for a permit to be released. So if you have a max of one and you send 100, you're going to be waiting forever. I'm interested whether this would resolve it — it sounds like a similar symptom.
+
+**Taylor Thomas** [1:02:13](https://youtu.be/BWlfrXOXALc?t=3733)
+
+Yeah. We've had many discussions among maintainers about making that piece of the code use the flow-control mechanisms that come built in. What we end up doing is enqueuing things coming in into a channel and then draining that channel, but we're not necessarily respecting timeouts — it's like we got halfway to using JetStream without using JetStream, because that introduces additional overhead. So part of it is that we want to handle that the right way. I'm pretty sure, just from how the NATS client works, that if things aren't being received as they come in, it'll start to send a slow-consumer signal, and then the queue subscribe won't get another thing — it'll go to other machines, or everything just won't get it. We can't really signal back to the HTTP server without using something like JetStream, but we can at least flow-control better coming in, rather than just accepting and then dying.
+
+This goes back a little to what Masood was saying. This is where we really need feedback from people like you, Florian, and others using it in the community, about what's best — because things like the HTTP server are a trade-off. Do you want the flexibility of being able to swap it out, which multiple people have said they want, or do you want faster speed and less complexity but more coupling, which others have said they want? That's been one of the hardest things as the wasmCloud project has matured: figuring out how to handle both. We still handle both, but optimizing for both is a difficult task. So any feedback here is great. I think there are some things we can definitely do to improve this now — what Brooks showed you, and then maybe revisiting some of the flow-control stuff.
+
+**ossfellow** [1:04:13](https://youtu.be/BWlfrXOXALc?t=3853)
+
+So, Taylor, a quick comment. You mentioned there are some providers with built-in implementations that you don't need to set up — like HTTP server or messaging — and then ones where you need to actually install the provider. I mentioned in a community call some time ago, when Brooks was talking about embedding wasmCloud and increasing flexibility, that one of the good things would be to lean out the runtime. For those things that become built in, they'll have their own implementation inside wasmCloud, simple and straightforward; and then anything else that doesn't have a wRPC implementation inside wasmCloud becomes an extension — we take that out, and that allows people to swap and switch things if they want.
+
+**Taylor Thomas** [1:05:37](https://youtu.be/BWlfrXOXALc?t=3937)
+
+I think it's very much along those lines. Here's how I've always approached this — and Brooks can disagree with me. We want to make it lean for some of those same reasons, but we're also in an awkward growing phase. We're in the teenage years of Wasm — you've got braces, your legs are super long and the rest of your body hasn't caught up. In an ideal future, what we really want is something where you can support all the types of things. Roman and I gave a little talk about this once when we were talking about wRPC: you have different options. You can have a dylib that you include, which is a security risk, but if it's something that needs to be hyper-optimized and is super-trusted, you could load that. You can have a plugin on the same system, which is faster — fewer problems with a network connection. Then you can have a distributed one, like we have now. And besides a dylib, as WASI continues to mature, you can have a Wasm plugin — a special kind of plugin granted things like network access, which would replace the dylib method.
+
+In an ideal world we could have all those, and having something more modular helps. But we want to give people the ability to tweak and tune things where they need it — that's the real goal. It's a balance: we don't have the time to do all those things, combined with the fact that we're trying to make the core leaner and have other parts swap out. Obviously, Brooks, you're going to add something there.
+
+**Brooks Townsend** [1:07:50](https://youtu.be/BWlfrXOXALc?t=4070)
+
+No, I think that's well said. What we've realized on the maintainer side is that we've taken on quite a lot of responsibility in the wasmCloud host, and anything we can do to make the host a little simpler but have plugin pieces or extensibility would make this easier — because people can build on the host and experiment without us needing to go through the whole rigmarole of putting it into the host, making sure it works, and committing to it in 1.0 and all that. There's probably plenty more for us to talk on there, but we're a little over time, and I want to be respectful of everybody — especially Florian, for bringing this up. Florian, do you have any other comments, or want to wrap up since you spurred such great discussion?
+
+**Florian Fürstenberg** [1:08:51](https://youtu.be/BWlfrXOXALc?t=4131)
+
+No — many thanks to all of you for the interesting discussion and sharing your ideas, and Brooks for the diagram-prompted discussion out of the blue. We'll definitely check it out. What I'm also curious about is checking it with other providers — I wasn't able to yet — because, as you said, HTTP is kind of special in wasmCloud. Checking it with another provider, like messaging or a custom one, would be really interesting, because that would point to a more serious issue in one of the lower layers, not necessarily wasmCloud itself.
+
+**Brooks Townsend** [1:09:32](https://youtu.be/BWlfrXOXALc?t=4172)
+
+Yeah, that sounds great. We should really strive to make the HTTP layer really solid, because it's much more complex than a generic custom interface, and then go from there.
+
+**Florian Fürstenberg** [1:09:48](https://youtu.be/BWlfrXOXALc?t=4188)
+
+As Victor asked about — I will definitely file an issue in the next couple of days. It's already the end of the day here, so not today, but we'll do it, and then we can discuss this as a community together.
+
+**Victor Adossi** [1:10:08](https://youtu.be/BWlfrXOXALc?t=4208)
+
+Oh, come on — maybe we'll even have tests.
+
+**Brooks Townsend** [1:10:21](https://youtu.be/BWlfrXOXALc?t=4221)
+
+All right, everybody — thank you so much for coming to wasmCloud Wednesday. I appreciate the great discussion and demos. As a reminder, these topics are totally open for anybody to propose and chat about, so if you have something you want to talk about for next week, just throw in a PR or hit up one of the maintainers in Slack. We're taking things all the time. I think that's it — thanks everybody, have a great rest of your week, and have an awesome wasmCloud day. I can't stop saying it. It's too good.

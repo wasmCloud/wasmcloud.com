@@ -1,0 +1,195 @@
+---
+date: '2025-11-12'
+title: 'Transcript: JCO, Hono on WebAssembly & the wasmCloud v2 Component Model'
+description: 'Full transcript of the November 12, 2025 wasmCloud community call covering JCO, running Hono on WebAssembly with jco-stl, and the new wasmCloud v2 runtime.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - jco
+  - javascript webassembly
+  - hono webassembly
+  - wasi p3
+  - webassembly news
+image: https://i.ytimg.com/vi/e0oZW8yEiC8/maxresdefault.jpg
+showTitle: true
+slug: 2025-11-12-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-11-12-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=e0oZW8yEiC8" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=e0oZW8yEiC8" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Nov 12, 2025 · 28 minutes*
+
+**Speakers:** Bailey Hayes, Victor Adossi, Mike
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [00:01](https://youtu.be/e0oZW8yEiC8?t=1)
+
+You guys hear me okay? I am…
+
+**Mike** [00:03](https://youtu.be/e0oZW8yEiC8?t=3)
+
+Yeah, hey Bailey, I'm good. How are you?
+
+**Bailey Hayes** [00:05](https://youtu.be/e0oZW8yEiC8?t=5)
+
+I'm good. I am a little busy — look busy. I'll give folks a little tour. We are on the KubeCon floor. Got a cool setup. There's Colin, he's been our boost guy, he's been doing a great job. We're good. I don't have any agenda items today, so I figured it's going to be a short one, but I wanted people to still have their lots-of-problems day. Let's see. We normally go live at five after — did you have anything you wanted to go through today?
+
+**Mike** [00:50](https://youtu.be/e0oZW8yEiC8?t=50)
+
+Not really, no. It's been a while, so I got some time to join. I figured I'd call, say hi.
+
+**Bailey Hayes** [01:00](https://youtu.be/e0oZW8yEiC8?t=60)
+
+What you're building — is it on wasmCloud?
+
+**Mike** [01:03](https://youtu.be/e0oZW8yEiC8?t=63)
+
+Yeah, yeah. So it's a workflow automation tool, like n8n, but you bring your own Wasm components for each node, and you can say that this node runs in the cloud — you just tag it with the same tags as your wasmCloud host, and each node gets deployed to whatever it is. I just started looking at v2, basically from the community meetings and whatnot, so I have to start playing with it and see how it fits into my model. But yeah, excited.
+
+**Bailey Hayes** [01:30](https://youtu.be/e0oZW8yEiC8?t=90)
+
+Definitely would love your feedback, definitely before I cut the major version. We're getting close — just maybe a couple more weeks sitting on this release candidate. So I'm going to hit "go live" once I find the button. Oh, hey Victor, how are things going?
+
+**Victor Adossi** [02:12](https://youtu.be/e0oZW8yEiC8?t=132)
+
+Sorry, super late, but good, good. Just got out of some meetings here and some catch-up on the async JCO stuff. Oh, I think my video never started — hold on.
+
+**Bailey Hayes** [02:30](https://youtu.be/e0oZW8yEiC8?t=150)
+
+Hello, floor and network. Very good — my network, that's maybe a little bit strange, but I'm sitting at the project pavilion right now. I'll give you a "maintainer" call to ask. Yeah, falling hard in this thing. And I — I just died, didn't I? Cool conference networking, my bad. Did you hear anything that I said?
+
+**Mike** [03:49](https://youtu.be/e0oZW8yEiC8?t=229)
+
+I barely heard anything, but I don't know, maybe it's just me — but I blame your connection.
+
+**Bailey Hayes** [03:55](https://youtu.be/e0oZW8yEiC8?t=235)
+
+I mean, it's definitely that. Since I'm hostess on the worst network — a conference network. Hey.
+
+**Victor Adossi** [04:38](https://youtu.be/e0oZW8yEiC8?t=278)
+
+Oh, yeah, sure — so there'll be a bunch of updates for JCO, so I'll do that. Let me share my screen here, if I can. Oh, the usual "screen share is not allowed." Bailey, how about now? Okay, now I can — thank you. Okay, so I think people should be able to see my screen now.
+
+Basically, there have been a bunch of releases that have gone out over the last little while here. The main work that's going on right now in JCO is work on the async P3 implementation, and that I'm busily working on — trying to really just make sure there are no bugs in the current implementation, and fixing the bugs as I find them. Outside of that, last week I took a little bit of time to address some bugs and fixes on the JCO repo.
+
+Just for people who don't know: JCO is tooling for the JavaScript side of the WebAssembly ecosystem. There are three projects that currently make WebAssembly components in JavaScript work. There is **StarlingMonkey**, which is an engine — it's a fork of SpiderMonkey that runs in Wasm. There is **ComponentizeJS**, which takes StarlingMonkey running as WebAssembly and runs your JavaScript inside a component. And there is **JCO**, which wraps all that together. You can use ComponentizeJS directly, or you can use it through `jco componentize` — there's a subcommand for that — and JCO adds stuff like TypeScript type support, like generating TypeScript from your WIT. In the future it's going to process TypeScript directly. It also acts as a host, which means you can take a WebAssembly component and run it anywhere that you have a JS engine — say V8, or in the browser. It'll take a WebAssembly component and turn it into something that can be run in the browser or in Node.js with V8 underneath.
+
+<img src="/img/community/2025-11-12/image001.webp" alt="JCO project overview: StarlingMonkey, ComponentizeJS, and jco transpile" />
+
+Basically, what it does is take a WebAssembly component, break it into core modules, add some shim and glue code to do the component-model stuff, and then give you a full JavaScript module — a folder with files in it that performs the functionality your component was written to do. So it makes your component runnable in JavaScript, as long as you have access to the built-in `WebAssembly` object.
+
+The part that takes a component and turns it into a JavaScript project that can be run is **`jco transpile`**. Up until now, this was usually built into JCO directly — you would call `jco transpile` via the CLI, but it was also available via API, or you can think of it as an SDK from JCO itself. Some people wanted to use just the transpile functionality without the rest of JCO, because JCO does type stuff and obviously pulls in ComponentizeJS to do componentization. Some users had filed a feature request and wanted to get transpile — transpiling bytes — as an interface. So that went in, and new versions of `jco transpile` went out last week. That's one thing that's been happening in JCO land.
+
+Another large thing that landed was the first stable release of **jco-stl**. The idea is a standard library for easy interoperability — easy adapters to the WebAssembly ecosystem for popular projects. One of the banner examples here is **Hono** integration. Hono is essentially a web-serving framework — you can think of it as a micro-framework like Express or Fastify. One of the key differences of Hono is that it is web-standards-first — or WinterTC, if anyone's familiar with that — so it deals with web requests and web responses. For people familiar with the JavaScript ecosystem, you know that Node has a request object, and you might use a request or response object in the browser. Hono basically defaults to the browser version — it's not tied to Node as a platform. That means Hono can run on a WebAssembly platform as well. So adding support and making it really easy to run Hono on the WebAssembly platform is part of what jco-stl does.
+
+<img src="/img/community/2025-11-12/image002.webp" alt="jco-stl standard library and the Hono integration" />
+
+Now, the idea behind jco-stl is to do this for lots of things. Hono is one of them, but we want to have something that looks like Express — which, honestly, I think the majority of the Node.js servers out there are. All the legacy code is probably still Express; there's a ton of Fastify out there as well. Ideally these shims aren't necessary in the long span of time, because we'll have Node.js bindings that just work, so you can take Node code off the shelf. But Hono is a special case, because it's not tied to Node — you need to do this translation from WASI or WebAssembly primitives to what Hono expects, which is the WinterTC stuff. So ideally jco-stl is a place for adapters that make it easier to write familiar JavaScript into WebAssembly components.
+
+So this is an example of that here. Most of this is just normal Hono stuff — you've got the import, the app creation; all of this would exist whether this was a normal Node.js project or not. And then here are the special bits. This import here is a bit long, but it basically gives you the Hono `fire` function — and a side tangent, "Hono" means "fire," it means a flame, so they have this little `fire` function that you call and that starts your app. We import `fire` instead of from the usual place, which comes from inside Hono — we take it from jco-stl, so it's an adapter of sorts. And then normally calling this line would be all you need to start your Hono app, but because we're using WebAssembly there's a little bit more required: we have to add an export that is an incoming handler. That means it handles incoming web requests, so we add that at the bottom. This handler is actually built for you, so all you have to do is export it — you don't have to implement it. It gets implemented when you call this. So with only these lines of code, you have a working Hono server that mostly looks like a regular Hono server. A lot of the stuff built for Hono — the middlewares and all sorts of plugins — is built against a very basic, interoperable layer at the bottom (web requests, web responses, etc.), so you can actually use a lot of it out of the box.
+
+<img src="/img/community/2025-11-12/image003.webp" alt="jco-stl Hono code example with the fire import and incoming handler export" />
+
+**Victor Adossi** [14:09](https://youtu.be/e0oZW8yEiC8?t=849)
+
+One thing I do want to show is that on the website there's actually a guide now for WebAssembly with WASI. This landed sometime last week, or early this week, I think. This guide basically goes through, just like all the other guides — you've got guides on how to run Hono on Cloudflare Workers, how to run on Deno, on Bun, Fastly, AWS Lambda, Supabase, and now you've got WebAssembly here. The WebAssembly one goes through setting up all these projects: you've got JCO, you've got ComponentizeJS, you've got jco-stl there, and then it walks someone through even how you would bundle all your code — because we need to bundle — and how you would build a Hono app for the WebAssembly platform as it exists now.
+
+<img src="/img/community/2025-11-12/image004.webp" alt="New JCO website guide for running Hono on WebAssembly" />
+
+Again, as the JS ecosystem evolves, the jco-stl library should be less and less necessary, but for now it's a lot easier than writing a lot of implementation yourself to bridge the types. It's possible, it's just — we wanted to make it easier for people. The upshot of doing all of this is that you can take JavaScript that was a Hono server, build it to WebAssembly, and then run it in Wasmtime, or you can use `jco serve` — which is an option right here, though `jco serve` is experimental, so you want to use the tried-and-tested Wasmtime, which is the bigger and more actively maintained engine (and by engine I mean WebAssembly runtime). So you can take your JavaScript that was a Hono app, add a little bit of jco-stl imports to make it work, compile that to a WebAssembly component, and run it as a web server — via `jco serve` or via `wasmtime serve` as well. What's nice is that this is now merged upstream and people know how to do this. Of course, this is probably going to bring more users and more people who kick the tires on JCO, and we're happy to have people file bug reports and tell us where things don't work and where things do work. So that also went out. jco-stl is open source — anyone can look at it, all the code is out there, it's in the JCO repo, so it's easy to find.
+
+Outside of this, the rest of the work going into JCO is the async implementations. I've covered this before, but **JCO async** is the second host implementation for P3, and P3 is the version of the component model that adds streams, futures, and native async to the component model. So we're working on that — we've got some cool stuff that's been released out in the wild on the JCO side, and we'll keep cranking on that. One thing I'll add before I throw it back to Bailey: a bunch of JCO has also been moved to **TypeScript**. So if that was stopping people from contributing before — it's TypeScript now, large parts of it are TypeScript now, so feel free to jump in. It should be a lot easier. All right — well, Bailey, I don't know if Bailey's still here. She's definitely not still here, actually, so I guess this is my meeting now. Does anyone have any questions or comments on the JCO stuff, or on products in general?
+
+**Victor Adossi** [18:37](https://youtu.be/e0oZW8yEiC8?t=1117)
+
+All right, it seems like no one has any questions. We'll wait and see if Bailey comes back — I know her internet's pretty bad. Let me stop sharing at least.
+
+**Bailey Hayes** [18:50](https://youtu.be/e0oZW8yEiC8?t=1130)
+
+Hey, I'm here.
+
+**Victor Adossi** [18:56](https://youtu.be/e0oZW8yEiC8?t=1136)
+
+Oh yeah, you froze right up until you said it — okay, but you're back now.
+
+**Bailey Hayes** [19:11](https://youtu.be/e0oZW8yEiC8?t=1151)
+
+Can you share the things in the chat? That's all I gotta say, and then we can wrap this thing up. If you'll say it out loud, Victor or Mike…
+
+**Victor Adossi** [19:18](https://youtu.be/e0oZW8yEiC8?t=1158)
+
+Yeah, I will, I'll share them. Okay, so note that there is a new wash release — **wash 2.0.0 RC3** is out. We're getting really close to pushing 2.0.0, the final thing, out there, which is great, because this basically represents our new vision for wash and the runtime as well. The name is a little bit misleading, but the new version of wash comes with wash and a new runtime underneath that is a lot simpler than the old stuff. Of course, the old stuff will continue to work. This new version of wash has a lot of changes in it, and it's pretty exciting. So if you're keeping up with the point releases, we've got another release candidate out there — RC3 — so you can check that out.
+
+Eric also has a blog on WasmCon, which you can actually watch live. As you know, the wasmCloud team enjoys WasmCon, so you can keep up with what's going on and basically all the things we're presenting, which is really interesting as well. Along with that, we've got the doc change of the week — **PR #1018**. Let me share my screen so you can see what it is.
+
+**Victor Adossi** [20:58](https://youtu.be/e0oZW8yEiC8?t=1258)
+
+So this is the page for the live blog. And this is the RC3 release that was put out three days ago — very, very fresh, lots of fixes by Lucas and Bailey here. And here is the live blog page — you can see the URL right here. We've got the **WasmCon NA live blog**. We've got a lot of stuff going on: you've got the welcome — Bailey gave the welcome talk — talks by Luke, talks by Elizabeth, and it just gets longer as stuff goes on, so please make sure to check back. And here, this is our doc change of the week, which was adding the introduction in the runtime section. This is actually already live, so you can see it now. Let's see if this link is still live.
+
+<img src="/img/community/2025-11-12/image005.webp" alt="WasmCon NA live blog and the wash 2.0.0 RC3 release notes" />
+
+**Bailey Hayes** [22:16](https://youtu.be/e0oZW8yEiC8?t=1336)
+
+…to the specific doc that I wanted to give a shout-out to in that same comment chat, yeah.
+
+**Victor Adossi** [22:25](https://youtu.be/e0oZW8yEiC8?t=1345)
+
+Okay, yeah, this is it — I think there's the same… okay, they're not the same page. Okay, so it's just this runtime page. This is a page describing the new wash runtime. The version's a little old — RC3 isn't up there yet, but we'll just pretend RC1 is RC3 — and this page goes through and lays out the architecture: how this host, what we're calling the wash runtime, works compared to the previous wasmCloud host, and which interfaces we've got support for.
+
+<img src="/img/community/2025-11-12/image006.webp" alt="New wasmCloud runtime architecture documentation page" />
+
+This host is a little bit unique and more flexible in that you can actually add plugins — ones that we've written, or that you write — and you can build your own host to run and then run workloads on. In the past, a lot of this stuff required setting up a NATS client, setting up a NATS server, making sure all that was running. Here it's a lot more streamlined: getting a host running, especially if you want to write your own custom embedding and your own custom host, is just these lines right here, which is pretty short and pretty declarative. We've got reasonable names for workloads, rather than having to jumble components and providers, and an easy-to-grok, straightforward-looking plugin implementation — we've got an engine and we've got plugins, and it's clear what they do. And of course this code is all available, so you can take a look directly.
+
+<img src="/img/community/2025-11-12/image007.webp" alt="Declarative custom host code with an engine and plugins" />
+
+For those specifically who want to embed and run from Rust, all of this is also packed behind feature flags, so you can slim down the host you're building. If you don't need HTTP, don't include it; if you don't need blob store or key-value or whatever, don't include it. It's really easy to build a host, add custom functionality to it, and start running your WebAssembly workloads on it — with the workloads connected to those plugins and able to call them.
+
+**Victor Adossi** [25:10](https://youtu.be/e0oZW8yEiC8?t=1510)
+
+Yeah, and I think that is it from the stuff that you put into chat, Bailey. Does anyone have any questions on any of that? Okay, I don't think there are — no questions right now.
+
+**Victor Adossi** [25:40](https://youtu.be/e0oZW8yEiC8?t=1540)
+
+Thanks, Mike, for taking a look at v2. Please file bugs and requests for documentation — anything that feels painful, we'd like to know, that'd be awesome. The goal is no pain, so if it feels painful, please let us know. But in general, yeah. Bailey, if you want to come back and wrap it up — I don't know if the internet will allow you. It feels like you should be able to get on; cell-phone internet should be able to just tether and hopefully not be competing with every single person at the conference. Oh, sorry, go ahead, Mike.
+
+**Mike** [26:31](https://youtu.be/e0oZW8yEiC8?t=1591)
+
+Were you going to say something? No — wrong button, you know, beginner mistake.
+
+**Victor Adossi** [26:39](https://youtu.be/e0oZW8yEiC8?t=1599)
+
+Yeah, we'll see if Bailey comes back here. I'll stop sharing.
+
+**Bailey Hayes** [26:53](https://youtu.be/e0oZW8yEiC8?t=1613)
+
+Thanks for being the host, Victor — ad-hoc host, appreciate it. My network's so bad that I shouldn't even wrap up the call, so I'm just going to say that's it for today. Thanks, everybody.
+
+**Victor Adossi** [27:05](https://youtu.be/e0oZW8yEiC8?t=1625)
+
+If only there were network vendors at that conference that could provide high-quality network — but it's a Kubernetes conference, so probably not. I guess no one who's good at networking is in the building.
+
+**Bailey Hayes** [27:27](https://youtu.be/e0oZW8yEiC8?t=1647)
+
+See you all next week, thank you.
+
+**Mike** [27:31](https://youtu.be/e0oZW8yEiC8?t=1651)
+
+See you later.

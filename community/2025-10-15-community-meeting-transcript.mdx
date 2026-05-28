@@ -1,0 +1,492 @@
+---
+date: '2025-10-15'
+title: 'Transcript: wasmCloud Runtime Crate: Embedding Wasmtime & the Component Model'
+description: 'Full transcript of the October 15, 2025 wasmCloud community call covering the new runtime crate, embedding Wasmtime, the Wasm component model, and MCP.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasmtime webassembly runtime
+  - wasm components
+  - wasi
+  - model context protocol
+image: https://i.ytimg.com/vi/3DlUjl8gQVs/maxresdefault.jpg
+showTitle: true
+slug: 2025-10-15-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-10-15-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=3DlUjl8gQVs" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=3DlUjl8gQVs" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Oct 15, 2025 · 59 minutes*
+
+**Speakers:** Brooks Townsend, Ian, Bailey Hayes, Yordis Prieto, Victor Adossi, Liam Randall
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Yordis Prieto** [01:33](https://youtu.be/3DlUjl8gQVs?t=93)
+
+All right, Brooks, you're the host. Everybody.
+
+**Brooks Townsend** [01:38](https://youtu.be/3DlUjl8gQVs?t=98)
+
+How's it going? Hey, Ian, good to see you again. Don't let me put you too much on the spot — we didn't start yet. I heard maybe you have a demo for today.
+
+**Ian** [01:53](https://youtu.be/3DlUjl8gQVs?t=113)
+
+Yeah, I was just mentioning that. I think we want to actually hold off another week for that, because I wasn't able to get the demo working on wasmCloud yet, mainly due to issues with WASI proposal inconsistencies, since we're trying to target multiple runtimes. But next week for sure — it should have something better by then.
+
+**Brooks Townsend** [02:11](https://youtu.be/3DlUjl8gQVs?t=131)
+
+Cool. Yeah, no, that sounds great. I saw in the thread — was it `wasi:config` or `wasi:runtime-config` that was giving you trouble?
+
+**Ian** [02:23](https://youtu.be/3DlUjl8gQVs?t=143)
+
+It's another thing.
+
+**Brooks Townsend** [02:24](https://youtu.be/3DlUjl8gQVs?t=144)
+
+Well, I think `wash` uses the older one — I always get it mixed up, but it's either it used to be `config-runtime` and now it's `runtime-config`, or the other way around. Inside of `wash`, I think I built in support for the older one, using the previous iteration. So I think I should probably just generate bindings and implement both, because they're the exact same interface. It's just named `config-runtime` or `runtime-config`.
+
+**Ian** [02:57](https://youtu.be/3DlUjl8gQVs?t=177)
+
+That's what I was noticing. I was trying to look at the repo on GitHub and the Wasmtime host implementation, and it's like there's something I'm missing here. So I'm glad to know it's not just me in terms of the issues with it.
+
+**Brooks Townsend** [03:15](https://youtu.be/3DlUjl8gQVs?t=195)
+
+Yeah, no, not at all. Just a little confusing, but it makes sense — this is one of the reasons we are trying to have these interfaces, especially the draft interfaces, be something you can swap in and out, because it kind of stinks to have a bunch of stuff pinned to the old version.
+
+**Ian** [03:39](https://youtu.be/3DlUjl8gQVs?t=219)
+
+It's kind of funny that that isn't the whole purpose of the Wasm interface — it's supposed to be solving that problem, kind of.
+
+**Bailey Hayes** [03:46](https://youtu.be/3DlUjl8gQVs?t=226)
+
+The only standard interfaces are in wasmCloud — `wasi:http`, nothing else is standard. Everything else is depending on some random fork of something, and it's not even enabled by default. If you're running it in wasmCloud, you're opting into using a random draft thing that hasn't been voted on. All those are phase one — anything could be phase one. In the WASI world, basically you had an idea of what phase one is.
+
+**Ian** [04:21](https://youtu.be/3DlUjl8gQVs?t=261)
+
+Got it. Okay, that makes a lot of sense, though.
+
+**Brooks Townsend** [04:24](https://youtu.be/3DlUjl8gQVs?t=264)
+
+I mean, complete devil's advocate — we 100% in `wash` could do both interfaces, we could implement all the drafts and move forward. But it's hard.
+
+One thing, Ian — once we start streaming, would you be interested in doing a general introduction for who you are and what you're working on?
+
+**Ian** [05:02](https://youtu.be/3DlUjl8gQVs?t=302)
+
+Yeah, definitely. That sounds good.
+
+**Brooks Townsend** [05:06](https://youtu.be/3DlUjl8gQVs?t=306)
+
+Cool, that sounds good. We'll start with that, and then I just have a quick agenda item — a wasmCloud crate walk. And then if there's any other fun discussion items, we'll do it here.
+
+All right, hey everybody. Welcome to wasmCloud Wednesday for Wednesday, October the 15th. I think we've got a pretty quick agenda for today, but maybe we'll come up with fun discussion like we did last time. Real quick, before we got started, I wanted to invite Ian — you did kind of an impromptu demo last week — to introduce yourself formally to the wasmCloud community. We always like having people do that when they come into the call.
+
+**Ian** [06:00](https://youtu.be/3DlUjl8gQVs?t=360)
+
+Yeah, thank you, Brooks. I'm pretty excited to be here. Before last week, I didn't know anyone had even looked at our project — Corey and I had just been pushing out commits into the void. So it's cool that someone finds it useful or interesting. I'm excited to work with everyone here going forward and get it working on wasmCloud.
+
+My own background: I've mainly been in DevOps and infrastructure since I started my career in 2018, when I graduated college. I worked at Atlassian and then a startup called Extend for the past five years. Corey and I were the two first infra people there, and we built basically a totally serverless platform that ended up being pretty successful. We left that together to be partners in something new — something related to MCP that we're still trying to figure out. We were basically looking for a problem to solve and a way to solve it, and **wasmcp** is one solution we've been working on. It would be awesome if it's a solution for other people too. I'd say I have some specific experience in AWS Lambda, if anyone here ever has questions about that, and with CDK, the Cloud Development Kit. Anyways, thank you.
+
+**Brooks Townsend** [07:22](https://youtu.be/3DlUjl8gQVs?t=442)
+
+Yeah, thank you, Ian — really great to have you here. I think it was really cool. Maybe Bailey or Liam pointed me over to the wasmcp project. The intersection of Wasm and AI stuff is just really interesting right now. There are so many different approaches, and people trying to tackle the whole MCP server thing, which is pretty cool. Welcome, Ian. Once you get that working on wasmCloud, we'd love to have you demo it in the community call — that'd be really cool to see. Maybe next week?
+
+**Ian** [08:08](https://youtu.be/3DlUjl8gQVs?t=488)
+
+Next week, hopefully. I've got everything running locally, but I just want to make sure it actually works on Wasmtime and that I have an out-of-the-box demo for deployment. But yeah, I'm excited to show it off soon.
+
+**Brooks Townsend** [08:21](https://youtu.be/3DlUjl8gQVs?t=501)
+
+Heck yeah. Well, the only thing we had on the agenda for today — I wanted to do another look into the runtime crate I've been putting together from `wash`. So I just wanted to do a quick implementation walk through the docs.rs page (the eventual page for when we publish the crate). I wanted to show what the top-level crate would look like.
+
+Ian, you may find this interesting. For anybody who's embedding Wasmtime, this embedding of the wasmCloud crate is effectively just an opinionated embedding of Wasmtime — a couple of nice wrapper types around it for when it comes to running in the cloud or on Kubernetes, but also a ton of really nice facilities that we don't have today with the wasmCloud host crate. It makes it really nice and flexible for the `wash dev` use case, where it should just be offline — we don't need to run any processes, we don't need to do any orchestration.
+
+I basically ripped the top part of the README from the wasmCloud repo as it is today, which I think is great. You can just run it as a binary, but I want to talk about the embedding API, because this is what you'd work with if you were doing anything in Rust. It's really simple. Right now the wasmCloud host kind of depends on NATS for its control interface — sending commands to the host like "hey, go download this component and start it." But the embedding API is meant to be something that's not using any network requests. So you can build the engine from the crate — basically the only thing in this struct is a Wasmtime engine, so it's just a direct wrapper. Then we have a concept of plugins: built-in implementations of interfaces, for example an HTTP server or `wasi:runtime-config`. These are just different implementations of a trait that you can plug into the host. You build and start the host, and then it's as simple as that for starting your first workload.
+
+<img src="/img/community/2025-10-15/image001.webp" alt="The wasmCloud runtime crate embedding API on docs.rs" />
+
+A workload is what we're dubbing a collection of components that will run as part of one bundle. They have a namespace, they have a name. You can think of a workload kind of like a wadm application, if you're familiar with the current system in wasmCloud. We have one public re-export — I really wanted this to work a bit more like pinning the version of wasmCloud for when you embed this crate, but really it's just for convenience.
+
+So let's do a quick walk through the different modules of this crate, because there's honestly not that much — the public API surface is pretty simple. The engine module is totally just a small wrapper around Wasmtime: all the configuration of resource limits, memory limits, and which allocator to use happens here, but by and large there's not too much to tune right now. You can provide your own wasmCloud config if you've been embedding it, and we have some hooks into the execution context of the engine. But the main piece of this engine module is the workload module underneath it.
+
+**Brooks Townsend** [11:00](https://youtu.be/3DlUjl8gQVs?t=660)
+
+The workload module has two main structs: the unresolved workload and the resolved workload. There's a ton that happens in the resolution of an individual workload. A resolved workload is a workload that you start that has multiple components — but some components in the same workload could have an import that a different component exports. So if you have a custom WIT interface and you want to implement it with a different component, that gets linked together through the workload resolution step.
+
+One of the first examples we use for this in `wash` is using a plugin to implement `wasi:blobstore`. It exports all the blob-store interfaces, and it imports `wasi:filesystem`, which is available to all components. So different components in the same workload can call each other's imports and exports directly. This all happens during the instantiation — when you say "go start the workload," during that first setup piece. From there you can instantiate different instances of your components, and these are also bound to WASI 0.2 interfaces. That's the basis of all the interface support in wasmCloud: the `wasi:http` and `wasi:cli` worlds are the ones you get for free, and then everything else is either a built-in plugin or satisfied by a different component in the same workload.
+
+<img src="/img/community/2025-10-15/image002.webp" alt="The workload module and resolution code in the runtime crate" />
+
+This resolution step is analogous to links, except you don't have to specify each and every one every time. Right now, with the application structure, if you have 10 different components all linking to each other, you have to specify all of that. But during workload resolution, it's essentially an auto-linking mechanism — it connects an import of one component to an export of another. That's super nice, and it gives you that runtime linking feature that wasmCloud lets you do today, instead of having to compose or `wac` components together ahead of time, if you wanted to keep them separate.
+
+As I'm talking through this, folks, please feel free to raise a hand and ask questions.
+
+**Brooks Townsend** [14:57](https://youtu.be/3DlUjl8gQVs?t=897)
+
+So the primary thing you will embed, if you're running wasmCloud, is the host struct. The host is similar to the wasmCloud host of today, but it's responsible for managing the engine. It has a friendly name, it has labels so you can do orchestration and scheduling, just like hosts do today. We took a lot of the same fields from the current host — an ID, friendly name, and labels. This is the main thing you'll embed. If you wanted to run your own wasmCloud host, this is pretty much all you need.
+
+The thing we vastly simplified in this version is what we used to call the control interface — now it's just called the host API. This host API is a much simpler thing that hosts need to implement: you can get a host heartbeat, start a workload, stop a workload, and get the status of a workload. So super simple. The biggest change is that a workload contains all of the information that previously would be a bunch of imperative commands — "start this component, start this provider, create this link." This consolidates all of that into one place, where you have your config, your links, the different components linked together, and the volumes you can access.
+
+<img src="/img/community/2025-10-15/image003.webp" alt="The host struct and simplified host API in the runtime crate" />
+
+**Brooks Townsend** [17:00](https://youtu.be/3DlUjl8gQVs?t=1020)
+
+I want to give the historical comparison, which is hopefully useful for folks who've been working with wasmCloud for a while. The big method of extending the host right now — this is essentially a wholesale replacement for our built-in capability providers — is the host plugin interface. You have to write Rust code for this to work; there's not a wRPC layer to this yet, but that will be a host plugin, which will be pretty sweet.
+
+wasmCloud provides WASI 0.2 as a base set of interfaces, and if you're embedding or using `wash dev`, you'll get `wasi:config`, `wasi:http`, and `wasi:logging` all for free — we just turn those on. But we don't do `wasi:keyvalue` or `wasi:blobstore` by default. If you run a component in wasmCloud and it uses any interfaces that are not these, then we'll fail to instantiate the component — it has dependencies it needs to instantiate. If you have your own custom interfaces, you can implement those and provide that implementation to wasmCloud using this host plugin trait. I'm calling these built-in plugins, or host plugins. The primary way you'd do this in today's wasmCloud is through a capability provider. I think this has a lot of advantages in terms of speed and customization, but of course it's built into the host, so both are valuable.
+
+Instead of looking at horrible lifetimes, let's look at an implementation. `wasi:logging` is a pretty easy one to grok. wasmCloud doesn't know about `wasi:logging` — it has no idea how to do it. You generate your component bindings using Wasmtime with your own custom world, and you just implement the bindings `Host` trait for the wasmCloud context struct — a local trait for a foreign struct. This defines the logging `log` function: whenever the component calls `wasi:logging` log with a certain level, we'll emit a tracing event onto our standard-error buffer. You get to implement any WIT interface — it can be custom, it doesn't need to be a WASI interface. You specify the versions and interfaces you're actually implementing, and then when components bind to this plugin, we make sure they're actually trying to bind to `wasi:logging`, and you add the implementation to the workload's linker.
+
+<img src="/img/community/2025-10-15/image004.webp" alt="The wasi:logging host plugin implementation in Rust" />
+
+The TLDR is that we were really struggling to have some of these built-ins in the wasmCloud host world of today. It took a lot of effort to add support for additional built-ins — you had to touch three different crates and have a special way of starting them. But this is more of a singleton plugin that's a lot easier to extend when you're running the host yourself.
+
+That's really the interesting meat of the crate. The rest is a bunch of types — request and response types for starting and stopping workloads, the component wrapper. Last but not least, the WIT module, which contains two key types. There might be analogous things in the Wasmtime and wasm-tools crates — Bailey and I were just talking about this — so hopefully I can delete this module entirely. But in the meantime, it's really nice to have a simple "here's a WIT world, here are all your imports and exports that a component, plugin, or host implements," and the WIT interface, which is your namespace, package, and interfaces. This is a semver version, which handles the zero-to-zeros, the draft interfaces of the world. As an extension, we'd love to have a version constraint on the host side — like "I can support `wasi:http` 0.2.0 or 0.2.x, and also 0.3."
+
+<img src="/img/community/2025-10-15/image005.webp" alt="The WIT world and WIT interface types in the runtime crate" />
+
+Notably — I feel like I've been talking about this a lot — when you think about links between two different components, it's really just a configured import or export with a set of config. So this WIT interface struct includes the configuration that goes along with this particular WIT interface. If you were trying to take an import for `wasi:keyvalue` atomics and store, and link that to some implementation that stored it in Redis, you could include your Redis URL right here in the WIT interface. In WIT right now, for reasonably good reason, that would be something you build into the component, and this is specified at runtime. But this feels so much more natural than needing to specify config on a link and say who it belongs to — it just kind of is the config. Most of the time it isn't a lot: a port to listen on for HTTP, a path, or a set of config for `wasi:runtime-config`.
+
+So there's obviously plenty more room for me to actually diagram this out instead of waving and joining things together like a crazy person. But I hope this was useful. I figure I'll pause — do folks have any questions, or anything they wanted me to dive a little deeper into with the combined runtime crate?
+
+**Bailey Hayes** [25:24](https://youtu.be/3DlUjl8gQVs?t=1524)
+
+Brooks, I think it might be helpful if we did an "explain it like I'm five." Why wouldn't you just use wasmCloud? What's the difference between this and wasmCloud?
+
+**Brooks Townsend** [25:35](https://youtu.be/3DlUjl8gQVs?t=1535)
+
+Yeah, great question. For most of the facilities around starting a component, this is pretty similar in API to Wasmtime. If you wanted to embed or run wasmCloud on the CLI layer, that's not too bad.
+
+**Bailey Hayes** [26:09](https://youtu.be/3DlUjl8gQVs?t=1569)
+
+Two components?
+
+**Brooks Townsend** [26:10](https://youtu.be/3DlUjl8gQVs?t=1570)
+
+That's a good question. If you wanted to run two components at the CLI layer, you'd run two different Wasmtimes. When you embed this, you can run multiple components.
+
+**Bailey Hayes** [26:28](https://youtu.be/3DlUjl8gQVs?t=1588)
+
+Now you've made your own wasmCloud host, effectively. What your `host.rs` is — 100%.
+
+**Brooks Townsend** [26:36](https://youtu.be/3DlUjl8gQVs?t=1596)
+
+Yeah. The implementation of plugins in wasmCloud is not so different than implementing your own custom Wasmtime host — you're still dealing with bindings and things like that. But what's taken care of in this crate is components calling each other. That is not an easy thing to do with just straight-up Wasmtime, unless you compose them, or you decide "this component is going to call this other component, but I'm just going to make an HTTP request from one component to the next." That step where you dynamically link one component's export as a function to another component's import as a function — this is the thing I keep waving about. It requires quite a bit of lifting and lowering values in and out of the same store. If you have a resource that needs to pass between components, then those types get type-erased but then reconstituted later.
+
+Ian and Corey, you guys are using the `wac-graph` crate when you compose things together, which is awesome. It really just depends on whether you want to `wac` them together to have the final artifact, or whether you want to have two separate ones, like some other reusable component.
+
+**Bailey Hayes** [28:26](https://youtu.be/3DlUjl8gQVs?t=1706)
+
+The only reason you wouldn't just `wac` to solve that problem — why you would have to build your own host — is if you have plugins implemented inside this host that expose interfaces with a different lifetime than the workload component they're linking to. How do you share a resource that's provided by this host plugin to the component that's trying to use it? wasmCloud itself doesn't support plugins. This implementation lets you run multiple workloads with plugins, and that is the "explain it like I'm five" answer. Why would we do all this work? It gives you all of that.
+
+**Yordis Prieto** [29:31](https://youtu.be/3DlUjl8gQVs?t=1771)
+
+I'm actually curious to see, at some point, if it would make sense for Wasmtime to actually be fixing this type of problem, or not. Obviously you want to make it work, put it in production, get it tested. But what's the angle when it comes to Wasmtime and the upstream, and all these tests that you're doing around it?
+
+**Bailey Hayes** [29:56](https://youtu.be/3DlUjl8gQVs?t=1796)
+
+Brooks, do you mind if I jump in there, then I gotta actually run? Essentially, wasmCloud has its embedding API, but it doesn't handle the top-level things that happen when you're trying to schedule different workloads on top of it. It just says, "oh, you want me to create this one instance? I will create this one instance." It's at that level of embedding. I do think there should be a general-purpose embedding of wasmCloud that's async-enabled, component-first, and gives you plugins. That is effectively the goal — we're not including anything weird or specific. We did the full rundown over an hour of live-code pair programming this morning, but Brooks gave you the speed run. You have to have something that owns the async-runtime-ness of the whole thing, and wasmCloud can't have that because it's written to be at that layer that's a little bit lower.
+
+**Yordis Prieto** [31:26](https://youtu.be/3DlUjl8gQVs?t=1886)
+
+So is that engine even a layer below wasmCloud — like it has nothing to do, per se, with wasmCloud? Is your intent that it's that reducible layer we'll all have fun with?
+
+**Bailey Hayes** [31:41](https://youtu.be/3DlUjl8gQVs?t=1901)
+
+Yeah. I feel that wasmCloud is "how do you run WebAssembly in the cloud?" Our next version of that is with our operator, which embeds this host that Brooks created, and focuses on how to create the right bindings between volume mounts and blob storage and key value. That's wasmCloud. But "how do I create a pluggable host that lets me add these different types of extensions?" — that's this generic thing, the `wash` runtime.
+
+**Brooks Townsend** [32:20](https://youtu.be/3DlUjl8gQVs?t=1940)
+
+Maybe just to add some of my own color: I don't want the wasmCloud crate to be doing a bunch of special wasmCloud things. It's in a lot better state now with the plugins and the way we can link components together, because you can implement interesting interfaces in terms of a component, not a special capability provider — we're pulling down things using the `wasmcloud-oci` spec. I'm not saying anything in this crate is on the level of Wasmtime, but I'd honestly be happy to contribute anything that's helpful for embedding upstream. What wasmCloud does really, really well, thanks to Bailey, is take an eye toward developer experience for the Wasm-in-the-cloud situation, so I don't feel any need to keep that special sauce away.
+
+Ian, I think you also had — I don't know if you came off mute, but your question in the chat was really cool too.
+
+**Ian** [33:41](https://youtu.be/3DlUjl8gQVs?t=2021)
+
+Yeah, that's what I was going to ask about. In our exploration, Corey and I discovered that wasmCloud doesn't reuse instances across requests — every request is a whole fresh instance of your composed component serving it. I didn't know why that's the case, whether it's an assumption wasmCloud is making in its implementation, or a built-in constraint of the component model. But it sounds like you've answered some of those questions for me already.
+
+**Brooks Townsend** [34:11](https://youtu.be/3DlUjl8gQVs?t=2051)
+
+Yeah. Let me pull up some specific code. What wasmCloud does right now — and you can do this with the Wasmtime API too — is you take your component bytes and compile them into a component, that struct in the crate. Then you use the linker to create a pre-instantiated instance. It does a little bit of pre-work so it's ready to go — pre-instantiated, so it's not a live instance yet. Then whenever something like an HTTP request comes in, we instantiate a brand-new component. It's got its own little slice of memory, totally fresh, handles the HTTP request, and then returns the response. I'm speaking from an HTTP perspective, but it works the same for all imports and exports.
+
+That's not a constraint of the component model — it's a choice. One reasoning is that it's so fast and cheap to instantiate on the fly that it's almost not worth holding on to the memory of specific instances for a long time, especially because these Wasm components are single-threaded, so an instance can only handle one request at a time. What we do have a facility for in the wasmCloud crate — it's not implemented yet, but it will be soon — is the notion of a pool size. You can say "hey, keep 15 instances of this component actually instantiated and ready to go," and call from those first. So if you wanted to optimize for initial handling speed, you could set up some pools. As far as why, I don't have a great answer other than not holding on to resources passively, and enforcing that you can't have state that persists from one request to the next — zero cold start. Victor has a good point around isolation too. But this is all really just to say it's not a limitation of the component model itself. In this crate, I hope I can expose some nice knobs for you to turn if you wanted to play with reusing instances, not reusing instances, and so on.
+
+**Ian** [37:14](https://youtu.be/3DlUjl8gQVs?t=2234)
+
+Yeah, that makes sense. I asked mainly because that totally determines how you design your WIT and your components — that assumption, whether it's there or not, and whether you're going to assume it's always going to be the case. So it's pretty important when you're writing WIT to keep that in mind, because your shapes would look totally different in either case. It's interesting to think about: if there was suddenly support for reusing an instance across HTTP requests, I bet a lot of existing components would just not work with that paradigm at an interface level, just in terms of the design.
+
+**Yordis Prieto** [37:58](https://youtu.be/3DlUjl8gQVs?t=2278)
+
+I don't know, we already replicate it in Erlang anyway.
+
+**Victor Adossi** [38:04](https://youtu.be/3DlUjl8gQVs?t=2284)
+
+Erlang reference. So to jump in here a little bit — you can reuse a component right now, it's just not recommended. There are some bugs depending on the ecosystem and toolchain you're using, because some toolchains basically expect that you'll make a new instance, so they do things that aren't reusable. But there's actually nothing stopping you from doing this. It's recommended to recycle — really, to destroy instances when you're done using them, for the isolation benefit — but you don't have to. Right now you can reuse one as many times as you want, as long as you don't have a memory leak or whatever else.
+
+Also, with Preview 3 sort of coming out, the idea that you reuse a component is going to become more and more common, because we'll have async, things like streams, things like futures, and in the future, threads. Right now you can't actually enter the same component twice — the same component can't really handle two requests that came in. But once we have threads, you can have a pool of components. Right now you're kind of limited: if you can only use one per request, you can't really re-enter it. So in the future there will be more examples of reusing and implicitly re-entering components, using them across threads — not in a use-and-throw-away manner. But for right now, the recommendation is, if you can tie a component to some short-lived life cycle — a request or an invocation — do that.
+
+**Ian** [40:16](https://youtu.be/3DlUjl8gQVs?t=2416)
+
+That totally makes sense. It's nice to know the flexibility is there. It's going to be incredible to see what people can do with this flexibility, even if it's not really utilized yet. So that's cool. Thank you.
+
+**Brooks Townsend** [40:41](https://youtu.be/3DlUjl8gQVs?t=2441)
+
+Ian, sorry to put you on the spot, but I think you said something pretty interesting. How would your WIT design change based on some of the assumptions we talked about, like reusing an instance or not?
+
+**Ian** [40:56](https://youtu.be/3DlUjl8gQVs?t=2456)
+
+So for example, it could determine whether you have an interface that exports resources that are then consumed by downstream components, or whether you treat that component itself as kind of a singleton. It seems to me that when you define an interface, you're defining more like methods on the object that is the component instance exporting that interface — versus thinking about it as a set of stateless, top-level functions that you have to send out handles through resources to do anything with.
+
+So it depends. If you always assume the component will die with the lifetime of the request, then you can safely create an interface that's methods on one instance of a component that will die. Versus if you don't make that assumption, that doesn't really work out well. If you have a component that's just a cache interface, and instead of exporting a cache resource it exports a `get` and a `set` function, then you could have some global state in that component that only applies to that request — it's a cache just for that request. Versus if that component is reused across requests, then it would probably export a resource instead; you wouldn't have that singleton state.
+
+**Brooks Townsend** [42:15](https://youtu.be/3DlUjl8gQVs?t=2535)
+
+Yeah, it's almost like thinking of the component as a resource that has a life cycle — things you have to manage, who's actually owning the individual. That makes total sense, because components serve different purposes too. If you have a little HTTP middleware, that has a different required life cycle than something that runs for a long time and keeps handling requests.
+
+**Ian** [42:57](https://youtu.be/3DlUjl8gQVs?t=2577)
+
+Yeah, we're still learning too. If you look at the history of wasmcp, you'll see the most drastic evolution of WIT, from someone who doesn't know anything to someone who still doesn't know that much more — and it's still going. Basically, sorry if I ask stupid questions because I'm new, but thank you, that makes sense.
+
+**Brooks Townsend** [43:19](https://youtu.be/3DlUjl8gQVs?t=2599)
+
+No — Yordis yells, but your WIT is one of the more well-crafted ones I've seen. It looks really nice.
+
+**Ian** [43:29](https://youtu.be/3DlUjl8gQVs?t=2609)
+
+I think it's trash compared to the one on my branch. But sorry.
+
+**Liam Randall** [43:33](https://youtu.be/3DlUjl8gQVs?t=2613)
+
+Ian, Corey — maybe as just a temporary place for right now, while you're building out in the open, do we create an MCP channel on wasmCloud where we can share best practices and learnings? Cosmonic just put some tooling out into the ecosystem last week. I think we set up a public group — there's a lot of interest in this. I was on the Hyperlight call earlier today, and folks were asking about this and thought it was a pretty good idea. I think you checked out the white paper that we published. I'm recording a video right now that I'm going to post on the sandbox MCP site, a little walkthrough. So I think there are a lot of us who see the opportunity to address some of the agentic-specific risks of AI workflows, and to use WebAssembly to really lock them down.
+
+**Ian** [44:37](https://youtu.be/3DlUjl8gQVs?t=2677)
+
+Yeah, that's exciting. I'm very down.
+
+**Yordis Prieto** [44:38](https://youtu.be/3DlUjl8gQVs?t=2678)
+
+I have good news for you on the WIT side — I'm trying to implement the map type right now, since the spec is already written, and I'm trying to add it to wasm-tools. So you're going to have maps.
+
+**Brooks Townsend** [45:00](https://youtu.be/3DlUjl8gQVs?t=2700)
+
+Heck yeah.
+
+**Ian** [45:05](https://youtu.be/3DlUjl8gQVs?t=2705)
+
+Show it.
+
+**Yordis Prieto** [45:08](https://youtu.be/3DlUjl8gQVs?t=2708)
+
+Well, I'm struggling with Rust — like, what is happening. God bless AI, honestly. Trying to get it done in wasm-tools, then add it to WIT. I need to prove it so the spec can be merged.
+
+**Ian** [45:30](https://youtu.be/3DlUjl8gQVs?t=2730)
+
+Thank you for your service. That's awesome. I would love a map type.
+
+**Brooks Townsend** [45:39](https://youtu.be/3DlUjl8gQVs?t=2739)
+
+I'd prefer that we called it a dictionary.
+
+**Yordis Prieto** [45:42](https://youtu.be/3DlUjl8gQVs?t=2742)
+
+No, you're wrong. You're just wrong. Don't listen to him.
+
+**Brooks Townsend** [45:53](https://youtu.be/3DlUjl8gQVs?t=2753)
+
+Yordis, whenever you have something we can share, that would be really cool, because everybody knows you can do the `list<tuple<string, string>>` or whatever in the component model and in WIT, but a native map type would be really, really sweet.
+
+**Yordis Prieto** [46:14](https://youtu.be/3DlUjl8gQVs?t=2774)
+
+I would definitely take some support in the future if you guys can dog-food it and screw with it, because I honestly don't have the time for that dog-fooding at the moment.
+
+**Brooks Townsend** [46:26](https://youtu.be/3DlUjl8gQVs?t=2786)
+
+Yeah, that'd be awesome. As soon as it's something like — oh, I guess I'll have to do it in WIT. Is it like an interface or a built-in type? A built-in, okay. As soon as there's some kind of release candidate we can play with, that sounds really cool.
+
+Well, I think that's all. Thank you all for the awesome discussion. Liam, you said you created the channel on the wasmCloud side. What's the channel?
+
+**Liam Randall** [46:59](https://youtu.be/3DlUjl8gQVs?t=2819)
+
+The channel is `#MCP`.
+
+**Brooks Townsend** [47:02](https://youtu.be/3DlUjl8gQVs?t=2822)
+
+`#MCP`, the coolest place to talk wasmCloud and AI in 2025 — wasmCloud Slack. Okay, whatever. That was all I had on the agenda for today. Thanks folks for the awesome discussion. Is there anything else in the Wasm ecosystem or wasmCloud world that folks wanted to discuss today? We've got some free time.
+
+**Yordis Prieto** [47:31](https://youtu.be/3DlUjl8gQVs?t=2851)
+
+Well, I have a question for Ian. Are you familiar with the Agent Client Protocol? I'm working right now on implementing it. Are you going to add it to your MCP thinking?
+
+**Ian** [47:47](https://youtu.be/3DlUjl8gQVs?t=2867)
+
+Agent Client Protocol?
+
+**Yordis Prieto** [47:49](https://youtu.be/3DlUjl8gQVs?t=2869)
+
+Yeah, that's something new — not from Anthropic, from Zed. So Zed and IntelliJ are both on top of it. If you implement that, I'm going to appreciate it, and it'll be freaking cool.
+
+**Ian** [48:04](https://youtu.be/3DlUjl8gQVs?t=2884)
+
+Yeah, I haven't heard of it, but I'll look into it. Is it basically an MCP alternative? Like I've seen UTCP.
+
+**Yordis Prieto** [48:12](https://youtu.be/3DlUjl8gQVs?t=2892)
+
+So MCP is from the tooling perspective. This is from the agentic-workflow perspective. You have the editor like Zed communicating with the agent — all the session management, all the models that it supports, the slash commands, all that stuff. Basically it's the agent part of it, not the tool. The tool is just a tool.
+
+**Ian** [48:36](https://youtu.be/3DlUjl8gQVs?t=2916)
+
+Oh, got it. So this would be like, if you wanted to implement Cursor yourself, you would do something like this.
+
+**Yordis Prieto** [48:42](https://youtu.be/3DlUjl8gQVs?t=2922)
+
+Yeah. Cursor, or Zed, or IntelliJ are already implementing the protocol. They just become IDEs — they don't care what agentic thing you use.
+
+**Ian** [48:53](https://youtu.be/3DlUjl8gQVs?t=2933)
+
+That's very cool. I'll definitely look into this. Thank you.
+
+**Yordis Prieto** [48:55](https://youtu.be/3DlUjl8gQVs?t=2935)
+
+Yeah, I'm following your projects now.
+
+**Brooks Townsend** [48:59](https://youtu.be/3DlUjl8gQVs?t=2939)
+
+And, Liam, make the ACP channel too.
+
+**Liam Randall** [49:05](https://youtu.be/3DlUjl8gQVs?t=2945)
+
+Well, we can do an audible now and just call it "agentic workflows" or something like that — since we're not on a standard, we're on a direction. I'll just rename the channel to call it AI.
+
+**Brooks Townsend** [49:19](https://youtu.be/3DlUjl8gQVs?t=2959)
+
+Yeah, I think this is really cool. Nerds like me.
+
+**Yordis Prieto** [49:27](https://youtu.be/3DlUjl8gQVs?t=2967)
+
+I did it myself, so welcome. An entire weekend just implementing this thing. I'm almost done with the entire Zed integration into my agent. It's kind of cool.
+
+**Brooks Townsend** [49:43](https://youtu.be/3DlUjl8gQVs?t=2983)
+
+It's so interesting to me — MCP, ACP, all these. We can just have this common protocol, and then anybody can implement it. It's like WebAssembly: use WebAssembly, that's what we're saying. Now they're exporting competing standards.
+
+**Victor Adossi** [50:02](https://youtu.be/3DlUjl8gQVs?t=3002)
+
+Yeah, there was the XKCD.
+
+**Brooks Townsend** [50:07](https://youtu.be/3DlUjl8gQVs?t=3007)
+
+It's interesting. I think all of these are just doing JSON — it's a JSON API.
+
+**Yordis Prieto** [50:13](https://youtu.be/3DlUjl8gQVs?t=3013)
+
+JSON-RPC, yep. It's not that you're wrong, but I think you need like 20 years for people to click in the brain how it's supposed to work. I don't know.
+
+**Brooks Townsend** [50:24](https://youtu.be/3DlUjl8gQVs?t=3024)
+
+Yeah. I mean, JSON-RPC 2.0 was last updated in 2013, so maybe we need 12 years of stabilization or something. Nope, don't say it, just run.
+
+**Ian** [50:44](https://youtu.be/3DlUjl8gQVs?t=3044)
+
+All right, well, before we —
+
+**Brooks Townsend** [50:48](https://youtu.be/3DlUjl8gQVs?t=3048)
+
+Before we start talking about anything horrible, I think that's it for today. Thank you, Corey, Ian, Yordis, everybody, for coming and hanging out. Look forward to next week. Please feel free to reach out on the wasmCloud Slack if you run into issues with `wash` — it feels like something that should just work out of the box for what you guys are doing, so I want to make sure that's the reality.
+
+**Yordis Prieto** [51:14](https://youtu.be/3DlUjl8gQVs?t=3074)
+
+Also put the useful links in the MCP channel, by the way, for cool projects. I already put the agent protocol there, although we haven't done it.
+
+**Liam Randall** [51:26](https://youtu.be/3DlUjl8gQVs?t=3086)
+
+Cool, sweet. From what I'm seeing, MCP has all the market share here in the space — from talking to various adopters. Not that A2A is a bad idea, but I think there's something about MCP that's just so simple that it reminds me of the success of HTTP and other pretty basic protocols in their infancy. MCP is just easy to get working, easy to get started, and with technologies like wasmCloud, I think it's pretty easy to do securely. So there's a real "here" here. I'm talking to enterprises that have over 1,000 MCP servers built. I was looking at one the other day — a big insurance company, not somebody you'd expect to be a big adopter — and they had like 670 MCP servers already deployed. So I think this is just going to continue to explode and grow.
+
+**Yordis Prieto** [52:28](https://youtu.be/3DlUjl8gQVs?t=3148)
+
+Yeah. Ian, the reason I got really excited with the Agent Client Protocol is that IntelliJ decided to integrate with it. So that's a big chunk of enterprise already in the IntelliJ tool, the editor — which kind of makes the smaller ones, you know, put IntelliJ in there having fun in the protocol, and I'm like, okay.
+
+**Ian** [53:02](https://youtu.be/3DlUjl8gQVs?t=3182)
+
+Yeah, regarding MCP's popularity, to me it feels like it's a JavaScript kind of situation. I think anyone who's really dug deep into the protocol sees the issues it has, and sees that it was probably more hastily designed than it should have been — there have been some big breaking changes, like the SSE transport to the streamable-HTTP transport, as a result. But it's kind of like JavaScript in that it's what exists, it's sticky, it's what has client support, it's what's snowballing. You can't just decide "let's replace JavaScript" because it's not ideal — that is the standard at this point for tool calling, at least, and the rest of the protocol is basically unimplemented by clients. At this point you can basically only do tool calling, and even that is a miracle to do universally. So hopefully in the future we'll get actual client support for elicitations with timeouts longer than 30 seconds, and all the other bidirectional features that are supposed to be the entire reason MCP exists. It's a pretty interesting state of things right now, but I don't see anything else coming in and becoming more popular than MCP, at least for tool calling, anytime soon. That's just my take.
+
+**Yordis Prieto** [54:20](https://youtu.be/3DlUjl8gQVs?t=3260)
+
+The ACP has built-in async communication to some extent, Ian, so most likely that could eventually make it to MCP — they have the concept of notifications, from the back end sending messages to the clients.
+
+**Ian** [54:37](https://youtu.be/3DlUjl8gQVs?t=3277)
+
+Yeah, that makes sense. MCP has that as well, but it's implemented in a weird way, I guess, because it doesn't — ACP assumes some kind of local connection, like standard IO only.
+
+**Yordis Prieto** [54:53](https://youtu.be/3DlUjl8gQVs?t=3293)
+
+Yes.
+
+**Ian** [54:56](https://youtu.be/3DlUjl8gQVs?t=3296)
+
+Okay, that makes sense, then — it's for IDEs, so it probably solves a lot of the issues with doing bidirectional communication over the network without WebSockets.
+
+**Yordis Prieto** [55:06](https://youtu.be/3DlUjl8gQVs?t=3306)
+
+Yeah, right now it's standard IO with a JSON multi-line thing, and then a JSON-RPC payload.
+
+**Ian** [55:19](https://youtu.be/3DlUjl8gQVs?t=3319)
+
+Very similar, though.
+
+**Brooks Townsend** [55:20](https://youtu.be/3DlUjl8gQVs?t=3320)
+
+If there's anything wasmCloud can learn from MCP, it's that just putting it out there — I mean, look, for being so new, there's such a wild ecosystem around MCP already, the amount of connectors and things. "Oh yeah, I'll just plug it into Azure cloud, and now I can tell my chatbot locally to start a VM for me." It's wild.
+
+**Ian** [55:50](https://youtu.be/3DlUjl8gQVs?t=3350)
+
+Yeah. The good decision about MCP is the fact that it's a bag of capabilities, just like a component is. They're very symmetric — when you read the MCP spec next to the WIT reference, it's pretty clear, like "oh, these evidently should go together." There's a similar underlying spirit to the design that I think plays really well together, and that's part of the motivation for wasmcp. So on my branch right now, basically what you can do is compose any number of tool components together — pre-published tool components — without having some kind of configuration file or composition. It's just a `wac`-plug pipeline the whole way. So you could, for example, say "add this tool from this OCI registry to my component," and it's there, and now your component has that tool, and your MCP server exposes all the composed tools in the component. That's a big goal of wasmcp, because that is a goal of MCP's architecture, from my own interpretation of it. Being useful for just running MCP on WebAssembly — a component-native framework for MCP — actually could end up being the best framework for MCP in general. That's my bet here. Corey, nice bet.
+
+**Brooks Townsend** [57:15](https://youtu.be/3DlUjl8gQVs?t=3435)
+
+Super cool. Y'all, really exciting stuff. Thanks, Yordis, for nerd-sniping us with another client protocol.
+
+**Yordis Prieto** [57:27](https://youtu.be/3DlUjl8gQVs?t=3447)
+
+It's fun. Yeah, I'm gonna create my own agentic thing.
+
+**Brooks Townsend** [57:34](https://youtu.be/3DlUjl8gQVs?t=3454)
+
+Why? YCP — Yordis Client Protocol?
+
+**Yordis Prieto** [57:37](https://youtu.be/3DlUjl8gQVs?t=3457)
+
+No, I have a name — Trogon, the Cuban bird, the Tocororo. You know what that is? Let me send you. It's this thing — yeah, that's a Cuban bird. It's tiny but really beautiful.
+
+**Brooks Townsend** [58:27](https://youtu.be/3DlUjl8gQVs?t=3507)
+
+Oh yeah. I thought you said Trojan. Welcome to wasmCloud After Dark, bird-watching hour.
+
+**Yordis Prieto** [58:38](https://youtu.be/3DlUjl8gQVs?t=3518)
+
+Sorry, guys.
+
+**Brooks Townsend** [58:41](https://youtu.be/3DlUjl8gQVs?t=3521)
+
+All right, everybody. Well, thank you so much for coming to the weekly this week. See you next week. Have a great rest of the week, everybody. Have a good one.
+
+**Ian** [58:54](https://youtu.be/3DlUjl8gQVs?t=3534)
+
+Awesome. wasmCloud Wednesday. Later.

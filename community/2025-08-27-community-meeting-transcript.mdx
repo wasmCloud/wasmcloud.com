@@ -1,0 +1,263 @@
+---
+date: '2025-08-27'
+title: 'Transcript: Wasm Component Model vs Capability Providers & the wash Plugin System'
+description: 'Full transcript of the August 27, 2025 wasmCloud community call covering the wash plugin system, capability providers, wRPC, and component density.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm components
+  - capability providers
+  - webassembly plugins
+  - wrpc
+  - webassembly news
+image: https://i.ytimg.com/vi/PnBGuEKab0o/maxresdefault.jpg
+showTitle: true
+slug: 2025-08-27-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-08-27-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=PnBGuEKab0o" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=PnBGuEKab0o" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Aug 27, 2025 · 36 minutes*
+
+**Speakers:** Brooks Townsend, Aditya, Bailey Hayes, Liam Randall, Egor, Jeremy Fleitz, Colin Murphy
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [00:20](https://youtu.be/PnBGuEKab0o?t=20)
+
+Here we go — I'm just gonna grab water real quick.
+
+**Liam Randall** [00:26](https://youtu.be/PnBGuEKab0o?t=26)
+
+Hey, Bailey, I'm gonna go grab a green shirt. I'll be right back. How's it going, folks?
+
+**Jeremy Fleitz** [01:56](https://youtu.be/PnBGuEKab0o?t=116)
+
+Happy Wednesday.
+
+**Aditya** [01:59](https://youtu.be/PnBGuEKab0o?t=119)
+
+Bailey, how's it going, everyone? Good, good. Good to see you. Yeah, long time no see.
+
+**Brooks Townsend** [02:09](https://youtu.be/PnBGuEKab0o?t=129)
+
+Hey, I opened up some of the questions that you had on — what is it? — 4636, the shared providers thing. I haven't actually gotten a chance to read all of it yet, but would you be interested in putting up your questions and proposals and whatever is in here, like talking about it today?
+
+**Aditya** [02:35](https://youtu.be/PnBGuEKab0o?t=155)
+
+Yeah, sure. I'm fine with that.
+
+**Brooks Townsend** [02:38](https://youtu.be/PnBGuEKab0o?t=158)
+
+Cool. Yeah, I think we've got a pretty quick agenda, really. It's just pointing out one of the newer blogs that's hitting the site, and then we can do a discussion item there, and from there see what comes out of it.
+
+**Aditya** [02:55](https://youtu.be/PnBGuEKab0o?t=175)
+
+Sounds good. Okay, cool.
+
+**Brooks Townsend** [02:59](https://youtu.be/PnBGuEKab0o?t=179)
+
+I'll give you co-host, just in case you want to share later. We can probably go ahead and get started. Let's see.
+
+All right. Welcome to wasmCloud Wednesday. For Wednesday, August 27, we've got a pretty fun agenda — maybe a little short, but it'll be fun nonetheless. I have a quick item where I just wanted to show off and point to one of the blogs that's going to land on the wasmCloud site — maybe it already has, here in the next two minutes or so — which is pretty exciting, about wash's plugin system. And then one of our maintainers, Aditya, is here on the call and wants to talk through some questions and considerations on one of the bigger roadmap items that we have for quarter three.
+
+So I'll go ahead and share real quick and talk about the blog that I want to point people at, and then we can move on. This blog is merging into the wasmCloud site right now, so you may not see it yet, but it'll be here very soon — around wash's new plugin system. Now, we had a plugin system, or we have a plugin system, in wash right now, but it's really not — it allows you to run components, but it really doesn't do the comprehensive integration into the CLI flow like the wash plugin system that we introduce in this blog.
+
+Now, people say — I don't know who they are, but they are people — they say that Wasm components are the last plugin model that you'll ever need. We fully subscribe to that, and so much so that we have taken the stance that in our wash CLI, we should be able to drive a really nice WebAssembly component development and running experience, and then provide any wasmCloud-specific functionality, or just general extensions, as Wasm plugins.
+
+So in this plugin system, it's fairly similar to the way things work today, where you can install and uninstall and list your plugins, but there are really three main categories of plugins that wash supports. There are hooks, so that you can run them before or after any command in the wash CLI lifecycle. So maybe before you generate a new project from a template, you want to insert a new template into that list of available things — that's what your plugin does. Or maybe before you push to an OCI registry, you want to attach additional annotations. Or before you run your dev process, you want to launch a container that you can export OpenTelemetry metrics to. All kinds of these are the possibilities that we were thinking of when we developed the hook system.
+
+And there is actually one special kind of hook, which I even put in its own category, called dev register. This is something where you can have a plugin implement custom interfaces so that you don't need to run capability providers, you don't need to run external processes. You can actually have these custom dev plugins that implement interfaces so that you can do the hot-reload loop without needing to reload anything other than your component. So one example of this is the Blobstore filesystem plugin. This is in the wash tree, but it implements WASI blobstore in terms of WASI filesystem. So now if you install that plugin, you can use WASI blobstore even though wash knows nothing about that interface at all, and it will send all of those invocations to the plugin, which will store those blobs on your filesystem.
+
+So there's a lot of possibilities there in the hook infrastructure. I look forward to doing pretty much all the WASI cloud plugins — I can see when we can use WASI key-value and WASI logging, you know, putting that out to the filesystem. And then you can do `wash dev`, you don't need any providers. It's a really slick system, if I do say so myself. And then the last category of plugins is top-level commands, so you can register your own essentially WASI CLI-style commands that will be present in the wash help text. You can execute all of your own logic — it runs in the secure component sandbox, but you have the ability to ask things like, "Hey, can I read this file from the filesystem? Can I execute this command?"
+
+All in all, I think there are still maybe some things to figure out, some changes that we may want to do to the wasmCloud–wash interface, but it's in a really good place right now. I think really all we can do is start to develop more and more plugins and see if it falls short anywhere, and then update the interface. So now is a really great time. If you haven't taken a look at the wash project, go take a look at the repo — `wasmcloud/wash` — and see what you think. I've been really impressed with folks coming in and taking a lot of the good first issues already, so kudos to everybody who's been doing that. Does anybody have any questions on the plugin system? I know that was just kind of a high-level overview. And hey, if you're looking for light reading, go read the blog — but happy to answer any questions here too.
+
+<img src="/img/community/2025-08-27/image001.webp" alt="wash plugin system blog on the wasmCloud site" />
+
+**Brooks Townsend** [09:15](https://youtu.be/PnBGuEKab0o?t=555)
+
+All righty. Well, then I think the only other thing I had on the agenda — which I figure for this discussion may take some time, we'll see. But Aditya, you've been doing some thinking on one of the bigger issues that we have on the wasmCloud roadmap. I'll just share it really briefly, and then I'll let you drive if this is something you want to do, or I can keep it up — it's up to you.
+
+But really, what this comes down to from our quarter-three roadmapping planning is that the abstraction of an application — the way that we run a wasmCloud application today, like a collection of components and providers — isn't exactly right. It works for the smaller app. It works for, like, baby's first wasmCloud, the first time you deploy an application. But then as soon as you start getting into the more complicated bits of using one HTTP server provider to serve an endpoint for many components, and you don't want to duplicate that, but you also want to be able to manage those components' lifecycle separately — it really doesn't quite describe the right unit of deployment. Obviously it's okay, and we've been working with it for a while. We also have the idea of a shared application or a shared component or provider in wadm itself. But really this is all just kind of a call-out that the app abstraction isn't exactly right, and there's got to be something better for us to do.
+
+So I left this somewhat intentionally open. I think I have some high-level ideas, but Aditya, you've come in over the past couple of days and given some thoughts and considerations. Would you like to talk through some of the things you laid out here, and what your thoughts were?
+
+<img src="/img/community/2025-08-27/image002.webp" alt="Roadmap issue 4636 on the wasmCloud application abstraction and shared providers" />
+
+**Aditya** [11:24](https://youtu.be/PnBGuEKab0o?t=684)
+
+Yeah, definitely. So just as a disclaimer, I'm totally ad hoc on this. I have not prepared in any sense, but yeah, I'll just go through some of my thoughts. I'll just share my screen.
+
+**Brooks Townsend** [11:43](https://youtu.be/PnBGuEKab0o?t=703)
+
+And double thank you to Aditya for just being willing to off-the-cuff this. Really appreciate it.
+
+**Aditya** [11:53](https://youtu.be/PnBGuEKab0o?t=713)
+
+Yeah, you have to be ready some days. Is it visible?
+
+**Bailey Hayes** [12:02](https://youtu.be/PnBGuEKab0o?t=722)
+
+Yep, I can see it.
+
+**Aditya** [12:03](https://youtu.be/PnBGuEKab0o?t=723)
+
+Okay, that's good. So currently, I'm sure we are all aware that the host follows a multi-app setup with duplicates of all the providers, as Brooks mentioned. So the problem I had understanding was, how are we going to limit or decrease the number — or I'd say, how would we increase the density of providers, per se — and handle the multiplexing that surrounds it? Because currently, providers mainly follow a "I serve one component" model; they assume they serve one component, or at least a part of the application, except for the HTTP server, which has the path-based routing.
+
+So my primary concern with the new model that we are proposing is, how would we handle the multiplexing with the other providers? Let's say, for example, we have the messaging queues and the blob store — all of them have different differentiators, like streams or subjects. That would be an interesting thing to look forward to: how we're going to keep the number of providers at a minimum, while also managing multiple different components, their ingress and their egress, and handling that. That's it for now. I'll elaborate more, but any questions so far?
+
+<img src="/img/community/2025-08-27/image003.webp" alt="Aditya sharing his screen on provider density and multiplexing" />
+
+**Brooks Townsend** [14:01](https://youtu.be/PnBGuEKab0o?t=841)
+
+Yeah, Aditya, just a quick question. I see you mentioned HTTP in here. I tend to just call it HTTP — but is this talking about, like, HTTP server or HTTP client, in terms of serving more than one component?
+
+**Aditya** [14:21](https://youtu.be/PnBGuEKab0o?t=861)
+
+So I'm talking about the HTTP server, where there is a lanky way of currently handling having a shared provider with the HTTP server, where you have the different parts that route to the different handle functions — like, say, `/foo` is handled by one component, `/bar` is handled by another component. I'm speaking from that point of view.
+
+**Brooks Townsend** [14:51](https://youtu.be/PnBGuEKab0o?t=891)
+
+Okay, yeah, that makes sense. Sorry, I don't think I have any other questions. I just wanted to disambiguate there, if you had more.
+
+**Aditya** [15:12](https://youtu.be/PnBGuEKab0o?t=912)
+
+Yeah. So, I mean, other than that — are we going to change the way the providers are written? Or are we going to keep a higher abstraction on top of the providers, so that people don't have to change the way the providers are written, in a way that multiplexes with being a shared provider? Are we going to change the way the providers are written?
+
+**Brooks Townsend** [15:37](https://youtu.be/PnBGuEKab0o?t=937)
+
+Yeah, that's a really good question. I think this somewhat relates to a different — where is it? — this relates to one of the other issues that we have on the roadmap, which I'll just share briefly so that folks are aware, and then drop it here in the chat. This is something that Luke Arch and I have been brainstorming around and finding solutions for: transitioning the idea of a capability provider from something that's wasmCloud-specific — you're using the wasmCloud provider SDK, you're specifically writing this provider, you're making all the decisions about how am I configured, am I getting configuration for this one component, or am I getting configuration for a bunch of different components.
+
+At a high level, what I would love to do, basically, is just drop the provider SDK entirely. And I know that sounds super drastic — I don't mean just `rm -rf`-ing it and getting rid of everything — but what I'd really love to do is lean more into wRPC as the way that these providers are written. Because right now when you write a provider, there's a step where you have to deal with running the provider, connecting to wasmCloud, making sure that you handle this initial list of links and everything — but handling an invocation, like key-value atomic increment, that's a really easy input. You basically implement the function for "when I get an invocation for atomic increment, what do I do?"
+
+So twofold: I would love to be able to have these providers be something where you're only really interested in that contract — like, I get an invocation for atomic increment, here's the configuration that I need to use (what database to connect to, what thing to invoke), and then you do it. It's almost like how you implement a component today, where you just say, "I'm exporting these interfaces, I'm going to implement them, and that's it." Aditya, I don't know — that's super broad and doesn't help — but I think only in the name of making these providers a little simpler to reason about, not having the whole capability-provider SDK because it's just simpler to write them, would be good.
+
+And it also lets you run capability providers, I guess, however you'd like. In a world where there was a wRPC bindgen for Java, you could write a little Java process or class that implements an interface, and then if it can connect to NATS, then wasmCloud can connect to it. So, big ideas — but I think the concrete next step is just to lean a little bit more into wRPC there.
+
+<img src="/img/community/2025-08-27/image004.webp" alt="Roadmap issue on transitioning capability providers to wRPC" />
+
+**Aditya** [19:07](https://youtu.be/PnBGuEKab0o?t=1147)
+
+Yeah, that makes a lot of sense. Definitely gives me a lot to brainstorm about. I had one question. When we talk about increasing the density of a wasmCloud application, we also need to think about how we are going to maintain the availability that comes with having a shared provider. The doubt I had is: would the providers be able to keep the availability as they are now? Or would there be a sort of contention with multiple components trying to make use of the capability providers?
+
+**Brooks Townsend** [19:50](https://youtu.be/PnBGuEKab0o?t=1190)
+
+Yeah, those are all good questions. At a bird's-eye view, when we talk about increasing density, I'm thinking of things like: if you deploy two different applications and both of them are trying to talk to Redis, and because they're separate applications, both of them need their own separate Redis provider process — which you invoke and it talks to the database itself. I think if we can merge these two into one Redis provider, then that would make the availability more predictable.
+
+It does introduce a scenario where, if you want to upgrade a single provider that's serving multiple components, then you need to have a way to do that such that you don't affect the other component workloads as you update your configuration. So I think really having an ability to update config without tearing down the provider and starting a new one — which isn't really what we do now, anyways — that's the most important thing for availability. If you're running in this multi-tenant mode, then you just have to be aware that some parts of the infrastructure, our singletons, aren't serving just one thing. So there's more to mind, but I don't see it being harder than today, I guess.
+
+**Aditya** [21:44](https://youtu.be/PnBGuEKab0o?t=1304)
+
+Yeah, thanks for answering that. That'll be all from my side here.
+
+**Brooks Townsend** [21:50](https://youtu.be/PnBGuEKab0o?t=1310)
+
+Let's see. Sorry, I've been just talking the whole time. Do folks have any other questions, or any questions for Aditya here? Bailey, you've been putting a lot in the chat too, around WASI P3 — where does that come into this mix?
+
+**Bailey Hayes** [22:06](https://youtu.be/PnBGuEKab0o?t=1326)
+
+I guess all I'm trying to say there is: what we previously have always had to rely on providers for — because in a lot of ways it was like our great escape hatch to "hey, this stuff doesn't compile to Wasm, so let's have a way to extend what the host is able to do with native code" — that's why we have providers. I really believe that with WASI P3, we're going to really start seeing components take over many, many more of the use cases that we were previously using providers for. And our next version of the host — I know you've been working on that — includes this concept of a service, so something that's long-running and stable, like a provider, but with components. So I just want to throw that out there: we can really be more targeted with what we're trying to solve for, leaning more into wRPC, and with these native extensions, because then we can think about, "well, okay, now of the subset of components, what exactly are they not able to do here? What are we actually missing?"
+
+**Brooks Townsend** [23:13](https://youtu.be/PnBGuEKab0o?t=1393)
+
+Yeah, okay. Bailey, I think this kind of goes back to Aditya's question around availability — how this changes the density model. So if we had a component that could do all the things that providers do — I was talking about Redis, imagining a WASI key-value implementer — so maybe, if there are any complications with resources or what have you, if we could skip over those, but just something understandable: how does that change the density model, the how-applications — I mean, when I say applications, I don't mean wadm applications, but, like, a bundle of components that you deploy together to make an application — how does that change the whole wasmCloud world?
+
+**Bailey Hayes** [24:09](https://youtu.be/PnBGuEKab0o?t=1449)
+
+It's a huge game changer. I mean, think about it this way: WebAssembly components are basically blocks that you're able to pack together — bin pack — in a single WebAssembly host. When you're talking about some other native process, to run that safely, securely, package it all up, yada yada yada, you're putting that thing in a container, right? And then you're calling out to it. We also allow our hosts today to kind of start processes and manage them external to the host, so maybe it's just a process running on the side — so it's still not bin packed like it would be in a WebAssembly runtime, because we're stacking those memories together as part of a giant allocation slab of the whole WebAssembly runtime. That's what gives you all that bin packing.
+
+So making it possible for you to define all of these different workloads independent of each other, we can spread it out and distribute the work. It means we also are able to co-locate workloads that depend on that specific type of service tightly packed together. And we can do a ton of different types of optimizations when you start talking about being able to do dynamic linking within the WebAssembly runtime. So like, within Wasmtime, being smart about, "oh hey, I'm talking to this thing, and I'm linked to it" — and when you do that in terms that Wasmtime is able to understand, you can do even more specialized optimizations, like Cranelift and compilation-type optimizations, to say, "oh, I see these same instructions are doing the same thing — I can ahead-of-time compile basically these two components together to trampoline really efficiently between each other," which is exciting.
+
+**Brooks Townsend** [25:56](https://youtu.be/PnBGuEKab0o?t=1556)
+
+Yeah. I mean, as far as I know, we don't have any trampolines in wasmCloud today, so if we could add trampolines, then that would at least make things more fun.
+
+**Bailey Hayes** [26:08](https://youtu.be/PnBGuEKab0o?t=1568)
+
+True. Oh, the dad jokes. Yeah, today, right? I'm just gonna answer it technically: if we compose a component together, you get that advantage. But if we could do smart things as part of the platform and say, "oh, did you mean to do that? Did you want them to be best friends and be composed together — aka be linked together?" we'll do that for you.
+
+**Brooks Townsend** [26:41](https://youtu.be/PnBGuEKab0o?t=1601)
+
+Okay. Do folks have any other questions or things they wanted to add on here? I'm going to do a bit of a summary, or whatever I'm thinking.
+
+Okay, yeah. I guess just to wrap this one up: Aditya, I'm sure you have other thoughts that maybe you'll compile or stew on over the next couple of days, or you made everything horrible and more complicated, which is also possible. I really think that we should keep brainstorming here. My issue title on this — "support configuring a wasmCloud host with shared capability providers" — I think is maybe a little misleading now, based on what we know. Not that that may not be the right thing to do, but I think a lot of things are going to change. If we can push forward the changes on capability providers being a little more in on wRPC, or components filling the role of what capability providers can do, then it certainly changes this requirement of a world where components are basically only able to access a really small amount of capabilities without a separate process running. And that's really the biggest problem with our provider model today: components are so much denser than running a separate process that's opening ports and all the things, so it's really hard to scale those at the same rate. So yeah, maybe some more research and thoughts here are needed.
+
+**Aditya** [28:52](https://youtu.be/PnBGuEKab0o?t=1732)
+
+Well, I'm gonna keep researching and doing my thing. Not sure I'm gonna factor that in with a lot of work that's going on with me, but yeah, I'll keep thinking about it.
+
+**Brooks Townsend** [29:09](https://youtu.be/PnBGuEKab0o?t=1749)
+
+That sounds good. Thank you so much, Aditya. And I know you've been poking around the whole Wasm space lately, so any other thoughts or questions there are really welcome. I think that's actually all that we had on the agenda, at least for today. Welcome to everybody who came in a little bit later — call in, join the outdoors, love it, good to see you. Ahmed, Egor, and Deepak are there. Are there other issues that we should talk about, or other discussion items from the broader Wasm ecosystem — things happening in wasmCloud that we should throw on for today?
+
+**Egor** [29:52](https://youtu.be/PnBGuEKab0o?t=1792)
+
+I just faced some issues that I cannot build a component on the latest Go version. Yeah, maybe let's discuss it after this call.
+
+**Brooks Townsend** [30:04](https://youtu.be/PnBGuEKab0o?t=1804)
+
+Okay, yeah, Egor, is this related to, like, Go 1.25 coming out? Bailey, you and I were just talking about this — we bumped something else to 1.25. I forget how this works; I've only done a couple of Go minor updates in life. But do we need to update our component SDK and examples to list 1.25 in the go.mod, or should that just kind of work? Is this a TinyGo problem? I'll just keep asking questions until somebody interrupts me. Either way, maybe we just need to take a look at that and see what the issue is.
+
+**Bailey Hayes** [30:59](https://youtu.be/PnBGuEKab0o?t=1859)
+
+Did TinyGo create a release? I would assume that maybe you need to have at least that release.
+
+**Brooks Townsend** [31:07](https://youtu.be/PnBGuEKab0o?t=1867)
+
+Okay, yeah. Egor, are you on the latest version of Go and all the things?
+
+**Egor** [31:14](https://youtu.be/PnBGuEKab0o?t=1874)
+
+Not technically Go, I guess — just Go. I just cannot compile.
+
+**Brooks Townsend** [31:30](https://youtu.be/PnBGuEKab0o?t=1890)
+
+Okay, yeah, Egor, let's follow up on this one. It looks like maybe that's a good place to start — updating TinyGo to 0.39. But if you still hit that issue, then we can follow up. I'll make sure in the new wash to add a little `wash doctor`-style thing to check and make sure if you're on 1.25 you've got to be on the new TinyGo, too.
+
+Bailey, you had a thing.
+
+**Bailey Hayes** [32:08](https://youtu.be/PnBGuEKab0o?t=1928)
+
+Oh, I also wrote a blog post — and thank you, Eric, if you're here, for helping me write that as well. I mostly talked about all of this, and the community call is linked at the top of those posts, so I'm not going to dive through it. But if you weren't in that community call and you'd rather read than listen, there's a blog post for you, or click that link and get more detail.
+
+I guess the only other thing worth giving a shout-out to is that I've been really into what Brooks has been cooking over on the wash side — the next version of wash and how that gives you basically plugins, aka Wasm components, all the way down. So we now, as part of wasmCloud, have an action that's in the GitHub Marketplace that makes it possible for you to easily get going with this new version of wash — it points directly at it. To consume it, you need to point it at the release-candidate version, or don't pass in a version, and by default we already specify the release candidates that Brooks has been cutting for the next version of wash. So I'd love your feedback. I really want to add something to it that enumerates all the plugins you need to have installed for the action. That's something I haven't done yet on the setup-wash action, but that would be really good to have.
+
+<img src="/img/community/2025-08-27/image005.webp" alt="setup-wash action in the GitHub Marketplace" />
+
+**Brooks Townsend** [33:50](https://youtu.be/PnBGuEKab0o?t=2030)
+
+Yeah, Bailey, I know that we're going to be essentially integrating wash into the Rust monorepo that we have. I think we're going to be making quite a bit of changes there, so I really look forward to using some of these reusable actions just to make it easy — run a workflow, wash is installed, and I can do all my testing.
+
+**Bailey Hayes** [34:24](https://youtu.be/PnBGuEKab0o?t=2064)
+
+We're there. It's in the Marketplace, we're in it. So give it a shot, give us feedback, post in the wasmCloud Slack if it's working for you. And look at our cute little logo — that was probably the hardest thing about this whole setup, trying to decide which one we could use out of the available feather icons, because if you're not a GitHub partner, you're not able to pass in your own custom SVG. Boo. But anyways, I'm happy with how it looks. That's cute, the end.
+
+**Brooks Townsend** [35:00](https://youtu.be/PnBGuEKab0o?t=2100)
+
+Love it. Colin, you came off mute — but maybe that was just to say hi?
+
+**Colin Murphy** [35:13](https://youtu.be/PnBGuEKab0o?t=2113)
+
+I was mentioned.
+
+**Brooks Townsend** [35:17](https://youtu.be/PnBGuEKab0o?t=2117)
+
+All right, y'all. Well, I think that's probably it for today. Give everybody a little bit of time back. Go enjoy all of your wasmCloud Wednesday, and next week is a normal week — holiday on Monday — we'll see you all next week on Wednesday for wasmCloud Wednesday. Good to see everybody.

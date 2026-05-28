@@ -1,0 +1,201 @@
+---
+date: '2025-08-13'
+title: 'Transcript: Event Sourcing with the Wasm Component Model & Resources'
+description: 'Full transcript of the August 13, 2025 wasmCloud community call covering event sourcing with WebAssembly components, Wasm resources, and WIT data types.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - event sourcing
+  - webassembly components
+  - wit
+  - wasm resources
+  - rust webassembly
+image: https://i.ytimg.com/vi/rZSZ87g_82M/maxresdefault.jpg
+showTitle: true
+slug: 2025-08-13-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-08-13-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=rZSZ87g_82M" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=rZSZ87g_82M" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Aug 13, 2025 · 55 minutes*
+
+**Speakers:** Brooks Townsend, Yordis Prieto
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [00:11](https://youtu.be/rZSZ87g_82M?t=11)
+
+So I haven't started the recording yet or anything. Let me make you a co-host. I was thinking that I would talk a little bit through the event sourcing repo — like the WIT that I have — and how I was talking with you, and we were talking about doing this thing, so I did this little POC. Then I thought I'd hand it over to you to do the whole spiel and what you think about it. How does that sound? Do you want to just take it from the start and talk about the work you've been doing? Because that's what I'm really more interested in showing off.
+
+**Yordis Prieto** [00:58](https://youtu.be/rZSZ87g_82M?t=58)
+
+The trick of it is that it depends, because WebAssembly is there to support things at the platform level — once you extract away from the problem. But most of the stuff I've already made isn't wasmCloud-specific; it's WebAssembly, WIT, that kind of thing. So it depends on what you want to get out of the conversation. Now, the conversation I'm having with — what's his name, Luke? — yeah, with Luke, will make WIT a step closer to what I need from the platform.
+
+**Brooks Townsend** [01:38](https://youtu.be/rZSZ87g_82M?t=98)
+
+I'm most interested in showing off a really cool use case for WebAssembly. The way you've approached it, whether or not it ended up being done with components from the start — that's something you're working on now — so you can always talk about the pros and cons there too.
+
+**Yordis Prieto** [02:01](https://youtu.be/rZSZ87g_82M?t=121)
+
+I can present a few examples for people to see what to expect when it comes to event sourcing. Let me get the repo ready for you. Also, don't ask me to run it, because the WebAssembly side isn't running — I destroyed the repository. It's literally just a lot of experimentation, just to figure out the final outcome I want.
+
+**Brooks Townsend** [03:11](https://youtu.be/rZSZ87g_82M?t=191)
+
+All right, we'll do the thing. Hey everybody, welcome to wasmCloud Wednesday for Wednesday, August 13. Today I'm joined with my co-host, Yordis — Yordis is here all the time. In the wasmCloud community meetings we were talking, and it came to my attention that Yordis is working on a really interesting application of WebAssembly in the event sourcing space — using WebAssembly as an enabling technology, not so much "I need to do a WebAssembly thing." I don't think he's really been able to show off his ideas in the community meeting, so we basically have the whole meeting to chat today.
+
+As a little primer: when Yordis and I were talking in Slack the other day, we started talking about how you could best use WebAssembly components for event sourcing. Yordis has a solution that's not built exactly on wasmCloud or exactly on components — he wasn't representing his event-source system in WIT — but it's something he wants to be able to do. So I put together a little experimental repo. It's certainly not fully featured, so take it with a grain of salt. What I wanted to see was whether I could represent something like an event-source system using only the composability of WebAssembly components.
+
+<img src="/img/community/2025-08-13/image001.webp" alt="Brooks' experimental event-sourcing WIT definitions" />
+
+Event sourcing is a pretty opinionated space. Once you start talking about how you write an application with event sourcing, there's this idea of, "is this an aggregate or a handler? Is it pure? Can you access this?" — so take all of this with a relative grain of salt. What I really want to do is represent a specific domain logic as an event-sourcing application, and handle all of the plumbing — where commands and events go, how they get stored, how they get routed to specific handlers — transparently on behalf of the user. Folks have had pretty good success looking at the WIT for something like this, because WIT is basically a description of the functionality of your app anyway.
+
+So I have a couple of different interfaces you can implement. There's the **command handler** interface — I called this an aggregate before; there are different names for it — but essentially it's a component that receives a command, something like "record transaction" or "open account" in the banking ecosystem, and returns a list of events to emit, like "account opened" or "account open failed." At a base level it's the idea of handling commands and returning this list of events, which is an immutable record of fact — here's all the things that happened over time. Then you have an **event handler**: any time an event enters the system, if you register interest in it, you can process that event and take certain actions; you could return a list of commands in response.
+
+Then there are some other components you don't need to interact with, but they're what make it work. There's the **event sourcer** component, responsible for receiving a command, routing it to the specific command handlers, and querying for specific events. From there, there's the **persistent storage layer**, the event store. Since events are an immutable record of the past, whenever an event is emitted it's stored with a certain timestamp, which solidifies it as something that happened.
+
+The use of **resources** here is pretty clever for this event-sourcing use case. A resource is specifically an owned piece — an owned resource, kind of like a file descriptor — but when you pass it around, it's really just this opaque handle. So in the core system we can work with events and commands, but we don't actually know what the event or command structure is. It's very custom to the business domain, and that works totally fine, because all we know is that you can deserialize a command from a list of bytes, and you can ask to serialize it to bytes as well. So the whole system just works with a bunch of bytes, passes it around, and does so really efficiently with resources.
+
+At the end of the day, a command handler — I'm actually doing something a little wacky and generating my event types from a protobuf definition. I included that just because I thought it'd be neat: you get to choose the serialization format, you don't need to use WIT, you could use JSON or whatever. So I'm using the proto definitions for my events and commands. This is in Rust, but of course you could do any component. On the business-logic side I'm responsible for implementing two functions: **rehydrate** — here's every event that's happened, give me back the total state of the system — and handling a specific command. So I have bank events for account opened, transaction occurred, transaction denied; I fold those and create the state of every account and its balance. Then handling a command: if it's a transaction, I take the current balance, and if subtracting the amount goes below zero I emit a transaction-denied, otherwise a transaction-succeeded. The business logic is really short — not a complicated piece of software, and you could represent so many different business domains with this. Yordis, do you mind if I hand it over to you to talk about what you've been working on, what led to this experiment, and the chats you've been having recently?
+
+<img src="/img/community/2025-08-13/image002.webp" alt="Rust command handler with rehydrate and protobuf-generated event types" />
+
+**Yordis Prieto** [12:26](https://youtu.be/rZSZ87g_82M?t=746)
+
+It's probably a good idea to share how I ended up in wasmCloud and why I'm chasing WebAssembly for this domain, because it matters to see what problems it solves and the why behind it. Let me share the screen — and the code is not production-ready, I've experimented a lot.
+
+My career in event sourcing started almost five years ago, around 2020, and it was all in Elixir. In Elixir we use **commanded**, and in that framework you have abstractions that let you extract away from the storage mechanism, so most of the time you're just defining your data structures. When you see this embedded schema, just imagine it's a type definition. At the end of the day you end up with a lot of types in your system defining the invariants and the correctness of that information — value objects, if you come from domain-driven design, and events, which are just a kind of value object. And there are two computations you run into, which you already showcased. The only two computational things — actual functions that do something — are evolve or apply (the one you called rehydrate): given a state machine and an event, tell me the new state of my system. And the second is a command handler: given the state machine and the command — the intent — produce me events or an error. So if you try to put as much as you can into the infrastructure, you end up with those signatures: three data structures (state, command, events with value objects inside) and two functions (the evolve/apply and the command handling — the decision and the set).
+
+<img src="/img/community/2025-08-13/image003.webp" alt="Yordis' event-sourcing component with state, command, and event data structures" />
+
+That's the command side. There's another piece in event sourcing, which is event reactivity — basically an event handler that reacts to an event happening in the system, and from there you do whatever you want. For example, when the deposit is recorded I just want to send an email; when the deposit is requested I want to do a check. I did this for a few years.
+
+The way I achieved the entire banking system — I did a full US banking system — is that there was absolutely no indeterministic code. That means everything was assertions around the messages. That's what started the journey of "I need to find something where I can focus on the messages and assertions, not necessarily on the behavior." And to achieve that by discipline, I had to tell people, "in the implementation of these functions, please don't call clocks, don't call anything that has indeterminism." For me to achieve what I wanted, I needed them to be disciplined — which is what led me to WebAssembly. If I'm trying to extract this away from the developer so they don't make a mistake, then in WebAssembly we have control over that indeterminism. If I don't give you the clock, you don't get to use the clock. That problem is what led me to WebAssembly to begin with. I want to honestly not rely on discipline, but actually give developers a tool that says, "you can mess up and you're okay at the platform level."
+
+Lastly, Elixir, compared with other languages when it comes to data structures and static types, is not the best one — there are a lot of runtime checks that other languages do more declaratively through type systems. So that was also a benefit: WebAssembly controls the platform and the indeterminism, and a developer can use Go or JavaScript or whatever they like, without being forced to use my framework or language, while I still control the runtime. That's the whole thing driving me into wasmCloud, because that's pretty much what I was describing — wasmCloud underneath, taking all these components and injecting the right dependencies at the right time, controlling the actual infrastructure.
+
+So at the very low level, I have a component that's supposed to be an event-source component — a lot of data structures. By the way, I'm not a Rust developer; I vibe-coded it and figured it out with experience. If you exclude the infrastructure stuff like serialization and debugging, it's just pure data structures, and then the computation: a command handler — take the state, take the command, give me a decision back — or evolve — take the state, take the event, give me the new state machine back. It's the exact same thing you showed, just a little different. I'm going with a really functional approach, because when a developer is working at this level, I don't want them getting caught up with stuff that's not related to the domain-specific language. I want engineers to be able to jump into any code, because it's not about computer science — all you get is a function and data types — and it's not about infrastructure, because all you're speaking is your domain language: here's the data you have, figure out what needs to get done for your domain.
+
+This first layer by itself isn't enough, because there's nothing here about event sourcing yet. So I wrap it at the next layer — this is in Wasm, and I'm using Extism for now. At this event-sourcing layer you start thinking about the streams: I need to identify which stream to read events from, and most likely you map from the command into that stream ID. This is also where I'd like to take advantage of WIT and figure out how I don't have to repeat this all over the place, because I also had to wrap the original functions for the sake of WebAssembly. When I go from WebAssembly into my component I only have a byte array — I don't know what the data type is, because the WIT specification didn't allow me to do that. That's the kind of thing I wish I could do, because there's a lot of marshaling in and out of WebAssembly due to its lack of understanding of my types. So evolve is, you know, JSON of two data structures in, then figure out how to deserialize for the sake of WebAssembly and pass it to my functions. It's just a wrapper.
+
+**Yordis Prieto** [22:20](https://youtu.be/rZSZ87g_82M?t=1340)
+
+One interesting thing: the decision can't only return events. Sometimes you need to return something like a monad — a batch of operations that you'll apply, then continue to the next one — because you may need to raise events, figure out the state of the state machine, and then decide if you need errors or continue raising events. That's part of an SDK or abstraction that shouldn't matter to the user. So that's at this level. Then you take this component, and what I did in my platform — because I love composition — is I have the Wasm event-sourcing component, and another component that takes a given plugin and does the calls in and out of those components.
+
+For example, here's a command dispatching. Every time you see this plugin, it's most likely going into a component: I get the stream ID, get the initial state, request all the events from the event store, loop through them, marshal them from the event store, evolve my state machine, then make the decision via the command handler, marshal the events back for the event store, and finish. Then you take this module and go to your main function or whatever infrastructure you have. In this particular case, as an MVP, I have NATS — wink wink — consuming commands, and all I'm doing is taking the command, finding the right service (I hard-coded it to the module here), initializing the Extism module, and running it through the instructions I described, then replying back.
+
+<img src="/img/community/2025-08-13/image004.webp" alt="Composition: a plugin component driving the event-sourcing component over NATS" />
+
+So this is the whole experimentation related to wasmCloud. You can imagine I don't want to be dealing with this section — how do I deploy my plugins, where do I deploy them, how do I route into a given service, how do I scale that command handling. This is where my experimentation eventually connects to wasmCloud, because that module becomes a wasmCloud-specific concern: how I deploy it, how I connect it to the physical providers I need, and how to route commands — just give me data in and data out. And given that WIT would be flexible enough to describe my data types, I'd use those types directly from my WIT specification, because all I need is marshaling, basic validations, and then calling the function.
+
+Now, in your example you only have one module handling multiple commands. This is where the discrepancy comes in — let me see how much you can reduce the complexity of understanding a problem. I depart a bit from the domain-driven-design event-sourcing community, which goes for aggregates and single objects for everything. I move more toward: in event sourcing, all you care about is a stream of events, and that's your focus — but not just the stream, the use case in a given moment with a given piece of information. Because of that, I started experimenting with: what is my unit of work that I should be able to deploy independently and reduce the risk of deployment? If I have one component handling all the commands, any change becomes a deployment risk for unrelated use cases. Why redeploy something that creates a bank account at the same time as something that closes one? They have nothing to do with each other. When an engineer is thinking about a problem, they need to be thinking about their own state machines, because in event sourcing the collaboration happens through the events — and events are immutable, so you can make assumptions about the past and the future.
+
+In practice there's some duplication of code, and that's okay, because we're talking about really basic computation — basically copying information from one place to another. And I gain flexibility: anything related to a given use case is in one file, which in the LLM era is extremely valuable, because I reduce the context to the most granular possible, so hallucination doesn't happen as much. I did this with my former CTO: I split apart the command handling into a function with the exact same signature that cares only about handling that command, because you're going to have a switch statement, and developers will want to move each branch into its own function. When you do that, you notice only a few keys matter to each function — in this one archive matters, in another drain matters — which is where the pattern recognition comes: is this single command handler the unit of work, or is there smarter routing we could do?
+
+So I took your example and tried to do the WIT. I'd have open-account and transaction-account — I no longer have one module, I have two. In every one of them you have to define your interface: I handle a command, and I have my own evolve function, because that state machine is your own, not shared across. If you want to share it in the implementation, that's up to you — that's not the point. The point is that from an architecture perspective I'm giving you the most granular way to deal with the problem; you're not forced to share code from the get-go, so follow the rule of three. But that means a lot of duplication, because every WIT that handles a command has to share an interface like a template, share the evolve, share the command handling, and for every state you have the state machine record plus the initial state and serialization. From the WIT perspective this is where the **generic** concept starts becoming valuable: if you think of WIT as a generic thing where I can inject different data types, you realize we could templatize some of these sections and then just generate the final WIT.
+
+**Yordis Prieto** [32:20](https://youtu.be/rZSZ87g_82M?t=1940)
+
+The last mile is the events themselves — the bank-account events. That is the actual true shareable module for a given version, because that's the one we agreed on, so it would affect deployment depending on what's inside. The stuff I showed is the command side, but when you deal with event reactivity you also need to figure out how to marshal those events. Ideally I can just give you a Wasm module that says, "here's the WIT for your data types at the programming-language level, and here's a module that already deals with marshaling in and out," so you don't even care about that.
+
+Lastly, I use protobuf. That's the thing I don't know how to think about: to what extent I want to leverage WIT not as my serialization but as close to the serialization as possible, so we don't duplicate the effort of having both protobuf and WIT. Or, if that's the case, how can I focus on protobuf and have something compatible with WIT so we don't have that much duplication around something that's just a data type. In the Go version I have, this kind of coding becomes my WebAssembly initialization — a bunch of function pointers and modules — and behind the scenes I'm using protobuf, primarily because Go lacks union types. But really I don't care; it's just a bag of information I need to serialize and deserialize, and I'm okay combining those two layers. Questions, answers?
+
+**Brooks Townsend** [34:37](https://youtu.be/rZSZ87g_82M?t=2077)
+
+Yordis, thank you for coming on and talking through all this. And everybody, please don't let me monopolize the time. I love jumping from Elixir to Go to Rust, seeing the evolution of your project — it's really cool. You've been thinking about this stuff for years, and Wasm as a potential enabler for a better version of this system is super cool. I'm glad we have it here on recording so we can refer back to it.
+
+**Yordis Prieto** [35:20](https://youtu.be/rZSZ87g_82M?t=2120)
+
+If something doesn't make sense, hopefully I can follow up. That better-together story resonates with me way too much, because at some point in my career I became the team leader, and I had two choices: blame my developers — say they're lazy or not smart enough — or look at what we can do in the industry to empower that person. From my perspective, that would empower them, and that's what drove me into what WebAssembly can enable and the cultural aspect that could come from it. I saw my engineers in Elixir: fine, the platform is amazing, there's nothing better for distributed computing, but the language isn't ideal in specific aspects — especially controlling side effects. So that's why I'm forcing myself to be polyglot: I'm going to figure this out for everybody.
+
+**Brooks Townsend** [36:32](https://youtu.be/rZSZ87g_82M?t=2192)
+
+A big aspect of all of this is that since you're doing this in WebAssembly, if you're going to cross the Wasm ABI — the application boundary from guest to host — you need some representation of what's crossing that boundary. I feel like that's the core of this experimentation: how do you represent a command, an event, a state in such a way that it can cross the WebAssembly boundary, represented in a concrete way but provided by the developer? I can see why you went with Extism — that's classic WASI P1. If you don't know how to represent a concrete type, you represent it as a `Vec<u8>` and give some pointers. That's exactly what we did in wasmCloud years and years ago. But now there's the component model, and there's a rich language for describing complex types — that's the whole point of the proposal.
+
+You're definitely seeing that the component model doesn't have generics right now. Resources are actually almost close to representing something like generics — that was honestly the entire point of my POC, to show how you could represent this resource of a command and event. But the drawback is that with resources you can cross the Wasm boundary with this opaque handle, yet when you need to store it in the event store, or deserialize it from a concrete type, you do have to go from bytes to that concrete type — which I think you have to do no matter what system you're in. One of the reasons I used protos to represent the events: first, to show you don't have to use WIT to represent your events; and second, there's this project — event catalog — where if you have your events defined in proto or OpenAPI, it generates a whole website showing how your events and commands relate. I thought it'd be dope to have that for free. So I wanted to dig deeper on you representing your events in WIT.
+
+**Yordis Prieto** [39:54](https://youtu.be/rZSZ87g_82M?t=2394)
+
+One thing that's a "me" problem: I'm going from the experience I want and figuring out how to get there. That's why you see a lot of pushback from me — I know you could jump around the situation and do this or that, and that's okay, but I want what I'm showing you to be the experience when somebody is developing. If we all do our best, I don't see wasmCloud but it's there, I don't see WebAssembly but it's there. All I see is, "I have my own specific domain to be an expert at and do my work." That's what forces me to push back: I know you can jump around the problems, but can we figure out something that puts these things aside in the most powerful way? Because that proves the platform is simple enough and valuable, but also non-intrusive. That's been the tricky bit, and why I keep saying, "let me wait for Preview 2, let me see where WIT is going."
+
+**Brooks Townsend** [41:26](https://youtu.be/rZSZ87g_82M?t=2486)
+
+In some shape or form, wasmCloud does something really similar. It doesn't matter if we have to do ugly things plugging WebAssembly interfaces together in the back, as long as the user experience — the developer who comes and uses it — is really crisp. That's the thing that matters most. Here you have this represented in Rust, all these different structures, and it's exactly what people run into when they want to write a Wasm application. The ideal is that you're not showing up trying to write a Wasm application — you just show up and go, "I like Go, I wrote a Go app, I compiled Go to Wasm."
+
+**Yordis Prieto** [42:28](https://youtu.be/rZSZ87g_82M?t=2548)
+
+To some extent that's what I want, because everything else is just information representing information. I don't even want to write all this — that could be my WIT types. It's just information, it's not behavior, and in a good way I feel that.
+
+**Brooks Townsend** [42:46](https://youtu.be/rZSZ87g_82M?t=2566)
+
+It's almost like, if you're modeling a business domain, you can do it in terms of this structure of events. I wanted to ask — Yordis, you actually had a meeting with Luke Wagner, one of the original creators of Wasm and still mega-active in the space, one of the designers of WASI P3, the native async and the component model. Hi, Luke, you're watching this, thanks for all you do. You had a conversation with Luke the other day to bring up some of these things, which I'm really glad you did, because you're driving toward this experience in the native language — you want to do this in WIT, you need these things, you know there are reasons they don't exist, but how can we make it happen? Did you want to talk about your meeting, what you talked about, and where you got?
+
+**Yordis Prieto** [43:59](https://youtu.be/rZSZ87g_82M?t=2639)
+
+I shared with him the reasoning behind event sourcing — controlling determinism in the system so you don't get to shoot yourself in the foot. But at the end of the day, what I showed him is that I need to be able to connect all my protobuf, which some people see as a serialization mechanism — it has value, but I use it more as the specification of my information, especially with tools that don't allow me to make breaking changes. I need to close the gap: would WIT be my specification, or do I want something like protobuf to be my specification? I don't have strong opinions, but I need to close that gap. And if WIT is going to be my specification, then you need to provide me enough data types to make most programming languages descriptive enough.
+
+One conversation related to that is a PR — sorry, an issue — open about **dictionaries**. I really need maps, because it's actually really common in the ecosystem, and most engineers don't want to deal with transforming a list of tuples into a map in the programming language. I don't want to create a framework and a bloated SDK around WIT just to make the user experience better — though I can go that route — but I'm trying to figure out how to avoid being too far away from something that's just WebAssembly, where you technically don't need anything on top of it other than the WIT. For that I need maps. There's another issue too: **structs** — in protobuf, structs are like JSON, specific values where you can do whatever you want as long as it's strings, numbers, arrays, and structs. So I told him I need something like a dictionary — call it maps — and eventually something like structs. That would free up the shortcomings of being able to move most of my protobuf, if not everything, into WIT. At that point, everything related to the data types I'm showing you just becomes WIT, SDK, and tooling that generates these types in my programming language. Same with the repeatedness in every WIT file around evolve, handling, and command — that's where templating and generics come from. The host doesn't care too much what's inside; it knows the API. And in your guest component you have the fastest way to map into your in-memory representation. So those three — maps, structs, and recursion — are the use cases I've been talking to him about, coming from the perspective of not wanting to add too many layers on top of WIT. So far I think he agrees on maps, and he's already working on a specification for it, so wait and see. Structs are a little trickier; he said something about recursion not being that easy. I can't speak for it, but that was a concern, so that could be the next step after maps.
+
+**Brooks Townsend** [48:44](https://youtu.be/rZSZ87g_82M?t=2924)
+
+All three — a native map/dictionary, recursive types, and generic types — are things that have come up before, which every guest language ultimately solves in its own way. Maps feel pretty concrete; I'm not aware of a language that doesn't have maps.
+
+**Yordis Prieto** [49:16](https://youtu.be/rZSZ87g_82M?t=2956)
+
+If not, it's okay — we'd have to agree on a shared SDK that makes sense for that programming language, regardless of my tooling. I can take that route as well, but alignment matters a lot to me. I don't want to be creating soup culture that becomes its own thing where we can't speak the same language anymore. That's one of the reasons what you do at wasmCloud resonates so much: I know you could take shortcuts, but you've been pushing it to "WebAssembly first, then wasmCloud," and that resonates with what I'm trying to do.
+
+**Brooks Townsend** [49:57](https://youtu.be/rZSZ87g_82M?t=2997)
+
+It makes a lot of sense. What's the saying — you can't boil the ocean. With Wasm, we just can't land literally everything all the time. But having this end goal helps. When I look at maps, my first response is, "oh yeah, we don't have maps, you can just do list-tuple-tuple," and you go, "I know I can do that, I don't want that exactly." Same with recursive types — there are little workarounds. Realistically that's how we build up this ecosystem of tools. The goal of WASI 0.2 was to have this baseline set of interfaces you can use to represent a system. It's not everything — there will be workarounds for a lot — but with that baseline, we can figure out what's missing and build it one at a time.
+
+**Yordis Prieto** [51:14](https://youtu.be/rZSZ87g_82M?t=3074)
+
+Yeah, hopefully it makes sense why I keep pushing back.
+
+**Brooks Townsend** [51:22](https://youtu.be/rZSZ87g_82M?t=3082)
+
+There are some times you have to make the choice. It stinks to do a conversion from list-of-tuples to map every time, or to wrap that, because it changes the semantics. But it's all really good pushback, Yordis, and I'm glad you're participating in the upstream issues. You have a really big idea in the event-sourcing piece, but the concrete use cases — "here is how I want to write an application that targets Wasm" — help drive what the implementation should look like.
+
+**Yordis Prieto** [52:24](https://youtu.be/rZSZ87g_82M?t=3144)
+
+And in the worst case, if the answer is "it is what it is," okay, fine — we document it and move on. That's also my intent: let me push it and take ownership of trying to push it myself. If at the end all I learn is "you can't do it your way, here's the trade-off," that's fine — I document it and move on. But now we know.
+
+**Brooks Townsend** [52:54](https://youtu.be/rZSZ87g_82M?t=3174)
+
+Well, hey folks, thanks for coming to this panel where Yordis and I just talked back and forth. Does anybody have any other questions or comments for Yordis' work here?
+
+**Brooks Townsend** [53:21](https://youtu.be/rZSZ87g_82M?t=3201)
+
+Cool — that means it all made sense.
+
+**Yordis Prieto** [53:27](https://youtu.be/rZSZ87g_82M?t=3207)
+
+Perfect. Nothing wrong with it.
+
+**Brooks Townsend** [53:32](https://youtu.be/rZSZ87g_82M?t=3212)
+
+Yordis, this is awesome. Is there any link you want me to throw into the community meeting notes? I have a link to your PR proposing some changes in the Cosmonic Labs repo — I'm not really doing anything with it, I just wanted to put it out there so anybody could take a look as a reference. It's an interesting possible pattern, so maybe somebody will take it and run with it.
+
+**Yordis Prieto** [54:05](https://youtu.be/rZSZ87g_82M?t=3245)
+
+I'm going to share some links, primarily around the issues people could follow that may be related to what we did.
+
+**Brooks Townsend** [54:26](https://youtu.be/rZSZ87g_82M?t=3266)
+
+Thanks for coming today. Happy wasmCloud Wednesday. I think we're about halfway through our quarter two — maybe next week we'll be halfway through the quarter and do a roadmap check-in. We've had a really awesome sequence of calls, people coming on and showing what they built, so if anybody wants to fill that role and show what they've been building, I will always take seeing an application of it over me just spitting out a demo. Thanks again, Yordis. All right folks, have a wasmCloud day. See you next week.

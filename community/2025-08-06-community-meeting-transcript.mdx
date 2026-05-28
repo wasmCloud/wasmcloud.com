@@ -1,0 +1,299 @@
+---
+date: '2025-08-06'
+title: 'Transcript: Debugging a wadm Component Update: Image References & the Component Model'
+description: "Full transcript of the August 6, 2025 wasmCloud community call covering a wadm component update bug with OCI image references, lost config, and NATS debugging."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wadm
+  - oci registry
+  - nats
+  - opentelemetry
+  - webassembly news
+image: https://i.ytimg.com/vi/1pB61vbkoAo/maxresdefault.jpg
+showTitle: true
+slug: 2025-08-06-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-08-06-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=1pB61vbkoAo" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=1pB61vbkoAo" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Aug 6, 2025 · 26 minutes*
+
+**Speakers:** Brooks Townsend, Mike, Lucas Fontes
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [00:00](https://youtu.be/1pB61vbkoAo?t=0)
+
+Hey, Mike, how's it going?
+
+**Mike** [00:05](https://youtu.be/1pB61vbkoAo?t=5)
+
+Hey, Brooks, pretty good. Yourself?
+
+**Brooks Townsend** [00:09](https://youtu.be/1pB61vbkoAo?t=9)
+
+Yeah, pretty good. I see your pipeline platform — pipestack — on dev.
+
+**Mike** [00:14](https://youtu.be/1pB61vbkoAo?t=14)
+
+Actually, I should probably rename that. That's from a previous meeting — let's get rid of that. But yeah, it's happening. I've got my pipeline platform and stuff is rolling, but today I'm either going to have a big shock where I realize that I completely misunderstand how one thing works, or I found a bug. One of these two.
+
+**Brooks Townsend** [00:43](https://youtu.be/1pB61vbkoAo?t=43)
+
+Well, I mean, it's written in Rust. It compiled fine, so…
+
+**Mike** [00:47](https://youtu.be/1pB61vbkoAo?t=47)
+
+Yeah, yeah — I'm not building Rust. There's that.
+
+**Brooks Townsend** [00:56](https://youtu.be/1pB61vbkoAo?t=56)
+
+Oh, true. There's your problem. Yeah, I think discussing that bug, Mike, might be the main topic of the meeting today — which I did a poor job of reflecting in the community meeting agenda. I didn't have a demo, didn't have folks sign up for one. Maybe you'll turn it into an impromptu demo by showing the problem or something. No problem though.
+
+**Mike** [01:30](https://youtu.be/1pB61vbkoAo?t=90)
+
+Yeah, all good. I will show the problem in real time.
+
+**Brooks Townsend** [01:34](https://youtu.be/1pB61vbkoAo?t=94)
+
+Okay, nice. We'll give folks just another couple of minutes, and then we'll get started.
+
+**Brooks Townsend** [02:57](https://youtu.be/1pB61vbkoAo?t=177)
+
+All right. Hey everybody. Welcome to wasmCloud Wednesday, for Wednesday, August the sixth. I actually am a bad host and didn't put this on the community meeting agenda, but it really just makes my job easier, because I want to share my screen. We have kind of a demo-discussion hybrid that Mike here is going to lead out. We've been talking about a couple of things in the wasmCloud Slack over the last week or two. Mike, I think you posed this as a potential bug — slash misunderstanding — of wadm. So, yeah, I'd really love to see some of the things you've been hitting, especially as you start to launch your product at a specific scale. Maybe we can talk about what's missing, or what's a bug, or anything like that. Does that sound good?
+
+**Mike** [03:55](https://youtu.be/1pB61vbkoAo?t=235)
+
+Sounds perfect. Yeah, I'll walk everybody through it, and we'll take it from there. In an ideal world, somebody is just going to unmute and tell me, "Look, you misunderstand," problem solved. Well, let's see.
+
+So basically — if you've been here before, you've seen my pipeline platform. It's now at a point where I have some people using it. What I tried to do is, I have a bunch of components that I deployed to wasmCloud, and customers of my platform use them without even knowing they're using them. Now what I did is I updated one of those components. I added new features, so I increased the version of that component, deployed it to my registry, and then I have a script that goes through all the running pipelines and updates them — the wadm file — increasing the version by one. And I was hoping that wadm would then redeploy that application, or that component, with the new image that I pointed to. That didn't happen.
+
+What I was curious about is, "Okay, that's probably me." So I took a Hello World HTTP Rust template and I was able to reproduce it. So I'm going to walk you through that, and then we'll see what's going on. First things first, share my screen.
+
+<img src="/img/community/2025-08-06/image001.webp" alt="Mike's Hello World HTTP Rust component with a config import" />
+
+**Mike** [05:26](https://youtu.be/1pB61vbkoAo?t=326)
+
+What I have here is, as I said, the regular out-of-the-box Hello World HTTP Rust example. I did add one thing: I added an import for the config, and this is where I started to see the issue. Easy enough, and then I added my config to my component — regular HTTP component. The other thing I did is I changed the image from a file path to my local registry where I deployed that component. I think it didn't happen when I used a file path — don't quote me on that. But anyway, if I have an image, that's what's in production: there's an image linked to the registry, it points to my component, `0.0.1` at the moment.
+
+If we look at that component, you can see the only thing I added was a config — reading here from `get`. So whatever is in there, I'll read it and then print it out. Now if we look at the terminal, I have my wasmCloud logs on the left. Up here I have an empty host — there's nothing deployed at the moment — and I can deploy that application. Deployed. You can see some logs, it does a bunch of stuff, and then here I'm going to do a `curl` to that component. When I do that, you can see that the config gets printed: property name `value`, `world`. Excellent. That's what I expected.
+
+Now, in the real world, this was deployed for a while, and then I came in and made changes to the component. I updated it and deployed version `0.0.2`. So now if we go back and change our wadm file, first thing we need to do is increase the application version, because we already have one on `0.0.1`, and then here I'm changing the component version as well to `0.0.2`, which I already deployed to my local registry. If I go back and redeploy that application — you can see, successfully deployed `0.0.2`, looking good over here, seems to be okay. There are some warnings, but I'm not sure if maybe that's the issue.
+
+<img src="/img/community/2025-08-06/image002.webp" alt="The warning that the component will be scaled but the image reference will not be updated" />
+
+Now if I hit that component again — let me zoom in a bit — the config is empty. And what happens is, if I were to go back and redeploy version `0.0.3` of the application — so just increase the application version, but not the component — the config would be back. That really puzzled me. Something's going on. But I believe — somewhere in here I found a note. This one: it's saying *"requested to scale existing component to a different image reference,"* and then it says `0.0.1` is not equal to `0.0.2`, the component will be scaled, but the image reference will not be updated. So that also means it wouldn't actually take my `0.0.2` image to deploy — it would still use `0.0.1`, is my understanding. But also, I lose the config.
+
+So I think there's a few things going on, but I really just wanted to show that to people who have a better idea of what's happening here. I think two things are happening: I lose the config, number one, but also it doesn't actually use my new image reference. And in the code somewhere, I found a path where it goes either way — scaling or updating a component — and I wonder if maybe, for some reason, it goes down the wrong path. I'm going to stop for a second and see if anybody has any input or thoughts.
+
+<img src="/img/community/2025-08-06/image003.webp" alt="The curl response showing the component's config is now empty after the update" />
+
+**Brooks Townsend** [09:31](https://youtu.be/1pB61vbkoAo?t=571)
+
+Yeah, Mike, thanks for doing the demo to really show this off. I'm glad at least it's reproducible — you can see a consistent thing. Just to level set: I think you're doing all the right things here. I didn't see anything that raised a red flag, anything you needed to update. You're doing the right thing, good start.
+
+And I think your intuition there is right, around the warning about scaling. When you deploy a new version of this application and wadm sees in the diff that the image reference changed — from `0.0.1` to `0.0.2` — essentially what we do is send a request to the wasmCloud host to scale down the older component, and then we send a request to scale up the component with the newer OCI reference. So I think maybe there are a couple of things happening. It's been in our backlog for a little while to send the "update component" request, which kind of does an update in place. What seems a little more worrying — tell me if I'm wrong, but it looks like it updated to `0.0.2`, because that's what I see in the logging output.
+
+**Mike** [11:01](https://youtu.be/1pB61vbkoAo?t=661)
+
+Sorry, that one was hard-coded. Ignore that if you're looking at it.
+
+**Brooks Townsend** [11:07](https://youtu.be/1pB61vbkoAo?t=667)
+
+Oh, it's hard-coded. Yeah. I see in the first log update that it had config `0.0.1`. Is that right?
+
+**Mike** [11:18](https://youtu.be/1pB61vbkoAo?t=678)
+
+No, no. But I think this is the issue — the component will be scaled, but the image reference will not be updated. And then I don't think it actually took `0.0.2`. Although, hang on — it did say stopped component `0.0.1`, started… oh yeah, here. Oh, you're right, you're right. It says started component `0.0.2`. So maybe that's kind of a misleading log.
+
+**Brooks Townsend** [11:43](https://youtu.be/1pB61vbkoAo?t=703)
+
+Which, honestly, whether it's a misleading log or it's inconsistent — like you didn't see this behavior before — honestly the weirder thing is that your config is empty. That's the one I don't really have a knee-jerk answer to.
+
+**Mike** [12:05](https://youtu.be/1pB61vbkoAo?t=725)
+
+And Lucas is asking what's happening in config-data KV during the update. Good question. What's the easiest way to check that?
+
+**Brooks Townsend** [12:17](https://youtu.be/1pB61vbkoAo?t=737)
+
+Do you have NATS installed, like the command line?
+
+**Mike** [12:20](https://youtu.be/1pB61vbkoAo?t=740)
+
+I think I do somewhere. Hold on.
+
+**Brooks Townsend** [12:24](https://youtu.be/1pB61vbkoAo?t=744)
+
+If you do `nats kv ls`…
+
+**Mike** [12:29](https://youtu.be/1pB61vbkoAo?t=749)
+
+Hold on, that's `kv ls`…
+
+**Brooks Townsend** [12:35](https://youtu.be/1pB61vbkoAo?t=755)
+
+…using a JetStream domain. Hold on.
+
+**Mike** [12:38](https://youtu.be/1pB61vbkoAo?t=758)
+
+Oh, no — maybe. Hold on, hold on. Oh, that's the production one. I don't think I do. It's just a regular `wash dev up`, I think that's how I started.
+
+**Brooks Townsend** [12:59](https://youtu.be/1pB61vbkoAo?t=779)
+
+Do you have a NATS context that you're using? Like pointing somewhere, or is this going local? This should all be local.
+
+**Mike** [13:13](https://youtu.be/1pB61vbkoAo?t=793)
+
+Yeah, this should all be local. Another context — hang on. Oh, interesting. I never did that setup after checking. So I guess there's a context set up somewhere that I wasn't aware of.
+
+**Brooks Townsend** [13:36](https://youtu.be/1pB61vbkoAo?t=816)
+
+Cool. Yeah, Lucas's thing — so if you do a `kv ls` with that `CONFIGDATA_default` bucket, yep. And then if you do a `kv get` with that value at the end — the `rust_hello_world` whatever. Can you do that again?
+
+**Mike** [14:07](https://youtu.be/1pB61vbkoAo?t=847)
+
+The `ls`? Yeah, yep.
+
+**Brooks Townsend** [14:09](https://youtu.be/1pB61vbkoAo?t=849)
+
+Can you do it again?
+
+**Mike** [14:12](https://youtu.be/1pB61vbkoAo?t=852)
+
+Oh, hang on, interesting. So that's probably because it's gone, right? It doesn't show up in my logs either. Hang on, let me try something. What are the odds that I find this now — too much going on. Because if I redeploy — oh, it's over here. Hold on, if I redeploy, give me a sec. If we do `0.0.3`, redeploy the app… make sure I grab that. And if we run — oh, hang on, why didn't it do… yeah, so now it's back. So now if I go back here again and run that KV command — yeah, now I have two. Okay, so it literally just disappears from the bucket. Very interesting.
+
+**Brooks Townsend** [15:20](https://youtu.be/1pB61vbkoAo?t=920)
+
+Can you double-check what Lucas was saying? We did check that — there were no NATS issues there. This could definitely be the race condition, too. If you have a Docker container and a NATS server process — that's why I asked you to just run `ls` a couple of times, to balance between the two.
+
+**Mike** [15:43](https://youtu.be/1pB61vbkoAo?t=943)
+
+I'm running just all the OpenTelemetry stuff and the registry. That's all that's running.
+
+**Brooks Townsend** [15:52](https://youtu.be/1pB61vbkoAo?t=952)
+
+Yeah, okay. So if I had to guess — guessing is bad, but if I had to guess — when wadm deploys a new version of an application, we essentially do a diff to figure out the difference between what you have deployed and what's going to change. As you go to your version `0.0.2`, I think when the component updates, that's likely updating wadm state — it thinks, "oh, this component's updated, the image ref changed, I'm going to scale this component down, I'm going to delete the config that's associated with it, and then I'm going to scale the new one up." And I think there's got to be some piece of that that doesn't properly create the config again. Now, it shouldn't be deleting the config at all, in theory, because it didn't change.
+
+**Mike** [17:07](https://youtu.be/1pB61vbkoAo?t=1027)
+
+Maybe it's part of taking down the component — like, nobody else uses that config, we don't need it. I don't know, I haven't looked at the code.
+
+**Brooks Townsend** [17:15](https://youtu.be/1pB61vbkoAo?t=1035)
+
+That makes sense. There's basically this relationship where, in order for the component to start, the config has to exist. So in wadm, we create the config and then we create the component. It seems like there's something missing there. But this definitely seems like a bug. It looks like the updating from `0.0.1` to `0.0.2` worked in this scenario.
+
+**Mike** [17:45](https://youtu.be/1pB61vbkoAo?t=1065)
+
+Yeah. It seems like I can double-check that — I can deploy two components with two different logs, obviously two versions.
+
+**Brooks Townsend** [17:52](https://youtu.be/1pB61vbkoAo?t=1072)
+
+Yeah, we can see, because that sounds like a slightly separate issue. But I think this really just comes down to something in the upgrade logic in wadm computing a somewhat incomplete diff. Sounds like it.
+
+**Mike** [18:19](https://youtu.be/1pB61vbkoAo?t=1099)
+
+Should I try listening for lattice events?
+
+**Brooks Townsend** [18:24](https://youtu.be/1pB61vbkoAo?t=1104)
+
+Yeah. Whenever you're debugging any of this stuff, if you do a `nats sub` — `wasmbus.evt.>` — like the open angle bracket, the one pointing to the right. If you do this, it will listen to all of the events that happen in the wasmCloud system, like the cloud events. Most of these should be published out on traces too. But when you do a deploy, this is a really easy way to see, "oh, my component was scaled down, my config was deleted," whatever.
+
+**Mike** [19:22](https://youtu.be/1pB61vbkoAo?t=1162)
+
+`wasmbus.evt.>` — greater-than sign.
+
+**Brooks Townsend** [19:26](https://youtu.be/1pB61vbkoAo?t=1166)
+
+Yep, that's the one.
+
+**Mike** [19:29](https://youtu.be/1pB61vbkoAo?t=1169)
+
+Oh, hang on, we didn't do the context thing.
+
+**Brooks Townsend** [19:36](https://youtu.be/1pB61vbkoAo?t=1176)
+
+I was thinking it wouldn't be a problem if it's just a JetStream domain, but that's probably pointing up something weird.
+
+**Mike** [19:41](https://youtu.be/1pB61vbkoAo?t=1181)
+
+Something's weird. Let's try.
+
+**Brooks Townsend** [19:45](https://youtu.be/1pB61vbkoAo?t=1185)
+
+If you use `wash`, it usually drops you straight into a context.
+
+**Mike** [20:01](https://youtu.be/1pB61vbkoAo?t=1201)
+
+Okay, got a few. Okay, `config set`.
+
+**Brooks Townsend** [20:11](https://youtu.be/1pB61vbkoAo?t=1211)
+
+Yeah, so here you did the health-check status — that's just providers, host heartbeat happens every 30 seconds. But the only thing that happened on that deploy — what was the `config set`?
+
+**Mike** [20:23](https://youtu.be/1pB61vbkoAo?t=1223)
+
+That's for the Hello World custom. Oh, that's mine, I guess. Okay, cool. Maybe — okay, I'll open a bug. It's probably legit something that's not exactly right.
+
+**Brooks Townsend** [20:38](https://youtu.be/1pB61vbkoAo?t=1238)
+
+Yeah, that sounds great. Mike, thank you so much again for coming on and showing this. In that bug report, if you could include some of those events — you could get rid of any host heartbeats or whatever, but if you can show in the event log "oh, my component undeployed, new component got deployed, but then my config deleted and not sent" — that would be super helpful.
+
+**Mike** [21:09](https://youtu.be/1pB61vbkoAo?t=1269)
+
+Yeah, for sure. I'll make sure I put everything that's thrown in there. Thanks for helping me troubleshoot. Definitely got some new tools I can use to see what's going on. Maybe I'll figure it out.
+
+**Brooks Townsend** [21:18](https://youtu.be/1pB61vbkoAo?t=1278)
+
+For sure. Let me see — I think some of this would definitely be useful in our troubleshooting documentation, especially for folks who don't use NATS every day, or haven't used NATS before. If you haven't used NATS before, then some of that stuff might not be obvious — you might not know how to subscribe on a subject, you might not know what the specific event subjects are. We have some information on invoking components, we have some things with `wash`, which is good. But I don't know if we have anything on just general NATS debugging.
+
+Maybe, taking a step back, ideally you should have all of the information to track that down in your OpenTelemetry dashboards. Maybe that's a better North Star for us to shoot for.
+
+**Mike** [22:56](https://youtu.be/1pB61vbkoAo?t=1376)
+
+It's good. I've got a good way of, with a little bit of luck, making sure I capture everything. I'll make sure all the logs are in there, traces, everything, and then we'll see. I'll dig through the code as well — maybe I'll see something that stands out.
+
+**Brooks Townsend** [23:08](https://youtu.be/1pB61vbkoAo?t=1388)
+
+Yeah, that sounds great. If you wanted to pair on getting a solution, or need any pointers in the code too, happy to help.
+
+**Mike** [23:19](https://youtu.be/1pB61vbkoAo?t=1399)
+
+Yeah, sounds good. Thanks very much.
+
+**Brooks Townsend** [23:23](https://youtu.be/1pB61vbkoAo?t=1403)
+
+Yeah. I think I maybe dominated a lot of the talking there. Taylor, Lucas — do you guys have any other thoughts, speculation, things that Mike should dig into while he's here? Anybody's welcome.
+
+**Lucas Fontes** [23:42](https://youtu.be/1pB61vbkoAo?t=1422)
+
+Yeah, no, not really. I think getting the events there, playing with `nats sub`. And if you want to listen for everything, you can also just do `nats sub >` — the carrot, the greater-than — and then you're going to watch everything that's happening in the system, every single command going from wadm to the hosts. So that's probably the best way to start looking into this. Just one word of caution with the `nats sub` command: because you are subscribing, you are receiving the message, and sometimes you're taking away the message from the host that's supposed to be receiving it. So just keep that in mind, in terms of "no responders."
+
+**Mike** [24:27](https://youtu.be/1pB61vbkoAo?t=1467)
+
+Yeah, that's good to know. Thank you for that. I might have scratched my head on that if it happened. Nice. Cheers.
+
+**Brooks Townsend** [24:47](https://youtu.be/1pB61vbkoAo?t=1487)
+
+Alrighty. Well, that was actually the main agenda item that we had for today — just to make sure we had some good time to chat through any potential issues and talk about wadm. I think that's all I had on the agenda. Does anybody have anything they wanted to bring up from the roadmap or from the broader Wasm ecosystem that we should talk about today?
+
+**Brooks Townsend** [25:32](https://youtu.be/1pB61vbkoAo?t=1532)
+
+Alrighty. Well, hey, we'll call it the shortest wasmCloud community meeting of August so far. Thanks everybody for coming out and chatting, and thank you again, Mike, for coming on and chatting with us in the community meeting. Just a note for everybody: you're always welcome to propose these kinds of discussions — "Hey, I'm running into an issue, can you just help me out with it?" Always happy to do it in this kind of forum. It's a great place to do it. With that, I think we'll call it for today. Happy Wednesday. Have a wasmCloud day, everybody. See you next week.
