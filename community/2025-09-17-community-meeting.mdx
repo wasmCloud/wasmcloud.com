@@ -1,49 +1,135 @@
 ---
 date: '2025-09-17'
-title: 'Meeting Agenda - 2025-09-17'
-description: 'wasmCloud community call presenting the consolidated wasmcloud crate, a simplified workload-based Host API, host plugins for built-ins, and wasmCloud next.'
+title: 'wasmCloud V2: The Wasm Component Model & a Simplified Host'
+description: "wasmCloud V2 community call: a simplified Host API built on the Wasm component model, host plugins replacing built-in providers, and in-process component calls."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasm components
+  - wasmtime webassembly runtime
+  - wasm runtime autoscaling
+  - webassembly news
+chapters:
+  - { seconds: 0, label: "Welcome and pre-call" }
+  - { seconds: 153, label: "Agenda: introducing wasmCloud V2 / wasmCloud Next" }
+  - { seconds: 258, label: "The crate-consolidation PR and a simplified Host API" }
+  - { seconds: 732, label: "Q&A: making the wRPC layer an opt-in host plugin" }
+  - { seconds: 930, label: "C4 system-context diagram and the three personas" }
+  - { seconds: 1140, label: "Application-services diagram: the wasmcloud crate internals" }
+  - { seconds: 1320, label: "Embedding wasmCloud: the WASI WebGPU plugin use case" }
+  - { seconds: 1678, label: "Q&A: host capabilities, heartbeats, and linking" }
+  - { seconds: 1950, label: "Host plugins in the Wasmtime linker and the wash dev loop" }
+  - { seconds: 2069, label: "In-process component-to-component calls and the trampoline" }
+  - { seconds: 2512, label: "Q&A: footprint, efficiency, and crossing host boundaries" }
+  - { seconds: 3086, label: "The next version of the docs and closing remarks" }
+image: https://i.ytimg.com/vi/vTbKtMkWxBQ/maxresdefault.jpg
+showTitle: true
+slug: 2025-09-17-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- DEMO + DISCUSSION: [wasmCloud crate consolidation](https://github.com/wasmCloud/wash/pull/73)
-- DISCUSSION: A view of the new wasmCloud + wash crates in wasmCloud architecture diagrams
-- DISCUSSION: wasmCloud "next"
+<YouTube url="https://www.youtube.com/watch?v=vTbKtMkWxBQ" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=vTbKtMkWxBQ" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The September 17, 2025 wasmCloud community call is a deep dive into **wasmCloud V2** — also called wasmCloud Next — Brooks Townsend's proposal for a "radical simplification" of the platform. He walks through a pull request that introduces a consolidated `wasmcloud` crate (merging the host, runtime, and core libraries), a simplified **Host API** focused on scheduling workloads built from **[WebAssembly components](/docs/overview/workloads/components/)**, **host plugins** that replace built-in capability providers and make the wRPC transport opt-in, and **in-process component-to-component calls** for components running on the same host. Brooks presents C4-style architecture diagrams for the new model, and Eric Gregory previews a `next` version of the docs.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **wasmCloud V2 is a simplification, not a disruption.** Brooks framed "V2 / Next" as evolving past the current 1.x line (which has been stable for ~18 months, through 1.9) rather than a wave of breaking changes — the goal is to focus wasmCloud on what it does best: being a great **WebAssembly application runtime**.
+- **A consolidated `wasmcloud` crate** merges the previously separate host, runtime, and core Rust libraries into a single library-plus-binary crate, making it much easier to add features, embed wasmCloud, or extend the host without cloning and patching internals.
+- **The simplified Host API** is a trait for scheduling *workloads* — declarative collections of WebAssembly components and configuration, conceptually a [wadm](https://wasmcloud.com/docs/) application rolled forward with cleaner separation of concerns.
+- **Host plugins wholesale replace built-in capability providers.** They participate in the **[Wasmtime](https://wasmtime.dev/)** linker, can be feature-flagged on or off, and crucially make the **wRPC transport itself an opt-in plugin** rather than a hard requirement.
+- **In-process component-to-component calls** let components in the same workload talk directly through a lightweight linker "trampoline," avoiding a round trip over the NATS/wRPC transport for low-latency local calls.
+- **Running NATS Jetstream is no longer prescribed at the host level.** The host is responsible only for its own workloads; a control plane such as wadm or the **[Kubernetes operator](/docs/kubernetes-operator/)** handles scheduling and distribution.
+- **Distribution stays OCI-based and efficient.** Components are still pulled from an OCI registry, cached locally, and held as pre-compiled, pre-instantiated instances — with an instance pool planned to drive startup latency down further.
+- **The docs are getting a `next` version** built iteratively alongside Wasm Shell (the next generation of `wash`), using the community Excalidraw library for the new architecture diagrams.
+
+## Chapters
+
+- [0:00 — Welcome and pre-call](https://youtu.be/vTbKtMkWxBQ?t=0)
+- [2:33 — Agenda: introducing wasmCloud V2 / wasmCloud Next](https://youtu.be/vTbKtMkWxBQ?t=153)
+- [4:18 — The crate-consolidation PR and a simplified Host API](https://youtu.be/vTbKtMkWxBQ?t=258)
+- [12:12 — Q&A: making the wRPC layer an opt-in host plugin](https://youtu.be/vTbKtMkWxBQ?t=732)
+- [15:30 — C4 system-context diagram and the three personas](https://youtu.be/vTbKtMkWxBQ?t=930)
+- [19:00 — Application-services diagram: the wasmcloud crate internals](https://youtu.be/vTbKtMkWxBQ?t=1140)
+- [22:00 — Embedding wasmCloud: the WASI WebGPU plugin use case](https://youtu.be/vTbKtMkWxBQ?t=1320)
+- [27:58 — Q&A: host capabilities, heartbeats, and linking](https://youtu.be/vTbKtMkWxBQ?t=1678)
+- [32:30 — Host plugins in the Wasmtime linker and the wash dev loop](https://youtu.be/vTbKtMkWxBQ?t=1950)
+- [34:29 — In-process component-to-component calls and the trampoline](https://youtu.be/vTbKtMkWxBQ?t=2069)
+- [41:52 — Q&A: footprint, efficiency, and crossing host boundaries](https://youtu.be/vTbKtMkWxBQ?t=2512)
+- [51:26 — The next version of the docs and closing remarks](https://youtu.be/vTbKtMkWxBQ?t=3086)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### wasmCloud V2 and the Consolidated `wasmcloud` Crate
 
-### DISCUSSIONS: wasmCloud crate consolidation and wasmCloud next
+Brooks opened the deep dive on **wasmCloud V2** (a.k.a. wasmCloud Next) by walking through [a pull request he opened in the `wash` repository](https://github.com/wasmCloud/wash/pull/73) consolidating the libraries used to run wasmCloud. He was careful to defuse any "big breaking change" anxiety: the version label simply reflects that the **`wasmcloud` crate** itself was already on 1.9, and this is the next step in its evolution. The change introduces a single library-and-binary crate that **consolidates the host, runtime, and core libraries** that had previously been maintained as separate internal crates — a separation Brooks said wasn't productive for adding features, embedding wasmCloud, or extending the host.
 
-- Brooks presented plans for the radical simplification of APIs and architecture, and a consolidation of crates in support of that goal. He covered [his PR](https://github.com/wasmCloud/wash/pull/73) introducing the new `wasmcloud` crate.
-- The `wasmcloud` crate consolidates host, runtime, and core libraries into a single crate
-- The new crate aims to...
-   * Introduce a simplified Host API focused on scheduling "workloads" (collections of components with configuration)
-   * Replace built-in capability providers with host plugins for easier extension
-   * Make the wRPC layer optional and plugin-based
-   * Support in-process component-to-component calls for components running on the same host
-- Benefits and improvements from the new approach include...
-  * Simpler API surface for deploying and managing components
-  * No requirement to run NATS for local development
-  * Host plugins enable extending wasmCloud without modifying core code
-  * Performance improvements through direct component-to-component calls
-  * Better separation of concerns: wasmCloud focuses on being the best WebAssembly application runtime
-  * Still maintains OCI-based component distribution
+At the heart of the proposal is a **simplified Host API**: internally just a trait, implemented on the host, that supports scheduling *workloads*. A workload is a declarative collection of **[WebAssembly components](/docs/overview/workloads/components/)** plus configuration with a name and namespace — "essentially the idea of a wadm app rolled forward with a better degree of separation." The crate's *engine* is a loose wrapper around **[Wasmtime](https://wasmtime.dev/)**, responsible for linking a workload's components into the Wasmtime linker so they can use WASI interfaces and call each other.
 
-### DISCUSSION: `next` version in docs
+### Host Plugins and an Opt-In wRPC Transport
 
-- Eric has a [PR up](https://github.com/wasmCloud/wasmcloud.com/pull/987) creating a "next" version of docs along with initial documentation for Wasm Shell, the next generation of `wash`
-- Documentation will be iteratively updated to reflect the new architecture
-- New system context and application service diagrams created to explain the architecture
-- Community Excalidraw library being used and expanded for architecture diagrams
+The biggest architectural shift is **[host plugins](/docs/overview/hosts/plugins/)**, a near-wholesale replacement for built-in capability providers. Today, baking capabilities into the host means cloning the host repo and modifying internal code; the plugin mechanism instead lets you embed the host and extend it statically. Built-in behaviors like WASI logging become plugins that can be feature-flagged off, and — answering a question from **Taylor Thomas** — the **wRPC layer itself becomes an opt-in transport plugin**. Workloads declare, per set of interfaces, whether calls should go over wRPC (and thus over a NATS message bus or TCP socket) or be satisfied locally. That makes wasmCloud deliberate about exactly which interfaces cross the network boundary, and removes the requirement to run NATS for local development.
 
-## Recording
+### C4 Architecture Diagrams and the Three Personas
 
-{/* Automated - No need to adjust this unless automation fails */}
+Brooks introduced **C4-style architecture diagrams** (renaming the awkward "container" layer to "application services") to communicate the new model. The **system context** layer covers three ways people interact with the platform: the **developer**, who `curl`-installs `wash` and uses build/dev commands before pushing to an **OCI registry**; the **edge deployer**, who runs wasmCloud as a plain binary (or systemd service) executing multiple workloads; and the **platform engineer**, who deploys wasmCloud on **[Kubernetes](/docs/kubernetes-operator/)** via an operator and the Kubernetes API server. A key boundary he drew: in Kubernetes, wasmCloud runs as a normal container (the WebAssembly is *not* executed on containerd), and wRPC extensions run as their own containers or sidecars rather than as host-spawned binaries. The diagrams were built with the community Excalidraw library that Eric Gregory and Aditya have been assembling.
 
-<YouTube url="https://www.youtube.com/watch?v=vTbKtMkWxBQ" />
+### In-Process Component-to-Component Calls
+
+A roadmap item Brooks demonstrated as working in the new crate is **in-process component-to-component calls**. Today every invocation travels over the NATS/wRPC transport; in V2, when a workload's components share matching imports and exports, the host resolves those dependencies locally and wires them together with a lightweight **linker "trampoline."** His example used a component importing `wasi:blobstore` paired with a `blobstore-filesystem` component that *exports* `wasi:blobstore` (backed by `wasi:filesystem`): a `create-container` call is trampolined to a freshly instantiated filesystem component, which is then reused across the workload's lifecycle. For components that end up running remotely, the same call can fall back to the wRPC plugin (over NATS) or to HTTP / message-bus capabilities — Brooks noted teams often already have a service mesh and prefer routing over HTTP.
+
+### Efficiency, Footprint, and the `next` Docs
+
+**Frank Schaffa** pressed on whether the new features compromise WebAssembly's fast-start, small-footprint value. Brooks confirmed component handling is essentially unchanged: artifacts are still pulled from **OCI**, cached on disk, and held as pre-compiled, pre-instantiated instances, with a planned **instance pool** to trade a little memory for near-zero startup latency. Frank also raised leveraging existing platforms like Kubernetes to accelerate adoption, which Brooks welcomed. Finally, **Eric Gregory** previewed a [`next` version of the docs](https://github.com/wasmCloud/wasmcloud.com/pull/987), built iteratively alongside Wasm Shell (the next generation of `wash`), starting from the key developer and operator flows.
+
+## WebAssembly News and Updates
+
+This call is a window into how the wasmCloud project is rethinking its core architecture around the **Wasm component model**. The headline is the consolidated `wasmcloud` crate and a simplified [Host API](/docs/runtime/) that treats a *workload* — a set of [WebAssembly components](/docs/overview/workloads/components/) plus configuration — as the fundamental unit of deployment. The move to [host plugins](/docs/overview/hosts/plugins/) and an opt-in wRPC transport, combined with in-process component-to-component calls, points toward a leaner runtime that can run as a single process with no mandatory NATS dependency for local development. Brooks also flagged that WASI Preview 3 work was actively moving at the time of the call; for the broader picture, see the wasmCloud post on [WASI Preview 3 on wasmCloud](/blog/wasi-p3-on-wasmcloud/). For ongoing updates, follow the [wasmCloud blog](https://wasmcloud.com/blog/) and the [Bytecode Alliance](https://bytecodealliance.org/).
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/overview/workloads/components/) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](https://component-model.bytecodealliance.org/) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, C#, and more) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable provider architecture. wasmCloud's reference host is built on [Wasmtime](https://wasmtime.dev/), and — as this call shows — it is evolving toward a consolidated, embeddable runtime with [host plugins](/docs/overview/hosts/plugins/) and a simplified Host API. With built-in OpenTelemetry observability and [Kubernetes integration](/docs/kubernetes-operator/), wasmCloud bridges WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
+
+## Topic Deep Dive: The Wasm Component Model
+
+Nearly every design choice in this meeting traces back to the **[Wasm component model](https://component-model.bytecodealliance.org/)**. The simplified Host API schedules *workloads* — collections of [components](/docs/overview/workloads/components/) — and the engine's main job is to link those components into the Wasmtime linker so they can import and export typed [interfaces](/docs/overview/interfaces/) (WASI and beyond). Host plugins work because they participate in that same linker: a plugin that implements `wasi:keyvalue` is, from the component's perspective, indistinguishable from any other host function. The in-process component-to-component story is the component model taken to its logical conclusion — when two components in a workload have matching imports and exports, wasmCloud can satisfy the dependency *directly*, trampolining one component's call into another with no network hop. That same typed-interface contract is what lets a call gracefully fall back to wRPC-over-NATS when the components live on different hosts. As the platform leans harder into the component model, the unit of deployment, linking, and routing all converge on the same primitive: a [WebAssembly component](/docs/overview/workloads/components/) with a well-defined interface.
+
+## Who Should Watch This
+
+This call is especially valuable for **platform engineers and operators** evaluating where wasmCloud is heading — the simplified Host API, host plugins, and the consolidated crate (start with the PR walkthrough at [4:18](https://youtu.be/vTbKtMkWxBQ?t=258)); **architects** weighing in-process versus distributed component communication and the move to an opt-in wRPC transport (the trampoline deep dive at [34:29](https://youtu.be/vTbKtMkWxBQ?t=2069)); and **runtime and Rust developers** interested in embedding or extending the wasmCloud host, including the WASI WebGPU plugin use case (at [22:00](https://youtu.be/vTbKtMkWxBQ?t=1320)).
+
+## Up Next
+
+The next two community calls were set to be hosted by others while Brooks was on vacation, with plans to dive deeper into the Kubernetes story and the moving pieces in WASI Preview 3. Watch for continued iteration on the consolidated `wasmcloud` crate, the [`next` docs version](https://github.com/wasmCloud/wasmcloud.com/pull/987), and the [crate-consolidation PR](https://github.com/wasmCloud/wash/pull/73) landing in `wash`.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2025-09-17-community-meeting-transcript/)**

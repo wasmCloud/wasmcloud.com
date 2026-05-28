@@ -9,7 +9,7 @@ description: "Recapping wasmCloud's Q3 2025 roadmap: a slimmer host, rethinking 
 
 ![Q3 2025 Roadmap Recap](./images/q3-2025-roadmap-recap.webp)
 
-Every quarter, wasmCloud maintainers, contributors, and users gather in the [wasmCloud community meeting](/community/) to define the roadmap for the quarter ahead. [Last week](/community/2025/07/09/community-meeting/), we talked through our goals for the project in Q3&mdash;in this blog, we'll recap the major initiatives that emerged from the meeting.
+Every quarter, wasmCloud maintainers, contributors, and users gather in the [wasmCloud community meeting](/community/) to define the roadmap for the quarter ahead. [Last week](/community/2025-07-09-community-meeting/), we talked through our goals for the project in Q3&mdash;in this blog, we'll recap the major initiatives that emerged from the meeting.
 
 ## Reduce complexity in the wasmCloud host
 

@@ -1,0 +1,445 @@
+---
+date: '2025-09-10'
+title: 'Transcript: Wasm Component Model: Plugins, Shared Memory & WASI 0.3'
+description: 'Full transcript of the September 10, 2025 wasmCloud community call covering host plugins, system time zones in Wasmtime, shared memory, and the road to WASI 0.3.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasi p3
+  - wasmtime
+  - host plugins
+  - first class functions
+  - webassembly news
+image: https://i.ytimg.com/vi/BtOseiHpgmk/maxresdefault.jpg
+showTitle: true
+slug: 2025-09-10-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-09-10-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=BtOseiHpgmk" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=BtOseiHpgmk" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Sep 10, 2025 · 48 minutes*
+
+**Speakers:** Brooks Townsend, Colin Murphy, Victor Adossi
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [00:04](https://youtu.be/BtOseiHpgmk?t=4)
+
+Hey, Brooks. Hey, Jeremy, how's it going? Good. Hey, nice polo. Thanks.
+
+<img src="/img/community/2025-09-10/image001.webp" alt="wasmCloud Weekly Community Call participants on the September 10, 2025 Zoom" />
+
+**Brooks Townsend** [00:16](https://youtu.be/BtOseiHpgmk?t=16)
+
+Wow. I couldn't really see your cup. The way the window hit it, it almost looked like a stout — like a little Guinness. Now I kind of want one. It's five o'clock somewhere; it's the international meeting. I used to have an espresso machine with those little pods, and the mugs were clear glass, so it always looked like I was drinking a Guinness first thing in the morning back when I was on Critical Stack. Jason probably remembers that. Well, hey, Colin — this one is probably going to be a little short. I didn't actually have an agenda. I've been pretty heads-down on the runtime piece we talked about last week, like the wasmCloud host API, and Lucas has been working on the wasmCloud runtime operator, the Kubernetes operator.
+
+**Colin Murphy** [01:40](https://youtu.be/BtOseiHpgmk?t=100)
+
+Oh, yeah.
+
+**Brooks Townsend** [01:42](https://youtu.be/BtOseiHpgmk?t=102)
+
+It's actually open source, and we're just trying to figure out when to move it over.
+
+**Colin Murphy** [01:46](https://youtu.be/BtOseiHpgmk?t=106)
+
+So that's great. It'd be good — I know I don't know if it's more of a this-kind-of-meeting thing, but we'll have a good little review for it pretty soon. It's great. Are we going to stream this? Is it being streamed right now?
+
+**Brooks Townsend** [02:09](https://youtu.be/BtOseiHpgmk?t=129)
+
+It's not being streamed right now, but we will. It's just going to be really quick, and then we can chat after if you want.
+
+**Colin Murphy** [02:15](https://youtu.be/BtOseiHpgmk?t=135)
+
+That's okay. I guess I could chat after.
+
+**Brooks Townsend** [02:20](https://youtu.be/BtOseiHpgmk?t=140)
+
+Chat during too. But yeah, I think you may be interested — were you doing something like forking wasmCloud to add WASI WebGPU for a demo? It's upcoming.
+
+**Colin Murphy** [02:37](https://youtu.be/BtOseiHpgmk?t=157)
+
+Oh, yeah, I did. I did that. I added something. It isn't really the adding-to-wasmCloud part, because it looks like Wasmtime, right? So it's super easy to add the linker. But the actual getting all the calls of WebGPU mapped into an actual WASI — that's still ongoing.
+
+**Brooks Townsend** [03:17](https://youtu.be/BtOseiHpgmk?t=197)
+
+Yeah, you may be interested in some of the different surface API that the host can tap into, because you'd be able to do that without forking wasmCloud and going down to the runtime piece. There's a new facility for just providing a plugin. You'd have your little Rust binary, you embed the host — but we can talk about that later. All the work you're doing now to implement all those calls to the GPU, all of that carries over exactly. It's the same linker mechanism.
+
+**Colin Murphy** [03:53](https://youtu.be/BtOseiHpgmk?t=233)
+
+Oh yeah, I figured. I mean, ideally what I do for the talk is show it running completely in WebAssembly, and then also have it call to the ONNX runtime — running in a provider — just a pros-and-cons kind of thing.
+
+**Brooks Townsend** [04:13](https://youtu.be/BtOseiHpgmk?t=253)
+
+Yeah, sure. Okay, we can talk more later, but I'm just going to hop on. All right.
+
+**Colin Murphy** [04:21](https://youtu.be/BtOseiHpgmk?t=261)
+
+I'm going to go off video, at least.
+
+**Brooks Townsend** [04:23](https://youtu.be/BtOseiHpgmk?t=263)
+
+Don't do it. Don't make me alone.
+
+**Colin Murphy** [04:25](https://youtu.be/BtOseiHpgmk?t=265)
+
+I know, I feel bad. But I also hate seeing myself on video, so it's very difficult. You put me in quite a conundrum.
+
+**Brooks Townsend** [04:32](https://youtu.be/BtOseiHpgmk?t=272)
+
+Yeah. Well, the pressure is on. Hey everybody, welcome to wasmCloud Wednesday, for Wednesday, September 10. I think the only agenda item we had today was no agenda items — so I guess all we're really responsible for is trying to host the quickest, fastest wasmCloud community meeting ever, which we could do. There hasn't been any new blogs that I wanted to call out, like, "hey, go check this out, go take a read." On the wasmCloud side we've really just been heads-down on some of these last items on the Quarter 3 roadmap. So as we look forward, it should be pretty exciting. I don't know if folks on the call — Colin, Jeremy, Eric — had anything you wanted to bring up from wasmCloud or from the broader Wasm ecosystem. Speak now or hold your peace.
+
+<img src="/img/community/2025-09-10/image002.webp" alt="Brooks Townsend kicking off wasmCloud Wednesday for September 10" />
+
+**Colin Murphy** [06:01](https://youtu.be/BtOseiHpgmk?t=361)
+
+Well, you did the team thing.
+
+**Brooks Townsend** [06:03](https://youtu.be/BtOseiHpgmk?t=363)
+
+Yeah, nice. Is that a virtual background?
+
+**Colin Murphy** [06:07](https://youtu.be/BtOseiHpgmk?t=367)
+
+No, that's why I turned off the camera — the cats aren't coming around virtual backgrounds, I think.
+
+**Brooks Townsend** [06:13](https://youtu.be/BtOseiHpgmk?t=373)
+
+Right, y'all. Well, quick meeting today, but we should just be saving up the fun stuff for next week. So thanks, everybody. Have a great rest of your wasmCloud Wednesday. Bye — easy peasy.
+
+**Colin Murphy** [06:32](https://youtu.be/BtOseiHpgmk?t=392)
+
+Yeah, I've been working on the time-zone thing.
+
+**Brooks Townsend** [06:35](https://youtu.be/BtOseiHpgmk?t=395)
+
+Oh yeah?
+
+**Colin Murphy** [06:37](https://youtu.be/BtOseiHpgmk?t=397)
+
+WASI clocks. It's been pretty frustrating. We're like a year and a half from getting these ECMA folks to finish rewriting our WASI interface, and then they just changed the name. I think it's fine — what they're doing is correct, so I don't want to complain, but the way the Wasmtime repository is set up, you change the name of something and that propagates through all these binding files. And it's like, do we really want to, just because you don't like the name? I asked Roman if he wrote back. And then the time-zone thing — I actually got into a little bit of a thing with Roman, because I came off a little harsh. I was just like, why do we need to set the *system* time zone? That kept coming up. Nothing else does that — Docker doesn't do that. It's kind of like a time-based attack, a "kick-me sign": if you can spin up a Wasm one time with one time zone, and then kick the same one with a different time zone — you know what I mean. And he's like, "yeah, but then you'd have to have access to the full runtime." I'm like, have you ever talked to a security person? The number of times I've said "they'd have to have access to the runtime" and they'd be like, "no, I don't care." He didn't like that. I was kind of joking — kind of — but it was not enthusiastic after I said that. Anyway, it was such a minor point, and time zones aren't even landing until 0.3, so whatever. But it'll be completely different. The new time-zone interface could be much better, but it's hard to tell where people are coming from, because they're like, "why do you want that?" I'm just trying to provide the system time zone, you know? I'm just trying to do this one thing.
+
+**Brooks Townsend** [09:21](https://youtu.be/BtOseiHpgmk?t=561)
+
+Yeah, that seems to be kind of a recurring theme — that to land something in Wasmtime or in WASI, you have to reach pretty extreme consensus, and it has to be correct. So I don't blame them.
+
+**Colin Murphy** [09:41](https://youtu.be/BtOseiHpgmk?t=581)
+
+No, I don't blame anyone. But it's very frustrating to have something out for a year and a half. We're talking about, like, five lines. At some point it's death by a thousand cuts. Maybe people aren't asking for it — maybe people are like, "I don't really need the system time zone." That was kind of implied by a lot of the comments. Because if you run Alpine, the slim image, and ask for the time zone, it gives you UTC, because it doesn't have the time-zone database in the base image. So if that's the way things work and nobody really needs the system time zone, then I guess we don't need it — but we should just say that. Don't provide a means to get the system time zone and then have it not give you the system time zone by default. I'd rather have that than get UTC and call it a day.
+
+**Brooks Townsend** [10:47](https://youtu.be/BtOseiHpgmk?t=647)
+
+Well, that's the way it works now.
+
+**Colin Murphy** [10:50](https://youtu.be/BtOseiHpgmk?t=650)
+
+That doesn't require a pull request. For Rust, if jiff can't find the system time zone, it gives you UTC. There's a `system` call that tries to get the system time zone, and if it can't, it gives you UTC; and then there's a `try_system` that throws an error if it can't bind. So that would fail for you. I don't want to change that behavior. It'll be a flag, right? Like "use system time zone" or something — I forget the name; Roman had an idea for the flag name that seemed fine. But you can't fake it: when you put the flag on, you're looking for the system time zone. So it seems like such a basic issue that even I can stay on top of it — as opposed to, usually, we have a conversation, two months go by, we try to have the same conversation, and I have no idea what I could have said last time. Hello, Aditya and Ahmed.
+
+**Brooks Townsend** [12:10](https://youtu.be/BtOseiHpgmk?t=730)
+
+Hey folks. This is actually —
+
+**Colin Murphy** [12:12](https://youtu.be/BtOseiHpgmk?t=732)
+
+This is just a Colin Murphy bitching session.
+
+**Brooks Townsend** [12:18](https://youtu.be/BtOseiHpgmk?t=738)
+
+We actually made a quick agenda today, so it was easy peasy, but good to see you guys. Glad we hung out for a couple more minutes to say hey.
+
+**Colin Murphy** [12:32](https://youtu.be/BtOseiHpgmk?t=752)
+
+But you were saying, Brooks?
+
+**Brooks Townsend** [12:40](https://youtu.be/BtOseiHpgmk?t=760)
+
+Yeah. I was just thinking that maybe it's hard to add these things to Wasmtime — and it's a good opportunity for wasmCloud to provide a better experience. If you could have a little plugin that gets you the system time and is always available — because, like you said, it's five lines; you're just trying to make a WIT interface available. That's hard, you know — Wasmtime doesn't have a native plugin model, and wasmCloud only supports it if you build this whole provider thing.
+
+**Colin Murphy** [13:21](https://youtu.be/BtOseiHpgmk?t=801)
+
+So that's what you're doing now — you've got a plugin model, not just for wash, but for Wasm. That'll allow people to go faster.
+
+**Brooks Townsend** [13:32](https://youtu.be/BtOseiHpgmk?t=812)
+
+There are built-in plugins. You've got to write a Rust binary, but that's the interim step. Maybe we could do dynamic libraries or something later.
+
+**Colin Murphy** [13:45](https://youtu.be/BtOseiHpgmk?t=825)
+
+The problem really is that it's almost like the layer model — we're talking about the bottom layer. But for people to actually use this thing, it can't just be the bottom layer. You actually need jiff and chrono to have this in there, in those crates, right? They're not going to put anything in their crate that's not in Wasmtime. So unless you're doing the fork — remember, I did that talk with CTOPaaS, like three years ago now, and I was like, "these are all the crates I had to fork in order to get this working."
+
+**Brooks Townsend** [14:32](https://youtu.be/BtOseiHpgmk?t=872)
+
+Yeah, so it's a great problem — talking about the wrong thing.
+
+**Colin Murphy** [14:36](https://youtu.be/BtOseiHpgmk?t=876)
+
+So it's good that you can do a plugin, but not for this kind of stuff, because people aren't going to be like, "oh, I'll fork chrono," or "I'll fork tz," or "I'll fork std fs."
+
+**Brooks Townsend** [14:51](https://youtu.be/BtOseiHpgmk?t=891)
+
+I know, yeah. That's like — there was that really small thing when I was trying to… hey, Victor, we're post-call now. We're in the Colin Murphy bitching session.
+
+**Colin Murphy** [15:05](https://youtu.be/BtOseiHpgmk?t=905)
+
+I'm just complaining.
+
+**Brooks Townsend** [15:08](https://youtu.be/BtOseiHpgmk?t=908)
+
+I remember needing to put up an upstream PR into the `url` crate and one other super-low-level crate, just like, "hey, if you add this, then it doesn't fail to compile on stable."
+
+**Colin Murphy** [15:24](https://youtu.be/BtOseiHpgmk?t=924)
+
+ring had a bunch of those.
+
+**Brooks Townsend** [15:27](https://youtu.be/BtOseiHpgmk?t=927)
+
+ring, yeah.
+
+**Colin Murphy** [15:28](https://youtu.be/BtOseiHpgmk?t=928)
+
+Many such things. Yeah, many such things.
+
+**Brooks Townsend** [15:40](https://youtu.be/BtOseiHpgmk?t=940)
+
+That's why — I don't know if you talked to Liam lately, but I've been so geeked about Hono, because a lot of that routing stuff just works. That kind of thing is really cool to see. I think we've got to find that equivalent in Rust too.
+
+**Colin Murphy** [16:01](https://youtu.be/BtOseiHpgmk?t=961)
+
+Good luck. But yeah, that'd be good. The Hono stuff was really nice — and Bailey, all the stuff she's been working on around Hono and WinterCG, that's great stuff. I think, for better or worse, my role on all this is to not be myopic, because I actually have a real software project. I have people complaining about why the heck we have WASI in this repository, and I have to justify it. Anytime there's a `cfg(target_os = "wasi")` and you put that in the repository, you're just asking for trouble. And I know that might sound similar to some of the people who are against Wasmtime and WASI in general — those people I'm not going to name — but it's not. I think it's "respect the sandbox, respect the runtime." But if you pass those things into the runtime and give it access, it should just work. Sometimes when you're working at the Wasmtime level, using Wasmtime directly, you lose sight of that. I'm not even calling anyone out — I'm just saying.
+
+**Brooks Townsend** [17:41](https://youtu.be/BtOseiHpgmk?t=1061)
+
+That's fair. This is really why I was encouraging you the other day to go chat with Luke and give us feedback — because he's a real person trying to use Wasm for a real thing. So the feedback, even if it's constructive criticism, is good. It really helps everybody who's working on it to hear what stinks. I've certainly heard my share of things about wasmCloud that could be better.
+
+**Colin Murphy** [18:21](https://youtu.be/BtOseiHpgmk?t=1101)
+
+I'm looking forward to seeing 0.3 — to see if it actually does all the things. Because we've been saying a lot of "once we have 0.3 this will be easy," especially around mio and Tokio and so many things. WASI crypto, everything that people have been asking for for many years — "oh, well, once we have futures and async, that'll be easy to do." Well, the proof's in the pudding.
+
+**Brooks Townsend** [19:01](https://youtu.be/BtOseiHpgmk?t=1141)
+
+That's true. Did you see Roman's demo a couple months back? It was accepting incoming connections on a socket and then hitting SQLx over a socket, async — basically a branch of P3.
+
+**Colin Murphy** [19:15](https://youtu.be/BtOseiHpgmk?t=1155)
+
+Yeah, I didn't see it, but I've talked about it with people. I think the socket thing — I know what we were thinking with sockets specifically was first SQL stuff.
+
+**Brooks Townsend** [19:33](https://youtu.be/BtOseiHpgmk?t=1173)
+
+Yeah, some of these are going to be really impressive.
+
+**Colin Murphy** [19:37](https://youtu.be/BtOseiHpgmk?t=1177)
+
+But I think it'd be good for — sorry, I can't both listen and think of new things at the same time. Does it work for wRPC? The sockets should also work for wRPC, because wRPC works at the socket layer too — I think; I might be wrong. I believe so. If sockets only works for SQL clients, then it's not really sockets, it's SQL sockets. I don't know if it works for wRPC or not, but I should probably try that out.
+
+**Brooks Townsend** [20:21](https://youtu.be/BtOseiHpgmk?t=1221)
+
+I think it's just regular sockets, and Roman was just using SQLx as an example.
+
+**Colin Murphy** [20:26](https://youtu.be/BtOseiHpgmk?t=1226)
+
+Yeah, no, I know — I trust the process. But Victor, did you have any idea — what time is it, Victor?
+
+**Victor Adossi** [20:39](https://youtu.be/BtOseiHpgmk?t=1239)
+
+Right now it's like 2 a.m.
+
+**Colin Murphy** [20:46](https://youtu.be/BtOseiHpgmk?t=1246)
+
+Yeah, I knew it wasn't 2 a.m. — not gonna try to correct you. Well, I mean, it wasn't like Victor Adossi time zone.
+
+**Victor Adossi** [20:58](https://youtu.be/BtOseiHpgmk?t=1258)
+
+Yeah, the socket stuff is interesting, because Joel is also not super hopeful for some of the PRs that are out to Tokio and stuff like that — driving comments and all that. But it's one of those things that probably will eventually land, right? At this point it's just that people don't… but it is a big thing that basically has to happen. Rust has POSIX support, sockets are part of POSIX support — like, sockets work on P2, right? So there is a socket implementation out there now. Eventually all those platforms that say they have support will need to do something. So it feels like it's only a matter of time. But the demo is still impressive. I think a lot of people are using some of this tech and just not talking about it — they ask really intense questions on Zulip about very specific things, and then disappear again.
+
+**Colin Murphy** [22:24](https://youtu.be/BtOseiHpgmk?t=1344)
+
+Those people are properly integrated and oriented between the things that provide them with a paycheck and — unlike us. We're the suckers.
+
+**Victor Adossi** [22:41](https://youtu.be/BtOseiHpgmk?t=1361)
+
+It's funny, yeah.
+
+**Colin Murphy** [22:47](https://youtu.be/BtOseiHpgmk?t=1367)
+
+No, but the 0.3 sockets are going to be a lot, right? My understanding is that's going to make things a lot easier for me.
+
+**Victor Adossi** [22:55](https://youtu.be/BtOseiHpgmk?t=1375)
+
+Oh yes, for a lot of reasons. One of the big reasons is you can't really mix IO from multiple components across multiple boundaries, because of how resources essentially are — it just doesn't work cleanly; you have to shim stuff. That's obviously the big thing. And it feels like people really want to express interfaces with the P3 semantics. Streams are a thing in many languages, and that kind of functionality is pretty important — P3 is finally going to bring it around. For example, wasi-virt right now is basically not being updated because we're just waiting for P3 to land.
+
+**Colin Murphy** [24:03](https://youtu.be/BtOseiHpgmk?t=1443)
+
+That's true with the clock stuff, because I went and made a PR for something that had been in P2 forever — and this is actually not complaining, because this was smart. Alex was like, "look, it's been in P2 forever, let's actually implement what's been in WASI clocks forever," and then he was like, "well, let's just wait for P3." So even though it's been in 0.2 — should have been implemented two years ago for time zones — he's like, "yeah, let's just wait." So we'll just wait.
+
+**Victor Adossi** [24:41](https://youtu.be/BtOseiHpgmk?t=1481)
+
+It's almost here, almost here.
+
+**Colin Murphy** [24:44](https://youtu.be/BtOseiHpgmk?t=1484)
+
+Maybe in time for WasmCon? That'd be good, actually, if it was done by WasmCon.
+
+**Victor Adossi** [24:53](https://youtu.be/BtOseiHpgmk?t=1493)
+
+When is WasmCon this year?
+
+**Colin Murphy** [24:55](https://youtu.be/BtOseiHpgmk?t=1495)
+
+It's Veterans Day, November. I'm on the veterans board for my town, and they're like, "where are you going to be?" I'm like, "not here." So that was not good. But yeah, Veterans Day. A lot of the things I should talk about — I can't remember, but it's not about wasmCloud. What was the thing I asked for? I made this big point last night — I saw Luke and asked for this one thing, and…
+
+**Victor Adossi** [25:36](https://youtu.be/BtOseiHpgmk?t=1536)
+
+In terms of, like —
+
+**Colin Murphy** [25:42](https://youtu.be/BtOseiHpgmk?t=1542)
+
+It was around resources. I don't even remember it. That's how bad things are with me here. I haven't thought about it since I talked to him in March. You were talking about the limitations in resources, and I was like, "oh, I should bring that up — I have a limitation on resources." But I don't remember it now.
+
+**Victor Adossi** [26:11](https://youtu.be/BtOseiHpgmk?t=1571)
+
+Fallible constructors or something like that — there's lots of little things that have been —
+
+**Colin Murphy** [26:18](https://youtu.be/BtOseiHpgmk?t=1578)
+
+I'm looking it up now. Don't encourage me. We definitely have threads, we have GraalVM… 2025… oh, shared functions, I don't know. Oh yeah, shared functions and tables. There's a proposal around that — shared-everything threads. I'm so sorry, and I killed Brooks.
+
+**Victor Adossi** [27:17](https://youtu.be/BtOseiHpgmk?t=1637)
+
+Yeah, he's probably like, "okay, gotta go." But have you seen Christophe's shared-memory little proof-of-concept repo? No? So this is a great little demo of shared memory between a host and a component. He does some magic tricks in there, but it's pretty cool. It's another little thing that's out there that I don't think a ton of people know about, but it's pretty exciting — at least I think so. It's one of those things people ask for all the time: "oh, I want to be able to share, not have to copy all these bytes." And it's not really on those people's radars right now, just because it's experimental — he's doing it in a big way — but it's a cool little proof of concept.
+
+**Colin Murphy** [28:39](https://youtu.be/BtOseiHpgmk?t=1719)
+
+You've got to be kidding me.
+
+**Victor Adossi** [28:41](https://youtu.be/BtOseiHpgmk?t=1721)
+
+Yeah, and it's all possible with P2, and he's updated it to P3, which is crazy. The stuff he's doing — I don't know how he finds time to do so much exploration, but he is. It's one of my favorites.
+
+**Colin Murphy** [29:16](https://youtu.be/BtOseiHpgmk?t=1756)
+
+That's great. I had made slides — I can't find my presentation where I put the things on, so it's very frustrating. But yeah, that's awesome, and it's very similar to what I was asking for: shared memory.
+
+**Victor Adossi** [30:08](https://youtu.be/BtOseiHpgmk?t=1808)
+
+Yeah, like, the gears have started on getting a different way to do it — a more built-in, sort of "blessed" way. But I was thoroughly impressed that he just has it, and it just works, and it's demonstrable like this, which is pretty cool.
+
+**Colin Murphy** [30:33](https://youtu.be/BtOseiHpgmk?t=1833)
+
+Yeah. Send me the link in Slack — Jeremy.
+
+**Victor Adossi** [30:39](https://youtu.be/BtOseiHpgmk?t=1839)
+
+Yeah, let me get it.
+
+**Colin Murphy** [30:46](https://youtu.be/BtOseiHpgmk?t=1846)
+
+Oh — first-class functions. That was what I needed.
+
+**Victor Adossi** [30:46](https://youtu.be/BtOseiHpgmk?t=1846)
+
+Oh wow, first-class functions. Yeah, that's definitely a feature and a half. Hold on, I'm Slacking you the link, just in case.
+
+**Colin Murphy** [31:02](https://youtu.be/BtOseiHpgmk?t=1862)
+
+Yeah, that was it — first-class functions. You think I could remember things like that?
+
+**Victor Adossi** [31:14](https://youtu.be/BtOseiHpgmk?t=1874)
+
+Yeah, that's really interesting. But explain.
+
+**Colin Murphy** [31:22](https://youtu.be/BtOseiHpgmk?t=1882)
+
+I basically gave a whole talk on why you need to have first-class functions.
+
+**Victor Adossi** [31:29](https://youtu.be/BtOseiHpgmk?t=1889)
+
+It would be cool if the first-class functions could be Wasm themselves.
+
+**Colin Murphy** [31:42](https://youtu.be/BtOseiHpgmk?t=1902)
+
+Yeah, that's what I did. But the problem is sometimes — let's imagine a JCO situation. Maybe more like callbacks. Let's say you have a signing object, and one of the methods is `sign`, and that method takes a function as an argument. Right now, if I were to make an SDK — let's say I have a browser SDK; it uses wasm-bindgen, right? But say I wanted to generate an SDK from WASI, and I wanted to define the SDK interface in WIT, so that I could make all the SDKs from a single WIT file —
+
+**Victor Adossi** [32:58](https://youtu.be/BtOseiHpgmk?t=1978)
+
+From a single one, yeah.
+
+**Colin Murphy** [32:59](https://youtu.be/BtOseiHpgmk?t=1979)
+
+— then you kind of need to have first-class functions, because most SDKs, especially those for Node and JavaScript, expect to be able to use functions as arguments. So to realize that side of it, you need it.
+
+**Victor Adossi** [33:19](https://youtu.be/BtOseiHpgmk?t=1999)
+
+Like callbacks, basically.
+
+**Colin Murphy** [33:20](https://youtu.be/BtOseiHpgmk?t=2000)
+
+Basically callbacks. It's hard to do just callbacks in WIT — you'd need it to be something you could define and pass back. So it's not everything you think of with first-class functions, but you definitely need some sort of callback. And the callback isn't itself a WIT component, like a Wasm component, right?
+
+**Victor Adossi** [33:46](https://youtu.be/BtOseiHpgmk?t=2026)
+
+Yeah, no, I get that. That makes sense to me.
+
+**Colin Murphy** [33:50](https://youtu.be/BtOseiHpgmk?t=2030)
+
+The problem is that Wasm can do that in the browser because JavaScript owns and controls the Wasm, right? It's both the language you're writing in and the engine — the browser is controlling the WebAssembly, so it knows when it returns. You don't have that just in WASI. It's not part of the spec that you control the control flow. I don't even know — I'm just saying words that are close to what I mean. I just don't know when it's done, you know?
+
+**Victor Adossi** [34:33](https://youtu.be/BtOseiHpgmk?t=2073)
+
+You don't have that tight control, slash —
+
+**Colin Murphy** [34:40](https://youtu.be/BtOseiHpgmk?t=2080)
+
+— handle, like a handle to a thing, yeah.
+
+**Victor Adossi** [34:42](https://youtu.be/BtOseiHpgmk?t=2082)
+
+Yeah, you don't have full control.
+
+**Colin Murphy** [34:44](https://youtu.be/BtOseiHpgmk?t=2084)
+
+So I don't control — anyway, I was saying "control flow," it kind of was. See, I'm reaching the limitations of being a mechanical engineer and not taking that CS class. All right, that's enough. Victor, go to bed, please. I'm so sorry.
+
+**Victor Adossi** [35:03](https://youtu.be/BtOseiHpgmk?t=2103)
+
+Oh, I'll see if I can get out of some of those meetings I have scheduled later, and then it's bedtime.
+
+**Colin Murphy** [35:11](https://youtu.be/BtOseiHpgmk?t=2111)
+
+It's living in Tokyo — amazing. You're willing to stay up all night, every night. That's impressive.
+
+**Victor Adossi** [35:17](https://youtu.be/BtOseiHpgmk?t=2117)
+
+Well, not every night.
+
+**Colin Murphy** [35:19](https://youtu.be/BtOseiHpgmk?t=2119)
+
+Okay — not Saturday and Sunday.
+
+**Victor Adossi** [35:23](https://youtu.be/BtOseiHpgmk?t=2123)
+
+Definitely not Sunday, but Friday, yeah. It's actually kind of rare. Today is a meetings day, basically — been in a bunch of meetings, and then there's all the stuff that needs to get done.
+
+**Colin Murphy** [35:40](https://youtu.be/BtOseiHpgmk?t=2140)
+
+Man. I still think you've got it — P3's going to hit. I don't know.
+
+**Victor Adossi** [35:44](https://youtu.be/BtOseiHpgmk?t=2144)
+
+Yeah, no, not forever. We'll see. All right, see you later, Colin.

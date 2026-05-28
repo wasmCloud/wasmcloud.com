@@ -1,52 +1,141 @@
 ---
 date: '2025-11-19'
-title: 'Meeting Agenda - 2025-11-19'
-description: 'wasmCloud community call demoing the v2 Helm install on Kubernetes, a new v2 HTTP implementation in wash, plus Wasmtime 38 to 40 progress for WASI P3 alignment.'
+title: 'WebAssembly on Kubernetes: v2 Helm Operator, wash HTTP & WASI P3'
+description: "WebAssembly on Kubernetes in focus: a wasmCloud v2 Helm operator install demo, a new wash HTTP/gRPC runtime, and the road to WASI P3 on Wasmtime 40."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasi p3
+  - wasmtime
+  - kubernetes operator
+  - webassembly news
+chapters:
+  - { seconds: 0, label: "Welcome and v1-to-v2 migration questions" }
+  - { seconds: 334, label: "Demo: installing the v2 Kubernetes operator with Helm and kind" }
+  - { seconds: 602, label: "Release candidate status and WebGPU support" }
+  - { seconds: 680, label: "The new HTTP implementation in the wash runtime" }
+  - { seconds: 1051, label: "Walking the wash runtime: routers and host handlers" }
+  - { seconds: 1565, label: "Why wasmCloud builds on Wasmtime's HTTP stack" }
+  - { seconds: 1722, label: "Where wRPC fits in wasmCloud v2" }
+  - { seconds: 2115, label: "wRPC vs HTTP and messaging: the performance trade-off" }
+  - { seconds: 2363, label: "Wasmtime, WASI P3, and aligning on Wasmtime 40" }
+  - { seconds: 2767, label: "Upgrading P2 to P3 components and ergonomic async" }
+  - { seconds: 3071, label: "The relationship between wasmCloud and Kubernetes" }
+  - { seconds: 3509, label: "Mini schedulers, wash serve, and the reconciler model" }
+image: https://i.ytimg.com/vi/EqvKzu-e9gw/maxresdefault.jpg
+showTitle: true
+slug: 2025-11-19-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- v2 Helm install and doc updates
-- Review and discussion for v2 HTTP implementation [wash#156](https://github.com/wasmCloud/wash/pull/156)
-- Update to Wasmtime 38, 39 will be out soon, but we're aiming for 40 to be our P3 impl
-- Getting a patch out for v1 wasmCloud
+<YouTube url="https://www.youtube.com/watch?v=EqvKzu-e9gw" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=EqvKzu-e9gw" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The November 19, 2025 wasmCloud community call is a deep dive into running **WebAssembly on Kubernetes** with the new wasmCloud v2 runtime. Eric Gregory demos a fresh end-to-end install of the v2.0 release-candidate Kubernetes operator using Helm and kind, then Lucas Fontes walks through a major rework of HTTP in the `wash` runtime that pulls HTTP, gRPC, and HTTP/2 handling close to the runtime instead of routing it over the network. Bailey Hayes closes with the road to WASI P3 — why P3 components will align on Wasmtime 40 in December — and the group untangles how wasmCloud actually relates to Kubernetes, wRPC, and the schedulers that place workloads.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **The v2 Kubernetes operator install is now documented end-to-end** — Eric demoed standing up a local cluster with `kind`, installing the operator from an OCI Helm chart, deploying a Hello World Wasm component via a workload manifest, and curling it back, all in three or four commands
+- **wasmCloud uses the Kubernetes API as a scheduler, not a requirement** — the operator leans on the Kubernetes API server to store and reconcile workload state, but wasmCloud also runs on a bare k3s API server at the edge, or on a fully custom scheduler built from the published protobuf and Go code
+- **HTTP moved into the wash runtime** — the v1 wRPC HTTP provider added an extra NATS network hop per call; v2 binds HTTP directly to the Wasmtime context, eliminating the hop and supporting HTTP/1, HTTP/2, and gRPC without forcing users to write custom WASI plugins
+- **Two integration points for HTTP** — implement a lightweight `router` if you only need to allow/deny and direct requests (great for plugging into an external gateway or XDS), or a full `host handler` if you want to own the entire HTTP transport, TLS included; outbound HTTP is **deny-by-default**
+- **wRPC is no longer a core feature of v2** — HTTP and event-bus messaging cover the ~99% use case with transparent errors and standard libraries; wRPC remains available as a nice-to-have for typed component-to-component remoting
+- **WASI P3 components will align on Wasmtime 40** — a design change discovered during implementation (driven partly by Mozilla's Firefox component-model work) makes current P3 builds incompatible with Wasmtime 38/39, so the ecosystem is targeting Wasmtime 40 in December, with a full async-components release aimed at late January
+- **Upgrading P2 to P3 will be easy** — wasmCloud runs whatever Wasmtime supports, so the host is transparent to P2 vs P3; the real win of P3 is ergonomic async in language bindings, not new capability (async already works in P2 via callbacks)
+- **A second reference implementation is in progress** — Victor Adossi continues advancing a Node.js-based reference implementation of the component model interfaces, a prerequisite for advancing P3 as a standard
+
+## Chapters
+
+- [0:00 — Welcome and v1-to-v2 migration questions](https://youtu.be/EqvKzu-e9gw?t=0)
+- [5:34 — Demo: installing the v2 Kubernetes operator with Helm and kind](https://youtu.be/EqvKzu-e9gw?t=334)
+- [10:02 — Release candidate status and WebGPU support](https://youtu.be/EqvKzu-e9gw?t=602)
+- [11:20 — The new HTTP implementation in the wash runtime](https://youtu.be/EqvKzu-e9gw?t=680)
+- [17:31 — Walking the wash runtime: routers and host handlers](https://youtu.be/EqvKzu-e9gw?t=1051)
+- [26:05 — Why wasmCloud builds on Wasmtime's HTTP stack](https://youtu.be/EqvKzu-e9gw?t=1565)
+- [28:42 — Where wRPC fits in wasmCloud v2](https://youtu.be/EqvKzu-e9gw?t=1722)
+- [35:15 — wRPC vs HTTP and messaging: the performance trade-off](https://youtu.be/EqvKzu-e9gw?t=2115)
+- [39:23 — Wasmtime, WASI P3, and aligning on Wasmtime 40](https://youtu.be/EqvKzu-e9gw?t=2363)
+- [46:07 — Upgrading P2 to P3 components and ergonomic async](https://youtu.be/EqvKzu-e9gw?t=2767)
+- [51:11 — The relationship between wasmCloud and Kubernetes](https://youtu.be/EqvKzu-e9gw?t=3071)
+- [58:29 — Mini schedulers, wash serve, and the reconciler model](https://youtu.be/EqvKzu-e9gw?t=3509)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### Demo: Installing the wasmCloud v2 Kubernetes Operator
 
-### Demo: Kubernetes Operator installation
+[Eric Gregory](https://github.com/ericgregory) walked through brand-new documentation for installing the **v2.0 release-candidate runtime operator** on [Kubernetes](/docs/kubernetes-operator/). The docs break down the pieces that constitute the wasmCloud platform on Kubernetes — the operator and its custom resource definitions, wasmCloud hosts, and NATS with JetStream — then provide a getting-started path. In the live demo, Eric spun up a local cluster with **kind** (a one-liner that downloads a kind config tuned for ingress and local development), used **Helm** to install the operator from an OCI chart image with [local values](/docs/kubernetes-operator/operator-manual/helm-values/), and brought up three named host groups: public ingress (node port), private ingress (cluster IP for intra-cluster traffic), and a default host group. He then applied a **workload deployment manifest** for a Hello World image over the HTTP interface and curled `localhost` to get back `Hello from wasmCloud` — a complete end-to-end loop in three or four commands. Bailey Hayes noted the docs were already on RC3 (mostly small patch fixes plus new WebGPU support shown by Mindy and Colin at WasmCon) and suggested the docs reference a rolling "RC latest" rather than a pinned version.
 
-* Eric walked through the process of installing the v2.0 release candidate runtime operator on Kubernetes using kind and helm, available for reference now in the wasmCloud docs. He demonstrated deploying a Wasm component and curling it to show it's running, highlighting the quick setup process. 
+### The New HTTP Implementation in the wash Runtime
 
-### Discussion: HTTP Implementation in wasmCloud v2
+[Lucas Fontes](https://github.com/lxfontes) explained why HTTP moved into the [`wash` runtime](/docs/runtime/) that powers wasmCloud v2. In **v1**, exposing anything over HTTP meant standing up a wRPC HTTP provider that held the routing logic and proxied every WebAssembly call over NATS — an extra network hop per request that capped performance. The v2 design choice was to bring HTTP **as close to the runtime as possible**. An early attempt to ship HTTP as an ordinary `wash` plugin ran aground on a heavy dependency on the **Wasmtime** `wasi-http` crate, which funneled all calls through a single interface when the team needed to fan out to both an HTTP plane and a gRPC plane (surfaced by Aditya's HTTP client / gRPC client work). The resolution: keep building on Wasmtime's `wasi-http` and tightly couple HTTP to the **Wasmtime context** so it is always present in the runtime but can be enabled or disabled per use case.
 
-* Lucas discussed the new HTTP implementation in wasmCloud v2, emphasizing moving the HTTP processing closer to the runtime to improve performance. This approach avoids the extra network hop present in v1's wRPC-driven HTTP provider.
-* The goal is a solid HTTP implementation within `wash` that supports HTTP, gRPC, and HTTP/2, reducing the need for custom WASI plugins.
-* HTTP is now tightly coupled to the wasmtime context, allowing it to be enabled or disabled based on use cases.
-* HTTP can be integrated with the runtime by implementing a router for allowing or denying HTTP requests from components, OR by implementing a host handler for a full HTTP stack, allowing custom HTTP transports.
-* By default, all outbound HTTP requests are blocked unless explicitly enabled.
+### Routers vs. Host Handlers: Two Ways to Integrate HTTP
 
-### Discussion: Wasmtime, WASI P3, and Async Components
+Lucas walked the `wash` runtime README to show the two integration traits. A **router** is for when you only care about allowing or denying and directing requests — you implement callbacks for when a workload is resolved or unbound, plus callbacks to allow outgoing requests and to map an incoming request to a workload ID (the shipped **dynamic router** keeps a host-to-workload hash map for clustered environments; the **wash dev router** always targets the last workload). A **host handler** is for when you want to own the whole HTTP transport — binding sockets, bringing up the server, and handling TLS — and ships in two flavors: a no-op server that blocks everything, and a canonical implementation matching what the old plugin did. Crucially, you pass exactly **one** HTTP handler for the entire runtime, and if you pass none, all [outbound HTTP is **blocked by default**](/docs/wash/developer-guide/network-access-and-socket-isolation/). Because gRPC detection now lives at a known point in this implementation, gRPC becomes a per-component configuration flag rather than a specialized plugin.
 
-* The support for HTTP/2 in Wasmtime is discussed, with the goal of making it transparent for users.
-* A design change in P3 components makes them incompatible with current Wasmtime versions. Wasmtime 40, expected in December, is the target for alignment across the ecosystem.
-* wasmCloud v2 will easily upgrade from P2 to P3 components, and the main benefit of P3 is more ergonomic async code within language bindings.
-* The full release with async components is targeted for late January.
+### Where wRPC Fits, and the Performance Trade-Off
 
-## Weekly highlights
+Responding to ossfellow, Bailey and Lucas were direct: **wRPC is no longer a core feature of v2**. Bailey framed each host as "its own world" and argued that hosts communicating in a ring leads to the kind of distributed-systems "magic" that caused trouble in the CORBA era. For the ~99% use case, components talk over **HTTP or event-bus messaging** — wasmCloud messaging supplies publish/subscribe, request/response, and handlers — giving transparent errors and standard-library ergonomics. wRPC remains available for typed, with-style remoting when you explicitly want it, but Lucas detailed the cost: wRPC buffers every lift/lower operation and ships it over the network, which is the difference between roughly **5,000 and 30,000 requests per second** for some protocols. So v2 trades wRPC's automatic linking and component wiring for performance, and wRPC is "demoted" to opt-in rather than the default transport.
 
-### Documentation of the Week
+### Wasmtime, WASI P3, and the Road to Wasmtime 40
 
-- [v2 Helm Chart](https://wasmcloud.com/docs/v2.0.0-rc/kubernetes-operator/#get-started-with-the-wasmcloud-operator)
-  - Helm Chart install and walkthrough
+Picking up an HTTP/2 question from Frank Schaffa, Bailey explained that `wasi-http` is intentionally **protocol-agnostic and virtualizable** across HTTP/1, /2, and /3 — a patch already allows the gRPC `te` trailer header to pass through — and the remaining HTTP/2 work is server configuration, not standards work. He then previewed **WASI P3**: Mozilla's Firefox team (Ryan Hunt) showed off using the component model for the browser at a W3C meeting, and the browser's scoping requirements surfaced a **design change** in P3 implementation. As a result, P3 components built off `main` today are **incompatible with Wasmtime 38 and 39**, so the ecosystem will align on **Wasmtime 40**, expected in December (Wasmtime ships monthly). Roman's upgrade to Wasmtime 38 had just landed for both v1 and v2; Bailey planned a v1 patch that week and the next v2 release candidate.
 
-## Recording
+### Upgrading P2 to P3, and a Second Reference Implementation
 
-{/* Automated - No need to adjust this unless automation fails */}
+Bailey emphasized that you can build on wasmCloud v2 **today** with WASI P2 components and upgrade to P3 later via an adapter technique, similar to the P1-to-P2 path. The real benefit of P3 is **ergonomic async** in guest language bindings — async already works in P2 via the callback technique built into `wasi:io`, but P3 exposes primitives that language bindings can bind to directly, so guest code reads much more naturally. wasmCloud itself is **agnostic** to P2 vs P3 (it runs whatever Wasmtime is configured for), so the plan is to build Wasmtime 40 into `wash` once it ships, gate P3 behind a flag until the standardization vote, and target a **full async-components release around late January**. [Victor Adossi](https://github.com/vados-cosmonic) continues work on a **second reference implementation** — getting the component-model interfaces working in a Node.js environment — which is a gating requirement for advancing P3 as a standard.
 
-<YouTube url="https://www.youtube.com/watch?v=EqvKzu-e9gw" />
+### How wasmCloud Relates to Kubernetes
+
+Closing a long-running question, Lucas laid out the **wasmCloud-and-Kubernetes** relationship. Kubernetes is used as a ready-made scheduler and state store via its API server — not because Kubernetes is mandatory, but because it is the incumbent the project chose to align on. That unlocks three deployment shapes: run anywhere Kubernetes runs (EKS, AKS, GKE); point the operator and hosts at a bare **k3s API server** (just the API server) to manage a fleet of edge hosts over NATS from one `kubectl`; or skip Kubernetes entirely and build a **custom scheduler** on the published protobuf and the Go code inside the runtime operator, storing workload definitions in Redis, static files, or anything else. Lucas framed the next wave as **mini schedulers** tied to existing platforms, plus a future `wash serve` command for build-pack environments like Heroku. Bailey reframed the "scheduler" as more of a **reconciler** — declaring desired state and telling hosts to converge on it — a substantial simplification versus v1. The agenda also flagged a `wash#156` v2 HTTP pull request and a forthcoming v1 patch.
+
+## WebAssembly News and Updates
+
+This call captures the WebAssembly ecosystem coordinating around a single release train. The headline news is **WASI Preview 3**: a design change uncovered during implementation — and informed by Mozilla's Firefox component-model work shown at the W3C — means P3 components will align on [Wasmtime](https://wasmtime.dev/) **40** in December rather than the current 38/39 releases, with a second reference implementation in a Node.js environment advancing [the standard](/blog/wasi-p3-on-wasmcloud/) in parallel. On the runtime side, [WebGPU](https://www.w3.org/TR/webgpu/) support (demoed at WasmCon) landed in the v2 release candidates, and the `wasi-http` spec gained a patch to pass the gRPC `te` trailer header — a small but real step toward transparent HTTP/2 and gRPC. For ongoing updates, follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [WASI](https://wasi.dev/) subgroup.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](/docs/overview/workloads/components) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, C#) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable provider architecture. wasmCloud's reference host is built on [Wasmtime](https://wasmtime.dev/), and as this call shows, the v2 runtime can be scheduled by the Kubernetes API server, a bare k3s API server at the edge, or a fully custom scheduler built on its published protobuf interfaces. With built-in OpenTelemetry observability and [Kubernetes integration](/docs/kubernetes-operator/), wasmCloud bridges WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
+
+## Topic Deep Dive: WebAssembly on Kubernetes
+
+The throughline of this meeting is what it actually means to run **WebAssembly on Kubernetes** with wasmCloud v2. Rather than scheduling Wasm by mapping every component to a pod with its own IP address — the cardinality explosion that makes naive Wasm-on-Kubernetes painful — wasmCloud uses the [Kubernetes API server](/docs/kubernetes-operator/) purely as a scheduler and reconciliation store. The operator stores desired workload state, and wasmCloud hosts (talking NATS) converge on it. That design is what lets the same model stretch from a managed cloud cluster down to a single k3s API server driving edge hosts, or out to an entirely non-Kubernetes scheduler reading from Redis or flat files. The HTTP rework reinforces the same philosophy: by binding HTTP to the Wasmtime context and exposing a router trait, wasmCloud can plug directly into a Kubernetes gateway or XDS control plane instead of standing up its own networking. The bet is that WebAssembly on Kubernetes succeeds not by reinventing the scheduler, but by treating Kubernetes as one reconciler among many over a portable [component model](/docs/overview/workloads/components) workload.
+
+## Who Should Watch This
+
+This call is especially valuable for **platform and Kubernetes engineers** evaluating how wasmCloud v2 installs and schedules on a cluster (start with Eric's Helm/kind demo at [5:34](https://youtu.be/EqvKzu-e9gw?t=334) and the Kubernetes-relationship discussion at [51:11](https://youtu.be/EqvKzu-e9gw?t=3071)), **runtime and networking developers** who want to understand the new HTTP/gRPC integration points in the `wash` runtime (Lucas's router-vs-host-handler walkthrough at [17:31](https://youtu.be/EqvKzu-e9gw?t=1051)), and **component authors** tracking when WASI P3 and ergonomic async land (Bailey's Wasmtime 40 update at [39:23](https://youtu.be/EqvKzu-e9gw?t=2363)).
+
+## Up Next
+
+The next community calls follow the v2 release train toward general availability: expect another v2 release candidate to stabilize the new HTTP runtime, a v1 patch and the Wasmtime 38-to-39 upgrade landing first, then Wasmtime 40 in December enabling WASI P3 alignment, with the full async-components release targeted for late January. Bailey also teased a **C++ demo** for an upcoming call.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2025-11-19-community-meeting-transcript/)**

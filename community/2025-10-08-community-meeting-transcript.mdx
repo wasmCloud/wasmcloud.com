@@ -1,0 +1,285 @@
+---
+date: '2025-10-08'
+title: 'Transcript: MCP Server as a Wasm Component: OpenAPI to MCP, JCO & Component Model'
+description: 'Full transcript of the October 8, 2025 wasmCloud community call covering an MCP server as a Wasm component, OpenAPI to MCP, JCO/StarlingMonkey, and WASI P3.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - mcp server
+  - jco
+  - starlingmonkey
+  - wasi p3
+  - openapi to mcp
+image: https://i.ytimg.com/vi/aQ_SpvOfWSQ/maxresdefault.jpg
+showTitle: true
+slug: 2025-10-08-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-10-08-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=aQ_SpvOfWSQ" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=aQ_SpvOfWSQ" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Oct 8, 2025 · 64 minutes*
+
+**Speakers:** Brooks Townsend, Bailey Hayes, Liam Randall, Victor Adossi, Ian
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [00:44](https://youtu.be/aQ_SpvOfWSQ?t=44)
+
+Give folks another couple of minutes. I know that Bailey is going to be doing a little bit of a demo, so she's probably just polishing that up. Hey, thanks for joining — it's good to be back. Like, a long time. I guess it was relatively a long time. It's good to be back.
+
+**Brooks Townsend** [01:56](https://youtu.be/aQ_SpvOfWSQ?t=116)
+
+Yeah, I goofed a little bit on the agenda. I was waiting for the last minute. So Bailey, I pretty much — I won't have too much of an intro for you, but I'll mention it and then give it to you when we start. Does that sound okay?
+
+**Bailey Hayes** [02:16](https://youtu.be/aQ_SpvOfWSQ?t=136)
+
+Do you want to talk about your runtime updates? Is that in the agenda?
+
+**Brooks Townsend** [02:21](https://youtu.be/aQ_SpvOfWSQ?t=141)
+
+Are you good for the demo? Do you want me to do that first and then give it to you for pizzazz? I mean, demo first is better.
+
+**Bailey Hayes** [02:29](https://youtu.be/aQ_SpvOfWSQ?t=149)
+
+Yeah, definitely happy to do a demo — changing it up on the fly right now.
+
+**Brooks Townsend** [02:35](https://youtu.be/aQ_SpvOfWSQ?t=155)
+
+Fine, it'll be good. Okay, cool. Well, we'll wait for another minute or two. Maybe we can touch a little bit on the roadmap, and then talk about whether we're doing it next week or the week after — that would probably be good.
+
+**Liam Randall** [03:50](https://youtu.be/aQ_SpvOfWSQ?t=230)
+
+It's like April Fool's, like half wasmCloud Wednesday.
+
+**Brooks Townsend** [04:42](https://youtu.be/aQ_SpvOfWSQ?t=282)
+
+Hey everybody. Welcome to wasmCloud Wednesday on October the eighth. My first wasmCloud Wednesday for a couple of weeks. Good to be back. To start us off, I goofed a little bit on making the agenda, which is totally okay — we do have an agenda. Got a couple of good things to talk through today, so I'll just verbalize it and then someone awesome like Eric will fix it in post.
+
+So Bailey is going to take us through an example of an MCP server as a Wasm component. I don't want to say too much more, because there's so much more than that, but I'll leave that to the demo. I want to talk through a fairly large PR that kind of left hanging right before, for about two weeks, but is shaping up really nicely around the `wash` runtime. And then — thanks for pointing this out — we should take a look at the Q3 roadmap and start thinking about Q4. We need to make sure we're capturing what we should get done through the end of the year. A huge part of Q4 is going to be KubeCon in early November, so we may have a mini-epic leading toward KubeCon where hopefully we'll get to see a bunch of fun people in person. So why don't I stop talking? Bailey, would you mind doing a little spiel on what the demo is going to do?
+
+**Bailey Hayes** [06:39](https://youtu.be/aQ_SpvOfWSQ?t=399)
+
+All right. Okay. So this is slightly different from what I've been doing, which is, "Hey, look at all the CI stuff." You might have been wondering why I'm doing all this CI stuff, and the short answer is that I really wanted to get to the point of showing the art of the possible with the next version of `wash`, where something works totally end to end and it's real-ish. I'm still going to use Pet Store, so that makes it feel slightly less real, but you can insert your own enterprise API to make this work.
+
+So what am I going to show? I've got a template that I created along with Victor and Mindy, and essentially this is an **MCP server template**. It's a project that uses the Model Context Protocol to serve an MCP client. An MCP client would be like your VS Code instance, or if you're using Claude or ChatGPT — a lot of these things now are adding the ability to connect to an MCP server, and that gives them capabilities they otherwise don't know how to do. One of those capabilities this one specifically targets is the ability to make HTTP requests to some API. Sometimes it's kind of hard for an LLM to know how to formulate a request — what body, what parameters should I put in, what does this even do for me? Some APIs can be extremely verbose. So the idea is that you use MCP as your glue between what you're trying to do with your LLM and the actual backend thing you want to talk to, and it teaches the LLM the right ways to call and work with it.
+
+<img src="/img/community/2025-10-08/image001.webp" alt="MCP server template project overview" />
+
+The MCP spec started with a stdio transport and an SSE (server-sent events) transport. This one, however, is using the latest transport, which is **streamable HTTP** — so just straight-up HTTP. What's really exciting is that I saw that and thought, "Hey, I think that might just literally compile to Wasm HTTP, and that'll be a portable component I can run anywhere." So this is open source — you can grab it. It's called MCP Server Template TS. If you clone it down, all you need to run to get it working is `wash dev`. You don't need to run any other commands. What that does is run `npm install` for you, do the right calls to build with JCO, and there's something else happening where it knows to run the **Model Context Protocol Inspector**. So when you're iterating on an MCP server, you want to inspect it and basically say, "Can I connect to you? Do you work? Cool, you do work. And I can ask you to list some resources." A lot of times resources might be links to documentation. If I go over to my tools, I want to see what this MCP server provides. The template just gives you a very basic ability to echo messages back to you. So this is a really nice little dev loop — if I make changes to what I'm allowed to do in this template, `wash dev` is watching for changes and will rebuild, and then I'll be able to reconnect and keep iterating.
+
+<img src="/img/community/2025-10-08/image002.webp" alt="Model Context Protocol Inspector connected to the echo MCP server" />
+
+Now, that's the basics, but the second part of the equation is another open source project called **OpenAPI to MCP**. What is OpenAPI to MCP? It's a `wash` plugin, and it takes an OpenAPI spec document and creates MCP tools from it. This one's also at Cosmonic Labs. Every time we do this, we release it and publish it to OCI. But if you're not familiar, `wash` plugins themselves are WebAssembly components, so I can say `wash plugin install` this plugin. I already have it installed — the command is `wash plugin list`. As part of a hook into my dev loop, it knows to spin up the model inspector and what path to pass in.
+
+<img src="/img/community/2025-10-08/image003.webp" alt="OpenAPI to MCP wash plugin readme" />
+
+**Bailey Hayes** [13:01](https://youtu.be/aQ_SpvOfWSQ?t=781)
+
+All right. So let's say I want to make this. I'll cheat and use some commands I already have, which basically say I want to generate a Pet Store MCP server. So I say `wash new`, I give it my template, and I tell it where I want it to generate. In here now I've just pulled down that template and plopped it in. This is the same thing we talked about before — if I open up these tools, there's our little echo guy. I cloned that one and told it to put it in a different project path, conveniently in my test folder, because that's where I like to iterate.
+
+The next step is to pass in an OpenAPI spec. So this is `input.json` — basically the same thing you could download from Pet Store, the Swagger `petstore3.io`. The main reason I'm using the local one is that if you specify the server's URL, I can take that as part of the generator and make sure it's our base URL by default in the server we generate. So this is what the HTTP clients inside the MCP server go out and talk to. Now I'll run it with that — go ahead, generate into this folder, and clean up afterwards. It generated all these tools, more than just echo. Now I know how to do things like delete the username for the Pet Store, or more normal things for a pet clinic: post a pet, get a pet, list what pets are available. So if I want, I can go into the test folder, run `wash dev`, and get the exact same experience.
+
+<img src="/img/community/2025-10-08/image004.webp" alt="Generated Pet Store MCP server tools listed in the inspector" />
+
+**Bailey Hayes** [17:29](https://youtu.be/aQ_SpvOfWSQ?t=1049)
+
+Now let's actually show what it's like if you're working with it from an LLM. This is **Goose**. There are plenty of other options — ChatGPT, Claude, and so on. There are many MCP hosts out there with MCP clients that connect to MCP servers. I like Goose because it's easier to work with as a development tool: it gives me good errors when I don't set things up correctly, and it doesn't require a signed cert for my server, which is handy for a development server.
+
+So I'll go to Extensions, add a custom extension, call it Pet Store, change the type to streamable HTTP, and give it the same endpoint we had over here. It says "successfully connected," which means it knew this thing is definitely running, just like my model inspector. So if I go back out and say something like, "What pets are available for adoption?" — it will see it could use a tool, `getPetByStatus` available, and check the inventory. But right now I'm getting an interesting 500 — the backend service I'm using to test this isn't up, which is unfortunate. But you generally get the idea: you can generate a client, generate a message and output, and it should just work.
+
+<img src="/img/community/2025-10-08/image005.webp" alt="Goose connected to the Pet Store MCP server over streamable HTTP" />
+
+**Liam Randall** [18:22](https://youtu.be/aQ_SpvOfWSQ?t=1102)
+
+Bailey, go ahead and show it. I mean, if you want to generate it, I can pull up the Claude — I can take the cake out of the oven, if you want.
+
+**Bailey Hayes** [18:30](https://youtu.be/aQ_SpvOfWSQ?t=1110)
+
+Well, you actually committed it here. So here's another example that's just in this repo. I actually haven't tried generating it before, so I'm going to give it a shot. Instead of Pet Store, let's do this. There we go — generated. So same thing: I just put up a template over there. And now if I say `wash`, the API, FRED, and I pass in the YAML, and I'll go to the same place and generate into it. Let's go check this thing out. I'll open it in a different window. And Liam, do you want to do the voiceover? What is the server? What did I just generate against?
+
+**Liam Randall** [20:06](https://youtu.be/aQ_SpvOfWSQ?t=1206)
+
+Sure. The **US Federal Reserve** provides an incredible long-running repository of economic data. So what I wanted to do was grab an API that people commonly use to build reports. At a big company, you might pull all this data through the API into Excel, then pull in your own custom data or other comparison economic data, and chart things over time — for example, the impact on housing starts compared to consumer confidence and the federal funds rate. You'd create some charting and understand where the world is going. You need to pre-register for an API key at FRED, which is pretty common.
+
+So Bailey, if you let me share your screen, I can take the cake out real fast. I've configured this in Claude, and then I asked it to pull those three variables: the federal housing starts, the federal funds rate, and the consumer confidence repo. I did this with Bailey and my 11-year-old daughter — although she's 12, she had her birthday this weekend — and we asked it to explain it in a way she could understand, with three creations: a timeline chart, a comparison chart, and a middle-school-friendly narrative. And this is what came up.
+
+<img src="/img/community/2025-10-08/image006.webp" alt="FRED economic data charts generated through the MCP server" />
+
+So I think this is a good example of how quickly we can enable the adoption of agentic-specific technologies like Model Context Protocol and MCP servers — but sandbox them in order to remove some of the agentic-specific risk. If you're not familiar with that term, you might think, "Well, all agentic software is still just software." But the very free-text nature of this interactivity and searching leads to enhanced risk for vulnerabilities like LLM prompt injection, data exfiltration, and improper input/output handling. So by locking it down in a tiny WebAssembly sandbox, you're able to mitigate these risks very effectively, so you can continue to move fast.
+
+And I want to add that we've got a couple of folks on the call — Ian and Corey — who are working on some different ways of doing this that I think are awesome. We reached out to them to see if we could help get their stuff running on wasmCloud, and hopefully they can demo some different approaches next week. So Ian, hello, we can pick up on Slack there. Bailey, I'll go back on mute.
+
+**Bailey Hayes** [23:32](https://youtu.be/aQ_SpvOfWSQ?t=1412)
+
+Sure. Thank you for doing the cookie show with me, Liam. So I promised I'd show a little bit about how this build works. You saw in the tools what the source code looks like. It is regular old TypeScript. The goal is that you have no idea you're doing WebAssembly stuff. Not only that, but you're able to take the existing SDK — which, wow, is moving really fast; this gets updated a lot, their protocol versions change quite a bit — and take advantage of that speed by not abstracting it away, instead building straight from their piece and producing a WebAssembly component that's just regular old WASI HTTP.
+
+So if we look at that WIT, it's WASI HTTP. It doesn't have a ton in it, and that's actually really nice — it means I'm not supposed to be able to access other external pieces. There are definitely some language tooling updates I'd like to make so it doesn't include as much of WASI as it currently does. So Liam asked about doing an inspect. It builds into the `dist` folder, so you can say `wash inspect` on the `.wasm`, and this shows you exactly the capabilities it imports from the host — making requests out to an HTTP client and handling incoming requests. Those are your Wasm HTTP handlers.
+
+<img src="/img/community/2025-10-08/image007.webp" alt="wash inspect showing the WASI HTTP component capabilities" />
+
+If you want to see how small it is — it's not the smallest, the JavaScript tooling is a lot more than if you did this with Rust, and yet it's way smaller than if I ran this with Node.js, or if I built a container with this. We're talking hundreds of megabytes there, so it's extremely competitive with those other solutions while also being sandboxed.
+
+In terms of the stack: it builds with the Model Context SDK. To build JavaScript/TypeScript code into Wasm, we — as in Victor, one of the maintainers — use a project called **JCO** and **ComponentizeJS**. JCO is the JavaScript component tooling, and `componentize` is the command for taking JavaScript code and stuffing it into a WebAssembly component. When `wash dev` ran, it looked for a build command and knew to do the TypeScript thing: we take our TypeScript, compile it to JavaScript, and then componentize it by putting the JavaScript into Wasm. At the final point we get a `.wasm` — `component.wasm`. I don't need any JavaScript glue to run it, and I can also serve this with wasmCloud, because again it's just a regular Wasm HTTP component, so it's portable and can run anywhere.
+
+So we've spent a lot of time over the past couple of years trying to bridge the gap back to ecosystems, and a lot of times that meant building our own interfaces, tooling, or frameworks. But the reality is ecosystems have evolved and can come the other direction — if we start with what they have and make that work, we both move pretty fast. When I look at this I want to see idiomatic TypeScript, idiomatic JavaScript, no shenanigans — and it just all worked. I feel like we finally hit it. It's been years, but I think we're there.
+
+<img src="/img/community/2025-10-08/image008.webp" alt="CI pipeline building and publishing the MCP server component" />
+
+You want to see some CI stuff? I can't help it. If you clone from this MCP server template, you get a pipeline already built for you using our actions toolkit, all from wasmCloud. I've got a build CI step set up — `wash` just builds it and then publishes it. So long as you're doing regular WebAssembly components, you really don't need any extra steps, and this is really fast because it's cached using the actions cache. An example I did yesterday is this Pet Store MCP server. I used a tool called **Backstage** to scaffold it, and it created a PR that ran our OpenAPI to MCP plugin. There's the OpenAPI-to-MCP-gen workflow — it takes an input for where you put the spec path, and creates a pull request that says, "Here are the new tools based on that spec." That's a pretty handy, fast way to start instantly building an MCP server with WebAssembly components.
+
+Now, Liam mentioned there are a lot of other approaches happening in the ecosystem, and we're super welcoming to them. I'll be straight up: this OpenAPI-to-MCP thing is a dime a dozen — I found like 15 of these. It was really easy to get started because we've been generating OpenAPI clients for a decade now, and that's really what this is, except mapping to MCP tool constructs. Some people on the MCP side say it's not amazing practice to make MCP servers one-to-one with OpenAPI; if that's the case, you should generate from there and maybe implement a proxy. My goal with this was a hybrid approach — take an OpenAPI spec to get started, but then evolve it to a point where it's much more in line with an API that's ergonomic for LLMs to call.
+
+**Liam Randall** [32:25](https://youtu.be/aQ_SpvOfWSQ?t=1945)
+
+Bailey, one of the neat things you've done here is you've taken Hono and pre-selected a set of libraries and a template that work really well with WebAssembly today, in its current state. I know Victor on our team is working really hard on JCO. You also highlighted a second opportunity: right now each component includes a whole copy of the runtime, which is what blows it up and makes it large. Can you give us a track on what the next six months look like for this space? Will I always have to choose pre-selected libraries? Will there ever be a world where a developer just writes JavaScript and this just works out of the box?
+
+**Bailey Hayes** [33:13](https://youtu.be/aQ_SpvOfWSQ?t=1993)
+
+That's a great question. Breaking it down: `jco componentize` will give you a `.wasm`. But what's in the `.wasm`? The thing you need to know is that there's a Bytecode Alliance project called **StarlingMonkey**. This is a JavaScript runtime that compiles to WebAssembly, and when we run `jco componentize`, we get this runtime inside that `.wasm`. So when we run this, we're really taking that JavaScript code and effectively interpreting it with this runtime.
+
+If you think the name is strange — you're probably familiar with **SpiderMonkey**, which is where this gets its origins. SpiderMonkey is the JavaScript runtime inside Firefox. A lot of those developers joined Fastly, now five years ago, and Fastly had their own minimal JavaScript runtime meant for edge functions called Starling. When those two projects come together and make a runtime baby, it's called **StarlingMonkey**. It's hosted inside the Bytecode Alliance nonprofit foundation, which is a great place for building the foundational pieces of the software we depend on, like guest toolchains. When I say "guest," I mean how do I take this thing and get it into Wasm; on the host side, how do I run the Wasm — our runtime of choice is **Wasmtime**. Inside JCO, instead of just calling `componentize`, I can also run `jco transpile` and use that to run inside Node.js and other potentially web-based environments.
+
+<img src="/img/community/2025-10-08/image009.webp" alt="StarlingMonkey JavaScript runtime embedded in the component" />
+
+So, StarlingMonkey's roadmap. Liam called out that instead of 100% Model Context Protocol SDK, I also have a dependency on **Hono**. If I had a couple of other things, you'd also see Express. Express is one of the OG ways of doing server handling in JavaScript for Node.js. We do not yet have 100% Node.js compatibility inside StarlingMonkey, so when it sees Node.js-specific APIs it might fail, which it definitely did when I was first trying to compile this. However, StarlingMonkey has been working very hard on **WinterTC** APIs — another standards body for great ways to run things, not just in the web and not just for Node.js, but things like Bun and Deno and what runs on Cloudflare Workers. That suite of APIs is something Hono is really well aligned to, and that's really just `fetch`, the more modern way of doing a lot of this. It also helps me produce a much slimmer binary.
+
+**Liam Randall** [37:15](https://youtu.be/aQ_SpvOfWSQ?t=2235)
+
+Let me play back what I think I heard, as simply as possible. Today the framework embeds the right libraries to get people started and working in this direction, sandboxing MCP. And in the near future there will be a world where I can start with any old JavaScript or TypeScript framework, compile it down, and won't even need to understand it — it'll just be a build option, where I decide whether to build it for Node or build it as a WebAssembly component. Did I basically summarize what I heard?
+
+**Bailey Hayes** [38:04](https://youtu.be/aQ_SpvOfWSQ?t=2284)
+
+Yes. Victor's got some good context in chat. Victor, do you want to jump in? This is very much something I should have just directed at you.
+
+**Victor Adossi** [38:32](https://youtu.be/aQ_SpvOfWSQ?t=2312)
+
+Yeah. What Bailey said is mostly true and pretty much spot on for the state of things and where they're going. Right now the reason we can use Hono so easily is because of **WinterTC**, formerly known as WinterCG support. This is basically a cross-language, cross-framework effort to support JavaScript primitives — a common API that most JavaScript programs need for platforms and the like. You can't yet just take any library from NPM and run it out of the box, because of the specifics of the Node platform. So StarlingMonkey has WinterTC support, but not generic Node.js support. When you do things like `import node:fs`, that's backed by libraries specific to Node, and you can't, for example, just run those in a browser.
+
+So there's work underway to support those Node interfaces. There are lots of ways you can do this — you can do it at a completely JavaScript level and patch it through to the Wasm stuff that's available now. But the way we're trying to do it, the current approach, is to put this support straight into StarlingMonkey at the lowest level — adding support for, say, `node:fs` — so that you have a better chance of just taking any library off NPM and compiling it into a WebAssembly module.
+
+**Liam Randall** [40:43](https://youtu.be/aQ_SpvOfWSQ?t=2443)
+
+That's awesome. Let me ask the second question, Bailey. Today the second opportunity you referenced is that each of these sandboxes has a full copy of the runtime. WebAssembly components are share-nothing, stack-based virtual machines. I know we just got WASI Preview 2, which is a huge accomplishment. Is there anything coming in the next few months that would give you the ability to load a particular version of TypeScript once and then share it across many scripts, or something like that?
+
+**Bailey Hayes** [41:27](https://youtu.be/aQ_SpvOfWSQ?t=2487)
+
+Whoa though — hey, we haven't gotten **WASI Preview 3**. Let's not say that yet. We have a release candidate, and we have another one coming. There are release candidates, there are implementations. Okay, yes, I did cut a release yesterday, but it was for 0.2. I know Victor probably started panicking. Hey Victor — did you just get the spec tests passing, the ones you just got working?
+
+**Victor Adossi** [42:09](https://youtu.be/aQ_SpvOfWSQ?t=2529)
+
+It's like a bunch of new WebAssembly components. So for people who don't know, **Preview 3 (P3)** is an enhancement of the capabilities and things you can do with WebAssembly components in general. You can think of it like a change to the spec, the implementations, the tooling, and the lowest levels of the ecosystem. When P3 is fully released, the kind of WebAssembly components — mostly unbeknownst to the average user — will change. New intrinsics, new functionality, will be packed into components in general. So making sure those components work in all the places and all the ways we try to run web components is something everyone is working on right now — improving test suites, making sure things work both in the Rust ecosystem and, in my case, in the JavaScript ecosystem.
+
+JCO is a second reference implementation of a way to run web components. We have the Rust stuff with Wasmtime — this is what we make use of in wasmCloud, and what most teams in modern WebAssembly use. And then there's the JS ecosystem via `jco transpile`, which can also run the modern WebAssembly components. So we try to make sure the new components, with new functionality and different binaries, also run in JavaScript. That's the work underway. It's not done, but we welcome people to try it out and build what you can. There are good repos with good examples — maybe I'll link some in the chat.
+
+**Bailey Hayes** [44:23](https://youtu.be/aQ_SpvOfWSQ?t=2663)
+
+Thank you, Victor. Okay, so one thing Liam mentioned. There are multiple core modules loaded inside this `.wasm` — one of these is StarlingMonkey. Now, what we're able to do with WebAssembly components, and WebAssembly modules in general, is that there are two different types of linking, and our plan from the Bytecode Alliance side is to make it so this piece doesn't have to be included. If we push up an OCI artifact and explode this out into layers, then just like the way you expect de-duping of OCI layers, we want these common runtimes to be de-duped too, so you're only downloading the bytes of the JavaScript code you needed to compile and run.
+
+In this case, I want my `.wasm` to be fully self-contained and runnable by anybody, anytime, anywhere. But there are a lot of tooling enhancements — post-guest-toolchain, in the OCI-layer sphere — where we can optimize this away and get something much, much smaller.
+
+<img src="/img/community/2025-10-08/image010.webp" alt="Core modules including StarlingMonkey inside the component, targeted for OCI layer de-duplication" />
+
+**Liam Randall** [45:57](https://youtu.be/aQ_SpvOfWSQ?t=2757)
+
+All right, that's awesome. Ian Corey — I know you guys may be new to the call, but you've been on the wasmCloud Slack, and recently I spotted some work you were doing in this same area with some different approaches. I'd love for you to introduce what you're working on. And Bailey, would you mind helping us understand some of the cool trade-offs between different approaches?
+
+**Brooks Townsend** [46:32](https://youtu.be/aQ_SpvOfWSQ?t=2792)
+
+No, this is great. Just a heads-up: I'm going to save the last five minutes of the call to do our other agenda items. But this is awesome.
+
+**Ian** [46:43](https://youtu.be/aQ_SpvOfWSQ?t=2803)
+
+Cool. So hey, I'm Ian, and Corey is on this call too. We both quit our jobs at another startup a few months ago to work full time on the problem related to this. We started from the top down with the problem of real-time agent tools. Real-time agents are becoming a thing, real-time model APIs, but there's no real-time tool-calling infrastructure to support that. We tried a bunch of different ways — Cloudflare at the edge, basically every architecture we could find for deploying MCP servers — and then realized, wait, WebAssembly is basically the future here. There are inherent architectural advantages, especially in the component model as it relates to MCP, in terms of their structural symmetry. MCP servers are also just a bag of capabilities that can be composed and progressively added together, and that fits very well into the component model ideas. That's where we came from with our approach. We have a repo right now implementing that idea. I didn't know I'd be talking, so next week I'll have an actual demo we can give you.
+
+**Liam Randall** [48:13](https://youtu.be/aQ_SpvOfWSQ?t=2893)
+
+I really just — I've been watching what you guys were working on, and I thought it was super cool. We always think that CNCF, wasmCloud is incubating, so it's not just open source — it's controlled and known by a foundation, and it's really the community's runtime. So we call out and lift up folks doing cool stuff in the ecosystem. Bailey, I don't know if you had any questions or thoughts, or we can look forward to the demo next week.
+
+**Ian** [48:56](https://youtu.be/aQ_SpvOfWSQ?t=2936)
+
+I can briefly show you the WIT, if that helps with some context for answering that question.
+
+**Bailey Hayes** [49:09](https://youtu.be/aQ_SpvOfWSQ?t=2949)
+
+I obviously have looked — if it's got the word wasmCloud, if it's a blog, news post, repo on GitHub, I've probably looked at it. I'm really excited about your approach. I'd prefer we save as much time as we can so we can really put the light on it next week, instead of throwing you into an ad-hoc demo — which Liam totally did to me about an hour before this call. So if you want to save it for next week and focus on that, that would be huge. If you want to give the short answer, you're totally welcome to. I think there's the WIT-native approach versus the trivial approach, which is what I'd say I took on this.
+
+**Ian** [50:01](https://youtu.be/aQ_SpvOfWSQ?t=3001)
+
+I don't know if it's trivial. Two different types of engineers would use each approach. Yours is — you don't need to know about WebAssembly. If you have a WebAssembly runtime or a platform and want to deploy an MCP server, you couldn't do that easily before, and now you don't have to know how any of it works. Mine is coming from a more — it's just a different goal, but I feel like they'll eventually converge into common tooling and a common idea that hopefully works everywhere, because that's the whole promise of this technology. We have our stuff running on Fermyon Cloud and wasmCloud, and it's amazing to just have platforms that are component buckets in the future.
+
+**Bailey Hayes** [50:49](https://youtu.be/aQ_SpvOfWSQ?t=3049)
+
+My goal basically is for the projects like what you've made to be able to run on wasmCloud, and for those and other solutions like that — all of them. We're in the business of selling shovels right now, and let's get all of these different approaches working, because that's the win: true portability, true sandbox-ability. When you guys said what you discovered with MCP servers — I'm looking at all this stuff and it's like, man, I wish we had an API for defining how to do capabilities and share tools and make it so I can run it anywhere. And then it's like, well, let me find a way to package this up so I can run it in all these environments — and, like, components. Components are the only answer here. Okay, I'm off my soapbox.
+
+**Brooks Townsend** [51:50](https://youtu.be/aQ_SpvOfWSQ?t=3110)
+
+This is so cool. MCP servers are big, but seeing all the different approaches — your WIT interface, I just thought it was really cool. The thing I saw immediately is your HTTP transport world, and I'm like, oh, WASI HTTP — that should just work on `wash` right now. And then the stuff we're doing with our template at Cosmonic, which is from OpenAPI templates, and then wasi at Microsoft, using WIT as the interface for MCP. It's really interesting seeing where this is all going to shake out.
+
+**Ian** [52:47](https://youtu.be/aQ_SpvOfWSQ?t=3167)
+
+Yeah, who knows? Maybe Anthropic will come out with their own official component SDK, or someone's working on it, or maybe one of the projects we're working on will end up becoming that. It's really cool.
+
+**Brooks Townsend** [53:03](https://youtu.be/aQ_SpvOfWSQ?t=3183)
+
+Well, I know we're getting tight on time. Bailey, I had my hand up earlier because we saw like 15 different technologies in these demos — tons of stuff, like Goose and the MCP Inspector. It's really cool to see other open source tools. Just to confirm: there's the TypeScript template you were generating from with `wash new`, and then OpenAPI to MCP, which is the tool you were primarily demoing — compilable to a component, run as a `wash` plugin — and that takes as input the template, which is an MCP Hono TypeScript template, and generates the tools there. Then you have a working MCP server with Hono TS and all the official things, just compiled to Wasm, and that's how you're running it.
+
+**Bailey Hayes** [54:38](https://youtu.be/aQ_SpvOfWSQ?t=3278)
+
+Exactly.
+
+**Brooks Townsend** [54:39](https://youtu.be/aQ_SpvOfWSQ?t=3279)
+
+And then you did it again with that FRED YAML, same process. All you need is basically the project scaffolding and the OpenAPI template, and then you get the thing.
+
+**Bailey Hayes** [54:55](https://youtu.be/aQ_SpvOfWSQ?t=3295)
+
+Yeah. Once you have a generator, you can do the do-it-again method as many times as you want. And thank you, Victor, for helping me get this thing compiled.
+
+**Brooks Townsend** [55:07](https://youtu.be/aQ_SpvOfWSQ?t=3307)
+
+Big kudos. Well, dang — maybe Bailey, we can slice up every 10 minutes of your demo and do a whole community call for that deep dive.
+
+**Bailey Hayes** [55:20](https://youtu.be/aQ_SpvOfWSQ?t=3320)
+
+The hilarious-slash-sad part is I've basically been doing that the last two community calls — "all right, let me show you one more CI change I had to make" — getting it up to that point where you got the full end-to-end. You can scaffold the whole thing, generate it all from CI, and then publish it. But now we need to do the MCP side of it.
+
+**Ian** [56:16](https://youtu.be/aQ_SpvOfWSQ?t=3376)
+
+I guess just one question for Bailey. Is the goal of this project to support other languages directly in this way, or is it supposed to be for TypeScript/JavaScript specifically?
+
+**Bailey Hayes** [56:28](https://youtu.be/aQ_SpvOfWSQ?t=3388)
+
+I think long term the goal is definitely for all these other languages to be able to just compile in. However, if you look at the Model Context SDKs available right now, there are really only two that all the focus is on from the Anthropic side: Python and TypeScript. The reason I decided to spend time on the TypeScript route is that Cloudflare and several others have seemingly gone all in on doing it in TypeScript. If that's going to be the best experience for MCP — and all this moves so fast — I wanted to make sure I had the best route. Long term, like any of those other SDKs, I think they should just compile straight off the shelf. I'm approaching that all the way upstream — talking to folks like Brett Cannon working on CPython, like, "all right, wasmCloud is about to come out, what do we need to do to make that a really easy experience to get compiling?" And I know that's a key difference between this project and what you've been working on.
+
+**Ian** [57:48](https://youtu.be/aQ_SpvOfWSQ?t=3468)
+
+That makes sense. The Rust SDK has an example for WASI — I don't know when they added it — so it had some basic ability to do at least the tools that way. I'm sure the other ones will add it too, so it'd be awesome in the future if you didn't have to learn something new. That makes sense. Thanks.
+
+**Brooks Townsend** [58:19](https://youtu.be/aQ_SpvOfWSQ?t=3499)
+
+Well, I think we've got a pretty fun-looking next-week community call. Just to speed-run here in the last couple of minutes, I promised to do a quick update on two things. I basically abandoned this PR for a short amount of time, but the runtime crate we've been working on — dubbed `wasmcloud`, the runtime crate underneath `wash` that supports plugins, built-ins, and all those things — is now fully integrated into `wash` in this PR. So running `wash dev`, if you install plugins, that's going to be using the workload API with `wasmcloud` to actually drive component-to-component calls and work with built-in plugins. That's all looking really exciting. I should have this out of draft and ready for review a little bit later today, so let it marinate — folks are welcome to take a look. Most of the 14,000 lines is generated stuff, but it's a couple thousand lines for sure.
+
+The other thing I wanted to mention is a shout-out to all the folks who have been contributing to `wash` since this project opened. I've been really impressed and heartened by all the contributors coming in — like **Jacob**, you're crushing it, continually coming in fixing things, TODOs, issues of different sizes. **Luca**, looks like you've come in, and **Junji** too — thank you so much for contributing to the project. You leave a TODO like "gotta add config cleanup at some point" and someone comes in and does it. It's really awesome.
+
+This PR bringing in the crate isn't going to finalize everything, but it makes significant progress on the Q3 roadmap. Q3 wrapped up last week, so we're due for Q4 planning. I think we can tentatively say **two weeks from today — October 22** — for the Q4 roadmap planning. I know that's a bit into Q4, but it's like what we did last year: KubeCon comes up in Q4, everybody's gearing up, getting demos and talks ready, so it's good to have buffer room to plan. This PR makes a ton of progress on in-process component-to-component calls, reducing host responsibility, simplifying interface maintenance, and configuring a wasmCloud host with built-in providers — all present in the `wasmcloud` crate now. The remaining work is integrating that into the wasmCloud binary and getting it released. I'm going to touch base with Luke Arc this week about capability provider changes, since he's been doing a lot of work there in a backwards-compatible way.
+
+Oh, an Aditya question: the capability provider model isn't going away entirely in v2, right? No, definitely not. To disambiguate: what we want to get away from in the capability provider model is the custom provider-archive thing, where you have to build binaries for every architecture and put them in a special tarball with claims, and then wasmCloud needs to run processes. That's what we want to get away from. But extending wasmCloud at runtime is still definitely a goal — that's the whole point of the wRPC server effort. Let me link that if folks want a read. Thanks for asking, Aditya — I didn't mean to be ambiguous.
+
+Okay, so with that, we'll call it for this one. Thanks, folks. Ian, Corey — I realized you didn't even really get to do a full introduction, so maybe next week we can get that done. Thanks to all the new folks and the old folks, and we'll see you next week. Have a wasmCloud day, everybody.

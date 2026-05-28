@@ -1,0 +1,125 @@
+---
+date: '2025-08-06'
+title: 'Debugging a wadm Component Update: Image References & the Component Model'
+description: "Wasm component model debugging on the wasmCloud call: why a wadm component update kept an old OCI image reference and dropped config, plus NATS tooling."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wadm
+  - oci registry
+  - nats
+  - opentelemetry
+  - webassembly news
+chapters:
+  - { seconds: 0, label: "Welcome and pre-show: the pipeline platform bug" }
+  - { seconds: 177, label: "wasmCloud Wednesday kickoff and impromptu demo" }
+  - { seconds: 241, label: "Mike's pipeline platform and the component update problem" }
+  - { seconds: 326, label: "Demo: reproducing the bug with a Hello World HTTP Rust component" }
+  - { seconds: 571, label: "Brooks' analysis: the wadm diff and scale-down/scale-up" }
+  - { seconds: 725, label: "Inspecting config data in NATS KV" }
+  - { seconds: 920, label: "The empty config, race conditions, and incomplete diffs" }
+  - { seconds: 1104, label: "Debugging with nats sub and wasmbus events" }
+  - { seconds: 1278, label: "Troubleshooting docs, OpenTelemetry, and next steps" }
+  - { seconds: 1487, label: "Wrap-up and an open invitation to bring issues" }
+image: https://i.ytimg.com/vi/1pB61vbkoAo/maxresdefault.jpg
+showTitle: true
+slug: 2025-08-06-community-meeting
+---
+
+import YouTube from 'react-player/youtube';
+
+{/* Video hero — the whole point of this page */}
+
+<YouTube url="https://www.youtube.com/watch?v=1pB61vbkoAo" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=1pB61vbkoAo" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The August 6, 2025 wasmCloud community call turned into a live debugging session around the **Wasm component model** in production. Mike, who runs a pipeline platform on wasmCloud, walked through what looked like either a misunderstanding or a bug: when he updated one of his deployed components to a new **OCI image reference**, [wadm](https://github.com/wasmCloud/wadm) scaled the component but kept the old image — and, more worryingly, dropped the component's config. Brooks Townsend reproduced the issue alongside him, traced it to an incomplete diff in wadm's upgrade logic, and showed how to use **NATS** key-value buckets and event subscriptions to debug the running system.
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **Updating a component's OCI image reference didn't redeploy the new image:** Mike bumped a component from `0.0.1` to `0.0.2`, redeployed the application, and wadm logged "the component will be scaled, but image reference will not be updated" — leaving the old image running
+- **The config data silently disappeared:** after the update, the component's config came back empty; bumping the application version again (without changing the component) restored it, pointing at the update path rather than the config itself
+- **Brooks reproduced the bug live** with a stock **Hello World HTTP Rust** component plus a single config import, confirming it wasn't a misconfiguration on Mike's end
+- **The root cause looks like an incomplete diff in wadm's upgrade logic:** on a version bump wadm diffs the manifest, scales the old component down (deleting its config), then scales the new one up — and something in that path fails to recreate the config that should never have been removed
+- **A wasmCloud component requires its config to exist before it starts,** so wadm creates the config and then the component; the teardown step appears to be removing config that another component no longer references
+- **`nats kv ls` and `nats kv get`** against the `CONFIGDATA_default` bucket are a fast way to confirm whether a component's config is present during an update
+- **`nats sub "wasmbus.evt.>"`** surfaces every cloud event in the system (component scaled, config deleted, and so on) — invaluable for debugging deploys, though Lucas Fontes cautioned that a broad `nats sub ">"` can steal messages from the host and cause "no responders" errors
+- **OpenTelemetry traces and dashboards** should ideally carry the same information, and the team flagged general NATS-debugging guidance as a gap in the troubleshooting docs
+
+## Chapters
+
+- [0:00 — Welcome and pre-show: the pipeline platform bug](https://youtu.be/1pB61vbkoAo?t=0)
+- [2:57 — wasmCloud Wednesday kickoff and impromptu demo](https://youtu.be/1pB61vbkoAo?t=177)
+- [4:01 — Mike's pipeline platform and the component update problem](https://youtu.be/1pB61vbkoAo?t=241)
+- [5:26 — Demo: reproducing the bug with a Hello World HTTP Rust component](https://youtu.be/1pB61vbkoAo?t=326)
+- [9:31 — Brooks' analysis: the wadm diff and scale-down/scale-up](https://youtu.be/1pB61vbkoAo?t=571)
+- [12:05 — Inspecting config data in NATS KV](https://youtu.be/1pB61vbkoAo?t=725)
+- [15:20 — The empty config, race conditions, and incomplete diffs](https://youtu.be/1pB61vbkoAo?t=920)
+- [18:24 — Debugging with nats sub and wasmbus events](https://youtu.be/1pB61vbkoAo?t=1104)
+- [21:18 — Troubleshooting docs, OpenTelemetry, and next steps](https://youtu.be/1pB61vbkoAo?t=1278)
+- [24:47 — Wrap-up and an open invitation to bring issues](https://youtu.be/1pB61vbkoAo?t=1487)
+
+## Meeting Notes
+
+### The Setup: Updating a Component in a Live Pipeline Platform
+
+Mike has been building a [pipeline platform](https://wasmcloud.com/) on wasmCloud and now has real users running [WebAssembly components](/docs/overview/workloads/components) they don't even know they're using. He updated one of those components — added features, bumped its version, and pushed the new image to his registry — then ran a script that walks every running pipeline, updates the manifest, and increases the component version by one. He expected **wadm** to redeploy each application with the new image. It didn't. Suspecting the fault was his own, he reproduced the behavior from scratch with a stock **Hello World HTTP Rust** template, which made it the de facto main topic of the meeting.
+
+### Demo: Reproducing the Bug
+
+To the stock component Mike added a single `wasi:config` import that reads a value and prints it, and he changed the component's image source from a local file path to his **OCI** registry. Deploying version `0.0.1` worked perfectly: a `curl` printed the config value `world`. He then bumped both the application version and the component version to `0.0.2` (already pushed to his registry) and redeployed. The deploy reported success, but two things were wrong. First, the config came back **empty**. Second, a log line read *"requested to scale existing component to a different image reference… the component will be scaled, but image reference will not be updated"* — meaning the old `0.0.1` image kept running. Redeploying once more as application version `0.0.3` (without touching the component) brought the config back, which deepened the mystery.
+
+### Brooks' Analysis: The wadm Diff
+
+Brooks Townsend confirmed Mike was "doing all the right things" and the issue was reproducible. He explained the mechanics: when you deploy a new version of an application and **wadm** sees in the diff that the image reference changed, it sends the wasmCloud **host** a request to scale the old component down and another to scale the new **OCI** reference up. An in-place "update component" path has been on the backlog for a while, which may explain the image-reference behavior. The empty config was the more surprising symptom — Brooks noted wadm shouldn't be deleting config that didn't change. His working theory: the scale-down step tears down the component *and* its associated config (perhaps reasoning that nothing else references it), and the scale-up step then fails to recreate it. Because a component requires its config to exist before it starts, that gap leaves the new component running with no config. He concluded it looked like wadm computing a **somewhat incomplete diff** during the upgrade.
+
+### Debugging With NATS
+
+Lucas Fontes asked what was happening in the config-data **KV** bucket during the update, which sent the group into hands-on debugging. Using `nats kv ls` and `nats kv get` against the `CONFIGDATA_default` bucket, Mike watched the config literally disappear from the bucket after the update and reappear after a fresh redeploy. Brooks then introduced `nats sub "wasmbus.evt.>"` to listen to every cloud event in the wasmCloud system — component scaled down, config deleted, and so on — which is one of the easiest ways to see exactly what a deploy did. Lucas added a **word of caution**: a broad `nats sub ">"` watches everything but can intercept messages meant for the host, producing confusing "no responders" errors. The plan: Mike opens a bug report with the captured event log, logs, and traces, and optionally pairs with Brooks to dig into the wadm codebase.
+
+## WebAssembly News and Updates
+
+This was a focused, single-topic call rather than a roundup of ecosystem news, but it surfaced a practical truth about running the [Wasm component model](https://component-model.bytecodealliance.org/) in production: the developer experience increasingly lives at the edges where deployment tooling, **OCI** distribution, and configuration meet. The discussion reinforced that wasmCloud's reference [Wasmtime](https://wasmtime.dev/)-based host, the [wadm](https://github.com/wasmCloud/wadm) application deployment manager, and [NATS](https://nats.io/) as the control plane all need to agree precisely on a component's desired state during an upgrade. The team also flagged a documentation opportunity around general NATS debugging and [OpenTelemetry](/blog/otel-observable/) observability, which they'd like to make the "north star" for diagnosing these issues without dropping to raw NATS subscriptions.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/overview/workloads/components) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](https://component-model.bytecodealliance.org/) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, C#, and more) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable provider architecture. wasmCloud's reference host is built on [Wasmtime](https://wasmtime.dev/), distributes components as [OCI artifacts](/docs/overview/packaging/), and uses [NATS](/docs/overview/transport/) as its lattice control plane — with [wadm](https://github.com/wasmCloud/wadm) reconciling your declarative application manifests against the running system. With built-in OpenTelemetry observability and [Kubernetes integration](/docs/kubernetes-operator/), wasmCloud bridges WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
+
+## Topic Deep Dive: Updating Components in the Wasm Component Model
+
+The whole meeting orbits one deceptively simple operation: changing the image of a running **[Wasm component](https://component-model.bytecodealliance.org/)**. In wasmCloud, a deployed application is a declarative manifest, and [wadm](https://github.com/wasmCloud/wadm) is the reconciler that makes the running lattice match it. When the manifest's component version changes, wadm computes a diff and translates it into imperative commands to the [host](/docs/overview/hosts/): scale this component down, scale that one up, create or delete the [config](/docs/overview/interfaces/) those components depend on. The bug Mike surfaced lives in that translation. Two related issues showed up — the new **OCI image reference** wasn't applied (a known gap pending an in-place update path), and the component's config was deleted during scale-down but not recreated on scale-up. Because the component model ties a component's runnability to its declared configuration existing first, a missing config means a component that's nominally "updated" but functionally broken. It's a sharp reminder that the value of the component model — portable, sandboxed, OCI-distributed units of business logic — depends on the surrounding lifecycle machinery getting state transitions exactly right.
+
+## Who Should Watch This
+
+This call is especially valuable for **platform engineers running wasmCloud in production** who do rolling updates of components and want to understand exactly how [wadm](https://github.com/wasmCloud/wadm) diffs and applies a new manifest (start with Brooks' analysis at [9:31](https://youtu.be/1pB61vbkoAo?t=571)), **operators debugging deployments** who want practical NATS tooling for inspecting config and watching cloud events (the live debugging from [12:05](https://youtu.be/1pB61vbkoAo?t=725)), and **anyone packaging components as OCI images** who needs to know how image-reference changes are handled on update (Mike's reproduction at [5:26](https://youtu.be/1pB61vbkoAo?t=326)).
+
+## Up Next
+
+The immediate follow-up is a bug report from Mike — complete with the captured **wasmbus** event log, logs, and traces — and a possible pairing session with Brooks to trace the upgrade path through the wadm codebase. The team also wants to improve troubleshooting docs around NATS debugging and lean harder on OpenTelemetry dashboards as the primary way to diagnose deploys. As always, the community welcomes members bringing real-world issues to the call for live help.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2025-08-06-community-meeting-transcript/)**

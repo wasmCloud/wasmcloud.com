@@ -1,39 +1,134 @@
 ---
 date: '2025-10-22'
-title: 'Meeting Agenda - 2025-10-22'
-description: 'wasmCloud community call demoing wasmCP for composing MCP tooling across Rust, Python, and TypeScript plus the new long-running wasmCloud services concept.'
+title: 'wasmCP MCP Servers & Long-Running Services on the Wasm Component Model'
+description: "wasmCloud community call on the Wasm component model: wasmCP for composing MCP servers across languages, plus new long-running wasmCloud services."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - mcp server
+  - model context protocol
+  - wasm components
+  - webassembly news
+  - wasmtime
+  - capability providers
+chapters:
+  - { seconds: 0, label: "Welcome to wasmCloud Wednesday for October 22" }
+  - { seconds: 208, label: "Meet Corey and Ian: the origins of wasmCP" }
+  - { seconds: 275, label: "Demo: scaffolding MCP tools with wasmCP in Rust" }
+  - { seconds: 577, label: "Adding and composing tools with wash" }
+  - { seconds: 945, label: "Composed tools and middleware: the Pythagorean pattern" }
+  - { seconds: 1339, label: "Running on Wasmtime, wash, and Cosmonic Control" }
+  - { seconds: 1692, label: "Inside the WIT: a transport-agnostic MCP protocol" }
+  - { seconds: 2088, label: "MCP spec versions and supporting multiple releases" }
+  - { seconds: 2450, label: "Introducing wasmCloud services: long-running components" }
+  - { seconds: 2987, label: "Keeping services live: error handling and restarts" }
+  - { seconds: 3107, label: "The future of capability providers, OpenTelemetry, and NATS" }
+image: https://i.ytimg.com/vi/XcegvHapaao/maxresdefault.jpg
+showTitle: true
+slug: 2025-10-22-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- Demo: wasmCP (WebAssembly Component Development Kit)
-- Demo: wasmCloud Services and Long-Running Components
+<YouTube url="https://www.youtube.com/watch?v=XcegvHapaao" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=XcegvHapaao" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The October 22, 2025 wasmCloud community call is a two-demo deep dive into the **Wasm component model**. Corey and Ian demo **wasmCP**, a framework for building Model Context Protocol (MCP) servers as composable WebAssembly components in Rust, Python, and TypeScript — scaffolding tools, chaining them through a transport-agnostic WIT-defined middleware pattern, and running the result on Wasmtime, wash, or Cosmonic Control. Brooks Townsend then introduces **wasmCloud services**: long-running components targeting the WASI CLI world that open the door to component-native capability providers.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **wasmCP** is a framework for building MCP tooling, resources, and prompts as WebAssembly components — developers write only their business logic and input schema, and the framework handles every MCP-protocol concern
+- **Scaffold, build, compose, run** is the whole loop: `wash` (or standard Rust tooling) builds the component, a compose step wraps it in the wasmCP framework, and the result runs as an MCP server on Wasmtime, Spin, wash, or Cosmonic Control
+- **Composed tools** (Corey's "middleware" pattern) let one component intercept a tool call and delegate to downstream components — a Pythagorean-theorem tool calling separate square and square-root tools — so you can abstract or hide lower-level tools from the AI client
+- The wasmCP **WIT is transport-agnostic**: it is a near-direct, hand-written translation of the MCP spec types, with HTTP/streamable-HTTP and standard-IO transport components layered on top, leaving room for WebSockets or other transports without changing the contract
+- wasmCP currently targets the **March 0.3 MCP release** and plans to support the upcoming November spec, with the composition model making it feasible to support multiple spec versions in parallel
+- **wasmCloud services** are a new workload concept: long-running components targeting the **WASI CLI** world (any binary-target language) that run for the lifetime of their `main` function — unlike the short-lived, reactive components wasmCloud ran before
+- A **cron service** demo showed a long-running service invoking a separate cron component every second through a custom WIT interface, composed at runtime by wash's workload resolution rather than statically with `wac`
+- Services are a path to **proof-of-concept capability providers**: future work includes services holding open sockets/connection pools, an OpenTelemetry sidecar pattern, and avoiding a provider SDK by driving everything through WIT and the WASI CLI
+
+## Chapters
+
+- [0:00 — Welcome to wasmCloud Wednesday for October 22](https://youtu.be/XcegvHapaao?t=0)
+- [3:28 — Meet Corey and Ian: the origins of wasmCP](https://youtu.be/XcegvHapaao?t=208)
+- [4:35 — Demo: scaffolding MCP tools with wasmCP in Rust](https://youtu.be/XcegvHapaao?t=275)
+- [9:37 — Adding and composing tools with wash](https://youtu.be/XcegvHapaao?t=577)
+- [15:45 — Composed tools and middleware: the Pythagorean pattern](https://youtu.be/XcegvHapaao?t=945)
+- [22:19 — Running on Wasmtime, wash, and Cosmonic Control](https://youtu.be/XcegvHapaao?t=1339)
+- [28:12 — Inside the WIT: a transport-agnostic MCP protocol](https://youtu.be/XcegvHapaao?t=1692)
+- [34:48 — MCP spec versions and supporting multiple releases](https://youtu.be/XcegvHapaao?t=2088)
+- [40:50 — Introducing wasmCloud services: long-running components](https://youtu.be/XcegvHapaao?t=2450)
+- [49:47 — Keeping services live: error handling and restarts](https://youtu.be/XcegvHapaao?t=2987)
+- [51:47 — The future of capability providers, OpenTelemetry, and NATS](https://youtu.be/XcegvHapaao?t=3107)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### wasmCP: Building MCP Servers as WebAssembly Components
 
-### wasmCP (WebAssembly Component Development Kit) Demo
+Corey and Ian — former co-workers at the startup Extend, now building an AI project together — introduced **[wasmCP](https://github.com/wasmcp/wasmcp)**, a framework for building MCP (Model Context Protocol) tooling, resources, and prompts. The pitch is that developers focus only on business logic and an input schema while wasmCP handles every MCP-related concern. Corey scaffolded a new tool from a template (Rust, Python, and TypeScript are working today), which ships with an out-of-the-box reference set of tools like `add` and `subtract`. Building with `wash` (or normal Rust tooling) produces a binary, and a `compose` step wraps it in the framework to produce the final component, which runs as an MCP server on **Wasmtime**, Spin, `wash`, or **Cosmonic Control**.
 
-* Corey and Ian introduce wasmCP, a framework for building MCP (Model Context Protocol) tooling. 
-* They demonstrate how to scaffold new tools (currently supporting Rust, Python, and TypeScript), add functionality (like addition, subtraction, square, square root), build and compose them using `wash`, and run them as an MCP server. 
-* A key feature highlighted is the ability to build "middleware" or "composed tools" that can combine or abstract the functionality of other tools (e.g., a Pythagorean theorem tool calling square and square root tools). 
-* They emphasize that developers only need to focus on business logic, and the framework handles MCP-related complexities. 
-* The project aims to provide a first-class MCP SDK built on WebAssembly components, allowing dynamic composition of tools written in different languages.
+Corey then added more tools — squaring numbers and square root — rebuilt, recomposed, and reconnected to show four live tools. He also demonstrated the **aliasing** built into the tooling, which lets you reference components by friendly names that map to either local paths or [**OCI**](/docs/overview/packaging/) references, instead of copying long paths around.
 
-### wasmCloud Services and Long-Running Components Demo 
+### Composed Tools: A Middleware Pattern for the Component Model
 
-* Brooks introduces the new "service" concept in wasmCloud. 
-* Previously, wasmCloud components were short-lived and reactive. Services are now long-running components that target the Wasmtime CLI world, similar to a regular process. 
-* A demo shows a "cron service" (a long-running component) invoking a "cron component" on a timed interval via a custom interface. 
-* This new capability allows for proof-of-concept capability providers and extends custom functionality within the wasmCloud runtime, opening up use cases like long-lived database connections, custom metrics collectors, and more flexible application architectures.
+The most interesting pattern Corey demonstrated is what the team has been calling **middleware** but is more accurately **composed tools**. Using the Pythagorean theorem as an example, a composed-tool component sits above the lower-level tools: when it receives a tool call, it decides whether to handle the request itself (e.g. `pythagorean`) or hand it off to the next component in the chain. The Pythagorean tool calls downstream to the square tool for both numbers, then the square-root tool, and returns the hypotenuse. Because composition flows left to right through the chain, developers can **abstract functionality** — exposing only the high-level Pythagorean tool to the AI client while hiding the square and square-root tools, or pre-composing a component and publishing it alongside lower-level tools. Corey noted you could even **dynamically compose** tools on the fly from published OCI artifacts, or A/B test between two implementations via the middleware routing.
 
-## Recording
+### Inside the WIT: A Transport-Agnostic MCP Protocol
 
-{/* Automated - No need to adjust this unless automation fails */}
+Asked by Brooks how a totally custom interface runs across Wasmtime, wash, and Cosmonic Control, Corey and **Ian** walked through the [**WIT**](/docs/overview/interfaces/). Two packages are published: a **protocol** package — a painstaking, near-direct hand translation of the MCP spec types so others can implement their own framework architecture without copying thousands of lines of types — and a **server** package that provides the implementation layer and the middleware handler chain (inspired by the Middy framework for Lambda). Crucially, the transport contract just requires importing the handler, making it **transport agnostic**: today there is an HTTP transport component (using streams and WASI HTTP / streamable-HTTP) and a standard-IO transport component built on WASI CLI, with room to add WebSockets — or potentially gRPC for wasmCloud — without changing the WIT. Ian emphasized the goal of being **spec-complete**: anything you can do with an official MCP SDK should be doable on components, including SSE streams and elicitations.
 
-<YouTube url="https://www.youtube.com/watch?v=XcegvHapaao" />
+### wasmCloud Services: Long-Running Components
+
+Brooks introduced a new concept that just landed in `wash`: the **[service](/docs/overview/workloads/services/)**. Historically every component in wasmCloud was short-lived and reactive — receive an HTTP request, return an HTTP response. The new **workload API** adds a notion of a service: a component that targets the **WASI CLI** world (anything that compiles to a regular binary with a `main` function, like Rust, TinyGo, or C) and runs for the lifetime of that function, like a process. Brooks demoed a long-requested **cron** use case: a `cron service` that prints to stdout and, every second, calls a custom `wasmcloud:example/cron` interface, paired with a `cron component` that implements the other side and prints "hello from the cron component" to stderr. Rather than statically composing them with `wac`, **wash's workload resolution composes them at runtime** within the same workload — no volumes, host interfaces, or annotations required.
+
+### The Future of Capability Providers, OpenTelemetry, and NATS
+
+Brooks framed services as "effectively the beginning" of being able to **proof-of-concept capability providers** and extend custom functionality inside the wasmCloud runtime. Frank asked how to ensure a service stays live; Brooks explained that a service is a key component of a workload, so you can define a maximum restart count, and if it exits too many times the workload transitions to an error state (surfaced in the runtime and, on the operator side, in Kubernetes dashboards). Looking ahead, services could **open sockets or connection pools** that reactive components reuse, act as an **OpenTelemetry** sidecar collecting metrics/logs/traces, and eventually replace simpler providers (e.g. a service forwarding `wasi:messaging` to a NATS bus over TLS). Brooks said he'd rather wasmCloud run only WebAssembly than regular processes, and hopes to **avoid a provider SDK** by driving service implementation and communication entirely through WIT — with WASI P3 streaming and WASI TLS strengthening the case. Ian noted the standard-IO transport means an MCP server could run as a service directly.
+
+## WebAssembly News and Updates
+
+This call lands at the intersection of two fast-moving ecosystems: the **WebAssembly component model** and the **Model Context Protocol**. wasmCP shows MCP — the open protocol from Anthropic for connecting AI models to external tools and data — being implemented as first-class WebAssembly components, so MCP tools written in [Rust](/docs/), Python, or TypeScript can be composed together regardless of source language. The project tracks the MCP spec closely (the March 0.3 release today, with the November release planned) and is built on the same [Wasmtime](https://wasmtime.dev/) runtime and OCI distribution that power wasmCloud. On the platform side, the new long-running **services** concept points toward [WASI Preview 3](https://component-model.bytecodealliance.org/) async ([on wasmCloud](/blog/wasi-p3-on-wasmcloud/)) and WASI TLS reshaping how capabilities are delivered. For ongoing updates, follow the [wasmCloud blog](https://wasmcloud.com/blog/) and the [Bytecode Alliance](https://bytecodealliance.org/).
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](/docs/overview/workloads/components) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, C#, and more) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable provider architecture. wasmCloud's reference host is built on [Wasmtime](https://wasmtime.dev/), and as this call shows, the same component model that powers wasmCloud workloads also lets independent projects like wasmCP compose MCP servers from tools written in different languages. With built-in OpenTelemetry observability and [Kubernetes integration](/docs/kubernetes-operator/), wasmCloud bridges WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
+
+## Topic Deep Dive: The Wasm Component Model
+
+Both demos in this meeting are really demonstrations of the **[Wasm component model](https://component-model.bytecodealliance.org/)** in action. wasmCP's whole architecture — scaffold a tool, get generated bindings, compose components together — is the component model's "write once, compose anywhere" promise applied to MCP. The middleware/composed-tools pattern only works because components expose typed interfaces through **WIT** and can be chained without trusting one another's internals: a Pythagorean component can call square and square-root components that may be written in different languages, published as separate OCI artifacts, and swapped independently. The transport-agnostic WIT — a hand-translated MCP protocol package plus interchangeable HTTP and standard-IO transport components — shows how the [component model](/docs/overview/workloads/components) separates protocol contract from transport implementation. And wasmCloud services extend the same model from short-lived reactive components to long-running ones, with `wash` composing a service and a component at runtime through a custom WIT interface. The throughline: as more of the surface area (MCP servers, capability providers, transports) becomes composable components, the more the component model becomes the universal contract across languages and runtimes.
+
+## Who Should Watch This
+
+This call is especially valuable for **AI and MCP developers** who want to build MCP servers as portable, composable WebAssembly components across Rust, Python, and TypeScript (start with Corey and Ian's wasmCP demo at [4:35](https://youtu.be/XcegvHapaao?t=275)), **platform engineers** evaluating how long-running workloads and capability providers might be replaced by components (Brooks's wasmCloud services demo at [40:50](https://youtu.be/XcegvHapaao?t=2450)), and **WebAssembly tooling authors** curious how to structure a transport-agnostic WIT and a runtime-composition middleware pattern (Ian's WIT walkthrough at [28:12](https://youtu.be/XcegvHapaao?t=1692)).
+
+## Up Next
+
+The next community call on **[October 29, 2025](/community/2025-10-29-community-meeting/)** announces the new CNCF community calendar, demos the openapi2mcp Wasm Shell plugin, and shares a WASI P3 JCO async progress update. Watch for more compelling wasmCloud service examples — including socket support, shared virtual file systems between services and components, and MCP servers running as services — plus wasmCP supporting the November MCP spec release.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2025-10-22-community-meeting-transcript/)**

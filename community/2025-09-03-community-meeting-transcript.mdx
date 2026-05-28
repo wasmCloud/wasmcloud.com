@@ -1,0 +1,223 @@
+---
+date: '2025-09-03'
+title: 'Transcript: In-Process Component Calls & the Wasm Component Model'
+description: 'Full transcript of the September 3, 2025 wasmCloud community call covering in-process component-to-component calls, reducing the host API surface, and wash CLI completions.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm runtime
+  - wasmtime
+  - host plugins
+  - wash cli
+  - webassembly kubernetes
+image: https://i.ytimg.com/vi/CbE9Uzfkb2I/maxresdefault.jpg
+showTitle: true
+slug: 2025-09-03-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-09-03-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=CbE9Uzfkb2I" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=CbE9Uzfkb2I" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Sep 3, 2025 · 62 minutes*
+
+**Speakers:** Brooks Townsend, Bailey Hayes, Liam Randall, ossfellow
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Liam Randall** [00:54](https://youtu.be/CbE9Uzfkb2I?t=54)
+
+This is probably the fourth different video conferencing technology I've been on today. Teams, Meet, and the thing we use internally — Gather. Sometimes they just adopt different perspectives. I'd even blur my background so you can spot me from all my baby stuff, but I don't know where to do that. If you click the video icon in the bottom-left on my Mac, there's a little up arrow, and your background is a function right there.
+
+**Liam Randall** [01:48](https://youtu.be/CbE9Uzfkb2I?t=108)
+
+I've got three kids, so you understand how hermit crabs live when you have kids. Going from one to two was a lot, and then going from two to three really didn't matter, because we were already drowning. I'm not really a helicopter parent — I believe everybody should live their life 20% uncomfortable. That's my personal philosophy, and certainly for my kids: jump off that 20-foot cliff, follow the instructions, get some scrapes and bruises. About 80% of the growth happens in that 20% of the discomfort. So I really push my kids to fail a lot. If you're not failing at stuff, you're not being ambitious enough. That's Brooks — you have the con now.
+
+**Brooks Townsend** [03:37](https://youtu.be/CbE9Uzfkb2I?t=217)
+
+Thank you. Basically the same thing as kids — dogs. Sometimes you have to take them to the vet, and sometimes that appointment's really fast, which is nice. Now Dougie is just chilling in the sun in his bed. This is the time of year where the sun streams into the back window.
+
+**Brooks Townsend** [04:06](https://youtu.be/CbE9Uzfkb2I?t=246)
+
+Thanks for being here, everybody — good to see Mike, good to see Colin, good to see Aditya. I think today should be fun. I've got some good updates for some of the bigger tickets on the roadmap. I promised a demo, but I just got back, so quite honestly it's going to be two discussions. But Bailey, you have a demo, right? Do you want slightly more time? You need ten? Okay, we'll do the demo later. This discussion should take us a good bit of the way, so it'll be fine. Let's do it.
+
+**Brooks Townsend** [05:10](https://youtu.be/CbE9Uzfkb2I?t=310)
+
+Hey everybody, welcome to wasmCloud Wednesday, September the third. We are — oh my gosh — in our last month of quarter three. But do not despair: we've got some pretty nice updates on some of the bigger-ticket items on this roadmap. Last week we talked about one of the tickets in the research column, around configuring a wasmCloud host with shared capability providers. Aditya came in and led the discussion, calling out some of the things we still need to figure out — some of the research-column items just need time to pick up off the backlog and get well scoped.
+
+<img src="/img/community/2025-09-03/image001.webp" alt="wasmCloud Q3 roadmap board shared on screen" />
+
+This week I threw two items on the agenda. I'm going to bow out — sadly — of a live demo of the in-process component-to-component calls. I've actually demoed this before, so it super works, I promise. We'll leave these two tickets to discussion, because a back-and-forth would be better. And Bailey has a demo we'll stick on at the end for `wash` plugin completions in the CLI, which is really cool.
+
+Looking at the quarter-three roadmap: the updated `wash` we've been working on hasn't officially replaced what `wash` is now, and I think that's okay. I've marked the RFC for plugins in `wash` completed, because we did do it. One of the in-progress ones you may be anxious to hear about is **in-process component-to-component calls**. This is a feature request we get very often. The idea is: if two components are running on the same host — executing in the same Wasmtime engine — and one component has an export and the other has an import and they're linked to each other, why do we send that invocation out over wRPC, over NATS, instead of just calling it directly?
+
+Now, there are good reasons to do it the current way. The one we stuck with the longest is consistency: if everything goes over the RPC layer, you may incur a small local penalty — the network loopback is essentially negligible compared to the time it took the request to get to the component in the first place — but the behavior is very consistent. You're always going over the same code path; you don't have to think about "is this going over NATS, so I need to consider load balancing," or "this stays local." Still, this continues to come up often.
+
+So in our q3 roadmap planning we said it would be really nice if, instead of doing a couple-hundred-microsecond call, components could call each other directly on the same host at single-digit nanosecond latency — basically just the amount of time it takes to make a value cross the component boundary. One of the themes of this quarter's roadmap was **intentional distributed networking**: we should support this in-process component-to-component call when two components run on the same host, and if you want components to talk over a distributed network, you opt into wRPC explicitly, or use an interface like WASI HTTP or WASI messaging to control the semantics of that RPC call.
+
+This is work I was spiking on and implemented for `wash`. One thing `wash` does is embed the wasmCloud runtime crate — that's still the backbone of how we execute components. But `wash up` and `wash dev` have things that make lifecycle management difficult for a local dev session: having to download NATS, wadm, wasmCloud, providers, and other components from a remote network is generally fine, but frustrating when it comes to orchestrating processes on Windows or making sure one dev session isn't clobbering another. So with `wash dev` I really tried to put forward the idea that it can be self-contained — you can develop a component, extend it with custom capabilities, but not use providers, not have an orchestration layer, and not go over NATS. If there's no RPC mechanism here, then we can't default to that.
+
+So in `wash dev` we have a helper function I wanted to bring up. When you initialize the component and the linker — if you're familiar with Wasmtime embedding, it's similar to how we link things in wasmCloud, one component to the next on a specific interface — this is literally creating the function callbacks for when a component calls an import: what gets executed on the host. For WASI logging, whenever you call the log function, that executes this callback in the host and emits a tracing event at that verbosity. Same with WASI config runtime — when you look up a key, we're just reading from a hash map.
+
+With wasmCloud today it's really different. We have a predetermined set of interfaces we support — WASI blobstore, WASI config, WASI key-value, WASI logging — and then everything else, everything we don't recognize as an import, we run through this `link_item` function, which pretend-links that item to wRPC. So whenever you call an import, that immediately sends out a NATS message. That's how wasmCloud supports any custom interface: we don't know where it's going, we just assume that if you called an import, you have something on the other end of the distributed network listening.
+
+Now we want to be more explicit. The approach I took in `wash dev` is to explicitly define the interfaces we link. WASI 0.2, because those are the standard interfaces — file system access, opening sockets, standard in/out. WASI logging and WASI runtime config, which are two interfaces not yet out of draft, but used extensively in our examples. WASI HTTP, because it's part of 0.2 and we like to use it. And then, last but not least, this special function: `link_imports_plugin_exports`.
+
+**Brooks Townsend** [14:42](https://youtu.be/CbE9Uzfkb2I?t=882)
+
+Another great example of my superior naming ability as an engineer. This function does a lot of lifting: it lets you register components for the dev process that *export* interfaces — WASI blobstore, WASI key-value, or your own `my-org:my-package` interface. If you have a component that exports an interface, you can link that component's export to your component's import. Instead of what we do in wasmCloud — go over every import the component has and push it out over wRPC — we iterate over every import we don't satisfy with the runtime (like WASI 0.2 or WASI HTTP), and through instantiation, lookup, and matching, create a new callback that calls the other component's export when it's invoked.
+
+<img src="/img/community/2025-09-03/image002.webp" alt="The blobstore-filesystem plugin component source linking WASI blobstore to the file system" />
+
+What this means is we can create plugins — under the plugin directory, a blob store file system. This is what I've demoed before. This `blobstore-filesystem` component exports WASI blobstore — it implements the entire WASI blobstore interface — and it imports WASI filesystem. So it implements WASI blobstore by storing things in a local file the component has access to. This is really cool, because at the runtime layer we don't need to know anything about blob store at all. The component implements it. You could do the same thing with WASI key-value and push a message out on a socket to Redis. The key is that this is compiled to a component, and when you develop an application like `blobby` that imports WASI blobstore, all the blob store calls go component-to-component to this `blobstore-filesystem`.
+
+So this in-process component-to-component call is something I've been ironing the kinks out of, and it works quite well. The parsing logic is a little unwieldy — there's a lot of iterating over what a component imports and what your other components export — but that's going to be a key inclusion in the wasmCloud runtime crate: the ability to link components together. Making that available in a generic way is really key. The API surface is: hand in your Wasmtime linker, hand in the component you want to run, and hand in this collection of components that have exports you could call.
+
+What this really means is that if you — as in a scheduler — decide to run two components on the same host, they can talk to each other directly. We don't incur a network penalty, we have predictable deployments, and you can always opt into distributed calls. It just seems wasteful if you have a component that does logging and you're calling it ten times within the same invocation — why incur an extra penalty if you're always scheduling them next to each other? There will be more changes needed to make this feel nice from the wasmCloud perspective — in whatever manifest config format we land on, we'll want an easy way to intentionally put components on the same host and have them talk. Special thanks to Roman on the wasmCloud/Wasmtime side for the blueprint here — the lifting and lowering of values would have taken me 500 million years. What's next is pulling this out of `wash` and getting it into the runtime crate so it's easily consumable. Do folks have any questions? I see one in the chat.
+
+**ossfellow** [21:49](https://youtu.be/CbE9Uzfkb2I?t=1309)
+
+Does this logic remain part of the runtime when the wRPC interface implementations are taken out? I'm wondering whether we're adding technical debt here, or whether we're evolving the host implementation toward, let's say, a unified future.
+
+**Brooks Townsend** [22:15](https://youtu.be/CbE9Uzfkb2I?t=1335)
+
+Great question — and you're going to be very interested in my next discussion item. Right now wasmCloud is separated into the host and the runtime. The runtime deals with everything around executing components, and the host just hands bytes to the runtime and gets back a wrapped component. Inside the runtime is where all the wRPC links and capability implementations take place, and it's why we have a certain set of built-ins and custom behavior there. My work gives the host more opportunities to participate in what interfaces are supported, what's satisfied locally or by a built-in, and what goes over wRPC.
+
+So to answer directly: this will remain part of the runtime as a facility you can use. When we talk about taking out the wRPC interface implementations, it's more that we'll make them optional — something the wasmCloud host can turn on or off. When a component says "I want to link to WASI key-value," the host can say "I'm going to call this component," or "I'm going to go over wRPC," or "I don't support that at all, and I can't start you." I do need a diagram — many of them — but did that answer your question?
+
+**ossfellow** [24:34](https://youtu.be/CbE9Uzfkb2I?t=1474)
+
+For now it's good enough — and you said the next topic, so I'm waiting for the next topic.
+
+**Bailey Hayes** [24:38](https://youtu.be/CbE9Uzfkb2I?t=1478)
+
+I would argue, to answer your question, that this is very much on the evolving side and much less on the taking-away side — evolving in a way that's modularized, which is, I think, what we all want.
+
+**ossfellow** [25:02](https://youtu.be/CbE9Uzfkb2I?t=1502)
+
+One comment. We all know that if I have my custom implementation of WASI key-value, I can't bypass the wRPC implementation of the interface in the runtime, because it's hard-wired there. Part of the plan was that we'd disjoin these things and allow more flexibility, and also reduce the complexity of the runtime from constantly adding newer interfaces. So my question was whether it's part of the core runtime functionality, or part of the optional host.
+
+**Brooks Townsend** [26:13](https://youtu.be/CbE9Uzfkb2I?t=1573)
+
+Part of the optional. The intended design of the runtime now is that what you're guaranteed is WASI 0.2 — maybe there's a world where it makes sense to override CLI, standard in/out, sockets, file system, but I'd argue you could virtualize your component for that. With the runtime you get WASI 0.2; every other interface is satisfied either by an optional built-in plugin or your own custom implementation. So WASI key-value won't be something the runtime gives you implicitly. In the host, we may turn it on. Same with component-to-component calls — that'd be available if you decided to have a component call another component for that interface.
+
+**Brooks Townsend** [28:00](https://youtu.be/CbE9Uzfkb2I?t=1680)
+
+I'm tempted to go straight to the demo, but since we just said the next discussion item may interest you, we may as well talk about it. I alluded that the implementation of the runtime in `wash` right now is basically a module that uses wasmCloud runtime under the hood. So what is wasmCloud runtime, really? It's basically slightly-wrapped Wasmtime. When you use the most basic version of the runtime context, you get WASI 0.2 and that's it — you don't get the wRPC poly-filling when you're embedding, and you don't get any capability implementations. So in `wash` you still have to opt specifically into the interfaces you add, which means there's a lot of code in `wash` implementing these interfaces and running the component, because all wasmCloud runtime does is give you a nicely wrapped component back that you can make new stores from and call exports on.
+
+`wash` is a greenfield area that gave nice space to work on component-to-component calls. What I think we're really deserving of is evolving the wasmCloud runtime forward, so we don't need this idea of a custom context component, and you don't need to link in all your capabilities so granularly — because at that point you're basically just embedding Wasmtime, so why not embed Wasmtime normally? What I've been working on is extracting the pieces of wasmCloud runtime into a crate in the `wash` repository called `runtime`. This isn't where it'll end up — I'd love to release it as a minor version of wasmCloud runtime — but I'm iterating here to get the API surface right.
+
+This crate is responsible for a couple of things, basically the same core as wasmCloud runtime: please initialize this component, here are the bytes (from the file system, OCI, wherever), here are some resource limits to apply — max invocations at a time, that fun stuff. The same kind of API surface we have today, with some extras like volumes, a nice way to abstract the WASI file system pre-opens. We initialize a Wasmtime component from the bytes, create a new linker (standard Wasmtime embedding), add WASI 0.2, add WASI HTTP if the feature is enabled, pre-instantiate the component for performance, hook up the volume mounts, and get back a workload handle.
+
+You'll see the word **workload** used a lot around this little host API. A workload is an attempted evolution of the idea of a wadm application — a collection of components that make up an individual functionality. We could call it an application; it doesn't really matter. And a **service** — not a Kubernetes service, not an HTTP ingress service — is a component that exports the `wasi:cli/run` function. So a service is a long-running component that runs to completion, or runs long-running and does a cron job or something. Workload: a bunch of components; it could have a service in there that runs CLI — an attempt to get to the long-running-components world.
+
+I have the notion of a **host** in here, so there's reconciliation to do around naming. When we think about the host's responsibility — if it's not responsible for starting capability providers as processes (which Luke is working on right now) — then the host API, which is what we call the wasmCloud control interface today, is: you can ask the host for a heartbeat, request that it start a workload, ask for the status of a workload you already started, and stop it. If we boil the host API down to as minimal as possible — which is the goal for reducing host responsibility — the host is just responsible for the lifecycle of components: download them from OCI, start them, link them together appropriately, and give me back something I can use to query status or call the component.
+
+So the two big pieces in this runtime crate right now are the host API — this is just a trait, so the host can be implemented in terms of it, which is really nice from a Rust perspective: I implement `heartbeat` and hand back the heartbeat, and that's all I care about. What makes wasmCloud exist is wasmCloud embedding this host struct, listening for NATS messages, and when a request comes in — "host, give me your heartbeat," or every 30 seconds publish that heartbeat — we call this function and hand back the response. Because the host is implemented in terms of this simple API, we can unit-test it without interfacing with NATS at all. And within the idea of a workload comes all the information you'd typically get from many different "link this component to this provider, link this to this, configure this" calls — it's all contained in one payload, kind of like taking the wadm application and throwing it at a host: "run this, please." The host can validate it on receipt and reject it if necessary, instead of starting a component and then finding the link is invalid because the config didn't exist. Good call earlier, Victor, on making the annotations a B-tree map if we need it.
+
+**Brooks Townsend** [37:54](https://youtu.be/CbE9Uzfkb2I?t=2274)
+
+Something we've been struggling with consistently on the wasmCloud side over the last couple of months is the idea of a **built-in**. We have these capability providers you run separately that implement interfaces, but they come with the cost that every call goes over RPC. NATS is very performant, especially for smaller calls — but if you were implementing a WASI WebGPU capability provider, it would be massively inefficient to send a bunch of GPU frames over a network every time. Same with HTTP server streaming gigabytes of data. We want that to just call the component directly. So we've started making HTTP server built-in, HTTP client built-in, NATS messaging built-in — but we're building it all into the host, at a layer above where it probably should be, which is the runtime.
+
+<img src="/img/community/2025-09-03/image003.webp" alt="VS Code showing the runtime crate's HTTP server built-in plugin trait" />
+
+So in the runtime there's this plugin. Think of a built-in as a built-in provider. This trait tries to make the built-in provider simple, but lets you embed the wasmCloud host or runtime library and add your own built-ins easily. A couple of functions: return the WIT world this provider implements — all imports and exports; a start and stop handler, so you can listen on an HTTP address or shut it down or persist files to disk; and `bind`/`unbind` — really link and delete-link — so you participate in the link lifecycle for the component.
+
+Let me show the HTTP server built-in. It implements the `wasi:http/incoming-handler` interface. You start it — an HTTP server plugin has an address, listens on it, can do HTTP/HTTPS — and whenever a component starts that says "I export `wasi:http/incoming-handler`," the host calls this function: "this component wants to bind to you, do what you need, or tell me it shouldn't." As long as it's on incoming-handler, we set up host-based and path-based routing, open a new address like the HTTP server does today, store a handle to the component, and any time HTTP requests come in we call that component, past all the TLS stuff, and handle the request. That's for an export.
+
+Same thing works for an import. I can have a runtime config plugin that holds a big map of configuration for all the components. I implement this trait, get a handle to implement new interfaces without the runtime knowing about it — `get` and `get_all` for WASI config runtime. When a component starts and says "I want to bind to WASI config runtime," the runtime doesn't know anything about it; if this plugin doesn't exist, the component just fails to start. But as long as it does, you add the WASI config runtime bindings to that component's linker and implement them here. Same for logging, which has no state — add WASI logging to the linker and implement it with these tracing macros.
+
+So at the base level, wasmCloud runtime only does WASI 0.2 and outgoing HTTP — but not incoming. All the other capability implementations come from these built-in plugins, or — still in progress with Luke — a wRPC plugin. For specific interfaces, the wRPC plugin can say "in my WIT world, I want to take all calls to WASI key-value (my namespace, my package) and send them over a wRPC transport," and the runtime doesn't need to know anything about it. The point of the runtime crate is to nicely wrap Wasmtime, enforce resource limits, and give you hooks to extend the interfaces you want components to support — not just raw callbacks, but something extensible in a consistent way across multiple plugins. wasmCloud would embed this, and all the capability implementations in wasmCloud runtime today would shift to this plugin layer that you can turn on and off. It doesn't change much functionally about what happens when you run wasmCloud, but it gives us a lot of ability to customize what happens when a component calls an import.
+
+**ossfellow** [45:47](https://youtu.be/CbE9Uzfkb2I?t=2747)
+
+I wanted to put something out there: what happens if we expose the Wasmtime store to the component? For the most part, the reason a capability provider is a long-running process is that it needs instantiation or initialization — connecting to some source — as well as keeping state for its consumers, the components that are its clients. If we externalize that store so it's not part of the provider, we open the opportunity that a provider doesn't need to be a long-running process anymore, and could be a component that's only instantiated when there's an incoming call. Right now every provider has to maintain its own store. As part of this evolution, maybe it would be good to expose that store and provide facilities providers can leverage. There could be situations where initialization is expensive and a provider has to be long-running, but in a lot of cases that's not so, which means we can save resources and converge on the idea that providers are also components — and can leverage every benefit you're introducing for components, in-process calls, and so on. It seems Bailey agrees with me.
+
+**Bailey Hayes** [48:40](https://youtu.be/CbE9Uzfkb2I?t=2920)
+
+You get it — that's the big idea. With the `service`-type workload, which is intentionally tagged as long-running, or potentially long-running. The other version is the component-type workload, whose lifetime is tied to the store, so there's some lifetime trickiness to do. But with **WASI Preview 3** we get async reentrancy, which was really the big feature we needed to have components act as capability providers. So with WASI P3, we could have scale-to-zero capability providers that are sandboxed components. That would just be cool.
+
+**Brooks Townsend** [49:31](https://youtu.be/CbE9Uzfkb2I?t=2971)
+
+That's definitely an explicit goal here: if you know the lifecycle requirements of your provider, you can decide how it runs. Does it need a consistently open socket? Does it need to persist to disk? Does it need no state at all? A logging provider doesn't need any state — whenever you call it, we emit a tracing event. The `blobstore-filesystem` component does need some state and uses WASI filesystem as the facility. So there are a lot more options: if your provider is stateless and doesn't need to be long-running, you could run it as a component; running it as a wRPC endpoint is also fine if you want to scale it independently.
+
+And in wasmCloud right now we have no concept of running something as a CLI — it doesn't make sense, because you initialize it and then you're waiting for an incoming HTTP request, message, or trigger. Having a way in the runtime to execute a long-running component gives you options: you could hand that component a socket or a file descriptor for long streaming. That's the whole weird thing with the cron capability provider — now we have a whole separate process just to parse a cron statement and sleep before calling the component. That could totally be a component sitting there idle. I hope we have a lot more control over that.
+
+**Brooks Townsend** [52:38](https://youtu.be/CbE9Uzfkb2I?t=3158)
+
+Does anybody have any fun questions? I know this is a fire hose of information, with me ranting and pointing at my editor — my apologies for not getting a diagram together. Bailey, how long do you need for your demo?
+
+**Bailey Hayes** [53:01](https://youtu.be/CbE9Uzfkb2I?t=3181)
+
+It's pretty short. This is why I like to demo before you, Brooks — you're like "check out this amazing evolution of wasmCloud, a new way to run our workloads," and I've got a demo so fast I could do it in one minute.
+
+**Brooks Townsend** [53:22](https://youtu.be/CbE9Uzfkb2I?t=3202)
+
+Just to wrap up: you can see the component-to-component calls in `wash` now, in the `wash` repo. On the runtime side, I'm still fiddling with traits, types, and naming, but I should have a PR up into the `wash` repo later this week. The goal of having it in the `wash` repo is that I can iterate quickly, but I want `wash` and the wasmCloud runtime crate to flow back into the wasmCloud monorepo. Bailey, thank you for doing the demo since I wimped out.
+
+**Bailey Hayes** [54:31](https://youtu.be/CbE9Uzfkb2I?t=3271)
+
+In the same project Brooks was showing off, we have some nice little enhancements. Brooks has gotten really far on where the next version of `wash` should be, so I've been trying it out with all my normal workflows, dropping issues, giving feedback, and smoothing out rough edges. This was one of the first things I really wanted: completions. So I added — via Clap, the CLI crate we use, which supports auto-completion through an auto-complete crate — and guess what? It just worked. It was a really easy thing to get done in about ten minutes; I spent more time trying to figure out all the different ways people load shell completions. There's lots of stuff there, so give me feedback that this looks good. It took more time to do that part than the completions themselves.
+
+<img src="/img/community/2025-09-03/image004.webp" alt="Terminal demo of wash CLI shell tab-completions" />
+
+Let me show you. If I say `wash`, type `n`, and hit tab, it tabs out to `wash new`. Let me open a new tab, clear everything, and install the latest `wash`. `wash n<tab>` — it auto-completed `new`. Look at that. Let's use Rust — I'll use the sample HTTP REST. It created it. Now I have a simple Rust project, so let me build it: I hit `b` and tab — completion. It's not that amazing, but it's a really nice experience with the new version of `wash`. There was one little bug we fixed and published in the last release — I did that while you were talking, Brooks — and now you see a very minimal config file with our latest fixes; we had some extra stuff in there that's gone now. The more people use this and give us feedback, the better. One other place we'll want completions: if you type `wash oci` and can't remember whether you want `push` or `pull`, there's the command completion. So that's a pretty weak-sauce demo, but the cool part is how fast we can iterate on this next version of `wash` and cut a release as soon as changes land.
+
+**Brooks Townsend** [57:34](https://youtu.be/CbE9Uzfkb2I?t=3454)
+
+I have a question. Bailey, will you just run `wash` with no args? I didn't know if you had any plugins installed.
+
+**Bailey Hayes** [57:57](https://youtu.be/CbE9Uzfkb2I?t=3477)
+
+Maybe not anymore — I deleted my `wash` folder. It does actually include plugins in the completions; I tested that. I cleared it out because I didn't want people to see my super-secret plugin I'm working on.
+
+**Brooks Townsend** [58:17](https://youtu.be/CbE9Uzfkb2I?t=3497)
+
+That's what I was wondering — if you install a plugin that registers a top-level command, like "my super cool plugin," can you do `wash my<tab>` and have it pop out? You'll need to build it, but it's Rust, it'll build fast.
+
+**Bailey Hayes** [58:29](https://youtu.be/CbE9Uzfkb2I?t=3509)
+
+It does work. Let's test this on the fly. I just did that — and hey, I added a little note: "make sure you regenerate your plugin." Let me make sure my dog is good. `wash completions` — go back here, rerun this. `wash` without commands: I've got a completion, and look at that, it's got `wash inspect`. So if I type `wash i`, it auto-completes `inspect`.
+
+**Brooks Townsend** [59:46](https://youtu.be/CbE9Uzfkb2I?t=3586)
+
+So if you do `wash inspect -` and hit tab?
+
+**Bailey Hayes** [59:50](https://youtu.be/CbE9Uzfkb2I?t=3590)
+
+If I say `wash i`, it auto-completes, and if I add the dash like this — yeah.
+
+**Brooks Townsend** [1:00:01](https://youtu.be/CbE9Uzfkb2I?t=3601)
+
+That inspect plugin — I changed the top-level name to "inspect-enhance" or "inspect-plugin" or something, because it would conflict with the other one otherwise. Cool. Thank you, Bailey, that's awesome. Completions are super nice — I forget the ordering of some commands sometimes, which is probably bad, but you type it out and you can get there.
+
+**Bailey Hayes** [1:00:44](https://youtu.be/CbE9Uzfkb2I?t=3644)
+
+Easy peasy. We've dropped in other bug fixes too. I don't think we're quite ready for 1.0, but we're getting really close. So this is definitely the community's call to action: come in, try it out, give us feedback.
+
+**Brooks Townsend** [1:01:07](https://youtu.be/CbE9Uzfkb2I?t=3667)
+
+Ran right up to the end. Thanks so much — this is a pretty exciting community meeting, pretty exciting progress on the quarter-three roadmap. We're moving a lot of things across. Two of the other things still in triage are intentional distributed networking and simplifying interface maintenance, so we'll probably run right up to the end like every roadmap, but it's looking good. As always, if you're looking for an opportunity to contribute or pick up something a little more meaty, please let me or one of the maintainers know. Other than that: download `wash`, start playing with it. You have to — it's required, since you're all here you agreed to it.
+
+**Bailey Hayes** [1:02:00](https://youtu.be/CbE9Uzfkb2I?t=3720)
+
+That's actually really nice. I definitely prefer it.
+
+**Brooks Townsend** [1:02:05](https://youtu.be/CbE9Uzfkb2I?t=3725)
+
+Heck yeah, it's nice. All right, y'all — thank you so much. We'll see you next week for your favorite, wasmCloud Wednesday. Have an awesome day.

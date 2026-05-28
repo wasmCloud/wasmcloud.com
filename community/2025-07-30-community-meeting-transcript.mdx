@@ -1,0 +1,221 @@
+---
+date: '2025-07-30'
+title: 'Transcript: wash OAuth Plugin & the Wasm Component Model Plugin System'
+description: 'Full transcript of the July 30, 2025 wasmCloud community call covering the wash OAuth plugin, the Wasm component model plugin system, wash 1.0, and the wRPC capability provider roadmap.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wash cli
+  - webassembly plugin
+  - wasi http
+  - tinygo webassembly
+  - webassembly security
+image: https://i.ytimg.com/vi/QGsbX689MiQ/maxresdefault.jpg
+showTitle: true
+slug: 2025-07-30-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-07-30-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=QGsbX689MiQ" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=QGsbX689MiQ" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Jul 30, 2025 · 47 minutes*
+
+**Speakers:** Brooks Townsend, Masood (ossfellow), Kevin Hoffman
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [00:00](https://youtu.be/QGsbX689MiQ?t=0)
+
+Hey, how's it going?
+
+**Masood (ossfellow)** [00:07](https://youtu.be/QGsbX689MiQ?t=7)
+
+Could be better, but it's going — very, very busy.
+
+**Brooks Townsend** [00:15](https://youtu.be/QGsbX689MiQ?t=15)
+
+Well, hey, hopefully just busy and nothing too wild happening.
+
+**Masood (ossfellow)** [00:20](https://youtu.be/QGsbX689MiQ?t=20)
+
+No, no, but you know, it has also deprived me of really doing much with the project for the community. So I'm hoping that in September it's going to get a bit more sane.
+
+**Brooks Townsend** [00:39](https://youtu.be/QGsbX689MiQ?t=39)
+
+Yeah, nice, that makes sense. And also, please don't worry about that at all. I feel like that's a thing people talk about in open source — the amount of time you can contribute to it goes up and down. So we're just happy to have you in any capacity.
+
+**Masood (ossfellow)** [00:58](https://youtu.be/QGsbX689MiQ?t=58)
+
+Yeah. And you know, that's one of the fun parts of life.
+
+**Brooks Townsend** [01:07](https://youtu.be/QGsbX689MiQ?t=67)
+
+Yeah, yeah. Hey, Kevin, long time no see. How's it going outside of LinkedIn AI influencing, of course?
+
+**Kevin Hoffman** [01:23](https://youtu.be/QGsbX689MiQ?t=83)
+
+I'm still waiting for the day I mess with the algorithm so much I get booted off of there.
+
+**Brooks Townsend** [01:39](https://youtu.be/QGsbX689MiQ?t=99)
+
+Yeah. Let's give it maybe one more minute. One more minute good? All right, let's do that. Let me make sure everything is good.
+
+**Masood (ossfellow)** [02:27](https://youtu.be/QGsbX689MiQ?t=147)
+
+Everything's good.
+
+**Brooks Townsend** [02:47](https://youtu.be/QGsbX689MiQ?t=167)
+
+Hey everybody, welcome to wasmCloud Wednesday for Wednesday, July 30. I guess we're about a month into our quarter three roadmap, so I didn't actually put it on the agenda for today, but we'll do a quick check-in on some of the items there. I have a couple of updates that should be fun.
+
+Let me share the agenda for real. So — July 30, I've got a pretty fun demo. I was going to demo it last week, but I broke something right before, so instead we got to talk about pipelines and see Bailey's awesome `wash` action setup and all that. But I'm going to show an OAuth plugin in `wash`, and then I want to talk a little bit about the migration path for contributing that into the wasmCloud organization. We've got a couple of maintainers here; I just want to see if there are any opinions or thoughts. And then — there's not really a discussion needed, but look at that, we passed the 2,000 star mark. Yay, vanity metric. It's cool to just see that number tick up consistently on the homepage. So congrats, everybody. It's pretty fun to see the progress going in the upwards direction.
+
+<img src="/img/community/2025-07-30/image001.webp" alt="wasmCloud Wednesday agenda for July 30 and the 2,000 GitHub stars milestone" />
+
+So I guess we're messing with the agenda order, but okay — `wash` OAuth plugin. It's no secret; actually, two weeks ago I demoed the latest version of the Wasm Shell, which is a reimagining, a rewrite of `wash` from the ground up, built to be a Wasm component development tool and to have Wasm components integrated throughout the lifecycle of the CLI. We talked a little bit about a simple hook — right before your dev session starts up, you can have a before-hook that launches your observability stack. And we also talked about commands, which are top-level plugin subcommands, or one-level-nested commands that look like they're actually just a part of the Wasm Shell. I mean, hey, it kind of is like that.
+
+I'm going to show it from the guise of somebody who wants to try out a plugin for the first time. They haven't installed it yet, but they downloaded the WebAssembly component and they want to test it out. The purpose of this plugin is to be able to authenticate with any OAuth or OIDC server. That's a pretty common flow for authorizing with applications — go through an OAuth flow — and in `wash`, an OAuth login thing isn't really the responsibility of this tool. That's not the kind of thing we want to force into a top-level command and then have to maintain. So I went ahead and wrote a plugin. I just called it OAuth, and I pushed it up to the `wash` repository.
+
+Let me go ahead and inspect it. If we look at the `plugins/oauth/build`, you can see that this component uses WASI logging and config at runtime to look some things up. It makes outgoing HTTP calls, it accesses the file system, and then it imports and exports the wasmCloud `wash` plugin interface, so it can run as a plugin — but it also exports `wasi:http`, which is pretty interesting, a new capability that we've introduced into the plugin model system.
+
+<img src="/img/community/2025-07-30/image002.webp" alt="Inspecting the OAuth wash plugin component and its WASI imports and exports" />
+
+So if I wanted to see what this plugin was all about, I can. I'm going to do `cargo run`. I think everything's installed latest on my machine, but it never hurts. `cargo run plugin test` with this plugin, and then I'm just going to run `help`. You can also do `--help`; this will proxy down to it. Here's some of the information about this command. There's a single subcommand called `run`, which actually runs the command. So if I ran `run`, it'll say, "hey, you need to supply your client ID and your client secret for this component." Okay, reasonable. I actually have it exported in my other terminal, so I'm just going to use that.
+
+So I'm going to run this OAuth plugin, and when it runs, we get a single log that says, "waiting for authentication." This is basically just going to sit here. You can see we've opened up this HTTP port at `localhost:8888`. If I open that up, I can authorize my CLI plugin — or authorize this app. I get authorized. Boom, there's my access token. Don't steal it, I'll expire it. I don't even know if this is a secret — probably a good thing to figure out before you stream, but whatever. If I go back to my command line, you can see that I've authenticated myself and stored credentials under a specific access-token file. Now if I run this again, it's actually going to be able to look up that file immediately and look up my credentials.
+
+<img src="/img/community/2025-07-30/image003.webp" alt="Running the wash OAuth plugin: waiting for authentication on a local HTTP port" />
+
+So how did this work? When you run this plugin inside of `wash`, it's going to first execute essentially the main function of the plugin, which is only responsible for printing out a log and then waiting for this credentials file to exist. In the background, we instantiate another instance of this component that's waiting for the HTTP request at `/login`. Once you go through that flow, at the very end of it we store your credentials as part of that file.
+
+<img src="/img/community/2025-07-30/image004.webp" alt="Browser OAuth authorization returning an access token for the wash plugin" />
+
+**Brooks Townsend** [11:31](https://youtu.be/QGsbX689MiQ?t=691)
+
+So just to talk through the code a little bit more, because I think folks may find this interesting — I actually did this plugin in TinyGo. The main reason is because this HTTP router is just so nice. Two reasons, really: HTTP in and out in TinyGo is really nice. So you see I support three different endpoints: `/` is just the information, then `/login`, and then the callback URL.
+
+Inside of main — let's do main first — this is where my configuration of the plugin happens. So I add info, initialize, run, and a hook, and then my client ID and client secret config. Here's the one function you need to implement for every `wash` plugin: the `info` function. You hand back this structured piece of information about all the command-line flags that I'm expecting to be able to use. And nicely enough, I can actually use the environment variables from the host on an allow-only basis, so that I can run this demo and not show you my client ID and secret, which is really nice. And then the top-level command you can run, which is `run`.
+
+Inside of `run`, essentially what I do is parse the command-line arguments I got from the top-level CLI — client ID, client secret, and port — and then I set this plugin config. You have this shared plugin context that you can use across each instance of the component. So I set the client ID and client secret specifically, and then I do some work with WASI logging and WASI clocks and do a little exponential backoff checking the contents of the credentials file. So I'm essentially waiting for this file to exist.
+
+Now, I don't get to choose where this file comes from. Because this is a component, I have to use the WASI filesystem pre-opens API. There might be a way to do this with normal Go APIs — I didn't try, to be honest — but essentially I get the directory the host has allowed me to write to, and as soon as I can read it, I return: okay, we did it.
+
+<img src="/img/community/2025-07-30/image005.webp" alt="TinyGo OAuth plugin source: the info function, HTTP routes, and WASI filesystem pre-opens" />
+
+Right inside of OAuth, this is one of my favorite pieces of component code that I've been able to get working. I used it in a demo at KubeCon sometime last year. Essentially, I can just reuse the Go OAuth library with a WASI-implemented HTTP server to implement the whole login/auth/callback piece. So I form the OAuth configuration by grabbing the client ID and client secret from the other instance of this plugin, which has already been parsed — which is pretty fun — and then login, callback. This is straight-up copy-pasted from an example I found online for Go OAuth stuff, so I didn't have to do too much. Once I actually get the token and the user info JSON, I'll do the same thing with WASI logging to write the contents of that auth token to the directory where I'm allowed to write.
+
+I have a little more detail on this in an upcoming blog post about `wash` plugins and their security. This directory is under the XDG data directory, so it's supposed to be persisted between runs, which I think is most appropriate for plugins having their own little file system. Under the `wash` plugin directory there's an FS, and under this, every component gets its own little scratch. You can write everything to this directory, do whatever you want — but every plugin is only allowed to access their own directory. There's a bit of a precedent — thanks, Taylor, good to see you — maybe an idea, that you could have plugins ask other plugins for some contents in their store. But we're not there yet. I'm just trying to stick everything in its own little box.
+
+So really, when it comes to the security model of plugins, there are some things we allow, like incoming and outgoing HTTP requests. You can have your own file system; you just only get this one specific directory to play in, so you're not able to access anything else outside of that. We can really lean into the security model of components and WebAssembly for that.
+
+I thought this OAuth plugin would be a really good example to try and stretch the plugin system: if I can execute a command that's fully parsed by clap, available on the top-level CLI, and then do this full OAuth round-trip and store some creds — and then, ideally, what would be really cool is I could take these credentials, this token I've pulled down, and use it in a different area. Maybe I authenticate with a registry, and then right before pushing to an OCI registry I could look up that token and use it as a credential to push somewhere I've already logged into. Just basically trying to pump out a couple of really neat examples on the plugin side to make sure we have a fully fleshed-out model.
+
+I was pretty happy to see this fully working. It felt really cool to do with components, and it's a good example of a TinyGo component, since my knee-jerk is just to write everything in Rust. So let me drop the link to the plugin if anybody wants to take a look. That's it for the demo. Does anybody have questions, or want me to poke a little bit more into different pieces of this plugin or how it works? Happy to talk through how we're running those different instances too.
+
+**Brooks Townsend** [16:51](https://youtu.be/QGsbX689MiQ?t=1011)
+
+All right, this is all up and open source now. I just sent the link in the chat, but I'm going to show the link to the repo here in a second for our next discussion item. Let me go ahead and move on, then.
+
+So, I talked about this a little bit when I introduced `wash` in the community call a couple weeks ago. I know it's confusing — there's `wash` and then there's `wash`, but really it's all `wash`. It's all the same project. I'm sorry, I can't help it. The thing is, this is really just an evolution of the current Wasm Shell. I do like calling it the Wasm Shell, because we've actually yanked out all the other — other than the plugin WIT interface, which whatever, we'll just call them Wasm plugins — we've yanked out all the wasmCloud-specific bits. It is a general command-line tool for developing components, and then we're going to enhance that with some wasmCloud plugins like `wash wasmcloud deploy`, what have you. The world is your oyster when there's a full plugin model.
+
+So the current version of `wash` — the existing version of `wash` — is here in our wasmCloud repository. Most recently, one of the biggest changes that went into it was consolidating `wash-lib` and `wash-cli` into this one crate and then just releasing it under the single name, which is awesome.
+
+<img src="/img/community/2025-07-30/image006.webp" alt="The existing wash CLI in the wasmCloud repository after consolidating wash-lib and wash-cli" />
+
+There are a lot of things in the Wasm Shell that cover the same developer experience as `wash` today. So there's the structure of having an output kind for text or JSON, being able to set your log level, and then a command — this is all going to look really similar. Building components, pushing and pulling components, creating new templates, the hot-reload loop — all of that is the same. But it doesn't cover everything. In fact, there's a whole lot in the old `wash` that's not present in the new `wash`, and it's intentional. Some of these subcommands — generating keys, generating claims tokens (which we kind of do automatically in the background for build), creating or deploying wadm manifests — these are the things that are wasmCloud-specific, and we hope are good targets to be plugins. We really need a different name; this is all my fault. Things that should be plugins.
+
+<img src="/img/community/2025-07-30/image007.webp" alt="The next-generation Wasm Shell developer loop and plugin model" />
+
+So I don't think that in its current iteration — as cool as it is, as nice as the developer loop and the plugin system are — it's ready to replace what `wash` is today. So what I'd like to propose is that we take the current repository and release `wash` as version 1.0. Now, this isn't exactly the reason you'd take a project to 1.0, but really, we haven't had many breaking changes to `wash` in quite a while, and it is pretty well solidified as the tool that goes with wasmCloud 1.0. And there's nothing changing about wasmCloud right now.
+
+What I'd like to propose — and I threw this out in Slack, I just wanted to give everybody a chance to give feedback — is that I'm going to put up a PR to move `wash` to version 1.0. That'll essentially solidify its place as v1 of `wash`. Then we can start bringing in the Wasm Shell version of `wash` and compare the features. We can do a diff to talk about how you migrate from one version to the next, and essentially you can pick to install the newest version if it covers all your needs. What's also really nice about this is, if we have a major bump from 1.0 to 2.0, that's something that in the different package managers — Homebrew, apt, RPM — will actually be an obvious flag that you're jumping from major version to major version.
+
+So I don't have a strict timeline on when I'd like the new `wash` to be the `wash`, but I'd like to bump and release `wash` as 1.0, and then migrate a little bit later. Then I'd like to push the new `wash` into either the wasmCloud contrib repo or as a separate crate in the monorepo so that we can iterate on it there. I have one more thing I'll share on that, but Masood, you put your hand up — go for it.
+
+**Masood (ossfellow)** [23:14](https://youtu.be/QGsbX689MiQ?t=1394)
+
+Question for the existing one being released as version 1.0: are you planning to put a feature freeze on that? That's question one. And question two: even though plugins are using the component model, can you think of any features in the existing `wash` that aren't currently supported by the component model — something that requires native binary privileges?
+
+**Brooks Townsend** [23:57](https://youtu.be/QGsbX689MiQ?t=1437)
+
+Yeah, it's a great question. I know that the Wasm Shell piece is a passion project and an attempt to address the plug-in-a-fy-wash RFC that we've agreed we want to do. I don't want this to be something where we have to merge everything in and replace the old one. If we were to push out a 1.0 for `wash`, I would like to hold off on any backwards-incompatible breaking changes — but really, anything that's not patching a bug or fixing an issue. I think it'd be better if we're all working off of the same base for the CLI. Personally, I'm not going to be taking on any big features in `wash` as it stands today, just because I'd like to address that in the latest version, or be working off of the same base. Does that answer your question? Do you have any concerns or suggestions on that?
+
+**Masood (ossfellow)** [25:19](https://youtu.be/QGsbX689MiQ?t=1519)
+
+No, actually, personally I'm supportive of that. It's more like, if we keep adding features to the existing one, it kind of makes it harder to migrate, because it becomes a moving target, right? But then the second question, really related to this also, is: would we have a feature that we can't, at the moment at least, fit into the component model that plugins are using?
+
+**Brooks Townsend** [25:57](https://youtu.be/QGsbX689MiQ?t=1557)
+
+Yeah, I think there are a couple of commands that might not come over really cleanly. The developer loop, for example, is complicated enough — you need to spin up a WebAssembly runtime and then handle things on it. I think that is certainly a concern. Some of the other commands — any interaction with NATS, especially NATS JetStream, is certainly going to be more difficult in a plugin versus a native command. And it's not because components don't support it, but the plugin model right now doesn't give you a wasmCloud messaging implementation that we could back with NATS. That's totally in scope; if we can do that, then you can implement the `wash app` subcommands using NATS messaging, and you can implement all of the control-interface operations as well — spy, capture, yes, Bailey, that's right.
+
+There's something that's an intentional exclusion: the building and management of provider archives in `wash`. That's a wasmCloud-ism. I don't see why a component couldn't — hardball, something that seems like a reasonable level of support, like writing out bytes. But just like Bailey said, we do actually allow for components to, through `wash`, exec binaries that are running on the host system. This requires a confirmation dialog every time, interactively, from the user. So we could have plugins that send a message using the NATS CLI, for example, as a stopgap. That was a lot of me talking, I guess.
+
+**Masood (ossfellow)** [28:40](https://youtu.be/QGsbX689MiQ?t=1720)
+
+Sorry — in a sense, I'm saying this is a good use case to identify the limitations of the current plugin model. If we use this as a real-world example of where they're going to be stretched to their limit — what else do we need to have in the plugin model in order to make it really effective in all sorts of scenarios?
+
+**Brooks Townsend** [29:15](https://youtu.be/QGsbX689MiQ?t=1755)
+
+Yeah, I'm going to add that into the blog post. I'm not trying to have everything be perfect immediately, of course, but taking the commands that don't exist anymore and evaluating their viability to be a plugin would definitely help us identify whether the plugin model is sufficient for now. Great suggestion, Masood, thank you.
+
+**Brooks Townsend** [30:01](https://youtu.be/QGsbX689MiQ?t=1801)
+
+Yeah, to your other point — and maybe Bailey's suggestion — once `wash` is over on the wasmCloud side, I would definitely like to call for a feature freeze on the `wash` CLI. That's just to avoid the moving target. I'll probably call for that next week or so, once everything is in and shakes out. That'll avoid a couple things: it'll avoid people contributing features that don't end up being used because they were contributed to a different version, and it makes it easier for us to stick `wash` updates to ideally patch versions that resolve bugs.
+
+So if you were thinking, "there's going to be a feature freeze on `wash`, but I really wanted to contribute to the project — what could I do?" Well, fun news. I went through a polish pass on `wash` last week to wrap up some of the plugin-model pieces. Everywhere that had places for myself to come back and check out a little piece of code, or fix something, I categorized it with TODOs. I resolved a good couple of those, like any good engineer, but I actually annotated a lot of different TODOs that I didn't feel I needed to fix immediately with this `TODO(GFI)` — hopefully that doesn't stand for anything heinous, but I was doing it as "good first issue."
+
+What I would really love is, if folks are interested in contributing to this pretty new project — picking up some good first issues — there are a lot of good opportunities in the `wash` CLI, the new one, for people to contribute to a brand-new project. A feature freeze does not mean we don't have a place for contributors to plug in. These are really good things, like: hey, it would be great if we had, for the `wash` configuration, a command for validating it. How do I know my config is valid — that it corresponds to an actual set of keys in the `wash` config? All of these will translate over to TODOs with the issue number. There are some plugins that will actually link you out to the issue. For example, I have one issue on the `wash` repository around extended overrides for interface pulling. Bailey called this out — yes, I think all of these `TODO(GFI)` good first issues will get turned into an issue on a wasmCloud repository that anybody is welcome to take, which is really cool. There are a lot of fun opportunities to contribute on this. I'd love to get as many people working on it and eyes on it as possible.
+
+**Brooks Townsend** [33:57](https://youtu.be/QGsbX689MiQ?t=2037)
+
+So yeah, I think that's probably all on the `wash` side today. Everybody can keep an eye out — I'll throw up a PR whenever it's ready to show or bring that in. For the last little bit of the call, one thing I wanted to do is a quick roadmap check-in, since we're about a month in, and see where we're at.
+
+On the wasmCloud roadmap, I brought over this RFC for plug-in-a-fy-wash, since it's something I'm working on right now. This is in progress. We can probably call the RFC complete once it's in the wasmCloud org, but we'll continue working on the Wasm Shell after that. The other feature we've started spiking on — so it's not quite a good candidate for anybody to come and take at this time — I've been working with Luke Arc on transitioning the capability provider model into a wRPC server, a wRPC endpoint (name pending). The idea is that if wasmCloud is able to communicate with something over wRPC — that's how our invocations get from component to component, component to provider — then if they're able to communicate with each other, that endpoint, that server, is a capability provider. It implements an interface that's being used by components, or can call components.
+
+<img src="/img/community/2025-07-30/image008.webp" alt="The wasmCloud quarter three roadmap board with the plug-in-a-fy-wash RFC in progress" />
+
+This one is a little more open-ended, which is why I'm trying to pair with another longer-term maintainer on it. But the idea is that if we could get wasmCloud out of the responsibility of spawning native binaries, and into the responsibility of essentially doing — if you can tell the wasmCloud host, "here's where you can find the NATS connection information, here's the prefix to communicate on, here's the workload identity" — if it can communicate with some other process running on NATS somewhere else, that provider that implements a capability for the whole lattice can be a binary, a container, a side process, or embedded in another system. It both makes it a lot simpler on the wasmCloud side — we don't have to manage running processes anymore, we just manage running components and communicating via wRPC — and it means we don't have to make developers care about multi-architecture provider binaries anymore. You can just run a container, or a binary on your own architecture, which would be really nice.
+
+So keep an eye out for this one. We're shooting to have some kind of proof-of-concept WIT discovery algorithm — it may not be next week in the community meeting, but probably either next week or two weeks from now — and I'd love to show off what we come up with and get feedback. If anybody has thoughts, things you would suggest, other inspirations to take a look at, please feel free to leave some comments on that issue.
+
+One of the reasons Luke and I decided to take a look at this is that Luke actually had a PR that went in — it's in the wasmCloud repo — for this idea of virtual components, which is basically this wRPC-endpoint idea. It allows you to communicate with some other service that speaks wRPC that's connected to NATS. So I think this is really good inspiration. Luke is actually running this version of wasmCloud in production now, and it's working well for him. I really wanted him to take some of those learnings and work on this proposal. When I say I'm working on it with him — we spoke yesterday, and he's doing all the work. So definitely kudos to him. Luke, if you're watching — yeah, you could launch cross-platform providers using the execution engine of NATS. You could do anything.
+
+<img src="/img/community/2025-07-30/image009.webp" alt="Luke's virtual components PR demonstrating a wRPC endpoint connected to NATS" />
+
+**Masood (ossfellow)** [39:18](https://youtu.be/QGsbX689MiQ?t=2358)
+
+So, you know, I have previously said that I'm totally on board with this, but it seems to be having the same kind of issues we discussed about plugins. For example, for a component to be a capability provider, it needs to be able to have long-running processes, right? Or having additional access. We can say we can mix and match for those sorts of scenarios, but I'm just saying — particularly when it comes to long-running processes — that's something that is not, as far as I know, in the existing component model, to play the role of a capability provider.
+
+**Brooks Townsend** [40:10](https://youtu.be/QGsbX689MiQ?t=2410)
+
+Yeah, you're totally right. I think it's possible for us to maybe do something with components where we run them and then have them serve a specific endpoint, facilitated by the host. But I think I misspoke with the virtual components proposal. That's essentially what Luke called them — a virtual component running somewhere else. But running components as capability providers is not in scope for this specific issue. This is purely getting the host out of responsibility — stopping the host from running capability providers, which of course will support all the way through a 2.0, and supporting them talking to an external wRPC service.
+
+What I see as good candidates for the MVP of this wRPC server: a standalone binary that knows how to connect to NATS, configured to do so; a container running in Kubernetes or Docker Compose, connected to NATS; and an embedded process in some other long-running container or library that can connect. Does that help alleviate some of the fear there, Luke — just to know that components aren't in scope? But you're totally right. We've had this dream for a long time that we could do this long-running, stateful, multi-threaded component as a capability provider. I think WASI P3 will help us realize that a little bit more formally, and the maturation of WASI TLS will let us have secure connections. So that's definitely in the future, but for now we're looking to just break that piece out.
+
+**Brooks Townsend** [42:41](https://youtu.be/QGsbX689MiQ?t=2561)
+
+Yeah — just to wrap up. Sorry, Bailey, I saw your note: async reentrancy of the component model, much needed. So we'll have to do a P3 deep dive someday on this call.
+
+Just wrapping up, looking at the roadmap, we've got a couple other issues in here that are in triage but that we're essentially working through now. The in-process component-to-component calls is something I've started spiking on along with Roman. This is in the `wash` CLI — it's how components call other components inside the developer iteration loop. This has been nominally implemented in terms of the wasmCloud runtime, but doing this in terms of a wasmCloud deployment is a little more complicated, because when you have in-process calls you kind of sidestep the NATS routing logic, so there's a bit more teasing out of how to integrate that. But I can put this one as "in progress," because it's essentially been started. Working with resources can be hard, but it works, and it's pretty cool. Maybe I could do another demo of the Blobstore filesystem component when we come to talk about this one a little bit more.
+
+On the other pieces, they haven't really started yet. But I'm pretty happy — if we started three of the nine, that seems to be on a good track for a three-month quarter right now. We just have to finish them. I think things are going pretty well. If folks, especially maintainers, are looking to get on and contribute, I would love to pull a bunch of those good first issues out of `wash` and stick them on the roadmap, since they're really relevant right now. And if any maintainers are looking for something a little meatier, I could try and help do some knowledge sharing on some of the other issues in the research column. Wild stuff. Anybody have any questions or thoughts on the roadmap piece?
+
+**Brooks Townsend** [45:49](https://youtu.be/QGsbX689MiQ?t=2749)
+
+All right, quiet group on this Wednesday. Well, I think we can go ahead and call it then. Overall, I think really exciting stuff is happening right now — we just kind of need to get it organized and merge it all in so that we're all working off of the same place again. And honestly, I think we're making good moves on some of the longer-standing issues we've wanted to address in wasmCloud. So, hey, I'm all excited. It's great to see everybody, I really appreciate you all coming. Well, thanks all. We'll see you next week for our regularly scheduled wasmCloud Wednesday — but for now, just have a wasmCloud day.

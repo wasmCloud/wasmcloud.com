@@ -1,61 +1,133 @@
 ---
 date: '2025-07-30'
-title: 'Meeting Agenda - 2025-07-30'
-description: 'Short wasmCloud community call demoing a wash OAuth plugin, the wash contribution path back into wasmCloud, and celebrating 2,000 GitHub stars for the project.'
+title: 'wash OAuth Plugin & the Wasm Component Model Plugin System'
+description: "A wasm component model plugin system in action: wasmCloud demos a wash OAuth plugin, plots the path to wash 1.0, and crosses 2,000 GitHub stars."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wash cli
+  - webassembly plugin
+  - wasi http
+  - tinygo webassembly
+  - webassembly security
+chapters:
+  - { seconds: 0, label: "Welcome and the Q3 roadmap kickoff" }
+  - { seconds: 167, label: "Demo: the wash OAuth plugin in action" }
+  - { seconds: 691, label: "How the plugin works: WASI HTTP, file system, and the security model" }
+  - { seconds: 1011, label: "The new wash: the Wasm Shell and a full plugin model" }
+  - { seconds: 1394, label: "Releasing wash 1.0 and calling a feature freeze" }
+  - { seconds: 1519, label: "Which wash commands can become plugins?" }
+  - { seconds: 1801, label: "Good first issues and contribution opportunities" }
+  - { seconds: 2037, label: "Roadmap check-in: wRPC capability providers" }
+  - { seconds: 2358, label: "Component model limits, WASI P3, and in-process calls" }
+image: https://i.ytimg.com/vi/QGsbX689MiQ/maxresdefault.jpg
+showTitle: true
+slug: 2025-07-30-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- DEMO: wash oauth plugin
-- DISCUSSION: wash contribution -> wasmCloud
-- DISCUSSION: 2k stars ✨
+<YouTube url="https://www.youtube.com/watch?v=QGsbX689MiQ" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=QGsbX689MiQ" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The July 30, 2025 wasmCloud community call shows off the **Wasm component model** as a plugin system. Brooks Townsend demos an **OAuth plugin** for the `wash` CLI — a TinyGo WebAssembly component that runs a full OAuth login flow, stores credentials, and stays sandboxed in its own little file system — then lays out the migration path that takes the next-generation Wasm Shell into the wasmCloud org. Along the way the team agrees to ship the current `wash` as 1.0, call a feature freeze, surface a batch of good first issues, and check in on the Q3 roadmap, including the move to wRPC-based capability providers. Oh, and wasmCloud just passed **2,000 GitHub stars**.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **The wash plugin model is built on WebAssembly components.** The OAuth plugin imports WASI logging and config, makes outgoing HTTP calls, accesses a scoped file system, and both imports *and* exports the wasmCloud `wash` plugin interface — plus exports `wasi:http` as a new plugin capability
+- **A real OAuth round-trip ran entirely inside a sandboxed plugin.** One instance printed a log and waited for a credentials file while a second instance served the `/login` and callback endpoints over WASI HTTP; once authorized, the token was written to disk and reused on the next run
+- **The plugin was written in TinyGo, not Rust** — chosen for its excellent HTTP-in/HTTP-out story — and reused an off-the-shelf Go OAuth library against a WASI-implemented HTTP server
+- **Security is deny-by-default.** Each plugin gets only its own scratch directory under the XDG data dir, environment variables are exposed on an allow-only basis, and any host-binary execution requires interactive confirmation — leaning directly on the WebAssembly component security model
+- **The team will release the current `wash` as v1.0 and freeze its features**, then bring the next-generation Wasm Shell into the wasmCloud contrib repo or monorepo so the two can be diffed and migrated cleanly across major versions
+- **A feature freeze does not mean fewer contributions.** Brooks tagged numerous `TODO(GFI)` good-first-issues across the codebase that will become tracked issues for new contributors
+- **The Q3 roadmap is moving toward wRPC capability providers** — getting the host out of the business of spawning native binaries so providers can run as a binary, container, side process, or embedded service that simply speaks wRPC over NATS
+- **wasmCloud passed 2,000 GitHub stars**, a fun milestone for the project's steady upward climb
+
+## Chapters
+
+- [0:00 — Welcome and the Q3 roadmap kickoff](https://youtu.be/QGsbX689MiQ?t=0)
+- [2:47 — Demo: the wash OAuth plugin in action](https://youtu.be/QGsbX689MiQ?t=167)
+- [11:31 — How the plugin works: WASI HTTP, file system, and the security model](https://youtu.be/QGsbX689MiQ?t=691)
+- [16:51 — The new wash: the Wasm Shell and a full plugin model](https://youtu.be/QGsbX689MiQ?t=1011)
+- [23:14 — Releasing wash 1.0 and calling a feature freeze](https://youtu.be/QGsbX689MiQ?t=1394)
+- [25:19 — Which wash commands can become plugins?](https://youtu.be/QGsbX689MiQ?t=1519)
+- [30:01 — Good first issues and contribution opportunities](https://youtu.be/QGsbX689MiQ?t=1801)
+- [33:57 — Roadmap check-in: wRPC capability providers](https://youtu.be/QGsbX689MiQ?t=2037)
+- [39:18 — Component model limits, WASI P3, and in-process calls](https://youtu.be/QGsbX689MiQ?t=2358)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### Demo: a wash OAuth Plugin Built as a Wasm Component
 
-### Topic 1
+Brooks introduced an **OAuth plugin** for `wash`, written to authenticate against any OAuth or OIDC server — a flow he argued has no business being a top-level CLI command the maintainers have to own. Inspecting the component showed it using WASI logging and config at runtime, making outgoing HTTP calls, accessing the file system, and importing/exporting the wasmCloud [`wash` plugin interface](/docs/overview/hosts/plugins/) while also exporting `wasi:http` — a newly introduced capability for the plugin model.
 
-- Note 1
-- Note 2
+Running it (`cargo run plugin test ... run`) prompted for a client ID and secret, then printed "waiting for authentication" and opened an HTTP port on `localhost`. Authorizing in the browser produced an access token, which the plugin stored to a credentials file; on a second run it found the file immediately and reused the stored credentials. Under the hood, **two instances** of the same component cooperate: the main function logs and waits (with exponential backoff) for the credentials file to exist, while a second instance serves `/login` and the OAuth callback over WASI HTTP and writes the token when the flow completes.
 
-### Topic 2
+### Inside the Plugin: TinyGo, WASI, and a Deny-by-Default Security Model
 
-- Note 1
-- Note 2
+Brooks walked the code, written in **TinyGo** specifically for its clean HTTP-in/HTTP-out ergonomics. Each plugin implements a single `info` function describing its CLI flags and commands; here, environment variables from the host are exposed on an **allow-only** basis so the live demo could read secrets without printing them. The plugin reused a standard Go OAuth library against a WASI-implemented HTTP server, and used the WASI [filesystem pre-opens](/docs/overview/interfaces/) API to discover the one directory it is allowed to write to.
 
-## Weekly highlights
+That directory sits under the XDG data dir so credentials persist between runs, but **every plugin only gets its own scratch space** — it cannot reach anything else. Combined with controlled incoming/outgoing HTTP and (interactively confirmed) host-binary execution, the model leans directly on the security guarantees of [WebAssembly components](/docs/overview/workloads/components/). Brooks noted an upcoming blog post would cover wash plugins and their security in more detail — now published as [Introducing the wash CLI's new Wasm-powered plugin system](/blog/introducing-wash-wasm-powered-plugin-system/).
 
-### Issue of the Week
+### The New wash, wash 1.0, and a Feature Freeze
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+The OAuth demo runs on the next-generation **Wasm Shell** — a ground-up rewrite of `wash` reimagined as a general component-development tool, with wasmCloud-specific behavior moved out into plugins. It covers much of today's [developer loop](/docs/wash/developer-guide/) (build, push/pull, templates, hot reload) but intentionally drops wasmCloud-specific commands (key/claims generation, wadm manifests) that are good plugin candidates. Because it is not yet ready to replace today's tool, Brooks proposed releasing the **current `wash` as v1.0** — solidifying its place alongside wasmCloud 1.0 — and then bringing the new shell into the [wasmCloud contrib repo](https://github.com/wasmcloud/wasmcloud) or monorepo so the two can be diffed and migrated across a clean major-version bump.
 
-### Documentation of the Week
+Masood (ossfellow) asked whether 1.0 would come with a **feature freeze** and whether any existing commands simply can't fit the component model. Brooks agreed a freeze made sense once the new shell lands — avoiding a moving target and keeping `wash` updates to bug-fix patch releases — and used the question to frame a useful exercise: evaluate the commands that *don't* yet exist in the new shell to identify exactly where the plugin model needs to stretch. He noted that the developer loop, NATS JetStream interactions, control-interface operations (start/stop, spy, capture), and provider-archive management are the trickiest to port, with some achievable via a [host plugin's messaging capability](/docs/runtime/creating-host-plugins/).
 
-- [title](/docs/v1/intro)
-  - summary
+### Good First Issues and the Q3 Roadmap
 
-## Community Updates
+A freeze does not close the door on contributors: Brooks did a polish pass and annotated many `TODO(GFI)` ("good first issue") markers — for example, a command to validate a `wash` config against its real key set — that will be turned into tracked issues anyone can pick up. On the [Q3 roadmap](https://github.com/orgs/wasmcloud/projects), the plug-in-a-fied wash RFC is in progress, and Brooks and Luke Arc have begun spiking on moving the [capability provider model](/docs/overview/) onto a **wRPC server/endpoint**: if the host can simply tell an external process where to find NATS and how to communicate, that process becomes a capability provider — running as a binary, container, side process, or embedded library — and the host stops managing native binaries entirely. Luke's "virtual components" PR (already running in production) is the inspiration, with a proof-of-concept WIT discovery algorithm targeted for an upcoming call.
 
-### Tune in…
+### Component Model Limits and What's Next
 
-{/* Add any upcoming events/streams/etc */}
+Masood pressed on a familiar constraint: capability providers want **long-running processes**, which today's component model doesn't really support. Brooks clarified that running components *as* providers is out of scope for this specific effort — the goal is just to stop the host from spawning native binaries and let it talk to an external wRPC service. The longer-term dream of long-running, stateful, multi-threaded components as providers should be helped by **WASI P3** (async, reentrancy) and a maturing **WASI TLS** for secure connections. Brooks also flagged that in-process component-to-component calls (spiked with Roman) are working in the runtime and developer loop, though wiring them into a full wasmCloud deployment sidesteps NATS routing and needs more teasing out. With three of nine roadmap items started a month into the quarter, he called the pace healthy.
 
--
+## WebAssembly News and Updates
 
-### Catch up…
+The headline from this call is a maturing **WebAssembly plugin** story for command-line tools. The wash OAuth plugin demonstrates that a [Wasm component](/docs/overview/workloads/components/) can run a complete OAuth round-trip — outgoing HTTP, a local WASI HTTP server, and scoped credential storage — while staying sandboxed by default, and that the same model is portable enough to write in [TinyGo](/docs/wash/developer-guide/language-support/) rather than Rust. The community also celebrated wasmCloud crossing **2,000 GitHub stars**. Looking outward, the roadmap leans on emerging standards: **WASI Preview 3** for async and reentrancy and **WASI TLS** for secure connections, both of which unlock richer long-running workloads. For ongoing ecosystem updates, follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [WebAssembly component model](https://component-model.bytecodealliance.org/) project.
 
-{/* Add any blog posts/articles that the community might find interesting */}
+## What is wasmCloud?
 
--
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/overview/workloads/components/) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](/docs/overview/interfaces/) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, C#) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable provider architecture. wasmCloud's reference host is built on [Wasmtime](https://wasmtime.dev/), and — as this call shows — the same component model now powers the `wash` CLI's [plugin system](/docs/overview/hosts/plugins/), letting you extend tooling with sandboxed, portable Wasm components. With built-in OpenTelemetry observability and [Kubernetes integration](/docs/kubernetes-operator/), wasmCloud bridges WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
 
-## Recording
+## Topic Deep Dive: The Wasm Component Model
 
-{/* Automated - No need to adjust this unless automation fails */}
+Every thread in this meeting traces back to the **[Wasm component model](https://component-model.bytecodealliance.org/)**. The OAuth plugin is a component: it declares the interfaces it imports (WASI logging, config, HTTP, filesystem) and exports (the `wash` plugin interface, plus `wasi:http`), and the host enforces exactly those boundaries — no more, no less. That is what makes a plugin model "the last one you'll ever need": portability across architectures and OSes, language independence (a TinyGo plugin sits next to Rust ones with no special handling), and a security model where each component is confined to its own scratch directory and its declared capabilities. The same contract powers the next-generation Wasm Shell, where wasmCloud-specific commands become [host plugins](/docs/overview/hosts/plugins/), and underpins the wRPC capability-provider work, where any process that speaks the component model's transport can serve an interface. As the model matures toward [WASI P3](/blog/wasi-p3-on-wasmcloud/) — adding async and reentrancy — the kinds of workloads a single [component](/docs/overview/workloads/components/) can host expand toward long-running, stateful services. wasmCloud's bet is that the component model is the universal contract across hosts, languages, plugins, and providers.
 
-<YouTube url="https://www.youtube.com/watch?v=QGsbX689MiQ" />
+## Who Should Watch This
+
+This call is especially valuable for **CLI and tooling developers** curious how a Wasm component model plugin system works in practice (start with the OAuth demo at [2:47](https://youtu.be/QGsbX689MiQ?t=167)), **Go and TinyGo developers** who want to see a non-Rust component handle HTTP and OAuth end to end (the code walkthrough at [11:31](https://youtu.be/QGsbX689MiQ?t=691)), and **platform engineers and maintainers** weighing the wash 1.0 / feature-freeze plan and the move to wRPC-based capability providers (the roadmap check-in at [33:57](https://youtu.be/QGsbX689MiQ?t=2037)). New contributors looking for an on-ramp should jump to the good-first-issues discussion at [30:01](https://youtu.be/QGsbX689MiQ?t=1801).
+
+## Up Next
+
+The next community calls follow this work to completion: a PR to release the current `wash` as **v1.0**, a **feature freeze** once the next-generation Wasm Shell lands in the wasmCloud org, a batch of good first issues promoted onto the roadmap, and — targeted for an upcoming meeting — a proof-of-concept **WIT discovery algorithm** for the wRPC-based capability provider model. Watch for a possible follow-up demo of in-process component calls via the Blobstore file system component.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2025-07-30-community-meeting-transcript/)**

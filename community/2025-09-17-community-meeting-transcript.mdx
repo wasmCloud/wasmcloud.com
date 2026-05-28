@@ -1,0 +1,222 @@
+---
+date: '2025-09-17'
+title: 'Transcript: wasmCloud V2: The Wasm Component Model & a Simplified Host'
+description: 'Full transcript of the September 17, 2025 wasmCloud community call covering wasmCloud V2, the consolidated wasmcloud crate, host plugins, and component calls.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasm components
+  - wasmtime webassembly runtime
+  - webassembly news
+image: https://i.ytimg.com/vi/vTbKtMkWxBQ/maxresdefault.jpg
+showTitle: true
+slug: 2025-09-17-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-09-17-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=vTbKtMkWxBQ" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=vTbKtMkWxBQ" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Sep 17, 2025 · 57 minutes*
+
+**Speakers:** Brooks Townsend, Taylor Thomas, Frank Schaffa, Eric Gregory, Bailey Hayes
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [00:13](https://youtu.be/vTbKtMkWxBQ?t=13)
+
+Let me grab some water really quick before we do the thing. Yeah, I'll make you the host. We'll get started in just a minute or two — until five after, since all meetings run over.
+
+**Frank Schaffa** [01:45](https://youtu.be/vTbKtMkWxBQ?t=105)
+
+It's been a long time. Glad I could finally jump in.
+
+**Brooks Townsend** [01:51](https://youtu.be/vTbKtMkWxBQ?t=111)
+
+Yeah, it has been a little while. Good to see you.
+
+**Brooks Townsend** [02:33](https://youtu.be/vTbKtMkWxBQ?t=153)
+
+So for the agenda today, I'll be doing various levels of deep dives into what we're proposing as the beginning of **wasmCloud V2**, a.k.a. wasmCloud Next. The naming version isn't really important, but the key discussion is going to be around what Bailey said — I really liked how Bailey phrased this: "radical simplification." So, simplifying the APIs that we use, really trying to focus in on what wasmCloud does well. I think I have a pretty good starting-off point for that, and we'll just start talking about features that need to make it in there. I've got some architecture diagrams, I've got some code I'm going to bring up here, and I'm going to be talking about documentation, which Eric has been working on under a `next` version. So, all exciting stuff.
+
+**Brooks Townsend** [04:18](https://youtu.be/vTbKtMkWxBQ?t=258)
+
+Hey everybody, welcome to wasmCloud Wednesday for Wednesday, September 17. I have a feeling I'll be talking at you a lot today — hopefully that's enjoyable for everybody, but feel free to stop me if you have questions or comments or concerns.
+
+Today's demo and discussion items are going to be pretty meaty. It's going to center a lot around [this pull request](https://github.com/wasmCloud/wash/pull/73) I opened in the `wash` repository, which is around consolidating the libraries that we use to run wasmCloud. It's somewhat tied to issues in progress on the roadmap right now: statically configuring a wasmCloud host with a set of components and providers to run, supporting component-to-component calls on the same host without going out to NATS, transitioning capability providers to wRPC servers or endpoints, and reducing the host's responsibility and API surface. All of those feed into this. I'm hoping we can go through a fun discussion on this evolution — moving towards the next version of wasmCloud. We've been on 1.0 for about a year and a half now, all the way up to 1.9, and we've had folks running in various stages of dev, QA, and production for quite a while. I'm trying to represent the ideal features from all the feedback we've gotten from the community, but if your perspective isn't shown in some of this, please let me know.
+
+<img src="/img/community/2025-09-17/image001.webp" alt="The crate-consolidation pull request in the wash repository" />
+
+So let me link the PR in the chat. There's a lot going on here — these 12,000 lines aren't all WIT and Cargo.lock, but a lot of it is. Please don't let the "V2 / Next" discussion worry anyone about big breaking changes. This is really just the version I picked for the `wasmcloud` crate, because the `wasmcloud` crate right now is on 1.9, so we're evolving past that. The `wasmcloud` crate today, in the main mono-repo, is just the binary target — when you run the wasmCloud container or binary, that's what you get. But this new `wasmcloud` crate is a library *and* a binary target, and it consolidates the **wasmCloud host, the wasmCloud runtime, and the wasmCloud core libraries**. These are all the different Rust libraries we maintain internally. What we found is that the separation of these crates isn't necessarily productive for adding new features, and it can make it difficult to embed wasmCloud or extend the host in your own ways.
+
+<img src="/img/community/2025-09-17/image002.webp" alt="The consolidated wasmcloud crate and its simplified Host API" />
+
+So what I wanted to do was take the API surface we know and like — the simple idea of "here's this application or set of components, and here's all this configuration; can you deploy it?" and later "can you stop it?" — an extremely simplified version of the wasmCloud control interface, which I'm just calling the **Host API**. Internally it's a trait we implement on the host that supports scheduling *workloads*, which are a collection of components plus configuration, very similar to the idea folks have of a wadm application today: a declarative set of all the things you want to deploy, with a name and a namespace. It also has an *engine*, which is very similar to the wasmCloud runtime — the engine is responsible for taking the multiple components in a workload and linking them to the **Wasmtime** linker so they can do WASI things and call each other.
+
+It also supports **host plugin** implementations, which are pretty much a wholesale replacement of built-in capability providers. Built-in capability providers are nice for some cases — it's good to skip the wRPC transport for things like HTTP incoming and outgoing that you do all the time — but building these into the host required cloning the host repository and modifying code internally. So I wanted to add a plugin mechanism where you can embed the wasmCloud host and extend it statically, especially when an external capability provider isn't a great fit. The crate comes with a couple of example plugins so you can see how this works.
+
+<img src="/img/community/2025-09-17/image003.webp" alt="Host plugin example replacing built-in capability providers" />
+
+**Taylor Thomas** [12:12](https://youtu.be/vTbKtMkWxBQ?t=732)
+
+Can you hear me now? Okay — the question is on point three, I think, because you and I have talked about the host plugin stuff before. Will the wRPC layer also be a host plugin in this new thing? That seems to make sense to me. So if you still want to use a remote provider you can, but it's via wRPC only, added via plugin — is that correct?
+
+**Brooks Townsend** [12:42](https://youtu.be/vTbKtMkWxBQ?t=762)
+
+Yes, that's the thought. We'd have a wRPC transport plugin. When you deploy your little workload of components, you say, "hey, for these sets of interfaces — say, `wasi:keyvalue` and my org's package for these interfaces — I want you to use the wRPC plugin," and those will go over the transport when you run it. The whole goal of wRPC being something you explicitly opt into is to address the roadmap feature about being very intentional: *these* are the interfaces that are going to go over the NATS message bus or TCP socket.
+
+**Taylor Thomas** [13:38](https://youtu.be/vTbKtMkWxBQ?t=818)
+
+Okay, that's what I thought. The wording on the PR was a little vague — it almost sounded like it was going to replace, but I did think it was exactly as you described.
+
+**Brooks Townsend** [13:55](https://youtu.be/vTbKtMkWxBQ?t=835)
+
+Good call-out. Yes — in this case, you can replace the wRPC layer with some built-ins if you choose to pull in the host library and embed it yourself, but for the vast majority of folks used to the capability provider model, they'd use the wRPC built-in to go out to wRPC servers.
+
+Before we go any further, thank you Taylor for bringing up wRPC servers. This crate doesn't have everything wasmCloud has today — it doesn't have a pluggable policy engine, which I know we want to re-examine, and it doesn't have pulling secrets from an external secrets operator; it's assuming you've done that already. Just like the goal of the Wasm Shell project — the next version of `wash` — is to simplify down to the smallest bits, I wanted to do the same thing with the `wasmcloud` crate: focus on being a WebAssembly application runtime for cloud and edge contexts, and hit the basics really, really well. Then we build the external extensions on top. So this is intended as a stepping-off point, but it may not have everything yet.
+
+Now let's take a look at some diagrams. I've been looking into this idea of **C4 diagrams**. I'll be honest — if you've worked on C4 a lot, I'm sorry, but generally I look at those diagrams and go "ooh, okay." That said, I really like having a high-level view of the architecture: the first layer is called **system context**, and then you expand out each layer, all the way down to class diagrams and code. I only have two layers right now. The system context should be a good first layer, and the second layer is called "containers," which is awful, so I call it **application services**; the third layer is called "components," so we just can't use those words for the diagrams.
+
+<img src="/img/community/2025-09-17/image004.webp" alt="C4 system-context diagram for wasmCloud V2" />
+
+Looking at the system context for wasmCloud: on a high level, on a docs page, a **developer** — a user developing Wasm applications — will `curl`-install the `wash` CLI, use the new build/dev commands to do their developer loop in the language of their choice, and when they're finished, push that binary to an OCI registry. That's the developer's interaction with wasmCloud, and it's really simple — you don't want to install multiple different things; `wash` takes care of all of it.
+
+Then we have the **edge deployers**, the people running Wasm at the edge. What we want to enable there is running wasmCloud just as a binary, maybe as a systemd service. The wasmCloud binary can run multiple workloads, and those workloads have multiple components inside them. If you want to extend the host at runtime with a wRPC endpoint — what we call capability providers right now — you can run that as a separate service, a binary, or a container. The point is these aren't bound by the container box; they communicate back and forth using a wRPC transport like NATS.
+
+Then there's the **platform engineer**, which is the majority of folks I work with — people deploying wasmCloud, lots of times in Kubernetes. The platform engineer providing a platform for Wasm apps interacts with an operator and the Kubernetes API server, applying a manifest that says "go deploy my wasmCloud hosts, go deploy these workloads on top of those hosts." The boundary I really want to draw is that inside your Kubernetes nodes, wasmCloud runs *as a container* — we're not executing the WebAssembly on containerd or anything like that. And distinctly different from today, where wasmCloud executes binaries for capability providers, the model I'm trying to drive for wRPC extensions in Kubernetes is to run them as containers on the same node — could be a sidecar to the wasmCloud container, or just their own container. When users interact with this, it goes through all the classic load balancer, API gateway, and ingress stuff, but it all gets routed to your Wasm apps.
+
+<img src="/img/community/2025-09-17/image005.webp" alt="Application-services diagram showing the wasmcloud crate internals" />
+
+So if we blow up the idea of an individual application and service, this is where the more interesting stuff comes in — a view internally into the organization of wasmCloud and `wash`. In order for wasmCloud to receive requests, start workloads, and run components, there's ideally some control-plane process making sure workloads are scheduled on the correct host — for wasmCloud, we'd use wadm for this, or our Kubernetes operator. The wasmCloud binary is a loose wrapper around `wasmcloud` the library, which is what we used to have as the host, the runtime, and the core. The **host** is responsible for executing and organizing workloads; those workloads have a collection of WebAssembly components inside them; and the **engine** is basically a loose wrapper around Wasmtime, our Wasm engine. We have our specific set of built-in plugins — HTTP server, runtime config, logging — and, Taylor, like you called out, the wRPC extension client plugin for making external requests to some binary or container listening on wRPC.
+
+We've been talking about this for a long time, and it really does simplify the management of a wasmCloud host locally — not needing to download provider archives, not needing to spin out child processes from a binary. That's a better separation of concerns: wasmCloud should be concerned with being the best Wasm application runtime, not running binaries. And what's really cool is, from any binary embedding the `wasmcloud` library, you can provide your own plugins.
+
+<img src="/img/community/2025-09-17/image006.webp" alt="Embedding wasmCloud and the WASI WebGPU plugin use case" />
+
+This is going to be really interesting for folks like Colin Murphy, a wasmCloud org maintainer, who's working on a presentation for **WASI WebGPU**. If you're doing heavy GPU computations, you don't want to send all that data over a network boundary before you hit the GPU — so this is a great use case for embedding the `wasmcloud` library and running it. As WASI WebGPU goes through standardization, it could just be an optional plugin we include that you turn on and off when you run the host, giving the host a new set of interfaces — everything in the WASI WebGPU suite. So the message gets to the host over NATS, whether in wadm or Kubernetes, and then you can orchestrate components within a single host.
+
+Notably, you don't see any interaction with NATS Jetstream here — today we socialize links and configuration over Jetstream, but it's not prescribed here; we don't require it. I think our control-plane layer, the wadm side, will use Jetstream to socialize workload manifests and make sure we're sending messages to widely distributed hosts, but the host itself isn't writing to a global state or coordinating between hosts at all. It's only responsible for its own things. If we take away a lot of what the control interface supports today, which is more imperative, it's much easier to reason about: "start this workload," where the workload is some metadata plus all the components that make up an application. I keep saying "application" and "workload" — I think they're analogous; that's essentially a wadm app rolled forward with a better degree of separation.
+
+So that's wasmCloud — a lot more self-contained. It has some built-in plugins, but those built-in plugins use the same mechanism you can use to extend the host, so it's not so entrenched that you need to modify the bindings of the runtime or fake a built-in OCI reference.
+
+**Taylor Thomas** [27:58](https://youtu.be/vTbKtMkWxBQ?t=1678)
+
+A question around exposing capabilities: any reconciler or scheduler on top of this is going to need to know what capabilities the host has. Is that contained in the heartbeat, or exposed through some other mechanism?
+
+**Brooks Townsend** [28:15](https://youtu.be/vTbKtMkWxBQ?t=1695)
+
+That is contained in the heartbeat, and I can actually pull that up here.
+
+**Taylor Thomas** [28:23](https://youtu.be/vTbKtMkWxBQ?t=1703)
+
+And do you still link to make sure you're granting exactly what you want, or is it more "if you're scheduling on this machine, it's because it has X capabilities"?
+
+**Brooks Townsend** [28:39](https://youtu.be/vTbKtMkWxBQ?t=1719)
+
+A little bit of both. Right now — and this may change based on what's nicest to support — the host heartbeat contains the imports and exports the host supports. I'm marking WASI 0.2 as a given, so these are the imports and exports beyond WASI other than HTTP, which you can turn off. Then when you schedule a workload, you declare "I need incoming-handler, I need key-value store and atomics, I need WASI config-runtime, and here's my configuration." It's not so much linking as declaring the interfaces you want to import and export plus the configuration that goes with it — which is basically what a link is.
+
+**Taylor Thomas** [29:46](https://youtu.be/vTbKtMkWxBQ?t=1786)
+
+Yeah, that makes sense. So it's basically clarifying the many times you and I tried to rejigger the links to make them look better — this is better. I think we'll just need to clarify that when we start pushing this out to other people, like "here's v1, here's v2," and document some of that. No actions there, I just wanted to make sure I understood.
+
+**Brooks Townsend** [30:17](https://youtu.be/vTbKtMkWxBQ?t=1817)
+
+For sure. And it's made a little more interesting by the fact that we let you participate in the **Wasmtime linker** when you're a plugin. I'll give you an example: WASI logging. The WASI logging plugin is a really easy implementation — it's how we implement it today in the wasmCloud runtime, but there's no way to turn it off. Now it's a plugin, so you can feature-flag it off or just not load it. The implementation is simple: when you log at a level like `warn`, we emit a tracing event and it goes straight to the host's standard error. When a component starts and says "I need WASI logging" and you provide it, that's where this plugin adds the logging implementation to *that component's* linker. So the way you link between two components — or from a component to a plugin, or to the wRPC plugin — is by participating in the Wasmtime linker, exactly how you'd call any host function from a Wasm guest context.
+
+<img src="/img/community/2025-09-17/image007.webp" alt="WASI logging host plugin participating in the Wasmtime linker" />
+
+There's still error handling to do — making sure two plugins can't register for the same thing — but because these are all built in, we have tight control over their lifecycle, and if you're embedding wasmCloud you provide exactly what you want. To give you a specific example of how I'm immediately going to use this: `wash`. Right now `wash`'s dev loop embeds Wasmtime and the wasmCloud runtime crate, with a lot of logic on top for managing components, their lifecycle, and exposing the right bindings. With this `wasmcloud` library embedded inside `wash`, when we run the developer loop we can start a workload with the component the developer is iterating on, plus all the dev-loop plugins to implement extra interfaces, plus a `wash` interface plugin so we can execute commands and hooks in the `wash` binary. So I get to delete a lot of code out of the `wash` binary. Now under wasmCloud and under `wash` we'll have the same unified crate with the higher-level concepts — we're dog-fooding this pretty immediately.
+
+**Brooks Townsend** [34:29](https://youtu.be/vTbKtMkWxBQ?t=2069)
+
+Let me jump back to code one more time. Like I mentioned, host plugins can participate in linking the component in the host. If you declare an interface like `wasi:keyvalue`, we can have an implementation that maybe stores things in Jetstream, and we add that functionality directly to the linker. But one of the things that's a requirement — something we talked about on the wasmCloud roadmap — is supporting **in-process, component-to-component calls**. We've experimented with this in the past, but in the current wasmCloud host every single invocation goes over the NATS/wRPC transport, which has its pros and cons. If, when you schedule your workload, you say "I want all three of these components running in that workload on this specific host," those components should be able to talk to each other directly — and that's one of the key things making it into this `wasmcloud` crate.
+
+<img src="/img/community/2025-09-17/image008.webp" alt="In-process component-to-component calls via a linker trampoline" />
+
+When you initially schedule a workload, you get it as an *unresolved* workload, and then internally we resolve it by iterating over all the components, checking their imports and exports, and defining a host callback in the Wasmtime linker — a "trampoline" — that trampolines the calling of a function to another component. Here's the example I have working: I have a component trying to use `wasi:blobstore`, but I do *not* enable the blobstore plugin — wasmCloud knows nothing about `wasi:blobstore`. And I have a component called `blobstore-filesystem` that *exports* `wasi:blobstore` and uses `wasi:filesystem` to back that interface. So you give it a filesystem pre-open locally, and it implements the containers and object writing there. When I call `create-container` in my component, that defines a new function in the linker that instantiates a new instance of the `blobstore-filesystem` component, calls `create-container` on it, which creates the folder locally and returns the resource handle to the original component — and we reuse this instance for continuing calls of the same workload.
+
+<img src="/img/community/2025-09-17/image009.webp" alt="The blobstore-filesystem integration test running in the wasmcloud crate" />
+
+So when you run multiple components in the same workload with matching imports and exports, we link them together directly with this lightweight trampoline — we just instantiate the other component if it isn't already, and call the function on it. The roadmap issue for in-process component calls is something I have implemented and working in this crate. The reason we did it in the more greenfield area is that supporting this changes the default for what wasmCloud tries to do — by default we'll try to resolve dependencies locally to take advantage of super-low-latency component-to-component calls. There's plenty more to discuss for different use cases — when you'd want to run locally versus distributed — but this `wasmcloud` and `wash` crate should be a good foundation to test those assumptions. Folks, any questions? I've been talking for way too long.
+
+**Frank Schaffa** [41:52](https://youtu.be/vTbKtMkWxBQ?t=2512)
+
+A lot of this looks very cool and interesting. Going back to it — where are you getting the components from? Are they still CI-based? And you mentioned simplification, so I'm wondering if you're also looking at the whole Wasm value proposition: fast start, extremely quick processing, very small footprint. Are we maintaining those points? By adding all these features and capabilities, how much are we paying for it?
+
+**Brooks Townsend** [43:13](https://youtu.be/vTbKtMkWxBQ?t=2593)
+
+Both really good questions, Frank. On where we're getting components from: that's all still **OCI**, still using the same implementations. From your developer or CI/CD, you use a tool like `wash` or an OCI registry as storage to push your Wasm artifact, and whether you're running as a standalone binary or as a container in Kubernetes, you pull that component from your OCI registry all the same. There's an opportunity to start from a file too, but by and large OCI covers the vast majority of situations — it's really just that we're specifying multiple OCI references in one workload, like one application.
+
+On efficiency and management: we're taking the same steps for WebAssembly components as today. When you schedule a workload, there's an initial time where you pull the component artifact — we cache that locally on disk so you don't keep pulling the same one. Once you've pulled it, we hold on to a pre-compiled, pre-instantiated version of the component; when an HTTP request comes in, we instantiate it, hand it the request, and rebuild those resources. There's also a notion of a *pool* in the workload — you can determine a number of instances to instantiate ahead of time before a request comes in. I still need to implement that part, but it can mitigate the minimal instantiation cost: take a slight memory increase for the minimal startup time possible. So some of the boundaries of what we're deploying are changing, but the way we deal with components is essentially the exact same.
+
+**Frank Schaffa** [46:15](https://youtu.be/vTbKtMkWxBQ?t=2775)
+
+One follow-up to your example: you're literally returning a reference to a local file. So what do you do when you're crossing boundaries? If components are running in different parts, at some point that component is running remote — so I lose that capability of a shared filesystem, right?
+
+**Brooks Townsend** [46:52](https://youtu.be/vTbKtMkWxBQ?t=2812)
+
+Great question. If the components are running remote, you have a choice to make. Are the two components communicating over a strongly-typed WIT interface? If so, you can replicate the same behavior you'd get today with the wRPC plugin — the component calls the other component, it goes through the wRPC plugin in-process (the linking piece), and then over a NATS transport. If they aren't communicating over a strongly-typed WIT interface, this is a good time to consider connecting them using the HTTP capability or a message-bus capability — instead of going over wRPC, you could use WASI messaging, which we can implement for NATS and route to the component that way.
+
+That one is so much more custom per environment. What we see all the time is people already have a service-mesh routing layer they want to tap into, and going through wRPC and NATS isn't something they already do. So what we end up recommending is using HTTP and hitting your Envoy or service mesh. Does that speak to what you're interested in, Frank?
+
+**Frank Schaffa** [49:15](https://youtu.be/vTbKtMkWxBQ?t=2955)
+
+Definitely. Leveraging Kubernetes will definitely accelerate the whole acceptance, because you're leveraging a platform that already exists and just adding the capability that wasmCloud brings on top of it. I'm looking forward to experimenting with that.
+
+**Brooks Townsend** [49:44](https://youtu.be/vTbKtMkWxBQ?t=2984)
+
+Awesome. The goal — and I know NATS is such a big part of our infrastructure today — is to have a world where, if you can implement your application in terms of a set of components that use WASI Preview 2 or Preview 3 (which includes sockets and HTTP), plus built-ins for messaging and key-value, then the only piece of infrastructure you need to coordinate is this wasmCloud process. That decoupling has been so nice for the local `wash dev` experience, because I don't need to deal with separate processes or a network boundary — it's all satisfied within the same process — but having the right cut-outs so you can use NATS more intelligently would be really nice. I'm really interested, as we start running our sample applications as workloads, in how it feels — if it's simpler, if it's more performant.
+
+**Brooks Townsend** [51:26](https://youtu.be/vTbKtMkWxBQ?t=3086)
+
+I'll call out one other thing Eric has been working on. Hey Eric, jump in if you don't want me to steal your thunder.
+
+**Eric Gregory** [51:37](https://youtu.be/vTbKtMkWxBQ?t=3097)
+
+Go ahead and field any questions folks might have.
+
+**Brooks Townsend** [51:43](https://youtu.be/vTbKtMkWxBQ?t=3103)
+
+Awesome. So under our documentation — I don't think this has been merged quite yet — we have documentation going back to 3.1.0 of wasmCloud 1.x, and we've been iterating on a `next` version of the documentation. José isn't here to give the spiel about Diátaxis, but we're approaching the docs iteratively, just like we are with `wash` and wasmCloud, starting from the key developer flows and operator flows: what are the `wash` commands (a whole lot simpler than the last list), what are useful Wasm tools — essentially bringing things over piece by piece from the 1.x documentation. If you're looking at the docs and you see this, don't be afraid. We need to start documenting the different diagrams, the interactions of `wash`, and how you configure local component files. No action really here, but just to note this is something we're working on, and when the time is right we'll change the default version on the docs to be the `next` version and tell folks to reinstall `wash`.
+
+<img src="/img/community/2025-09-17/image010.webp" alt="The next version of the wasmCloud docs in progress" />
+
+For most use cases I've tried on wasmCloud, I haven't found one that doesn't work well in the new model yet, and it's a heck of a lot nicer to work from the context of a nicely-resolved workload than "I want to add this little extra thing, so now I need to make a capability provider and package it up in five different architectures." Eric, anything else you wanted to add?
+
+**Eric Gregory** [54:18](https://youtu.be/vTbKtMkWxBQ?t=3258)
+
+No, that was perfect. The changes you showed are up in the PR now, and there's some discussion about how exactly we want to implement and structure the `next` version — anyone who wants to pitch into that conversation is very welcome. Some form of that `next` version is where we'll be iterating on these changes going forward.
+
+**Brooks Townsend** [54:45](https://youtu.be/vTbKtMkWxBQ?t=3285)
+
+Awesome. And a big shout-out to Aditya and Eric for putting together the community Excalidraw library, which helped me make some of the architecture diagrams here. We'll get synced up and reconcile some of those to make sure they're in the right wasmCloud language. I think that's all I had, other than shouting at all of you for 50 minutes. Does anybody have any other questions or thoughts from today's discussion?
+
+**Bailey Hayes** [55:34](https://youtu.be/vTbKtMkWxBQ?t=3334)
+
+Thank you, Brooks, for sharing your magnum opus with us. It's pretty great.
+
+**Brooks Townsend** [55:46](https://youtu.be/vTbKtMkWxBQ?t=3346)
+
+Well, I look forward to drawing up some more stuff and having folks try out `wash` and wasmCloud. I don't want to conflate "more simple" with "always better," but having been in the ecosystem for so long, I find these ideas so much easier to understand and relate to the existing way people run applications. I really hope other folks do too — that's the goal.
+
+Alrighty folks, I think we can cut it for this week. I will regretfully not see any of you for the next two weeks — I'm going out on vacation, so this will be hosted by someone else who is also very cool. We've got some really cool things planned, like diving more into the Kubernetes piece, and there are some things moving around in WASI P3 right now, so plenty of fun stuff. Looking forward to catching up with you all in the next wasmCloud Wednesday. Thanks everybody.
+
+**Frank Schaffa** [57:17](https://youtu.be/vTbKtMkWxBQ?t=3437)
+
+Have a great day. Bye.
