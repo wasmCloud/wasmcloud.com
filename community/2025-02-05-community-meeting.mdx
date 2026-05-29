@@ -1,72 +1,135 @@
 ---
 date: '2025-02-05'
-title: 'Meeting Agenda - 2025-02-05'
-description: 'wasmCloud community call discussing a wash plugin RFC and a Workload Identity RFC for SPIFFE-based, secret-less authn across hosts, providers, and components.'
+title: 'Workload Identity (SPIFFE) and wash Plugins as Wasm Components'
+description: "wasmCloud community call on the Wasm component model: a SPIFFE workload identity RFC plus turning the wash CLI into a Wasm component plugin system."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - workload identity
+  - spiffe
+  - wash cli
+  - wasm plugins
+  - webassembly security
+chapters:
+  - { seconds: 107, label: "Welcome and agenda for February 5" }
+  - { seconds: 189, label: "Workload identity: infrastructure-agnostic, verifiable identity" }
+  - { seconds: 320, label: "Immediate use cases: NATS, OCI pulls, and mutual TLS" }
+  - { seconds: 480, label: "Adopting SPIFFE and the SPIRE ecosystem" }
+  - { seconds: 703, label: "Rolling out across host, providers, and components" }
+  - { seconds: 845, label: "Why workload identity matters for the enterprise" }
+  - { seconds: 992, label: "Optional by default? Operating SPIRE" }
+  - { seconds: 1641, label: "wash plugins RFC: the plugin and auth interfaces" }
+  - { seconds: 2434, label: "Q&A: multi-tier subcommands and auth for providers" }
+  - { seconds: 2651, label: "Subcommands as plugins and out-of-band updates" }
+  - { seconds: 3100, label: "Q1 roadmap and progress update" }
+image: https://i.ytimg.com/vi/iuOm81zs4cM/maxresdefault.jpg
+showTitle: true
+slug: 2025-02-05-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- DEMO + DISCUSSION: Updates to wash plugins
-- DISCUSSION: Workload Identity
-- DISCUSSION: weekly Q1 roadmap check-in
+<YouTube url="https://www.youtube.com/watch?v=iuOm81zs4cM" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=iuOm81zs4cM" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The February 5, 2025 wasmCloud community call pairs two forward-looking RFCs. Joonas Bergius walks through a **workload identity** proposal built on **SPIFFE** — an infrastructure-agnostic, cryptographically verifiable identity for hosts, providers, and components that can secure NATS connectivity, enable secret-less OCI pulls, and establish mutual TLS across clusters. Then the team makes the case for turning the **wash CLI** into a **Wasm component**-based plugin system — the dog-food argument that the **Wasm component model** should be "the last plugin system you'll ever need." Brooks Townsend closes with a Q1 roadmap check-in.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **Workload identity** for wasmCloud aims to be infrastructure-agnostic, standards-based, cryptographically verifiable, and — to the extent possible — fully automated, so a workload only has to *request* an identity for it to be available
+- The proposal adopts **[SPIFFE](https://spiffe.io/)** as the standard and leans on the **SPIRE** ecosystem to bootstrap, with the option to swap in lighter-weight or managed back-ends because the implementation targets the SPIFFE spec rather than SPIRE specifically
+- Immediate use cases include **securing NATS connectivity**, **secret-less dynamic OCI artifact pulls**, secret-less access to third-party resources (e.g. a blobstore provider talking to S3), **mutual TLS** between hosts and providers, and cross-cluster trust
+- Workload identity will be **optional** and additive (non-breaking); the team cited OWASP's new **Non-Human Identity Top 10** as motivation, noting workload identity addresses over half of those risks
+- The **wash plugin RFC** ([issue #4059](https://github.com/wasmCloud/wasmCloud/issues/4059)) proposes plugin-ifying large parts of the `wash` CLI into Wasm components, renaming the subcommand interface to `plugin`, and delegating all argument parsing to plugins for maximum flexibility (including multi-tier subcommands)
+- A new **auth interface** abstracts login flows behind a single `authenticate` method, returning NATS credentials (seed + JWT) and an optional bearer token, with wasmCloud handling the **OIDC** callback server so plugins don't have to
+- Plugins request capabilities (env vars, paths) via an **access-request prompt** — an OS-style "this app would like access" experience — backed by a new `wash` config file for sandboxing; default builds embed core plugins so nothing extra is installed
+- New subcommands should land **as plugins**, enabling **out-of-band, SemVer-compatible updates** via OCI and far fewer full `wash` CLI releases; `wash drain` and `wash keys` are the first proof-of-concept plugins
+
+## Chapters
+
+- [1:47 — Welcome and agenda for February 5](https://youtu.be/iuOm81zs4cM?t=107)
+- [3:09 — Workload identity: infrastructure-agnostic, verifiable identity](https://youtu.be/iuOm81zs4cM?t=189)
+- [5:20 — Immediate use cases: NATS, OCI pulls, and mutual TLS](https://youtu.be/iuOm81zs4cM?t=320)
+- [8:00 — Adopting SPIFFE and the SPIRE ecosystem](https://youtu.be/iuOm81zs4cM?t=480)
+- [11:43 — Rolling out across host, providers, and components](https://youtu.be/iuOm81zs4cM?t=703)
+- [14:05 — Why workload identity matters for the enterprise](https://youtu.be/iuOm81zs4cM?t=845)
+- [16:32 — Optional by default? Operating SPIRE](https://youtu.be/iuOm81zs4cM?t=992)
+- [27:21 — wash plugins RFC: the plugin and auth interfaces](https://youtu.be/iuOm81zs4cM?t=1641)
+- [40:34 — Q&A: multi-tier subcommands and auth for providers](https://youtu.be/iuOm81zs4cM?t=2434)
+- [44:11 — Subcommands as plugins and out-of-band updates](https://youtu.be/iuOm81zs4cM?t=2651)
+- [51:40 — Q1 roadmap and progress update](https://youtu.be/iuOm81zs4cM?t=3100)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### Workload Identity: A SPIFFE-Based RFC
 
-### Discussion: Workload identity RFC
+Joonas Bergius opened with an educational walkthrough of **workload identity** — the concept of a platform issuing identity to the services running on it, increasingly known as *non-human identity* to contrast it with human users. Cloud providers and orchestrators like Kubernetes and Nomad already offer this; the proposal is for wasmCloud to provide its own form. Because wasmCloud runs everywhere from edge to cloud to on-prem to IoT, the identity has to be **infrastructure-agnostic** (not tied to AWS/GCP/Azure primitives), **standards-based** and interoperable across platforms, **cryptographically verifiable**, and — to the extent possible — **fully automated**.
 
-* Joonas introduces background on an RFC for workload identity.
-  - Infrastructure-agnostic.
-  - Standards-based: interoperable across platforms.
-  - Cryptographically verifiable. 
-  - To the extent possible, fully automated. Workloads should only have to request identity for it to be available to them. 
-* Use-cases: 
-  - Securing NATS connectivity.
-  - Dynamic, secret-less OCI artifact pulls.
-  - Secret-less access to third party resources.
-  - Mutual authN for host and provider communication.
-  - Establishing trust across clusters.
-* Implementation in three steps:
-  - Host
-  - Providers
-  - Components
-* What's next?
-  - RCF/Proposal
-  - POC demonstration of host integration
-  - Tracking issue + work items
-* **Question**: Would this be mandatory or optional?
-  - Answer: The goal is definitely to make this optional.
+The immediate use cases: securing **NATS connectivity** for hosts and providers, enabling **secret-less dynamic OCI artifact pulls** (so the host presents its identity rather than storing registry credentials), secret-less access to third-party resources (a blobstore provider authenticating to S3 with no stored secrets), **mutual TLS** between hosts and providers, and establishing trust between clusters deployed across different environments.
 
-### Discussion: `wash` pluginification RFC introduction
+### Adopting SPIFFE and SPIRE
 
-* Taylor introduces background on an RFC for plugin-ifying `wash`
-* The RFC is available on GitHub: https://github.com/wasmCloud/wasmCloud/issues/4059
-* "This enables more flexibility for things like auth providers and custom extensions for those running wasmCloud in production."
-* This would replace current plugin model.
-* **Question**: Current plugin model limits ability to use multi-tier subcommand. Would the new model be able to get around this limitation?
-  - Answer: Yes, this should add increased flexibility to do all of the things you would expect.
-* **Question**: What would our recommendations to contributors be if they wanted to add a feature to `wash`?
-  - Answer: If this goes through, my thought would be that we recommend contributors implement the feature as a plugin.
+The proposal adopts **[SPIFFE](https://spiffe.io/)** — the CNCF-graduated standard for workload identity — and uses the **SPIRE** reference-implementation ecosystem to bootstrap. Joonas outlined a three-step rollout: the **host** first (so it can obtain identity for itself and its workloads), then **providers** (where ready-to-go use cases exist), then **components**. As extra motivation he pointed to OWASP's newly published **Non-Human Identity Top 10**, noting that workload identity can address over half of those risks. Next steps: an RFC/proposal in the wasmCloud issue tracker, a proof-of-concept showing host-side NATS connectivity over workload identity, and a tracking issue — with a preview teased for the team's upcoming KubeCon talk.
 
-### Tune in…
+### Optional, Additive, and Enterprise-Focused
 
-{/* Add any upcoming events/streams/etc */}
+Florian Fürstenberg asked whether workload identity would be mandatory and whether the RFC would cover best practices for operating SPIRE. Joonas confirmed it will be **optional** and additive — a sizable footprint you opt into, not a hard dependency — and that wasmCloud will provide getting-started guidance while deferring deep operational knowledge to the SPIRE community (and recommending managed back-ends where available). Liam Randall framed this as an **enterprise** problem — the kind Istio solved with SPIFFE — and argued that baking it in could make wasmCloud "the last service-token problem you ever have." Because the implementation targets SPIFFE rather than SPIRE specifically, lighter-weight or development-friendly back-ends remain possible, and the SPIRE agent could eventually be folded directly into the host.
 
--
+### Plugin-ifying wash with Wasm Components
 
-### Catch up…
+Picking up the [wash plugin RFC (#4059)](https://github.com/wasmCloud/wasmCloud/issues/4059) — originally authored as the text-based plugin demo — the team proposed turning large chunks of the **wash CLI** into **Wasm components** that can be updated independently. The motivation is twofold: dog-food components (the project's own tooling proving out the model) and serve the growing number of teams productionizing wasmCloud who need auth plugins and custom extensions. The RFC renames the subcommand interface to `plugin`, supporting both standard subcommand plugins and **auth plugins**; crucially, all argument parsing is now **delegated to plugins**, unlocking multi-tier subcommands and full CLI-like flexibility.
 
-{/* Add any blog posts/articles that the community might find interesting */}
+The new **auth interface** abstracts login flows behind a single `authenticate` method and returns a NATS credential (seed + JWT) plus an optional token for future HTTP/bearer flows. Because many plugins need an **OIDC** flow, wasmCloud provides the callback machinery — spinning up a localhost listener and inserting the response — so plugins don't reimplement it. A new `wash` config file enables sandboxing: plugins declare **access requests** (env vars, file paths) and users approve them through an OS-style permission prompt, interactive by default. To keep the experience seamless, the default `wash` build embeds core plugins, with a future light build letting you assemble your own. `wash drain` and `wash keys` are the first proof-of-concept plugins; `wash context`, an auth plugin, and `wash pull`/`push` follow.
 
--
+### Q1 Roadmap Check-In
 
-## Recording
+Brooks Townsend closed with the roadmap, noting strong progress moving issues from triage into **ready for work**. Highlights: Aditya's **cron job provider**, Masood/ossfellow's **built-in HTTP client provider** and SBOM/build-provenance work, Ahmed's draft to **consolidate wash CLI and wash lib** (functionally done, with workspace pains remaining), and Roman's **wasmCloud crate features** work that — combined with Nix flake outputs and Nix-on-CI — lets CI build only the specific binaries it needs, making builds faster and greener.
 
-{/* Automated - No need to adjust this unless automation fails */}
+## WebAssembly News and Updates
 
-<YouTube url="https://www.youtube.com/watch?v=iuOm81zs4cM" />
+Both headline items reflect where the broader WebAssembly ecosystem was heading in early 2025: security primitives and the **Wasm component model** as a universal extension mechanism. Workload identity brings the **[SPIFFE](https://spiffe.io/)**/**[SPIRE](https://github.com/spiffe/spire)** standard — battle-tested in the Istio/Envoy world — into a Wasm-native platform, addressing OWASP's [Non-Human Identity Top 10](https://owasp.org/www-project-non-human-identities-top-10/) risks. The wash plugin RFC is a bet on the component model as the substrate for extensible tooling, echoing the longer story told in [Introducing wash: a Wasm-powered plugin system](/blog/introducing-wash-wasm-powered-plugin-system/). For ongoing updates, follow the [wasmCloud blog](https://wasmcloud.com/blog/) and the [SPIFFE project](https://spiffe.io/).
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/overview/workloads/components/) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](/docs/overview/workloads/components/) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, C#) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable [provider architecture](/docs/overview/hosts/plugins/). wasmCloud's host is built on [Wasmtime](https://wasmtime.dev/), connects its control plane over [NATS](/docs/overview/transport/), and distributes workloads as [OCI artifacts](/docs/overview/packaging/). With built-in OpenTelemetry observability and [Kubernetes integration](/docs/kubernetes-operator/), wasmCloud bridges WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
+
+## Topic Deep Dive: The Wasm Component Model as a Plugin System
+
+The wash RFC is, at heart, an argument about the **[Wasm component model](https://component-model.bytecodealliance.org/)**. The thesis: a great component model should be "the last plugin system you'll ever need." By compiling wash subcommands to [WebAssembly components](/docs/overview/workloads/components/) and defining their contract in WIT [interfaces](/docs/overview/interfaces/) — `plugin`, `auth`, `registry`, plus the WASI CLI `run` world — wash gains language-agnostic extensibility (write a plugin in Go, ship it as a component), sandboxing via explicit [access requests](/docs/overview/hosts/plugins/), and **out-of-band, SemVer-compatible updates** distributed over OCI. The same component boundary that isolates a workload also isolates a CLI plugin: it gets exactly the env vars, file paths, and capabilities it asks for and nothing more — deny-by-default, enforced at the component edge. As more of wash becomes components, the CLI converges on what it always wanted to be: a small Wasmtime host orchestrating plugins, with the [component model](/docs/overview/workloads/components/) as the universal contract.
+
+## Who Should Watch This
+
+This call is especially valuable for **platform and security engineers** evaluating zero-trust, secret-less identity for cloud-native workloads (start with Joonas's workload identity walkthrough at [3:09](https://youtu.be/iuOm81zs4cM?t=189)), **wasmCloud operators and provider authors** who want secret-less NATS and OCI access (the use-cases section at [5:20](https://youtu.be/iuOm81zs4cM?t=320)), and **contributors and tooling developers** interested in extending the wash CLI through Wasm component plugins (the wash RFC at [27:21](https://youtu.be/iuOm81zs4cM?t=1641)).
+
+## Up Next
+
+Expect the **workload identity RFC** to land in the wasmCloud issue tracker, followed by a proof-of-concept demonstrating host-side NATS connectivity over SPIFFE-based identity (with a preview at KubeCon), and a tracking issue scoping host, provider, and component work. On the tooling side, watch for a draft RFC and community feedback on the **wash plugin system** ([issue #4059](https://github.com/wasmCloud/wasmCloud/issues/4059)), starting with `wash drain` and `wash keys` as the first plugins to prove out the architecture.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2025-02-05-community-meeting-transcript/)**

@@ -1,0 +1,259 @@
+---
+date: '2025-03-12'
+title: 'Transcript: wadm Config Reconciliation, the Single wash CLI & KubeCon EU'
+description: 'Full transcript of the March 12, 2025 wasmCloud community call covering wadm config reconciliation, the merged wash CLI, KubeCon EU, and provider tracing.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wadm
+  - wash cli
+  - webassembly kubernetes
+  - kubecon eu
+  - webassembly news
+image: https://i.ytimg.com/vi/Ccw7V__Q0Gc/maxresdefault.jpg
+showTitle: true
+slug: 2025-03-12-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-03-12-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=Ccw7V__Q0Gc" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=Ccw7V__Q0Gc" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Mar 12, 2025 · 46 minutes*
+
+**Speakers:** Brooks Townsend, Liam Randall, Taylor Thomas, Colin Murphy, Sudhanshu Pandey, ossfellow
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [04:20](https://youtu.be/Ccw7V__Q0Gc?t=260)
+
+All right. Hello everybody. Welcome to wasmCloud Wednesday for Wednesday, March the 12th. Apologies for being a couple minutes behind — we were laughing about how bad technology is, you know, the thing we're all trying to figure out all the time. But in relation to today's meeting, let me go ahead and share the agenda. We've got just a couple things that we wanted to talk about today.
+
+On the demo front, there has been a pretty significant improvement that we put in yesterday. After we were able to do a great pairing session with some folks who were using wasmCloud, we figured out an issue which is kind of annoying on the local dev experience, and we'll talk about how some of our tooling has made this update really easy for you to get. We will talk about the combination of the wash CLI and wash lib, which fully completed sometime last week after the community meeting — a huge amount of effort there. And then just a little bit of time for us to discuss KubeCon EU coming up, which is, I think, three weeks out. Then we should have some free time at the end of the call, our regularly scheduled unscheduled time to discuss anything happening in the wasmCloud community and the Wasm ecosystem in general.
+
+So let's go ahead and get started. The demo that I have for you today is actually an update that we put into wadm, related to some strange behavior you may see when you're deploying applications locally. Let me go ahead and share my terminal really quick.
+
+<img src="/img/community/2025-03-12/image001.webp" alt="Terminal sharing the wadm config reconciliation demo" />
+
+So what I have here is just the Rust Hello World app, slightly modified to include one particular thing: with this component, I am supplying a piece of configuration. This is something that we support for components and for the implementation of capability providers — you can provide configuration that you fetch at runtime using the WASI runtime config interface. If you wanted to configure things like the language you return a response in, or the port to listen on, all these kinds of things, you would use config for. Nothing too crazy there.
+
+When I deploy this application, I've got a little watch happening in the top pane of my terminal that keeps an eye on the status, and in the bottom pane I've got my wasmCloud host logs — but really we'll just need to pay attention to the top one. When I deploy this, you can see the application pretty much immediately starts reconciling. The HTTP server provider starts fairly quickly, and then we are essentially sitting here. The link gets defined. We're waiting on this component to reconcile. And this is a little strange — WebAssembly components are generally very small. This Rust Hello World component we're loading is, what, 200 kilobytes from disk. There's no reason it should take that amount of time to start.
+
+If we undeploy this application and then deploy it again, this would essentially just be loading the provider from cache and loading the component, the same thing. We can see it sits in reconciling here for a little bit. This is weird — something you could hit anytime you're running with config. We actually figured out the source: a small bug in our reconciliation logic for wadm. Essentially, every time you define a component or a provider and it has configuration, we first reconcile the configuration to make sure it's created, and then we'll start the component or provider.
+
+<img src="/img/community/2025-03-12/image002.webp" alt="wadm reconciliation logic and the scaler comparison" />
+
+What we were able to do is change this functionality so that we can react to that configuration event and then schedule the component — essentially what you would expect. Just to nail this point home: previously, wadm would basically sit here reconciling until a heartbeat came across, and that's what caused the component to start. But this is another part where I get to give kudos to the wasmCloud community — great work to mark, who implemented the functionality to pull the latest patch version of our bundled NATS server and wadm when you run `wash up`.
+
+So check this out. wadm, when you run `wash up`, is configured to pull version 0.20.2. If I take a look at the wadm version we have downloaded, that is what we have. Now if I specify the wadm version 0.20.3 — I'll check into why that wasn't happening automatically before — we'll download the latest patch version on `wash up`. And now when I deploy my application, you can see that essentially in the amount of time it took for me to get the status in the first place, the application is fully deployed. This is the correct status. You can curl this component and get the hello from Rust.
+
+The TL;DR is that this change, this patch bump, should result in much quicker reconciliation for wadm locally — on average, a deployment going from around 15 seconds, because you may be missing a heartbeat, to less than one second, especially when it's loading a component. This should be a whole lot snappier for your deploys. I'll double check what's going on with my environment on `wash up` — I might be holding it wrong — but you should essentially automatically get this patch version the next time you run `wash up`, which is pretty cool.
+
+The only other thing I could share is the original pull request, if folks are interested in what actually changed. It's always fun to talk through code. Essentially, inside the reconciliation logic for wadm, when I am deploying my component, now if configuration is created and it's a configuration the component depends on, then this individual scaler will reconcile — comparing desired state to the actual state of the lattice. We didn't have this before, so when the config got created it did not result in a pass on this state. Really not a huge update. I'm also doing a little experimentation with having links react to the configuration event as well — there's no reason we shouldn't put this in. Looking at this, the end-to-end tests seem to be running almost twice as fast, which is very interesting. So, some nice snappy reconciliation improvements coming to a wadm near you. Do folks have any questions on this particular feature, or how wadm works? Always happy to talk about that stuff.
+
+The only other thing I'll mention is around the release cadence for wasmCloud. We have been doing a really good job lately of cutting releases as soon as we have new functionality or new patches available. I definitely want to optimize for getting functionality out as soon as possible. This patch release to wadm only included the one feature, but that does make it really nice for tracking over time — just quickly releasing as available.
+
+Okay, next on the agenda. Let me share that again. I did want to leave a little time to talk about the wash CLI and wash lib merging together into a single wash. This is actually pretty cool — you can go onto crates.io and look for `wash`, and it's us. Look at that, it's our whole thing. We've been looking to use this crate for quite a long time. I really appreciate the original owner of this crate for transferring it to us — huge help.
+
+<img src="/img/community/2025-03-12/image003.webp" alt="The wash crate on crates.io" />
+
+So now if you look up `wash` on crates.io, `wash-cli` and `wash-lib` will still remain. We're not going to do anything with them — we just are no longer publishing updates to those two crates. This shouldn't result in any real change to you, unless you were installing wash via `cargo install`. Now you can just change your scripts or whatever configuration you have to use `wash` instead. There weren't actually any feature changes from the wash perspective, from 0.39 to 0.40, so feel free to upgrade at any time.
+
+What you will see, if you were embedding wash lib as a library, is that the organization of this crate — just to facilitate merging it really quickly — is divided now into CLI and lib. If you go into the wash lib module, it is the exact same structure as the wash lib crate, so this really should not result in huge breaking changes for folks who need to update. Please file issues if something is in the wrong place or organized incorrectly. But thank you so much again to Ahmed, who is one of the maintainers on wasmCloud, for taking on the vast majority of this merging work. I essentially just rebased the PR at the end of the day to get it merged in, but Ahmed did a ton of work there. This is one of those tasks that's a bit of a chore, but in the long term I think we're going to see the benefit pretty immediately when we get to release wash in a single release rather than two.
+
+The only other thing I'll mention is that now that we've finished this merge, we can lift the feature freeze on wash, which we were trying to maintain to facilitate getting those crates merged. Everybody who's been sitting there twiddling their thumbs waiting to add their awesome features to wash — you can stop doing that and add your awesome features to wash. In all seriousness, as we go forward in the development of this crate, we will likely do some larger internal refactors to consolidate some of the modules and enforce a more common structure, because wash is one of our longest-lived crates. It's been here through two major Rust editions now, so it's a great place to think about modernizing the codebase.
+
+We are also finalizing a couple of other updates in the wasmCloud repo to wrap up this rename — being able to install wash in our CI from the `wash` name and not `wash-cli` — just little trailing things, but really it's done. Hey, speak of the devil, Ahmed. We were just talking about merging wash CLI and wash lib, so now I can thank you in person. Thank you again, it's great.
+
+All right, folks. Does anybody have any questions about the merge of those two crates? Any concerns, or folks who are depending on the older wash CLI and wash lib that are looking for advice?
+
+**Sudhanshu Pandey** [20:27](https://youtu.be/Ccw7V__Q0Gc?t=1227)
+
+I show recording from here, as well as streaming.
+
+**Liam Randall** [20:29](https://youtu.be/Ccw7V__Q0Gc?t=1229)
+
+I see it says the contents of the meeting are set to a third-party live, so I think we're streaming.
+
+**Brooks Townsend** [20:35](https://youtu.be/Ccw7V__Q0Gc?t=1235)
+
+I see it on Zoom. Sorry to distract — I don't think we had any more on the wash thing, but we'll take another minute just to see if we're streaming right. Okay, we're streaming to Twitter. Hi, Twitter. Are we on Twitch too? Okay, we're on Twitch. I will take a look and figure this out after the call. I think we probably just got our stream keys crossed, but let me point you to a different stream and then we should be able to take this and upload it.
+
+We are on here, all right. Yeah, this is just a misconfiguration on the stream itself. So hey, YouTube — everybody's been waiting, I'm so sorry. Looks like we had our configuration a little bit wrong on the stream. For folks tuning in now, we'll make sure that on the community meeting notes we have a link to the actual full video. You missed the demo and the discussion, but maybe we can just go live again later today and pretend like it's not daylight savings time.
+
+All right, well, let's wrap up the last discussion item, and we'll fix it in post. Sorry to the folks on YouTube. The last discussion item I had for today is just around KubeCon EU. There are a couple of different awesome wasmCloud things — if you look at Wasm on the KubeCon schedule, there's a ton of stuff coming across in the WebAssembly world. Correct me if I'm wrong, but I do not think there is a Wasm co-located event at this KubeCon. What we do have right before is WasmIO, a WebAssembly-and-only-WebAssembly conference, which is directly before KubeCon in Barcelona. For all the Wasm enthusiasts, you'll want to go to the Wasm conference, and then at KubeCon we'd essentially be replaying a bunch of the same talks.
+
+**Liam Randall** [24:38](https://youtu.be/Ccw7V__Q0Gc?t=1478)
+
+We do have a ton of WebAssembly talks in the main sessions. WebAssembly has really been incorporated all across cloud native, so I'll be speaking in the platform engineering track, for example, at regular KubeCon. Brooks, you have a talk?
+
+**Brooks Townsend** [24:59](https://youtu.be/Ccw7V__Q0Gc?t=1499)
+
+I do have a talk, yeah, talking in the maintainer track.
+
+**Liam Randall** [25:05](https://youtu.be/Ccw7V__Q0Gc?t=1505)
+
+And then Jonas is speaking twice — he's at "Meshing with WebAssembly: Taking Liquidity Beyond Containers" and "SPIFFE in Practice: Universal Identity for WebAssembly Workloads." Bailey is speaking at WasmIO. Brooks, you've got "Wasm Whiplash: wasmCloud's Wild Ride to Standards." And I've got "Can You Maintain 1000 Apps? wasmCloud and Kubernetes, the Ultimate Golden Template." Then at WasmIO I have "Don't Let Thousands of Apps Bite You" — it was clever in pre-production. Taylor has the super-fast TAG Runtime Wasm review lightning track, and also a review of the Wasm ecosystem in the maintainer track with David Justice. And that's us.
+
+There are some other wasmCloud talks. The Couchbase team is doing a wasmCloud workshop at WasmIO, which we're super excited about. Those folks are busy on the wasmCloud Slack, if you're not there, planning out their workshop. Now that we're incubating, I think we have the wasmCloud booth open all week at KubeCon EU, so you can come by and see Brooks, Taylor, Bailey, and Colin over there. And then over at the Cosmonic booth there'll be a crew of us slaving away on Cosmonic Control — it's our new product coming out. So we've got a lot of fun stuff.
+
+**Brooks Townsend** [26:40](https://youtu.be/Ccw7V__Q0Gc?t=1600)
+
+Colin, I know you asked in the wasmCloud Slack the other day about where to publish a demo component. I'll have to double check, but since you're an org maintainer you might have the ability to create repositories in the wasmCloud org — feel free to do that. But if not, I'm happy to create one for you.
+
+**Colin Murphy** [27:07](https://youtu.be/Ccw7V__Q0Gc?t=1627)
+
+Yeah, I'll spend a little while. I've intentionally stayed away from Docker and OCI registries for quite a while, so I'll figure it out.
+
+**Brooks Townsend** [27:20](https://youtu.be/Ccw7V__Q0Gc?t=1640)
+
+GitHub Packages has actually been pretty good — it's well supported. You can push it to Docker Hub too, but you can basically just `wash push` right to GitHub. All you need to do initially, when you push a package for the first time, is it'll be private, so you can make it public.
+
+**Colin Murphy** [27:46](https://youtu.be/Ccw7V__Q0Gc?t=1666)
+
+To which GitHub org? I guess I could do it to my own.
+
+**Brooks Townsend** [27:50](https://youtu.be/Ccw7V__Q0Gc?t=1670)
+
+Yeah, you're welcome to just push it to your own. I think you might just need to make a personal access token with permissions to write to the wasmCloud org's packages, and you should have permission to do that. For my talks I've done repos in my personal account, and I've done some on the wasmCloud side before. It doesn't make a super huge difference, because most people just end up scanning the QR code to look at it anyway.
+
+**Colin Murphy** [28:31](https://youtu.be/Ccw7V__Q0Gc?t=1711)
+
+Yeah, for the talk I just wanted it so you could pull it down.
+
+**Brooks Townsend** [28:42](https://youtu.be/Ccw7V__Q0Gc?t=1722)
+
+So I'd say do whatever is easiest or best from your perspective there. If it ends up being something we wanted to use for, like, an integration test with WordPress or whatever, then we could bring that entry into the wasmCloud repo.
+
+**Colin Murphy** [29:10](https://youtu.be/Ccw7V__Q0Gc?t=1750)
+
+Yeah, well, you could at least put a reference to a URI.
+
+**Brooks Townsend** [29:13](https://youtu.be/Ccw7V__Q0Gc?t=1753)
+
+Yeah, for sure. All right. Thank you, Liam, for the overview on all the talks — got a lot of fun stuff coming up. Show of hands, folks on the call who are going to end up going to KubeCon EU. Taylor, nice. So, since all of you folks watching at home could not raise your hand so that we could see it: if you are going to KubeCon EU in London, please feel free to hit us up in the wasmCloud Slack, or just come visit the booth.
+
+**Colin Murphy** [30:30](https://youtu.be/Ccw7V__Q0Gc?t=1830)
+
+Are you going to do a wasmCloud demo from the stage, like last time? I think people had fun with that last time. It was impressive.
+
+**Brooks Townsend** [30:43](https://youtu.be/Ccw7V__Q0Gc?t=1843)
+
+I thought it was pretty funny. And by the way, for anyone streaming this or watching later: if you are a wasmCloud maintainer or heavy user and you're going to be at KubeCon, come make sure you join us when we have the wasmCloud booth. We'll try to let people know when we're going to have it. Now that it's an official CNCF project — well, we've always been an official CNCF project, but now that we're incubating I think we get a bit more time, so we'll have a wasmCloud booth the whole time. If you're going to be there and you're involved in the community, we'd love to have you at those booths to help answer questions and interact with others.
+
+We'll definitely do a community meeting from the floor, if it ends up working out. If I happen to be getting on stage at that exact time, that would also be cool — like the demo and the solutions showcase. Next time I'll actually share my screen instead of Lachlan or Colin.
+
+**Colin Murphy** [32:02](https://youtu.be/Ccw7V__Q0Gc?t=1922)
+
+No, it was me — I think I shared it on my phone. I pointed my phone at the screen.
+
+**Brooks Townsend** [32:06](https://youtu.be/Ccw7V__Q0Gc?t=1926)
+
+That sounds right. It's like pointing your phone at your computer to take a screenshot, but we made it work. Cool. All right everyone, I think that's all we had for our scheduled agenda. Are there any other topics folks wanted to talk about from the wasmCloud community — app development, the broader WebAssembly ecosystem — that we should talk about today?
+
+**ossfellow** [32:54](https://youtu.be/Ccw7V__Q0Gc?t=1974)
+
+I have one quick question. For internal providers, do you observe any restrictions in terms of what they use? For example, I don't see them using the observability macro, and I'm tempted to use that. I was wondering, is there something I'm not aware of — are there some sort of restrictions in terms of what we can use for external ones versus internal ones, because they're part of the host?
+
+**Brooks Townsend** [33:32](https://youtu.be/Ccw7V__Q0Gc?t=2012)
+
+Yeah, I don't think we put any restrictions on what we can use there. There definitely is some amount of — when it comes to tracing and trace propagation, there's some amount of it being easier when it's an internal provider, because trace propagation is automatically carried through the function context. So in that sense, we don't need to call the propagate-trace function in response to a wRPC message to pull the context off of those headers, since we should already have that context internally. We'll have to check, though — I want to make sure you're not missing anything, and that we're not missing anything on having the traces connected. I remember the messaging that's built in propagating traces correctly. Does that one have the propagate-trace macro, or does it just work?
+
+**ossfellow** [34:44](https://youtu.be/Ccw7V__Q0Gc?t=2084)
+
+So, in the HTTP server one — and I've been looking at different crates, so don't quote me, but I think it was there that there was a comment about adding tracing. And because I wanted to add tracing for the client, I was thinking there was a reason that macro was not used here. Like, should we use a different method, for example a function call directly, if you want to pass any information in the tracing?
+
+**Brooks Townsend** [35:37](https://youtu.be/Ccw7V__Q0Gc?t=2137)
+
+Yeah. So there are two different — well, there's like 40 different things when it comes to tracing — but in this example, since the HTTP request, as far as wasmCloud is concerned, is the origin of the request in the wasmCloud trace, we generally start the trace at this HTTP request. However, there is a scenario where you're initiating the HTTP request from a different system where you have tracing enabled. So the to-do here, which we should actually see in this issue — does this work? Hey, nice, is it done? I think this might be someone who's working on this. Without getting sidetracked: what we really want here is, if there is a trace context on the incoming request, then we want to create a new span as the wasmCloud HTTP handling in that same trace, so that we can propagate it all the way from the outside system.
+
+For HTTP client, I don't think you should need to do that — you should be able to follow the messaging NATS example for keeping the trace. But there's one more thing to keep in mind, which I forget if it's done: this is another instance where we should take the trace context and inject it into the HTTP header so that a system on the other end could get that trace context. Does that make sense?
+
+**ossfellow** [38:03](https://youtu.be/Ccw7V__Q0Gc?t=2283)
+
+No, I understand what you're telling me. And I also saw in the HTTP server one that you're using the concrete kind of — well, a lower level than wRPC, from Wasmtime, right? So I assume I should follow the same practice, or not necessarily?
+
+**Brooks Townsend** [38:27](https://youtu.be/Ccw7V__Q0Gc?t=2307)
+
+Yeah, you should be able to. The HTTP server that's built into the host is slightly different than the external ones, but you should be able to follow the same practice that we followed in the external HTTP client.
+
+**ossfellow** [38:49](https://youtu.be/Ccw7V__Q0Gc?t=2329)
+
+I'm trying to reuse as much code as possible. I was just wondering if, instead of some of the wRPC types, I should go and look at the Wasmtime crate types — it has the concrete types behind the wRPC types, that kind of thing.
+
+**Brooks Townsend** [39:12](https://youtu.be/Ccw7V__Q0Gc?t=2352)
+
+Yeah. This might be a little delicate, because ideally with the built-in HTTP client, if possible, we don't need to do the translation into the wRPC interface. We should be able to go straight from the Wasm.
+
+**ossfellow** [39:45](https://youtu.be/Ccw7V__Q0Gc?t=2385)
+
+That's what I'm doing. I'm basically implementing the handler. We are really resorting to going to wRPC to do that, that's why I'm saying I go one level lower than that — straight to the Wasmtime HTTP crate, or whatever that crate is, the wasi-http crate.
+
+**Brooks Townsend** [40:18](https://youtu.be/Ccw7V__Q0Gc?t=2418)
+
+Yeah, okay, I think I've sorted it out in my own brain. Yes, that sounds right. We would probably want to use Wasmtime HTTP, slash wasi-http, directly and translate that into — it's really up to you if you wanted to turn that into a `reqwest` request, which I think works pretty well, or use hyper directly as a low-level framework.
+
+**ossfellow** [40:46](https://youtu.be/Ccw7V__Q0Gc?t=2446)
+
+I saw that you've used hyper, so I have not attempted to change that. I can go for `reqwest` if you think — you know.
+
+**Brooks Townsend** [40:55](https://youtu.be/Ccw7V__Q0Gc?t=2455)
+
+hyper is what's under `reqwest` anyway. So I think for performance, we'd have the most control doing it with hyper, so that's a continue.
+
+**ossfellow** [41:07](https://youtu.be/Ccw7V__Q0Gc?t=2467)
+
+I'll continue with hyper, yeah.
+
+**Brooks Townsend** [41:10](https://youtu.be/Ccw7V__Q0Gc?t=2470)
+
+I think that sounds great, awesome. Thank you. And please feel free, if there's anything starting to block you on that PR, to open a draft PR and solicit feedback.
+
+**ossfellow** [41:25](https://youtu.be/Ccw7V__Q0Gc?t=2485)
+
+That NATS blobstore provider — is there anything else I need to do for that? I'm not saying it needs to be released, because that depends on how soon users need it, and everybody can pull it off the PR and use it, as some have been. So it's not an issue. I was just wondering if there's anything I'm expected to do here.
+
+**Brooks Townsend** [42:01](https://youtu.be/Ccw7V__Q0Gc?t=2521)
+
+I think the last time we looked at this PR, there were just a couple of CI failures happening in main that were affecting your PR. I may reach out to you for a rebase — we're happy to do it, it would just rewrite the commit history to also have our little name on it. And thank you for the poke again. I think this is really just on us, because you addressed all of my nits on the PR, and the only thing we needed to do was address the stack overflow when you ran the tests, which was not your fault — it's on the tracing crate.
+
+**ossfellow** [42:54](https://youtu.be/Ccw7V__Q0Gc?t=2574)
+
+Yeah, that by default is kind of disabled, and that's why you need to run it in debug mode to use it, right?
+
+**Brooks Townsend** [43:05](https://youtu.be/Ccw7V__Q0Gc?t=2585)
+
+Weirdest issue.
+
+**ossfellow** [43:08](https://youtu.be/Ccw7V__Q0Gc?t=2588)
+
+It eventually ties back into the conversation we had some community meetings ago, where Taylor and you talked about the testing framework. I think at some point the testing framework needs a bit of love, so we make sure we have a good testing framework we can utilize everywhere. Right now I'm fuzzy about what I should do for testing the internal blobstore from unit testing. I'll test it with components, but in terms of test-framework sort of things, right?
+
+**Brooks Townsend** [43:52](https://youtu.be/Ccw7V__Q0Gc?t=2632)
+
+Right, yeah. We have the `wasmCloud-test-util`, but the integration with the provider SDK can definitely prove challenging for tests — I think we have a global object, so you essentially need to run one at a time. It requires some hand-holding. It is on our Q1 roadmap to revisit some of that stuff, so hopefully we can get to that.
+
+**ossfellow** [44:23](https://youtu.be/Ccw7V__Q0Gc?t=2663)
+
+Yeah, I'm saying we should kind of record them as technical debt, testing debt, or whatever we want to call it. And once those improvements are made, we can gradually add them into the quarterly plans and add them everywhere.
+
+**Brooks Townsend** [44:45](https://youtu.be/Ccw7V__Q0Gc?t=2685)
+
+Yeah, that makes sense. Thank you, ossfellow. Folks, any other topics or questions?
+
+All righty, well, thank you all for coming to wasmCloud Wednesday. Apologies for the initial hiccup on the stream to YouTube — we'll get that addressed and get the real video linked and all that fun stuff. But I think that's it. We'll see you all next week for our regularly scheduled community meeting. We've got two more weeks again before KubeCon, so those two meetings should be pretty normal, but then the KubeCon meeting we'll probably be doing from the conference floor — so it'll probably just be a quick update, everybody will wave, and all that stuff. We'll touch base on that a little bit later. All right folks, I'm going to go ahead and stop the recording. Thank you all for coming. Have a wasmCloud day.

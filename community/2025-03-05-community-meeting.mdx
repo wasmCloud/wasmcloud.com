@@ -1,38 +1,130 @@
 ---
 date: '2025-03-05'
-title: 'Meeting Agenda - 2025-03-05'
-description: 'Short wasmCloud community call covering the wash-cli and wash-lib consolidation PR plus an update on provenance and attestation work for build pipeline trust.'
+title: 'WebAssembly News: Merging the wash CLI and SBOM Build Provenance'
+description: "wasmCloud WebAssembly news for March 5, 2025: merging the wash CLI and wash-lib crates, plus SBOM and build-provenance work for the supply chain."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly news
+  - wash cli
+  - sbom
+  - build provenance
+  - oci artifacts
+  - supply chain security
+  - webassembly kubernetes
+chapters:
+  - { seconds: 82, label: "Welcome to wasmCloud Wednesday for March 5" }
+  - { seconds: 130, label: "Combining the wash CLI and wash-lib crates" }
+  - { seconds: 200, label: "What the wash crate merge means for installing wash" }
+  - { seconds: 336, label: "Masoud's update: SBOMs and build provenance" }
+  - { seconds: 469, label: "Reviewing the build pipeline work asynchronously" }
+  - { seconds: 585, label: "A possible regression in OCI artifact format" }
+  - { seconds: 650, label: "Confirming OCI-compliant config media types" }
+  - { seconds: 856, label: "Open floor: experimental flag for the built-in HTTP client" }
+image: https://i.ytimg.com/vi/aTyoufBIkOM/maxresdefault.jpg
+showTitle: true
+slug: 2025-03-05-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- Update on `wash-cli` and `wash-lib` consolidation
-- Update on provenance and attestation work
+<YouTube url="https://www.youtube.com/watch?v=aTyoufBIkOM" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=aTyoufBIkOM" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The March 5, 2025 wasmCloud community call is a short, heads-down WebAssembly news update from a team in KubeCon EU crunch mode. Brooks Townsend walks through the in-progress effort — led by maintainer Ahmed — to merge the **wash CLI** and **wash-lib** crates into a single `wash` crate so features ship faster, and explains why the team is holding a feature freeze until the PR lands. Masoud, a wasmCloud OSS Fellow, shares phase-one progress on **SBOM and build-provenance** work for wasmCloud artifacts, which sparks a discussion with Taylor Thomas about keeping component builds compliant with the **OCI artifact** standard.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- The **wash CLI** (`wash-cli`) and **wash-lib** crates are being consolidated into one `wash` crate, so new features and functionality can be released under a single crate much more quickly
+- The team is maintaining a **feature freeze** on both crates until the merge PR lands, and will cut one last `wash-lib` / `wash-cli` release just before it does
+- The change is invisible to most users — `wash` stays a single binary installed the same way — except that **Cargo** users will run `cargo install wash` instead of `cargo install wash-cli`
+- Masoud's **SBOM and build-provenance** work targets [SLSA](https://slsa.dev/) Build Level 2; Level 3 would require isolating the build and attestation into reusable workflows, which the current pipeline can't yet do cleanly
+- The team plans to evaluate the provenance approach asynchronously in Slack and pick it back up after KubeCon EU, since it isn't on the critical path for any feature
+- Masoud flagged a possible **regression** where some component images appeared to use an older custom config format; Taylor confirmed wasmCloud's tooling uses the **standard OCI artifact** config media type from the CNCF/OCI working group
+- The built-in HTTP client provider will sit behind the same kind of **experimental flag** as the built-in HTTP server provider, while the team teases out the right use cases for built-in providers
+
+## Chapters
+
+- [1:22 — Welcome to wasmCloud Wednesday for March 5](https://youtu.be/aTyoufBIkOM?t=82)
+- [2:10 — Combining the wash CLI and wash-lib crates](https://youtu.be/aTyoufBIkOM?t=130)
+- [3:20 — What the wash crate merge means for installing wash](https://youtu.be/aTyoufBIkOM?t=200)
+- [5:36 — Masoud's update: SBOMs and build provenance](https://youtu.be/aTyoufBIkOM?t=336)
+- [7:49 — Reviewing the build pipeline work asynchronously](https://youtu.be/aTyoufBIkOM?t=469)
+- [9:45 — A possible regression in OCI artifact format](https://youtu.be/aTyoufBIkOM?t=585)
+- [10:50 — Confirming OCI-compliant config media types](https://youtu.be/aTyoufBIkOM?t=650)
+- [14:16 — Open floor: experimental flag for the built-in HTTP client](https://youtu.be/aTyoufBIkOM?t=856)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### Combining the wash CLI and wash-lib Crates
 
-### Update on `wash-cli` and `wash-lib` consolidation
+Brooks opened with a quick touch-base — no big agenda items, with much of the team on-site, "heads down, looking forward toward KubeCon EU." The main item was an effort maintainer [Ahmed](https://github.com/ahmedtadde) has driven over the past few weeks: merging **wash-lib** and **wash-cli**, two separate crates in wasmCloud's Rust codebase, into a single `wash` crate. Combining them lets the team release [wash](/docs/wash/) features and functionality much faster, under one crate instead of two.
 
-- [Ahmed](https://github.com/ahmedtadde) has been working on merging `wash-lib` and `wash-cli`. By consolidating those, we’ll be able to release features a lot quicker. 
-- [This PR](https://github.com/wasmCloud/wasmCloud/pull/4047) is underway and we’re going to continue declining to merge anything into `wash-lib` or `wash-cli` until this lands. 
-- Right before the PR lands, we’ll cut one last release of `wash-lib` and `wash-cli`, and then we’ll have a singular wash crate under wasmCloud.
-- This shouldn’t change anything for anyone installing wash except for those installing through `cargo`&mdash;you’ll use `wash` instead of `wash-cli`.
+Getting there meant some cleanup. Ahmed had to rebase to bring over fixes from the repository's main branch, including swapping out a library with an incompatible license and resolving a couple of issues with an integration test for the HTTP client. To keep the merge clean, the team is holding a deliberate **feature freeze** — nothing new gets merged into `wash-lib` or `wash-cli` until the consolidation PR is across the line. This work is part of the Q1 roadmap, and Brooks noted it's moving along well (the customary CI flake notwithstanding).
 
-### Update on provenance and attestation work
+### What the Merge Means for Installing wash
 
-- [Masoud](https://github.com/ossfellow) updated the community on his progress on provenance and attestation.
-- Masoud has revised the approach, providing the background in [this comment](https://github.com/wasmCloud/wasmCloud/issues/3975#issuecomment-2689614607).
-- His latest work can be found [here](https://github.com/ossfellow/dugout/tree/main/.github).
-- [This comment](https://github.com/wasmCloud/wasmCloud/issues/3975#issuecomment-2689614607) includes observations on possible challenges in the build pipeline (at the bottom of the comment) for further discussion.
+The plan: right before the PR lands, cut one last release of `wash-lib` and `wash-cli`; after it lands, there's a single `wash` crate under wasmCloud. For the vast majority of users this changes nothing — `wash` is still a single binary, still installed through the same package managers, which the team will update behind the scenes. The one visible difference is for people installing via **Cargo**, who will run `cargo install wash` instead of `cargo install wash-cli`. Small baby steps, but a good thing to get done.
 
-## Recording
+### Masoud's Update: SBOMs and Build Provenance
 
-{/* Automated - No need to adjust this unless automation fails */}
+[Masoud](https://github.com/ossfellow), a wasmCloud OSS Fellow, reported on phase one of **SBOM (software bill of materials) and build-provenance** work for wasmCloud artifacts. After learning in January that an earlier assumption was wrong, he revised the approach and documented the full background in the issue. The crux: [SLSA](https://slsa.dev/) Build Level 3 requires isolating the build and the attestation — not just producing attestations — into reusable workflows, which wasmCloud's current pipeline can't do cleanly yet. So Masoud designed a solution suitable for Level 2 and stood up a repository to run wasmCloud component jobs and provider jobs with the necessary modifications. The trade-off he called out: the build pipeline is already complex, and the Level 2 approach adds more injection points, making it more complex still.
 
-<YouTube url="https://www.youtube.com/watch?v=aTyoufBIkOM" />
+### Reviewing the Work Async, and an OCI Artifact Question
+
+Because the provenance work isn't on the critical path for any feature, Brooks proposed reviewing Masoud's comment asynchronously in the [wasmCloud Slack](https://slack.wasmcloud.com/) and making it the first discussion item in the following week's call — giving the team time to digest before deciding whether to proceed now or after the pipeline is simplified. Masoud agreed to post it there.
+
+Masoud also flagged what looked like a **regression**: some of the latest component images appeared to be built in an older custom config format ("actor"-style), predating wasmCloud's adoption of the OCI standard. Brooks confirmed the team should be following the [Wasm OCI Artifact](/docs/overview/packaging/) recommendations from the working group. Taylor Thomas clarified that wasmCloud's current tooling uses the **standard OCI config media type** — the core of the spec produced with the CNCF and OCI folks — and that the word "actor" no longer appears in the codebase outside historical comments. Some old artifacts may still be drifting around with the legacy config type; Taylor asked Masoud to send a concrete example so they could track down what (or who) pushed it.
+
+### Open Floor: Built-in HTTP Client Behind an Experimental Flag
+
+With the agenda wrapped, Masoud asked whether the in-progress **built-in HTTP client provider** should sit behind the same kind of experimental flag recently added for built-in providers. Brooks confirmed yes — mirroring the built-in HTTP server provider's setup. wasmCloud wants to keep built-in providers behind an experimental flag while it teases out the right use cases, since built-ins behave differently from the project's discrete binary [capability providers](/docs/overview/hosts/plugins/).
+
+## WebAssembly News and Updates
+
+This was a tooling-and-supply-chain edition of wasmCloud's weekly WebAssembly news. The headline items — consolidating the [wash CLI](/docs/wash/) into a single crate and pushing [SBOM](/blog/2024-11-14-secure-your-wasmcloud-supply-chain-with-sboms/) and build-provenance work toward [SLSA](https://slsa.dev/) compliance — are the unglamorous plumbing that makes a [CNCF](https://www.cncf.io/) WebAssembly platform trustworthy in production. The OCI discussion is a reminder that wasmCloud distributes WebAssembly components and providers as standard [OCI artifacts](/docs/overview/packaging/), the same registries that carry container images. For the broader ecosystem, the team teased ongoing progress toward WASI Preview 3 and was visibly in KubeCon EU prep mode. For ongoing updates, follow the [wasmCloud blog](https://wasmcloud.com/blog/) and the [Bytecode Alliance](https://bytecodealliance.org/).
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/overview/workloads/components/) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](https://component-model.bytecodealliance.org/) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, C#) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable provider architecture. wasmCloud's reference host is built on [Wasmtime](https://wasmtime.dev/), and the [wash CLI](/docs/wash/) is the developer's main entry point for building, signing, and publishing components as [OCI artifacts](/docs/overview/packaging/). With built-in OpenTelemetry observability and [Kubernetes integration](/docs/kubernetes-operator/), wasmCloud bridges WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
+
+## Topic Deep Dive: Supply-Chain Trust for WebAssembly Artifacts
+
+Most of this short call orbits one theme: **trusting what you ship**. Merging `wash-lib` and `wash-cli` is about delivery velocity, but the SBOM and build-provenance work is squarely about supply-chain security. An [SBOM](/blog/2024-11-14-secure-your-wasmcloud-supply-chain-with-sboms/) inventories exactly what went into a build, and provenance attestations (per [SLSA](https://slsa.dev/)) prove how and where a binary was produced — both critical when a [WebAssembly component](/docs/overview/workloads/components/) might be pulled from a registry and scheduled anywhere across a fleet, including on [Kubernetes](/docs/kubernetes-operator/). The reason it's hard is the same reason it matters: SLSA Build Level 3 demands isolating the build from the attestation in reusable workflows, which a complex multi-job CI pipeline can't always satisfy without a redesign. The OCI-artifact thread reinforces the point — wasmCloud deliberately distributes components and providers as standard [OCI artifacts](/docs/overview/packaging/) with the spec's config media type, so the same registry tooling, scanners, and policies that secure container supply chains apply to WebAssembly workloads too.
+
+## Who Should Watch This
+
+This call is useful for **wasmCloud contributors and maintainers** tracking the `wash` crate consolidation and its Cargo install change (start at [2:10](https://youtu.be/aTyoufBIkOM?t=130)), **platform and security engineers** interested in SBOMs, build provenance, and SLSA levels for WebAssembly artifacts (Masoud's update at [5:36](https://youtu.be/aTyoufBIkOM?t=336)), and **anyone publishing components or providers** who wants to confirm wasmCloud's OCI-artifact compliance (the OCI discussion at [9:45](https://youtu.be/aTyoufBIkOM?t=585)).
+
+## Up Next
+
+The team planned to make Masoud's SBOM and build-provenance work the **first discussion item** in the following week's community call, after reviewing his comment asynchronously in Slack. Also on deck: tracking down the OCI artifact-format example Masoud was going to post, landing the `wash-lib` / `wash-cli` merge PR, and extending the experimental flag to the built-in HTTP client provider — all against the backdrop of KubeCon EU preparations.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2025-03-05-community-meeting-transcript/)**

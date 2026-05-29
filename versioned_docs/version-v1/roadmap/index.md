@@ -10,7 +10,7 @@ type: 'docs'
 This roadmap page is a snapshot of the current state of the project. It is not a guarantee of future direction or features. It is a living document and will change as the project evolves. You can view the most current version of this roadmap on [GitHub Projects](https://github.com/orgs/wasmCloud/projects/7/views/13).
 :::
 
-The 2025 Q2 Roadmap was brainstormed and planned in the [23 April 2025 community meeting](/community/2025/04/23/community-meeting/). Thank you to all who attended, commented, and contributed to making this roadmap community-driven.
+The 2025 Q2 Roadmap was brainstormed and planned in the [23 April 2025 community meeting](/community/2025-04-23-community-meeting/). Thank you to all who attended, commented, and contributed to making this roadmap community-driven.
 
 ## Retrospective
 

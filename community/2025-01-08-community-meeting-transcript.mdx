@@ -1,0 +1,185 @@
+---
+date: '2025-01-08'
+title: 'Transcript: wasmCloud Monorepos & Composing Wasm Components Across Languages'
+description: 'Full transcript of the January 8, 2025 wasmCloud community call covering the Go and TypeScript monorepos, JCO/wac component composition, C2PA, and WASI versioning.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm components
+  - jco
+  - go webassembly
+  - rust webassembly
+  - wasi
+image: https://i.ytimg.com/vi/3ytu_yD5ezw/maxresdefault.jpg
+showTitle: true
+slug: 2025-01-08-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-01-08-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=3ytu_yD5ezw" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=3ytu_yD5ezw" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Jan 8, 2025 · 41 minutes*
+
+**Speakers:** Liam Randall, Jonas Bergius, Lachlan Heywood, Taylor Thomas, Colin Murphy, Eric Gregory, Bailey Hayes
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Liam Randall** [03:22](https://youtu.be/3ytu_yD5ezw?t=202)
+
+Okay, looks like we're live. Just double-checking that it's all good. Well, welcome everyone to the community call today for January 8. As you can see, I am not Brooks — Brooks is on a well-earned vacation right now, so I'll be running the community call today. To get started, I'll show our agenda like normal. Let me get the link and share it, and put this in chat. Today we have a bunch of really fun demos coming up — that's basically what it boils down to. We'll be going over some of the **Go** changes first; we've been doing a lot of work to make the code a little easier to navigate, especially in some of the different language toolchains like Go and TypeScript. We'll have some stuff from Jonas first showing off the Go monorepo changes, then Lachlan showing the TypeScript side of things, and he also brought in Colin to show us something cool. After that we'll have some discussion items. So let's go ahead and roll straight into the demos. Jonas, you good to go?
+
+**Jonas Bergius** [04:53](https://youtu.be/3ytu_yD5ezw?t=293)
+
+<img src="/img/community/2025-01-08/image001.webp" alt="The wasmCloud/go monorepo on GitHub" />
+
+Folks who may have been following along on the community side might have noticed that we've started consolidating all — well, most; there's one exception right now — of the Go repositories for interacting with wasmCloud, whether that's building components, building providers, client libraries, examples, templates, and some experimental libraries as well. They're all now live under a single namespace, `wasmCloud/go`. The reason for that was just to make it easier to discover, easier to maintain, and easier to contribute to that codebase in one place. So at the top level you have a fairly simple, hopefully self-explanatory structure, and depending on what you're interested in you can dive into the different sections. We have a README that tries to explain what each of those folders is for and how you can make use of them. Under each folder we basically have the existing code. For example, this used to live under `wasmCloud/component-sdk-go`, and now it just lives under `wasmCloud/go/component` — it's the same codebase for the most part, just updated with a new path and a new process for publishing.
+
+We've made this change across the existing libraries. The one exception I should call out is **wadge** — we haven't quite figured out if it makes sense to roll into this structure, because it's a bunch of different technologies all in one, so for the time being it lives on its own. But everything else, from the component SDK to the provider SDK to examples to templates that are used by `wash` itself, now lives under this one directory.
+
+What we also did as part of this migration is introduce a new namespace for the `go.wasmcloud.dev` vanity URL: an **`x` namespace**. The idea behind the `x` namespace — and I do need to add a top-level README here — is to introduce packages that are essentially experimental. They're new ideas we're trying out, things we'd like to introduce but haven't quite figured out how they'll look in their final form. As an example, we have an OpenTelemetry exporter that I wrote, which can be used within a WebAssembly component to expose OpenTelemetry libraries from inside your Wasm. It's here under `x/wasi-otel`, and I need to update the README with more information on how to use it. The reason it's under experimental right now is that it previously required an unreleased version of **TinyGo** (0.35), which is actually now released — so I'll need to update this important note. The other reason is that TinyGo's Protocol Buffers tooling doesn't yet work very nicely, so it doesn't currently support all the exporter formats available in OpenTelemetry. It's not quite a drop-in replacement; it takes a little care to make it work correctly, which is why it hasn't been released as a top-level package. But it's here and usable for people who want to experiment with it — we've already demoed it in conference talks and other places.
+
+There's another package that Lucas recently introduced, where we also need to add a README: this is a Go module for interacting with wasmCloud itself using normal Go structs. You can consume events from wasmCloud, you can talk to `wadm`, you can send messages to the wasmCloud host. So if you're building something on the Go side that wants to interact with wasmCloud as a system, this package is intended for that — but again, it's under the `x` namespace so we can slowly improve it and get a feel for how we want to land it before moving it to the top level. The idea is that the `x` namespace lets us experiment with new things, and once we're comfortable they're in a good place, we can promote them to the top level just like `go.wasmcloud.dev/component` and `go.wasmcloud.dev/provider`. We also moved all the examples from the main `wasmcloud/wasmcloud` repository under here, which is an opportunity to showcase these libraries right next to the code they depend on. That's the long and short of it for the Go repository. Does anybody have any questions?
+
+**Liam Randall** [10:42](https://youtu.be/3ytu_yD5ezw?t=642)
+
+I'm not seeing anything in the stream or here, so thanks, Jonas — that was really great. If you have any questions for us, please feel free to reach out. We have a Go channel now inside Slack if you have Go-specific questions. We're really excited to get this into people's hands so they can try it out and give us feedback. Thanks, Jonas.
+
+**Jonas Bergius** [11:11](https://youtu.be/3ytu_yD5ezw?t=671)
+
+Can I add two quick things I forgot to mention? One: new releases of those packages are going to come out of this repository. We already have a new version for both the provider and the component based off this. There are older releases based off the old namespacing, but because we're using the vanity URLs, you won't know the difference — and thankfully upstream Go caches those, so you don't have to change anything on your side. The other thing is a quick shout-out to Eric for going through and updating our docs. The wasmCloud docs are now also pointing — or starting to point, across the board — to the new Go repository. You won't notice a difference; we'll seamlessly transition everything over and it should continue to work without skipping a beat. That's all.
+
+**Liam Randall** [11:58](https://youtu.be/3ytu_yD5ezw?t=718)
+
+It looks like masudur had a question, Jonas — in chat: will the experimental packages be separated for the main wasmCloud repo too?
+
+**Jonas Bergius** [12:02](https://youtu.be/3ytu_yD5ezw?t=722)
+
+I don't know if we've made any definitive decisions on how we may or may not want to introduce experimental features on the wasmCloud side — the main repository side. Maybe that's something you can speak to, Taylor.
+
+**Taylor Thomas** [12:20](https://youtu.be/3ytu_yD5ezw?t=740)
+
+Yeah. The `x` thing is a very well-known Go pattern for saying "this is experimental." The Rust side doesn't have as much of that available — most of the time when we do it, it's behind feature flags. We don't have anything that's necessarily super experimental in the main wasmCloud repo right now, though that's probably going to change in the next few months, so keep that in mind. As Bailey's calling out, there are flags behind most of it — I think we have one or two things in `wash` behind an experimental flag, and then the built-ins, which are the host 1.5 features, also behind experimental flags. But overall there aren't experimental libraries, just a few features behind flags. That might change in the future, and when it does we'll make sure we communicate and figure it out.
+
+**Liam Randall** [13:41](https://youtu.be/3ytu_yD5ezw?t=821)
+
+Awesome. I don't see any more questions, so let's go ahead and pass it off to Lachlan. You're muted, Lachlan — if you're trying to talk, I am seeing your screen, though.
+
+**Lachlan Heywood** [13:45](https://youtu.be/3ytu_yD5ezw?t=825)
+
+<img src="/img/community/2025-01-08/image002.webp" alt="The wasmCloud/typescript monorepo on GitHub" />
+
+Yes, that was the question. Similar to the Go monorepo, we've also moved all of the TypeScript/JavaScript-related stuff into its own repo. There was a little debate over whether it should be called JavaScript or TypeScript, but realistically you're not going to be using WIT and the types generated from it unless you're using TypeScript — there are no types in JavaScript yet (TM), and I'm skeptical that'll ever see the light of day. For the moment it's called TypeScript and we're going with that, because that's the best use case. All of this stuff is in the same repo, including the examples, and the washboard app is in here as well — that's the only app we've got in there as it stands.
+
+There are a couple of packages, and those get released. I don't think there are any new releases other than washboard so far, and I haven't moved the existing releases over to this repo yet, but I will. The packages were previously published from the main wasmCloud repo, but the next versions will release from here. Realistically it's just these two — `lattice-client-core` and `lattice-client-react` — that are publishing to NPM. The automation is set up so it does that automatically based on a tag push. All the other top-level stuff is around the JavaScript ecosystem and tooling. One thing I do need to do — there's an issue for it — is create a README; that's something I haven't added yet, so if anyone wants to help out, there's a help-wanted tag. The goal is to take the documentation that lives next to each example and pull it into the documentation repo so it automatically gets built, the same thing Taylor will likely do for this repo as he did for the Go examples, generating PRs that get pulled into the docs repo on wasmcloud.com.
+
+One other thing I've implemented here is a tool called **Changesets**. This is something we're experimenting with as a way to minimize the hoops new contributors have to jump through. We already require **DCO** — when you commit, you sign it to say you're allowed to contribute, which is a CNCF requirement. The other thing we do is **Conventional Commits** — a way of structuring your commit message so it tells the maintainers what that commit is doing: the action you took, a description, and an optional scope. If you know how to work with it, that's fine, but if you've never contributed to a repo that uses it, it's another hoop. You submit a PR, you think you're done, and then a check says "you didn't use Conventional Commits" — so you go back, re-commit, and force-push. That's a hurdle.
+
+With Changesets, what you add is a Markdown file: a single change is a Markdown file with some front matter describing which package changed, how it changed, and a description. When you submit a PR, you add that change. But if a contributor doesn't have the ability — or doesn't want to go back and do it — we as maintainers can just add that file to the PR, without making them re-sign and rewrite the commit messages. The tool then pulls the content into the appropriate version, automatically versions the packages, and opens another PR that tags the release and moves things across the line. So it's a semi-more-manual but lower-overhead way to contribute and still get good, descriptive changelogs around what happened and which packages were updated. PRs automatically get tagged with a comment saying "looks like you don't have a changeset; here are instructions if you don't know what they are." Right now these are just for the packages and apps; there are also the examples, which I'm looking into. At the moment it's not a hard requirement, but it'll be how we start building the changelog. Always looking for feedback on stuff like this — it's more of an experiment at this stage, but if it keeps working we might roll it out more widely. Any questions?
+
+**Liam Randall** [21:13](https://youtu.be/3ytu_yD5ezw?t=1273)
+
+Okay. With that — I know that at the beginning, Colin came in and had been talking to Lachlan, and apparently there are some demos using some of this TypeScript stuff to do some cool things. Is that correct, Colin?
+
+**Colin Murphy** [21:33](https://youtu.be/3ytu_yD5ezw?t=1293)
+
+It's tangentially related, yeah.
+
+**Liam Randall** [21:55](https://youtu.be/3ytu_yD5ezw?t=1315)
+
+Okay. There was a comment there — Taylor, you put it in — about automatically syncing the docs. Can you talk about it?
+
+**Taylor Thomas** [22:42](https://youtu.be/3ytu_yD5ezw?t=1362)
+
+<img src="/img/community/2025-01-08/image003.webp" alt="Example docs synced into the wasmCloud docs site" />
+
+Yeah, and there's actually a live one right now, because we merged some more changes. We have this set up right now to update example docs from Go — that's just where we started; the same patterns can be used everywhere else. Essentially, all the READMEs are synced over as examples inside the docs repo. It runs nightly, checks the repos to see if there are any changes, and if there are, it syncs them over for you. Eric is also doing a lot of work to add some more top-level things. If we go to wasmcloud.com and look at docs, you'll see there are examples down there, and there's Go now — eventually there'll be TypeScript and Rust too. You can click through, and because they're in the repo, they're completely indexed, so when you use the search feature you can find these things and click through to the repositories. The PR that's open right now makes sure they link to themselves, so when you get to an example you can click on it and it brings you to the repo where the example lives. It'll be really nice for people to look through and have the examples in a nice documentation format.
+
+**Eric Gregory** [24:19](https://youtu.be/3ytu_yD5ezw?t=1459)
+
+It's worth noting that this work is going to be ongoing this week and in the weeks to come, to iterate over these — make sure they're tutorializing as effectively as possible, and working in a docs context as well as possible. We've got all these here now, so these resources are very discoverable, and they're going to get more and more fleshed out as time goes on.
+
+**Liam Randall** [24:43](https://youtu.be/3ytu_yD5ezw?t=1483)
+
+We'd love any feedback there. If you're using this for the first time, let us know — like Eric said, right now they're just the READMEs and we're looking at ways to make sure they're doing everything properly. We're really happy to start getting those in. Okay, Colin — I'm excited to see this. Colin has a demo he's going to show us, and I'll let him explain it, because what I've heard is it's pretty fun.
+
+**Colin Murphy** [25:10](https://youtu.be/3ytu_yD5ezw?t=1510)
+
+<img src="/img/community/2025-01-08/image004.webp" alt="Composing a Rust component with a Node.js component using JCO and wac" />
+
+Hopefully it works out. So I have this public, personal repo around **C2PA**, which is a project I work on at Adobe. I built this based on a unified API that we generate for our Python SDK. For the purposes of this discussion, I've fulfilled this WIT interface I built. I have a component that implements this WIT interface, written in **Rust**, and I'm trying to use that component with other components — that's the big idea. I did one for Node: I import this manifest, export the incoming handler, and then I've got this Node C2PA code. I'm using **JCO**, and I'm using **wac** — that's pretty much the big idea.
+
+I have a pretty basic handler where I take the POST data — the binary — get the incoming stream, which is pretty cool, and pass it to that original C2PA component as a stream, and it spits out the manifest of the asset. The tools are actually being used: it's doing `npm run build`, so I'm using NPM, and then I'm using **wac** to compose this JCO-built component with the Rust-built component, and I create this fused `c2pa-node-fused.wasm`. So this command builds the component, then composes it with the other component, and then I serve it — using JCO, but you can also use **Wasmtime**. It starts up on port 8000, and I curl a JPEG and it returns the body. That's pretty much it. It's the same image from my Pop Rocks demos — I'm very creative. I'm going to keep making more: I want to make a Go one, a Python one, all that.
+
+**Eric Gregory** [28:36](https://youtu.be/3ytu_yD5ezw?t=1716)
+
+Two languages that are being smooshed together, using WIT as the way they line up.
+
+**Colin Murphy** [28:49](https://youtu.be/3ytu_yD5ezw?t=1729)
+
+And it's also from a single WIT file. From this one WIT file I can generate CLIs and HTTP handlers. I've done this one in Rust and this one in Node, but you could very easily go vice versa. It's using streams as well, which can be a little trickier for people. So that's the idea.
+
+**Liam Randall** [29:30](https://youtu.be/3ytu_yD5ezw?t=1770)
+
+This is awesome, Colin — thank you so much for sharing. Are there pieces of this that are open source we could use as an example? It would be great.
+
+**Colin Murphy** [29:50](https://youtu.be/3ytu_yD5ezw?t=1790)
+
+It's all open source — everything.
+
+**Liam Randall** [29:55](https://youtu.be/3ytu_yD5ezw?t=1795)
+
+Great. Let's get a ticket dropped and get this one in. I think there are at least two great examples here: there's the "smushing," and then there's using one component with different transports or interfaces for it. That's what you're doing, right? And it's using streams as well, so that can be trickier for people. This is awesome, Colin, thank you. For the uninitiated who might not know what C2PA is, can you give some background? I think that's really cool for people to know.
+
+**Colin Murphy** [31:10](https://youtu.be/3ytu_yD5ezw?t=1870)
+
+Yeah. C2PA is basically an SDK and tooling around the **Content Authenticity Initiative (CAI)**, which is all about tracking the provenance of images, video, and PDFs. When an image is taken with a camera, recorded as video, or generated through AI, some metadata is inserted into the image and signed with a key based on the provider. I've given a few talks on this at Wasm Day and WasmCon. The website itself actually has a pretty good example of how it works.
+
+**Liam Randall** [31:20](https://youtu.be/3ytu_yD5ezw?t=1880)
+
+Right. I'm not going to try to do that in front of people, but yes — all the big media companies, camera makers, Adobe, news sites, Meta, Google, they're all on board with this. This is a great real-world example of composition and why it's important. You're writing something where Rust is actually a pretty good fit — you're analyzing the image, doing some cryptography — and then you can compose any other language with it. So hopefully someday we don't have to make SDKs for all the different languages.
+
+**Colin Murphy** [32:08](https://youtu.be/3ytu_yD5ezw?t=1928)
+
+The best URL is **contentcredentials.org** — it has a couple of examples. This is an image that has those credentials attached to it, and you can see by clicking on the little icon that it was generated using Photoshop and Adobe Firefly. If you inspect it, you can see all the stuff that went into creating it and the variations, so it's pretty neat.
+
+**Liam Randall** [32:35](https://youtu.be/3ytu_yD5ezw?t=1955)
+
+And Lachlan got this working for my demo for WasmCon in Salt Lake City. I had a chance to meet with some lobbyists — I live near Washington, DC — and Colin and I ended up in a sidebar discussing this, trying to get them to recognize that platforms have a content problem now that AI-generated content is becoming indistinguishable. I love the way Jonas phrased it: having an SBOM for content is really cool. I'd love to see this take off. Thanks, Colin. Any other questions before we move on? Okay — thanks again.
+
+Our last agenda item is more of a reminder about next week. Next Wednesday we're going to have our **Q1 2025 roadmap planning** meeting for wasmCloud. Let me bring up the discussion item so I can link it one more time. Thank you to everyone who's been dropping feedback there — it's been great to see all the contributors coming out. I'll drop it in chat: if you look on the wasmCloud repo under Discussions, it's the **Q1 2025 roadmap** thread, so you can find it there if you're watching this later and can't see the Zoom chat. We'll take those items and build up the roadmap next week. We were waiting for Brooks, because Brooks recently rewrote and captured everything about how we do this to make sure it's documented, so we'll have him lead it once and then start alternating through the different maintainers of the various projects inside wasmCloud. So mark it in your calendar — we'll be doing that next week with Brooks leading us out. Anything I missed there? Okay. With that, we're at the end of the agenda. Were there any other big items people wanted to bring up before we wrap?
+
+**Bailey Hayes** [35:45](https://youtu.be/3ytu_yD5ezw?t=2145)
+
+Quick question — actually it's more on the interface side, regarding providers and those. I know they're under the Bytecode Alliance, but the question I have is: how do we know when a new version of an interface is going to come out? Say we have version 0.1, and by the time you do something with it, 0.3 is out.
+
+**Liam Randall** [36:37](https://youtu.be/3ytu_yD5ezw?t=2197)
+
+There's the **WASI** side of things, the **wasmCloud** side of things, and then the free-for-all that is everyone else. Bailey set up the WASI side, so I'll let her talk to that — it's actually pretty easy on the WASI side — and then I'll talk about the wasmCloud side. You're muted, Bailey. You might be double-muted.
+
+**Bailey Hayes** [37:14](https://youtu.be/3ytu_yD5ezw?t=2234)
+
+I think my microphone just got tired — I'm going to give it a different one. I am the chair for the **WASI subgroup** within the W3C WebAssembly Community Group. The GitHub work for that is under WebAssembly, as Jonas added in the chat, and that's where all those WASI interfaces live. If you're talking about the ones that don't have a `-draft` at the end, those are cut by me, and sometimes Yash, and sometimes Pat. For the most part we follow a **train release model**, which means there's a regular release on a Thursday every two months currently — so you know exactly when the next version is going to come out. The next one is going to be 0.4, and it won't be this month because I did it last month — I did December 10 last time. So those are regular, and we'll continue following that train model until **WASI 0.3** comes out, at which point we'll focus on the same train model but for 0.3.
+
+I can dive into why WASI, as a standardization effort, adopts a train model for its interfaces — but I think the question was broader than that. One last type of interface that shows up in the WebAssembly/WASI space are these **draft interfaces**. When a new version of one of those gets cut, that's fully controlled by the champion of those proposals. Taylor, for example, is a champion of some of those proposals and can cut a release at any time. The point of those is to iterate very quickly, versus the ones getting built into language toolchains, which have a really guaranteed level of stability so you know when the release is going to happen.
+
+**Liam Randall** [39:12](https://youtu.be/3ytu_yD5ezw?t=2352)
+
+That's very much the WASI side. Then on the `wasmcloud`-namespaced side and any of the new wasmCloud interfaces, we don't roll those as often, for stability reasons — but we try to convey them in release notes. Outside of that, everyone else pretty much has control over their own, so the question becomes the same as "how do I know when you're going to release a new version of X?" What we try to do is communicate on the wasmCloud side, through all the channels we can, as well as the releases on GitHub themselves. For us, all of these things are triggered by tags — when you tag it, it gets pushed up and we go from there. So hopefully that answers it well enough for you.
+
+Okay, awesome. I think with that, we've wrapped up — and I think it's our first time wrapping up early in a little while when it's not a holiday. Thanks, everyone, for coming today. It's been a great conversation, and we hope to see you next week for the planning meeting. I'll go ahead and end the live stream, and we'll stick around like normal. Thanks, everyone — I'll see y'all next week. Bye.

@@ -1,0 +1,301 @@
+---
+date: '2025-04-09'
+title: 'Transcript: WebAssembly Kubernetes Workload Identity with SPIFFE & SPIRE'
+description: 'Full transcript of the April 9, 2025 wasmCloud community call covering SPIFFE/SPIRE WebAssembly Kubernetes workload identity, WASI compatibility, and Helm deployments.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - workload identity
+  - spiffe
+  - spire
+  - wasi
+image: https://i.ytimg.com/vi/9kciv8hFyK4/maxresdefault.jpg
+showTitle: true
+slug: 2025-04-09-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-04-09-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=9kciv8hFyK4" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=9kciv8hFyK4" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Apr 9, 2025 · 70 minutes*
+
+**Speakers:** Bailey Hayes, Liam Randall, Joonas Bergius, Masood (ossfellow), Jorge, Florian Fürstenberg
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [05:32](https://youtu.be/9kciv8hFyK4?t=332)
+
+All right. Hey, welcome to wasmCloud Wednesday. This is the week after KubeCon, so a lot of us are still getting back and catching back up to everything. We had two back-to-back conferences, from wasm.io in Barcelona to KubeCon in London. The wasmCloud maintainers gave lots of different talks, and I'm expecting us today to give a little bit of an update on any talks, any news that happened, all that kind of cool stuff. And, yeah, Brooks isn't here, so I don't have his dad jokes. He's been leveling up his dad joke game, and I don't have it, so I need everybody else to fill in for that for me.
+
+But first agenda item: Joonas is going to show off what he demoed at KubeCon, and I think it was a pretty cool demo. Set some context for that one, Joonas, because I don't have the CFP handy for what you submitted.
+
+**Joonas Bergius** [06:43](https://youtu.be/9kciv8hFyK4?t=403)
+
+Sure. Yeah. Let me first just preview the relevant slides from the talk, and then I can talk a little bit about it. Can you all see my Google Chrome? Good. So the talk Colin and I gave was "SPIFFE in Practice: Universal Identity for WebAssembly Workloads." The idea is basically that, as we work toward introducing a form of workload identity for wasmCloud, we wanted to show what that might look like. Colin gave a really great intro and motivation in the beginning, and talked a little bit about WebAssembly, because of course you have to introduce WebAssembly to a community audience.
+
+<img src="/img/community/2025-04-09/image001.webp" alt="SPIFFE in Practice talk title slide shared on screen" />
+
+I should maybe start by just introducing SPIFFE a little bit. So SPIFFE is a standard that has been built and implemented inside of the CNCF. The idea is that SPIFFE gives you a format that allows you to describe identity associated with a given workload, and it gives you a couple of different representations for that standard format. There's a JWT-based representation and an X.509 certificate-based representation. With those two technologies, there's a whole host of different use cases we could use this for within wasmCloud. I've listed a few of them here, but already talking to folks at the conference, we came up with some new ones, and I'm sure that once the tooling is available, the community will come up with ever more use cases, which is exciting.
+
+So just to set the stage: for the purpose of the demo, we're running this inside of a Kubernetes cluster. We have a Kubernetes node where we have a wasmCloud host and the SPIRE agent. SPIRE is the reference implementation for SPIFFE — SPIFFE being the standard, SPIRE being the actual implementation. So it allows you to take the standard and actually put it to practice. We're using the SPIRE agent and SPIRE server as a way to serve the workload identity, and then we're teaching the wasmCloud host and downline other wasmCloud components to fetch those identities, validate them, and communicate them to one another.
+
+<img src="/img/community/2025-04-09/image002.webp" alt="Architecture diagram of SPIRE server and agent alongside a wasmCloud host in a Kubernetes cluster" />
+
+The problem is that SPIFFE and SPIRE were basically designed for the container age. The thing that wasmCloud and WebAssembly differ from is that SPIFFE, because of the nature of being introduced in the container age, expects to be able to talk to and observe every single workload that it is issuing identities for. As you all know, in the case of WebAssembly, you cannot actually observe the WebAssembly workloads that are running inside of a host — you can't directly access a PID and see that that's the WebAssembly workload running. They're all running in the WebAssembly host runtime. So that is the crux of the problem. There's a solution for this inside of SPIRE called the delegated identity API, and that's actually what the demo is going to show you: the implementation that we brought into the wasmCloud host under an experimental flag.
+
+I should quickly jump in and talk about the demo application. For KubeCon, we had a demo application called wasmPay. There's a whole host of components that make up the entirety of the application, but for the purpose of the talk we're zooming in on this specific bit: the API gateway. What it's doing is receiving HTTP requests at two endpoints. One is `/api/v1/token` for minting JWTs — these SPIFFE JWTs — and another called `/api/v1/bedrock`, where you can send the SPIFFE JWT and the API gateway will exchange it for a temporary, secure credential with AWS that the application will then present to Bedrock on the other end. Bedrock being an LLM that you can use to invoke all sorts of operations. What we're asking Bedrock to do, in this case, is actually write a story about workload identity.
+
+<img src="/img/community/2025-04-09/image003.webp" alt="wasmPay demo application architecture showing the API gateway component and its token and bedrock endpoints" />
+
+So for the demo, we're going to be curling the API gateway that's running on a wasmCloud host at these two URLs. Once we curl it, we'll take the token we get from the first endpoint, send it to the second endpoint, and as a result we expect to get back a story about workload identity. Let me switch gears — can you see my terminal? Yes. All right. Because I'm really bad at typing when I'm on stage, I ended up creating a Makefile with a whole bunch of commands.
+
+**Joonas Bergius** [13:32](https://youtu.be/9kciv8hFyK4?t=812)
+
+There are basically two endpoints. One of them is getting a token for AWS, another is getting a token just for the talk to show the audience that this is a real thing. For the purpose of this demo, I'm sending this request to a wasmCloud host that I have running locally, which is running the API gateway component. I'll send a request to `/api/v1/token`, and from the response we'll pull out the JWT SVID and set it to an environment variable, which will allow us to send it to the Bedrock endpoint. The second request will use the Bedrock request — I'll use the Bedrock request print command, which takes the token from the previous call, passes it in as an argument, and once that token is given to the endpoint, it exchanges it with AWS STS for an AWS-specific credential that it'll then pass down to Bedrock to use to write the story.
+
+<img src="/img/community/2025-04-09/image004.webp" alt="Terminal showing the Makefile commands used to call the API gateway token and bedrock endpoints" />
+
+So let me illustrate this in practice. We'll do `make token-aws`. This is a valid SVID — I'll show you that in just a second in the browser. I'll pop this variable into the environment, and then I can do `make bedrock-request-print`. What we expect now is for this to respond back with a story about workload identity. So all I'm doing is setting this JWT, which has nothing to do with AWS — it's specific to this wasmCloud installation I have running locally — and I'm exchanging it for a token specifically for AWS. If everything works as it has, we get back this nice story that is made up by the AWS Nova Lite model. So without me having any credentials locally to talk to AWS Bedrock — all I have is SPIRE, the reference implementation minting SPIFFE JWTs — I then have a trust relationship created from this. My local SPIRE installation has a trust relationship with the upstream AWS account that basically says: when you receive a JWT from this account, you can exchange it for a set of credentials valid for interacting with AWS.
+
+<img src="/img/community/2025-04-09/image005.webp" alt="Terminal output showing the AWS Bedrock Nova Lite model returning a generated story about workload identity" />
+
+What I'm going to do now is show you that this is real. Let me switch back to the browser. I have this site called jwt.ms — there are many of these that can unpack these tokens — and if I paste in the token I got back, you'll see the subject for this token is `wasmcloud.dev/spiffe-in-practice/api-gateway`, which is the namespace and the component in question. So this indicates this is the specific wasmCloud component running on my cluster that is the subject of this token. In this case I just made up an audience; in the other one it actually points to an AWS service. The audience communicates the intended recipient of this token. With these two, you can set rules inside AWS and other cloud providers, and many other services, to say: when I see these values, it's a valid token that I can exchange for another token to be used within their ecosystem.
+
+<img src="/img/community/2025-04-09/image006.webp" alt="jwt.ms browser view decoding the SPIFFE JWT with the wasmCloud component as the subject" />
+
+So without me giving them an actual secret — these are a form of secret, but they're short-lived. I don't know the exact expiration; I think it's maybe an hour, but these could be as low as five minutes, and in practice the AWS side reduces it to 15 minutes. The credentials minted as a result of these tokens are short-lived. The nice thing is, if one of these were to leak, they'd typically have maybe five to 15 minutes to exploit it. After that, it expires and can no longer be used. So if you had your credentials leaked in a pull request or otherwise, by the time somebody got to them, they might already have expired. It makes the process of not having to worry about these things a lot simpler, because they get revoked or expired so often that in practice, if they leak, you have a very finite amount of time to exploit them — unlike normal tokens, which could be valid for days, weeks, potentially indefinitely.
+
+So yeah, that was the demo. The point of this talk was that now we have these tokens available to be used within WebAssembly, because the functionality we're using is actually served by the host. The host provides a new interface called `wasmcloud:identity`, available as an experimental feature, and through that you can request these JWT-based SVIDs. There's more we want — it'll also be possible to request TLS credentials down the line and other configurable things — but this is a starting point to prove out the concept. So yeah, I think that's all I wanted to demo there.
+
+**Liam Randall** [20:01](https://youtu.be/9kciv8hFyK4?t=1201)
+
+Joonas, I love this work. This is pretty cool. From talking to big orgs, like banks, over the years, we've constantly seen people have trouble keeping credentials up to date. An app will have a set of static credentials for a quarter or a year, and people are doing these manual processes to keep their apps secure and the credentials valid. When we're thinking about moving to evergreen credentials, where you're constantly doing this — how does the change control work here? How do you revoke them, or how do you admit a new app, or shut an app down? Maybe I missed that detail.
+
+**Joonas Bergius** [20:54](https://youtu.be/9kciv8hFyK4?t=1254)
+
+Great question. The credentials themselves are set up with a short time to live — typically five minutes is what you'd expect. But you might have use cases where you want it a little longer. Once those credentials have expired, there's nothing you can do with them. Now, as far as how you control a given application, whether it's being onboarded or offboarded: you do that through policy. You create a trust relationship between the SPIRE deployment — you typically have a single SPIRE deployment per cluster — and it has something called a trust domain, which establishes the cluster you're establishing a relationship with. Every cluster has its unique trust domain, which you could think of like the DNS address for the cluster.
+
+You create the relationship there, and then within the cloud provider or service provider you create policies associated with that trust domain. You say: workloads from this specific path — which is part of the reason we represent them as part of the URL, the path being maybe the lattice and the component name — only this specific workload within this trust domain will have access to this service. That's something you write as part of the policies you set up on the AWS side. So rather than creating a specific set of credentials that you make available to an application, you create this trust relationship, and at that point the workload can request its credentials at any time. Assuming the trust exists and the policies are in place to allow that workload to talk to something, it will be allowed. But if the trust relationship doesn't exist, or the policies don't allow it, you won't be able to access that service even with a valid SVID.
+
+**Liam Randall** [23:14](https://youtu.be/9kciv8hFyK4?t=1394)
+
+I think there definitely is going to have to be some sort of a dashboard, or we use existing CRDs if we're going to be really in the Kubernetes world. For instance, Istio and various vendors already have ways you could map what can talk to what. There's a lot there, but yeah, we will have to make that — that's kind of the next phase, the user experience.
+
+**Bailey Hayes** [23:58](https://youtu.be/9kciv8hFyK4?t=1438)
+
+My question was kind of along that same vein. How much did you have to do specific to Bedrock and AWS, and could you do it for other cloud services, in a different cloud and different types of services?
+
+**Joonas Bergius** [24:14](https://youtu.be/9kciv8hFyK4?t=1454)
+
+Great question. There's nothing specific to Bedrock. All I had to do is essentially — and this is a standard part of the OIDC identity provider you can set up with AWS. What's happening in the background: in the case of AWS, you take the JWT SVID and invoke the STS `AssumeRoleWithWebIdentity` method. You present a token that AWS then checks against one of the pre-provisioned OIDC identity providers. So you have to set up the OIDC provider relationship inside of AWS.
+
+**Liam Randall** [25:05](https://youtu.be/9kciv8hFyK4?t=1505)
+
+You're assuming an IAM role, correct?
+
+**Joonas Bergius** [25:10](https://youtu.be/9kciv8hFyK4?t=1510)
+
+Yes, so you're assuming a role within AWS, which means you can apply all the AWS policies to that role. From there it's just like you had AWS credentials stored — except you don't have AWS credentials stored. You're only assuming a role, and then all the AWS primitives apply. This would translate to any cloud provider just the same. They all have more or less the same primitives in place, just slightly different language. And there's an increasing number of service providers — a good example is that Colin has added the ability to authenticate into Kafka, to talk to Kafka services using these same primitives. So it's becoming commonplace to establish these through a policy relationship.
+
+**Liam Randall** [25:59](https://youtu.be/9kciv8hFyK4?t=1559)
+
+From a business perspective, there are two big problems solved here. The first is first- and third-party multi-tenancy in a single cloud. This lets me take the same component and run it as different users — getting the credentials at the right time for that particular user, locked down just to the resources they're supposed to access. The second huge thing this solves is, if I have a single component and I want to run it across three different cloud providers, when I take that component to AWS or Azure or on-prem or wherever, this lets me get the right IAM, the right STS, the right security and secrets I need for that contextual deployment as I move around. This is awesome. This is, like, the authentication Rosetta Stone for us with WebAssembly components.
+
+**Joonas Bergius** [26:53](https://youtu.be/9kciv8hFyK4?t=1613)
+
+Yeah, and I'd add it's not dependent on the place where you run it. This is running on my laptop, talking to AWS. We had it in the demo running on AWS, talking to AWS, but it could have been running anywhere. As long as it has the ability to make the HTTP calls to talk to AWS endpoints, it can assume those roles just the same. So it's really nice to be able to move your workload around — as long as they have the trust relationship in place, they can exchange for the tokens they need to interact with the services they want to interact with.
+
+**Liam Randall** [27:34](https://youtu.be/9kciv8hFyK4?t=1654)
+
+Just to add on, this is how OIDC is meant to be used. This isn't a hack. This is exactly what AWS had in mind when they allowed third-party OIDC.
+
+**Joonas Bergius** [27:45](https://youtu.be/9kciv8hFyK4?t=1665)
+
+Yeah. There's a lot more we could do — this was one of the use cases, but there are many more this allows us to do, even within the wasmCloud ecosystem itself. This is just an illustration of what's possible once you have workload identity as a concept available to you, but we're certainly not limited to this. We'd like to be able to do things like pull OCI artifacts using these same credentials, mutually authenticate between services running inside of wasmCloud, things like that. So there's a lot of opportunity. The difference now is you don't have secrets in the mix, which is really important, because you don't want secrets leaking if you can help it.
+
+**Bailey Hayes** [28:44](https://youtu.be/9kciv8hFyK4?t=1724)
+
+Awesome. Thank you, Joonas. Any questions for Joonas or Colin? Cool. So that was technically our only agenda item. We are still getting back from conferencing. We were just talking before we turned on the recording about some of our favorite talks that I think are worth checking out.
+
+**Bailey Hayes** [29:07](https://youtu.be/9kciv8hFyK4?t=1747)
+
+In the wasmCloud Slack, I see Aditya already linked to Luke's talk. That is definitely what we consider one of the must-watches of the wasm.io conference. The other one is that the Oracle engineers talked about how they've been working for the past year and a half on adding Java-to-Wasm compilation support to the GraalVM, which is really exciting. They showed it working with GraalVM Enterprise, with plans to open source it soon. I think when that one's up, we'll definitely post it in the wasmCloud Slack.
+
+I can't actually say that mine and Liam's talk was a must-watch, but it was a fun one — lots of demos. And then Liam gave a v2 of that at KubeCon. You want to talk about that, Liam?
+
+**Liam Randall** [30:24](https://youtu.be/9kciv8hFyK4?t=1824)
+
+Sure. I gave a talk that tried to really tell the platform engineering story for WebAssembly components. I spent the first 10 minutes going through what I thought were the five big failures of even highly optimized containers, via demo — which I got through, and they all worked live on stage, which is great. Then I demonstrated how WebAssembly components work to solve those. I really enjoyed giving the talk; it was one I spent a long time building up and working through, with that many live demos on stage. We'll link it out in the wasmCloud Slack as soon as the recordings come in.
+
+Across the team, we had seven talks. On Thursday we had three talks at the same time, which was hard because we also had two booths to cover at KubeCon — both the Cosmonic booth and the wasmCloud booth. So it was an exhausting trip; if we seem especially wiped out, it was just two weeks of non-stop, all-day WebAssembly. Bailey, Joonas, and I were there and completely wiped out afterward. And thanks, Bailey — on the wasm.io talk, I gave one too, and it was really about trying to make an actual component and the real-world struggles, or where we still need to make improvements in WIT and WASI. I made it with the content authenticity, C2PA SDK — made a component for that, defined the interfaces. The only thing that was a little tricky was callbacks, where we don't have those yet in WIT, but I think we're going to have them for the 1.0 release candidate. There's a way to get something like a callback in, but it's a little involved — it involves making a special component just for that callback. But that'll hopefully be out on YouTube at some point, like all of ours.
+
+**Bailey Hayes** [32:57](https://youtu.be/9kciv8hFyK4?t=1977)
+
+Yeah, so we'll get all those links linked out in the wasmCloud Slack, and we should probably do a blog breakdown of cool conversations I had at the wasmCloud booth. I really enjoyed people knowing what WASI Preview 2 was. Over the years it usually started as "what is WebAssembly?", and then it became "okay, how do I apply WebAssembly to back-end services?", and now it's real deep technical questions, which is pretty exciting. The conversation I had with Florian about workload identity was really cool — he's got ideas about doing mutual TLS between components, doing a component-to-component call where the components themselves can assert that this is a real identity they want to interact with. That was awesome. I've got more to figure out and learn there.
+
+Colin, you staffed the wasmCloud booth a ton — did you have any comments worth calling out to the community?
+
+**Liam Randall** [34:12](https://youtu.be/9kciv8hFyK4?t=2052)
+
+I probably should have thought about it before. I think in general — shoot, I'm sorry, Bailey, I can't think of anything I remember. Brooks definitely had some quotes he was listening to, and he wrote down some of my quotes as usual, but I don't know if I had anything super special.
+
+**Bailey Hayes** [34:49](https://youtu.be/9kciv8hFyK4?t=2089)
+
+Yeah, sometimes people ask me if this was the year of Wasm. I'm like, absolutely — every year is the year of Wasm. But seeing real stuff being built on top of WASI Preview 2 felt really good. Where people have seen it and tried some things and maybe found some rough edges — but if you're getting far enough that you're hitting rough edges, that's a really good sign. Anyway, I had a great time. Happy to be back too. Brooks will be back next week. I think you said you had a question about WASI right now — do you want to run through that?
+
+**Masood** [35:30](https://youtu.be/9kciv8hFyK4?t=2130)
+
+Yeah, it's about — I'm of course not the first one encountering it — just thinking about what people think about those version mismatches, especially when foundational interfaces, such as what we saw with `wasi:io`, are changing, which has a ripple effect across the ones using socket and this and that. Suddenly you find yourself matching this tiny version to that tiny version, and that's very difficult when you're trying to manage the system. As the ecosystem grows, obviously that becomes an acute problem, and I wanted to know what the thoughts are around countering and containing this issue.
+
+**Bailey Hayes** [36:44](https://youtu.be/9kciv8hFyK4?t=2204)
+
+I can share a few. The first is that we're working really hard to get rid of `wasi:io` completely, by what we call canonicalizing — essentially representing a lot of the APIs that are inside `wasi:io` today at the component model ABI level. That's part of the WASI Preview 3 work to asyncify all the things, and it vastly reduces the blast radius of `wasi:io`. That's the set, if folks aren't familiar, where you interact with the stream and poll interface. Most other WASI APIs are some form of I/O — whether it's interacting with a socket, a file system, or HTTP — and because that brings in the concept of the stream, it brings in `wasi:io` types. So the blast radius of applying `wasi:io` and making changes there is broad and complicated. Step one is making it so that those types are just part of the component model ABI, and those types aren't changing — they're not getting new versions. That step one will make a big difference for at least that specific set.
+
+Now, if we're talking about an API — let me make one up that we've talked about before but isn't a real thing — it would be URI, having a type of URI with different ways of breaking up a URL, getting the origin, getting the port. You may rev that API some, but probably not a lot. At the end of the day that's something relatively stable. And those enums apply to many different WASI packages. The idea is that because we can look at APIs and know exactly what's actually being used, you can support forwards and backwards compatibility at the runtime level. I haven't seen that applied super well in practice yet — the ecosystem itself needs some maturity around the tooling. Right now a lot of that tends to be hard-coded. But it's totally possible, and by having forwards and backwards compatibility you can make this a much better ecosystem than even other dependency-type solutions. The second part is, WASI right now is treated as a monolith, and we're aiming to make it more modular after 1.0 once we reach stability.
+
+**Masood** [39:42](https://youtu.be/9kciv8hFyK4?t=2382)
+
+Actually, the part where at least some basic support for backward and forward compatibility is built into the entire framework specification would be great news — especially after those tags being introduced, like `since` and the things they face when something is deprecated or added to an interface. It becomes a nightmare if you try to manage that manually. Of course, those foundational ones, it's great that they go to ABI, because that's going to address a broad range of such issues. But it remains that, for example, if we go to the next version of messaging, we still need to observe some of that.
+
+**Bailey Hayes** [40:41](https://youtu.be/9kciv8hFyK4?t=2441)
+
+I'll link out on the wasmCloud Slack to where Wasmtime has the forwards and backwards compatibility built in, but that's not currently in a shared crate that other ecosystem tools use. What we really want is to smooth out some of the things Colin experienced when he was building his demo with `wstd`, where it's pinned to a specific version in crates. The Rust ecosystem right now doesn't natively know about the WASI versions being brought in, and it could — it could have that same kind of logic Wasmtime has for forward and backward compatibility, and apply it at the way it manages it at the crates level and what gets produced at the WASI target. Joel Dice is the one who's been thinking through some of the implementation for that. That's specific to one language ecosystem, but it's something I think could be broadly applied. Josh, you've got a question?
+
+**Jorge** [41:48](https://youtu.be/9kciv8hFyK4?t=2508)
+
+Yeah, I wanted to ask — the recommended way to deploy wasmCloud is through a Helm chart, but there are little examples of deploying wasmCloud using gateways to communicate between two or more clusters of NATS, and I don't know how to do it and deploy it. If someone can recommend how to create a configuration to deploy it.
+
+**Bailey Hayes** [42:54](https://youtu.be/9kciv8hFyK4?t=2574)
+
+Yeah, I'm not aware of some easy-to-follow resources for that. Essentially, the way our Helm platform chart gets deployed — shout out to Masood for building that for us, thank you — is the recommended way to deploy. It pulls in the upstream NATS chart, and there are a lot of configuration settings you'd select for the way you configure your NATS deployment. Part of that would also be how you configure wasmCloud to pull in NATS. But largely, to answer your question, it is at the NATS level, so I'm going to pass it to Masood, because that's not something I built myself.
+
+**Masood** [43:38](https://youtu.be/9kciv8hFyK4?t=2618)
+
+So the Helm chart is using the Helm-native ways of packaging the components and their dependencies. That means your sub-chart is exactly a Helm sub-chart, so if the configuration you want to do is available in the main Helm chart of that product — being NATS or anything else — then you can also do it here. If it's not possible there, you cannot, because here all you do is nesting. Otherwise the entire configuration is the same. So what you're trying to do, you have to first look into: can we do it in the chart of NATS today? If you can, you can literally take that — of course, changing names or IPs or whatever — and put it here and use it. And if you have any issues, you can reach out to me. I might answer with a delay, but I can help you figure out what to do. Again, you need to verify that what you're trying to achieve is possible in the NATS chart today. If it isn't, you can't just shove it into something else, because NATS is being a sub-chart.
+
+**Jorge** [45:26](https://youtu.be/9kciv8hFyK4?t=2726)
+
+Okay. And I wanted to ask about how you can expose the NATS chart in order to communicate with another chart in another cluster. I've been testing the chart of the wasmCloud platform.
+
+**Masood** [46:04](https://youtu.be/9kciv8hFyK4?t=2764)
+
+You can easily do that. Let me tell you how — simple, like `cargo new` or something. You can just create a local chart with a couple of commands, and then put those two charts as sub-charts of that. Then the variables can be exchanged between those charts, and you have what you're trying to do. You can ping me on Slack and I'll put some wording around this.
+
+**Jorge** [46:42](https://youtu.be/9kciv8hFyK4?t=2802)
+
+Okay. And I wanted to ask about wasmCloud in general. It is an amazing technology to build with, but there's little documentation and knowledge about it. I think it's amazing, and I don't understand — in the future, is it going to explode or something? I don't know if someone could tell me if you think it's going to become very popular.
+
+**Bailey Hayes** [47:46](https://youtu.be/9kciv8hFyK4?t=2866)
+
+Well, I'll give you my very biased answer first, and then I welcome everybody else to join. I definitely believe we're going to see exponential growth over the next year, and we are seeing it. With CNCF projects, they're all open — you can go look at the dashboard on number of contributors, folks downloading the project and getting their hands on it, and you can see we have an amazing amount of community growth. You'll also find we have a really wonderful and welcoming community here. The weekly community call, our Slack — it's very active. It's got maintainers like Masood who'll jump on and help solve problems. At the end of the day, any given technology is successful largely because of its community, and nothing else matters. So I think we have a lot of the indicators that we're shaping up to take off.
+
+One of the reasons it's been slow is that WebAssembly itself has been really challenging as a technology to work with. It's been an emerging technology for a while — until WASI Preview 2, it was very difficult to do a lot of basic things, in terms of the tooling and the types of programs you can build. I held that vote last year, January '24, and holding that vote advanced the spec, but it took almost six months to get that new specification being used in standard language tooling, starting in Rust and then Go and others. So you're really only looking at a handful of months of a whole new paradigm getting to the point where it could be applied generally. I think a lot of this is getting way better. I welcome anybody else to chime in.
+
+**Liam Randall** [50:28](https://youtu.be/9kciv8hFyK4?t=3028)
+
+I think the shared-everything functions — once that's done, and it's a lot of work — is going to really make it a lot easier for people to use WebAssembly in the browser, where the tool chains are a little more mature because they've been around longer. People are going to be able to just use packages they expect to work in their C++, Swift, things like that. We're going to have Java, Python — things like "I need a thread," or "I have a test framework." These things that are hard to get working currently are going to be a lot easier, so the barrier will come down quite a bit. That's hopefully going to be within the next year, so that's a big deal.
+
+**Jorge** [50:19](https://youtu.be/9kciv8hFyK4?t=3019)
+
+I expect it grows and becomes popular. So thank you. Thanks.
+
+**Masood** [51:49](https://youtu.be/9kciv8hFyK4?t=3109)
+
+Yeah, I just want to wrap up that question I asked in the chat about making CLI calls. I know that on Wasmtime I can, but I also know that there are some more restrictions being applied on wasmCloud, and I'm not sure. Instead of trying to write a component and figuring it out the hard way, I thought I'd ask the question here: can components on wasmCloud make CLI calls, basically?
+
+**Bailey Hayes** [52:32](https://youtu.be/9kciv8hFyK4?t=3152)
+
+Right now there's no process API in the WASI spec, so there's no way to execute a shell call. But if you compile a component to the WASI CLI interface and then run the `run` function on that, that does work. That's something I actually built out on one of the demos for the conferences — I can't remember which one now, but in the last two weeks I did try that out. However, we haven't implemented all the interfaces wrapped up into that, mainly because we hadn't set up a good way to ask folks to use wasi-virt, which was one of the other demos we did — file system, where you can run Wasmtime and pass in a pre-open. So if you virtualize the file system you're trying to use, using that setup, and do a WASI CLI run, that runs in wasmCloud and uses a virtual file system.
+
+**Masood** [54:10](https://youtu.be/9kciv8hFyK4?t=3250)
+
+A virtual file system also restricts access. That's why I wanted to understand what that means — that no process calls could be made out of that, but it just means that's where you can write. You have access to modify.
+
+**Liam Randall** [54:37](https://youtu.be/9kciv8hFyK4?t=3277)
+
+It's an in-memory file system, so if you need to make writes and reads you can, and it's just new memory.
+
+**Masood** [54:59](https://youtu.be/9kciv8hFyK4?t=3299)
+
+That's what I mean when I'm saying making calls to CLI tools.
+
+**Bailey Hayes** [55:02](https://youtu.be/9kciv8hFyK4?t=3302)
+
+Right. Yeah, now I don't think you can make calls to CLI tools even in the Wasmtime version, because there's no process-exec API.
+
+**Liam Randall** [55:13](https://youtu.be/9kciv8hFyK4?t=3313)
+
+Yeah, you can compile components to use the CLI interface, but you can't execute a system call on an operating system to just call an arbitrary binary.
+
+**Masood** [55:26](https://youtu.be/9kciv8hFyK4?t=3326)
+
+Okay. Because you guys are just packed from the conference, so let you recuperate.
+
+**Bailey Hayes** [55:38](https://youtu.be/9kciv8hFyK4?t=3338)
+
+Yeah, I'm interested. Right now, what you're trying to do sounds to me like something that could be provided by a provider.
+
+**Masood** [55:46](https://youtu.be/9kciv8hFyK4?t=3346)
+
+I'm really asking myself: am I wasting my time trying to write a provider to achieve this?
+
+**Liam Randall** [56:14](https://youtu.be/9kciv8hFyK4?t=3374)
+
+I mean, I think at some point we did do a YOLO provider that would just take an arbitrary CLI command and exec it. I'm not sure that's necessarily the greatest idea, and you can decide what's the right approach. One of the things we're trying to do with WASI is make sure you do have highly structured inputs and outputs, so you can maintain the composability, the security sandbox, and these other things. The idea of trying to poke a hole in that sort of defeats some of the longer-range goals of what we're trying to achieve here. But I could see the need for it.
+
+**Masood** [57:23](https://youtu.be/9kciv8hFyK4?t=3443)
+
+Liam, the patches should be there, because there will be cases where you need to. WASI is a good way of looking at it, but by the virtue of that, I want to have a flag that I explicitly turn on — I'm intentionally saying that I accept the risk of interacting with a foreign environment.
+
+**Liam Randall** [57:51](https://youtu.be/9kciv8hFyK4?t=3471)
+
+There's a little bit of a distinction between setting up a system where we restrict things — which is a good design principle — and the fact that if you're trying to call something not compiled to WebAssembly from WebAssembly, that's literally what providers are. So I don't think there's anything keeping you from doing this, with whatever policy you want to create around an exec call.
+
+**Liam Randall** [1:03:57](https://youtu.be/9kciv8hFyK4?t=3837)
+
+I just don't want people to try and give up. I think we're getting there. We're getting really close with the threading stuff, like Tokio — that's my big thing. Once that just works without a fork, I know we're going to be really close.
+
+**Bailey Hayes** [1:04:14](https://youtu.be/9kciv8hFyK4?t=3854)
+
+Yeah, that's a great point.
+
+**Masood** [1:04:57](https://youtu.be/9kciv8hFyK4?t=3897)
+
+No, I was agreeing — I am waiting for that. I want it badly for a lot of things. And no, this is not a good way: we should not attempt to reinvent the world just because we're in WebAssembly and say "let's recompile everything and rebuild it in Wasm." For something to grow, it needs to integrate with the rest of the world, continue supporting and improving it, and hopefully then replace it with something better. WebAssembly, and WASI in particular, has put a high bar for people to enter. We have to know where that boundary is — people might say that if the cost of operationalizing this outweighs the benefits, the ROI question, then we won't have the kind of embracement everybody in the community expects. I have to jump on a meeting, unfortunately. This is a very sweet conversation.
+
+**Bailey Hayes** [1:07:00](https://youtu.be/9kciv8hFyK4?t=4020)
+
+Yeah, it's near and dear. It's one of those I have to debate all the time, but I know we're at the top of the hour, and I agree completely. The line to hold and never give up on is that what you build supports capability-driven security models — otherwise, what's the point of what we're doing? Once we can hold that line, we can build out and make things work, so we can build a better future that everybody can actually jump on and be part of the ecosystem. Well, folks, I'm going to stop the recording now. Thank you for another wonderful wasmCloud Wednesday.
+
+**Liam Randall** [1:08:33](https://youtu.be/9kciv8hFyK4?t=4113)
+
+I appreciate the spirit. All right, everybody, have a good one — enough for Brooks. All right.
+
+**Florian Fürstenberg** [1:08:50](https://youtu.be/9kciv8hFyK4?t=4130)
+
+I actually just wanted to say, have a nice wasmCloud evening. As I said, it's not as late for me as for Victor, for example, so it's not even close. But now my free time actually starts, and maybe I can play a little bit around with Rust and wasmCloud. That would be cool.
+
+**Bailey Hayes** [1:09:14](https://youtu.be/9kciv8hFyK4?t=4154)
+
+That sounds really fun. I'm actually about to go meet with Victor now, so his evening continues. We're doing a handoff, because he's going to be out for the next week — he's going to be enjoying the cherry blossoms in Japan.
+
+**Florian Fürstenberg** [1:09:39](https://youtu.be/9kciv8hFyK4?t=4179)
+
+Ooh, cool. That's also on my to-do list. But yeah, let's see. Okay then. Have a nice day. See you.
