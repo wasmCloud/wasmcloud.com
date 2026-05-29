@@ -1,47 +1,144 @@
 ---
 date: '2025-02-19'
-title: 'Meeting Agenda - 2025-02-19'
-description: 'Short wasmCloud community call discussing combining wash cli and wash lib crates plus a rollout/rollback RFC for upgrades and updates of wasmCloud applications.'
+title: 'Robust Rollouts & Rollbacks for the Wasm Component Model'
+description: "wasmCloud community call on the Wasm component model: an RFC for robust, zero-downtime rollouts and rollbacks, host status reporting, and the control interface."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - zero downtime deployment
+  - webassembly kubernetes
+  - blue-green deployment
+  - canary deployment
+  - wash cli
+chapters:
+  - { seconds: 233, label: "Welcome to wasmCloud Wednesday, February 19" }
+  - { seconds: 350, label: "Combining the wash CLI and wash library crates" }
+  - { seconds: 600, label: "CI failures and CNCF license compliance" }
+  - { seconds: 850, label: "Zero-downtime component updates today" }
+  - { seconds: 1384, label: "Reporting component and provider status" }
+  - { seconds: 1619, label: "The host inventory as a Kubernetes-style control loop" }
+  - { seconds: 1631, label: "End-to-end rollout and rollback flow" }
+  - { seconds: 2100, label: "Re-initiating wadm scalers after an upgrade" }
+  - { seconds: 2221, label: "Canary and blue-green deployments in scope" }
+  - { seconds: 2629, label: "An extension model for the wasmCloud host" }
+  - { seconds: 3123, label: "wRPC nerd snipe and wrap-up" }
+image: https://i.ytimg.com/vi/Cfzy6ptCa70/maxresdefault.jpg
+showTitle: true
+slug: 2025-02-19-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- DISCUSSION: Combining `wash cli` and `wash lib` 
-- DISCUSSION: Upgrades and updates for wasmCloud applications
+<YouTube url="https://www.youtube.com/watch?v=Cfzy6ptCa70" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=Cfzy6ptCa70" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The February 19, 2025 wasmCloud community call is a deep dive into how the platform should roll out and roll back **Wasm component model** applications in production. Brooks Townsend walks through a large RFC for robust, zero-downtime upgrades: reporting component and provider status in the host inventory, shifting lattice-wide state writes out of individual hosts and into wadm via a new control interface, and making provider configuration a request/response operation so the host actually knows whether a rollout succeeded. The discussion ranges from CI and license-compliance housekeeping through to where canary and blue-green deployments fit — and whether the host should grow a Kubernetes-style extension model.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **A new RFC targets robust rollouts and rollbacks** for wasmCloud applications, going well beyond today's single `update component` operation so deployments that change configuration, links, or credentials can upgrade and roll back with zero downtime
+- **Today's `update component` is already zero-downtime** for version bumps — the host fetches the new bytes from OCI, validates and instantiates the component, then hot-swaps it without dropping invocations — but it does not touch links or configuration, which must be applied separately
+- **Hosts will report status in the host inventory** (pending, downloading, failed, unhealthy) so operators can query a component's or provider's state directly instead of racing to catch fire-and-forget events on the wasmCloud event bus
+- **Lattice-wide state moves out of individual hosts** — rather than each host writing links and configuration to the shared NATS KV buckets, a new control interface (dubbed v2-alpha) lets wadm assemble the full **component spec** and ship it to the host as a single `apply component spec` bundle
+- **Provider configuration becomes request/response** — when the host tells a provider to put or delete a link it will now get a response, so a failed TLS certificate or unreserved port surfaces as a failed rollout instead of being silently logged
+- **Canary and blue-green deployments are mostly deferred**, since running two component versions is easy until configuration changes force capability providers to contend for host resources like a fixed HTTP port — guardrails plus the new config-swap mechanism make these strategies feasible later
+- **An extension model for the host was floated**, inspired by Kubernetes add-ons and the wash plugin system, so capabilities like blue-green orchestration or local SPIFFE-style agents could be added in a more WebAssembly-native way than today's NATS-based host plugins
+- **Housekeeping:** the `wash` CLI and `wash` library crates are being combined (a freeze is in effect ahead of the merge), `wash` was bumped to 0.39, and CI is hitting disk-space limits and a CNCF license issue with a cbindgen-using crate
+
+## Chapters
+
+- [3:53 — Welcome to wasmCloud Wednesday, February 19](https://youtu.be/Cfzy6ptCa70?t=233)
+- [5:50 — Combining the wash CLI and wash library crates](https://youtu.be/Cfzy6ptCa70?t=350)
+- [10:00 — CI failures and CNCF license compliance](https://youtu.be/Cfzy6ptCa70?t=600)
+- [14:10 — Zero-downtime component updates today](https://youtu.be/Cfzy6ptCa70?t=850)
+- [23:04 — Reporting component and provider status](https://youtu.be/Cfzy6ptCa70?t=1384)
+- [26:59 — The host inventory as a Kubernetes-style control loop](https://youtu.be/Cfzy6ptCa70?t=1619)
+- [27:11 — End-to-end rollout and rollback flow](https://youtu.be/Cfzy6ptCa70?t=1631)
+- [35:00 — Re-initiating wadm scalers after an upgrade](https://youtu.be/Cfzy6ptCa70?t=2100)
+- [37:01 — Canary and blue-green deployments in scope](https://youtu.be/Cfzy6ptCa70?t=2221)
+- [43:49 — An extension model for the wasmCloud host](https://youtu.be/Cfzy6ptCa70?t=2629)
+- [52:03 — wRPC nerd snipe and wrap-up](https://youtu.be/Cfzy6ptCa70?t=3123)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### Combining the wash CLI and wash Library, Plus CI Housekeeping
 
-### DISCUSSION: Combining `wash cli` and `wash lib` 
+Brooks opened with an update on combining the `wash` CLI and `wash` library crates into a single crate, thanking maintainer Ahmed for taking on what he called "the yak shave of the century." The payoff is faster, easier `wash` releases. A soft freeze is in effect — contributors should hold off on big feature changes in those crates (critical bug fixes are fine) so the refactor can land cleanly; `wash` was bumped to **0.39**, expected to be the last release before everything ships as a single binary. Read more about the tool in the [`wash` CLI docs](/docs/wash/).
 
-- Thanks to ahmedtadde for the work on this initiative.
-- Contributors should hold off on adding major features until this refactor is complete. (Bug fixes are welcome!)
-- There are a few CI issues on the PR at the moment. Maintainers are taking a look at the moment!
+He also flagged two CI problems affecting unrelated PRs. First, a CNCF license-compliance issue: as an Apache-2.0 CNCF project, wasmCloud needs its dependencies to use approved licenses, and a crate pulling in cbindgen (MPL-2.0) needs either removal or a license exception — Roman had already removed one offending crate. Second, the CI runners are again running out of disk space during integration tests. Both are being handled out of band of the affected PRs.
 
-### DISCUSSION: Upgrades and updates for wasmCloud applications
+### Zero-Downtime Component Updates Today, and Why They Fall Short
 
-- Today we have a control interface operation to upgrade a component from, say, an OCI reference v1 to an OCI reference v2. The host will verify the component and as soon as it is ready, it'll be hot-swapped in, allowing for a zero-downtime upgrade. We don't do this in `wadm` or `wash dev` but the option is available.
-- This can get complicated when you're adding capabilities, changing configuration, etc. This existing approach doesn't seamlessly update links and configs and all of that&mdash;you have to do it manually.
-- So we want to have a smoother rollout and rollback story. Brooks has a fairly large RFC that he's put in the GitHub repo: https://github.com/wasmCloud/wasmCloud/issues/4141
-- The purpose here is to introduce robust transition from one version (or configuration) to another and back. 
-- For components and providers, it would helpful to report the status at all times. 
-- Step 1 is an operator has more information on what the host is doing. 
-- Step 2 is to change the way we handle lattice-wide state to have lattice state NATS KV operations managed by `wadm` or an operator in order to more effectively coordinate operations from multiple hosts. 
-- See the diagram on the RFC for a step-by-step walkthrough of how rollouts/rollbacks will work under this plan.
-- Question: A reinitiation of scalers wasn't included in the diagram - is that intentional?
-  - Answer: No, good call-out, that should be included in the diagram as well.
-- Question: Are canary deployments or blue-green deployments in scope for this RFC or kept for later?
-  - Answer: Probably mostly kept for later. Changing configs can be hard because providers contend for host resources; after introducing the rollouts and rollbacks, a solution here might be to introduce this style of upgrade while excepting the cases where you might have host resource contention.
-- Question: Shouldn't this be an add-on? We've had discussions about an extension model.
-  - Answer: This gives the primitives for someone to implement the rolling update at another level. 
+wasmCloud already has a control interface `update component` operation: point a running component at a new OCI reference (v1 → v2) and the host downloads the new bytes, verifies claims and signatures, instantiates the [WebAssembly component](/docs/overview/workloads/components/), and hot-swaps it in — a true zero-downtime upgrade with no lost invocations because subscriptions and configuration don't change. It works well, but it only swaps the component itself. The moment an upgrade also changes configuration — a new HTTP port or path, adding a key-value store, rotating database credentials — you have to update links and config separately, by hand. There is no official mechanism to do that as a coordinated, recoverable operation, which is exactly what production deployments need.
 
-## Recording
+### The RFC: Status Reporting, the Control Interface, and the Component Spec
 
-{/* Automated - No need to adjust this unless automation fails */}
+Brooks introduced a large RFC ([wasmCloud issue #4141](https://github.com/wasmCloud/wasmCloud/issues/4141)) with several mostly-independent pieces:
 
-<YouTube url="https://www.youtube.com/watch?v=Cfzy6ptCa70" />
+- **Report status in the host inventory.** Today a host inventory entry tells you a component's ID, image reference, scale, and annotations — but not whether it is running, pending, downloading, failed, or unhealthy. The RFC adds a backwards-compatible status field so an operator (or wadm) can query a host's internal state directly instead of relying on catching events that the host publishes and then forgets.
+- **Stop hosts from writing lattice-wide state.** Every host in a [lattice](/docs/overview/transport/) connects to two replicated NATS KV buckets — one for component data, one for configuration. Because hosts write to those buckets, two hosts can race on the same key, and a host has no chance to reject incoming links or config. The RFC keeps the buckets as a source of truth but introduces new control interface operations (a "v2-alpha" set) so the link/config *put* writes move up to wadm and the client libraries.
+- **Ship a single component spec.** Internally, the host already assembles all of a component's information — image reference, links, configuration — into a single **component spec**. The RFC shifts the job of forming that spec to wadm, `wash`, and the client libraries, then delivers it to the host in one `apply component spec` bundle so the host can reflect a single, coherent status.
+- **Make provider configuration request/response.** Telling a provider to put or delete a link is fire-and-forget today; the host never learns whether the provider configured itself correctly. The RFC turns this into a request that returns a result — so a missing TLS certificate or an unreservable port becomes a *failed rollout* the host can report, rather than a log line. This requires no changes to providers built on the provider SDK, which already return results.
+
+About half of the RFC is a wholesale improvement to today's system (better observability, single-shot delivery) that can ship even before the rollout/rollback machinery is finalized.
+
+### The End-to-End Rollout and Rollback Flow
+
+Brooks walked a "tall" diagram of the goal experience. A user (or CI/CD) tells **wadm** to deploy a new version. wadm non-destructively removes the scalers (the control-loop entities watching the lattice) so no reconciliation fires mid-upgrade, marks the app as *upgrading*, transforms the manifest into the component spec format, and sends `apply component spec` to the host. The host fetches the new component from the new image reference, instantiates and validates it (a Wasmtime pre-compile/instantiate step), and configures each *new* link — new links carry no shared state with the old version, so there are no conflicts. For the zero-downtime cut-over, the host sets the component pending, pauses (but keeps receiving) invocations on its wRPC subscription, swaps configuration link-by-link, then replaces the old component, resumes invocations, and reports success. wadm monitors the result; on failure (download or configuration), it re-applies the already-formed old configuration and the host rolls back. Florian Fürstenberg's catch — the diagram omitted *re-introducing* the scalers at the end — was acknowledged as belonging in the flow.
+
+A design principle runs through it: keep each wasmCloud host a focused agent that's very good at running a component, and leave lattice-wide orchestration to wadm, the scheduler with the higher-level view. Brooks explicitly wants to stop individual hosts from being able to mutate lattice-wide state.
+
+### Canary, Blue-Green, and a Host Extension Model
+
+Florian asked about canary and blue-green deployments. Brooks said they're mostly deferred: running two versions at once and switching invocation routing is *easy* when configuration doesn't change. It gets hard precisely because capability providers contend for host resources — the classic example being moving an HTTP listener from `:8000` to `:8080` when `:8080` is already taken. Once the robust configuration-swap lands, percentage-based, canary, or blue-green rollouts at the host level become feasible, likely with guardrails that flag when an app contends for host resources. Florian noted this would push wasmCloud past what Kubernetes does natively (where third-party tools usually handle progressive delivery).
+
+That prompted ossfellow to revive an idea Bailey Hayes and Jonas had raised previously: a Kubernetes-style **extension model**, where add-ons (or enhanced providers) fill capability gaps — for blue-green orchestration, or for security-sensitive cases like a SPIFFE-style delegated-auth agent that must be local to the host. Brooks agreed the wasmCloud control API's job is to expose the right operations so a higher-level orchestrator can extend the platform, and mused about wash-plugin-style, WebAssembly-native [host plugins](/docs/overview/hosts/plugins/) rather than today's NATS-based ones — building on the [building custom hosts](/docs/runtime/building-custom-hosts/) and [host plugin](/docs/runtime/creating-host-plugins/) work.
+
+## WebAssembly News and Updates
+
+The recurring reference point in this call is **Kubernetes**: the rollout/rollback design, the control loop, and the proposed extension model all draw explicit analogies to how Kubernetes reconciles desired state and lets you bolt on capabilities via add-ons. The difference is that wasmCloud aims to make robust upgrades a first-class property of the platform rather than something you assemble from third-party progressive-delivery tools, leaning on the [WebAssembly component model](https://component-model.bytecodealliance.org/) and a single-source-of-truth lattice. For background on running wasmCloud applications in production across any cloud or edge, see [wasmCloud 1.0: WebAssembly Apps in Production on Any Cloud, Any Edge](/blog/wasmcloud-1.0-webassembly-apps-production-any-cloud-any-edge/). Brooks closed with a "nerd snipe": go look at [wRPC](https://github.com/wasmCloud/wrpc), wasmCloud's transport-agnostic RPC framework, which already runs over NATS, QUIC, Unix domain sockets, and WebTransport (HTTP/3), and underpins how components compose across the lattice.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/overview/workloads/components/) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](/docs/overview/workloads/components/) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, C#) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable [provider architecture](/docs/overview/hosts/plugins/). wasmCloud's reference host is built on [Wasmtime](https://wasmtime.dev/) and connects hosts into a [lattice](/docs/overview/transport/) over NATS, with the [wadm](/docs/) declarative application manager reconciling desired state. With built-in OpenTelemetry observability and [Kubernetes integration](/docs/kubernetes-operator/), wasmCloud bridges WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
+
+## Topic Deep Dive: Zero-Downtime Rollouts for the Wasm Component Model
+
+The whole meeting is a study in what it takes to safely upgrade a **[Wasm component model](https://component-model.bytecodealliance.org/)** application in a distributed system. The single `update component` swap is the easy case: because a component exposes typed interfaces and the host validates the new version before hot-swapping, you get zero-downtime version bumps for free. The hard part is everything *around* the component — links, configuration, and the capability providers that back them. wasmCloud's bet is that by making the host report status, by treating provider configuration as a verifiable request rather than a fire-and-forget message, and by letting wadm assemble and apply a single [component spec](/docs/overview/workloads/components/), the platform can offer Kubernetes-grade rollout and rollback semantics natively. That same foundation — clean separation between a focused host and a lattice-wide scheduler — is what would later make canary and blue-green strategies a configuration choice rather than a bespoke integration. To go deeper on the model itself, see the [components overview](/docs/overview/workloads/components/) and the [building custom hosts](/docs/runtime/building-custom-hosts/) guide.
+
+## Who Should Watch This
+
+This call is especially valuable for **platform engineers and operators** running wasmCloud in production who need recoverable, zero-downtime deployments — the RFC walkthrough and end-to-end rollout flow start at [14:10](https://youtu.be/Cfzy6ptCa70?t=850) and [27:11](https://youtu.be/Cfzy6ptCa70?t=1631). **Capability provider authors** will want the request/response configuration change and status reporting discussion ([23:04](https://youtu.be/Cfzy6ptCa70?t=1384)), and **teams comparing wasmCloud to Kubernetes** for progressive delivery should watch the canary/blue-green and extension-model discussion at [37:01](https://youtu.be/Cfzy6ptCa70?t=2221).
+
+## Up Next
+
+The next wasmCloud Wednesday returns to the usual mix of discussion and demos. Watch for progress on the rollouts-and-rollbacks RFC ([wasmCloud issue #4141](https://github.com/wasmCloud/wasmCloud/issues/4141)) — Brooks planned to move ahead first with the broadly useful pieces (provider configuration responses and host status reporting) ahead of the full rollout/rollback machinery — plus the completed merge of the `wash` CLI and library crates. Feedback on the RFC, and real-world upgrade use cases, are explicitly wanted.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2025-02-19-community-meeting-transcript/)**

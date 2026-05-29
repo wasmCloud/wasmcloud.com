@@ -1,0 +1,241 @@
+---
+date: '2025-03-19'
+title: 'Transcript: WebAssembly Composition & the Wasm Component Model in wasmCloud'
+description: 'Full transcript of the March 19, 2025 wasmCloud community call covering WebAssembly composition with wac plug and wash build, and a virtual components proposal.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm components
+  - webassembly composition
+  - wac plug
+  - wrpc
+  - webassembly news
+image: https://i.ytimg.com/vi/J_0RQg8Qk4g/maxresdefault.jpg
+showTitle: true
+slug: 2025-03-19-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-03-19-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=J_0RQg8Qk4g" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=J_0RQg8Qk4g" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Mar 19, 2025 · 69 minutes*
+
+**Speakers:** Brooks Townsend, LUK3ARK, Joonas Bergius, Colin Murphy, Masood (ossfellow)
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Brooks Townsend** [07:31](https://youtu.be/J_0RQg8Qk4g?t=451)
+
+All right, hey everybody. Welcome to wasmCloud Wednesday for Wednesday, March 19. We've got a couple — you know, we got a demo, a couple discussion items for today. Should be a good time. Before I get into the agenda, though, we actually have LUK3ARK here, who has been in the wasmCloud community for quite a long time, but I think this is your first community meeting appearance. Luke, did you want to do a quick intro about yourself and how you found wasmCloud? And, well, anything else you'd feel like sharing?
+
+**LUK3ARK** [07:38](https://youtu.be/J_0RQg8Qk4g?t=458)
+
+Yeah, sure. So I've probably been in wasmCloud about a year and a half, coming on to two years now, pretty close. I actually came into wasmCloud before I even knew about NATS, which wasmCloud spun off of, and I've kind of been going in from the top down, rather than the bottom up, than most people. But yeah, I got into Wasm components probably before I heavily got into Wasm modules, and then, yeah, I've never looked back. I can't program normally again. So, absolutely love it.
+
+**Brooks Townsend** [08:52](https://youtu.be/J_0RQg8Qk4g?t=532)
+
+Yeah, I love it. And Luk, I know that you proposed — thank you for doing the intro, by the way — and proposed a discussion for later. I did just shift it down to below the demo, but I'm super excited to talk about it.
+
+For today's agenda, we've got a quick demo about WebAssembly composition, which should be a fun one. Then we'll do a discussion on one of the things that Luk is proposing, kind of put up in a PR — I think it's a really interesting proposal, the virtual components initiative. Then I wanted to talk about something more administrivia, in our organization, around the stalebot that we have kind of trawling around. And then Taylor also had an update from wasi-config, which is the upstream interface that we use for component and provider and link configuration. There's some updates happening there, and I think he's soliciting a little bit of feedback. So why don't we go ahead and get started?
+
+**Brooks Townsend** [09:08](https://youtu.be/J_0RQg8Qk4g?t=548)
+
+So I wanted to begin with a little bit of backstory and talk just briefly about WebAssembly components. When launching wasmCloud 1.0 last year — about a year ago, in April — the main mission, the way that we wanted the component experience to feel in wasmCloud, is that you were composing components over the lattice, over this distributed RPC. We're using NATS for it, just a distributed RPC layer. But from the user component experience, or from the actual code that you write, we didn't want to bring in all of the complexities of RPC. We wanted it to feel and be compatible with just composing components together.
+
+The whole story about WebAssembly components and composing them together is a core part of the WebAssembly component model. It's kind of just like traditional C FFI, but really it is linking together — we use the word "linking" over NATS, but it is composing one component's import with another component's export, so that when one component calls the function, it ends up invoking a function that was in a different component. This is core to the way that — internally, Wasmtime actually does call this linking — but this is core to the way that different composable pieces of compute, these WebAssembly components, can talk to each other. So we essentially extended this all the way through wasmCloud to fit our model, where you have multiple distributed pieces of compute, whether it's a component or a capability provider. They can communicate over a single interface, like a single function, and you link them together to allow them to invoke each other on an RPC layer.
+
+Now, this is a way that you can do runtime composition with wasmCloud. If you're interested in learning a little bit more of the difference, in our documentation under platform overview, we have linking at runtime, which details the way that two different components can communicate with each other. But we also have this notion of linking at build time. Now this is outside of wasmCloud entirely. This is core to the component model, where you can link two components together on a function and compose them into a single WebAssembly component, where they don't share memory, they don't share the global table, but they're able to communicate over a certain interface.
+
+The tooling to actually make this happen is called WebAssembly Compositions, or WAC — very fun. You can WAC components together and it forms a composed component that preserves all the details of the two original WebAssembly modules that were inside that component. So a simple example of this is exporting a function name, and then another component imports a function name, and then you can compose those together so that they become one component.
+
+**Brooks Townsend** [14:14](https://youtu.be/J_0RQg8Qk4g?t=854)
+
+So if we take a look here, we can take a look at the CLI. WAC is a tool for creating this. There is also the WAC language, where you can essentially specify your component graph. But traditionally, this is probably a little more than we want individual developers to have to worry about to compose for the first time. So there is a really nice utility in WAC called `wac plug`. And `wac plug` essentially takes the exports of any number of components that are in a "plug" shape, and allows you to plug it into the "socket" of a different component where they have an import.
+
+<img src="/img/community/2025-03-19/image001.webp" alt="The wac plug command-line tool for composing WebAssembly components" />
+
+So I'm actually going to give you a little bit of a preview of something that we're working on for a KubeCon booth demo, but hopefully it illustrates the point pretty well. I have a single WIT interface so that I can implement a component that validates a transaction. Very, very simple — here is your transaction, you return a bool, should this be valid, true or false? And from the perspective of the component that implements this interface, it's very, very simple. I get to write such a small amount of business logic here — in this case, this component does something really dumb. It just says, hey, if the currency is the US dollar, then sure, we'll let it go through. Otherwise, I don't know how to handle that. Totally made up rule. But from the perspective of a really small component, this is super nice.
+
+<img src="/img/community/2025-03-19/image002.webp" alt="A WIT interface defining a single transaction-validation function" />
+
+If you build this component and then inspect it, take a look at the WIT interfaces you have — some of the things that come in from just adapting the component, WASI logging, and then we are exporting our single validation function. Now, if you've been working with wasmCloud or with WebAssembly for a while, you know that in order to call this function, you essentially need to trigger the component, and that is usually done either by using a messaging interface or HTTP. Generally you can't just call this function out of nowhere. So I've actually created a different component where, instead of exporting this validation function, I am importing that validation function. So I'm pulling that in as an external dependency, a component dependency, and then I'll export the messaging handler. The whole purpose of this component is to receive an incoming message — this could be slurped in from a Kafka event stream — and it deals with the deserialization of a payload, and then we call this `validate` function. So this is basically a wrapper around the business logic to plug in the transport layer.
+
+If I inspect this component, it lists every single function that it could try and call or make use of or export at runtime. You can see my one export is the messaging handler, but my import up here is the wasm-pay platform validation function, and you'll notice that's the same export that I have in my other component. So when you compose these together, you essentially take this import-and-export pair and you link them together, so that when the one component calls the function, it's actually invoking the code in the other component.
+
+**Brooks Townsend** [18:18](https://youtu.be/J_0RQg8Qk4g?t=1098)
+
+So you have a couple of options here. You can use `wac plug` to essentially plug the messaging component together with my built component and then output the composed WebAssembly. And if I inspect this, you can actually see that that one import-export pair has been collapsed into a function call that's internal to the component. There is no longer a `validate` function that's been imported, no longer one that's been exported, because now that dependency is not a function that you expect to get from the runtime when you actually run it. So this is super cool — you can compose these components together.
+
+<img src="/img/community/2025-03-19/image003.webp" alt="Inspecting the composed component, where the import/export pair has collapsed into an internal call" />
+
+Now, when it comes to doing this repeatedly — this is something that every single time you build your component, you need to recompose these to create your final component. So what I have been doing for a while is I have a component where I change the build script to be a shell file, I run a `cargo build`, and then I compose these together with WAC. But this also means you need to have this tool installed locally and know how it works.
+
+So what I have added into `wash`, which is in a PR — so it still needs to make it in — is the ability inside your `wasmcloud.toml` to specify some parameters for composing components when you run `wash build`. So after we've built your component, we can actually take a socket and compose it together with that component, and the final output is your composed WebAssembly component. I'm going to run a `wash build` with my local copy of `wash`. This runs the build, and then after building the component, it will compose it together into a final component. And if we inspect it, we can see that this has been composed together on that single function.
+
+<img src="/img/community/2025-03-19/image004.webp" alt="Declaring a composition in wasmcloud.toml so wash build composes automatically" />
+
+So instead of the CLI, there is a programmatic API for the WebAssembly composition tooling that we can take advantage of in `wash`. It's just a Rust library, so you don't need that tool installed at all. The way that it works is we pull in both components, we register them in this composition graph — you can imagine the graph set up for all these imports and exports — and then we call the plug function from the library. So we're basically doing the same thing as the CLI, but we can do it programmatically just after you run `wash build`. I think this is going to make the composition story a whole lot simpler, especially in some of our examples where we compose components together. And the benefit is that we actually preserve the original built component and the composed component, so if you wanted to work with either, or push both of them up to your registry, you can do that as well.
+
+Now, Joonas brings up a great point. We have options here. wasmCloud already introduces many different terms into the ecosystem. When you come in, you have to learn about components, interfaces, and in wasmCloud we have this notion of capabilities — we're always trying to keep that simpler. It struck me when writing this out that, though it's descriptive to the original tool, this kind of makes it so that you have to know about the plug-and-socket terminology. I don't think the plug-and-socket terminology is bad — it's just not used anywhere in our code. So this functionality is not very hard to implement, because there's already the WebAssembly component library. But what I'd like to consider is a couple of things: maybe in the docs the Compose section should just be under the component config; maybe "socket," instead of being socket, could be something like "exporter" or "importer." I'm interested in ideas here. Ideally, if we just pointed at a bunch of components to compose, maybe we could parse the package, take a look at the imports and exports, and figure out how these should be composed together. Joonas, you had a couple of thoughts around the sockets and the terminology here — you liked the "components" thought, just trying to keep it simple?
+
+**Joonas Bergius** [25:30](https://youtu.be/J_0RQg8Qk4g?t=1530)
+
+Yeah, I think that as it stands, there's so much language to learn, like you said. I feel like as much as we can lean into existing language that we already have in the ecosystem — ubiquitous language terms — just reuse the existing language instead of new things, even if the underlying tools might have slightly different terms for this. Plugs and sockets make no sense to anybody, but components and composition does, right? So I would lean into those terms instead of the tool-specific things, because I think it's just confusing and it doesn't add anything. In fact, I think it just creates more terms you have to care about for no gain. So that would be my vote — just trying to lean into the existing language.
+
+**Brooks Townsend** [26:21](https://youtu.be/J_0RQg8Qk4g?t=1581)
+
+Yeah, that might make sense. I think ideally, obviously there's got to be a list, but ideally it would be great to be able to just specify a bunch of components, and then we kind of figure out how you should be composing them. That could be ambiguous, but for the 90% case, maybe this would work just fine. Masood, you had a good question — isn't this essentially a client/server or service-provider/consumer relationship? Yeah, one of the components has the function exported for you to call, and the other component has the function imported to call it. So there is a directionality to this, and the relationship is the same as links, where we have a source and a target. Whatever the best description for that relationship is, I feel like it's notoriously hard, but essentially, yes, it is kind of like a client/server style relationship — offering a function to call versus calling it. Colin, I saw you come off mute.
+
+**Colin Murphy** [28:03](https://youtu.be/J_0RQg8Qk4g?t=1683)
+
+I think WAC is fairly straightforward in how it composes things. And I think the closer we stick with WAC — I know one's a command and this is a config, but one could see a config for WAC, and if there is such a config for WAC, it should look as much like this as possible. So that's my only view.
+
+**Brooks Townsend** [28:38](https://youtu.be/J_0RQg8Qk4g?t=1718)
+
+Okay, yeah. I tend to agree. Once you get the directionality right, doing `wac plug` is super simple and works really well, so I definitely want to preserve that experience.
+
+**Colin Murphy** [28:56](https://youtu.be/J_0RQg8Qk4g?t=1736)
+
+It's one of the more intuitive things I've done with all the WebAssembly stuff. Sometimes it's a little hard — I think with import, export, use, it's hard because I don't think there's anything else for which "use" and "import" are not synonymous, right? I think that's a little bit of a head fake for people. But once you understand that part, component stuff kind of makes a lot more sense. So that's it.
+
+**Brooks Townsend** [29:38](https://youtu.be/J_0RQg8Qk4g?t=1778)
+
+The only other option that we have, which we don't have to talk about now because we're already halfway through the meeting, is that we always have the option to essentially use WAC inside of `wash` and offer a `wash compose` or `wash plug` — whatever we wanted to call it — utility. Often this is happening at the end of a build anyway, so I think we could evaluate what we wanted to do there. But since folks have other things they wanted to bring up, please feel free to raise your hand. What I'm taking away is that, when revisiting this PR, just trying to take more of the burden on terminology on the wasmCloud side if possible, and for the developer experience, keep it simple to specify. I'm going to drop the PR in the chat — folks, feel free to leave comments on that issue for thoughts. The CI is failing, but don't worry, it's just a draft PR. All right. Well, thank you all. Luk, let me hand it over to you to talk about the virtual components initiative.
+
+**LUK3ARK** [34:51](https://youtu.be/J_0RQg8Qk4g?t=2091)
+
+Yeah, sure. So I'll do the best with words. Just one minute to kind of break down how I think about a lattice. A lattice is made of two layers — an inner layer and an outer layer. The reason I separate it into two layers is because the inner layer is where components route wRPC messages, these data packets. On the outside of that, you have providers, which actually connect this internal lattice to allow messages to get in. The reason for that segregation is that everything will be provided through providers, with the edge case of something like NATS — underneath, that would just be using NATS as the communication layer anyway. So NATS is almost like that bedrock provider for the runtime.
+
+So at the moment, when you have all these connections, let's just imagine a wadm manifest. Once you define this manifest, you basically create a declaration of the entire system that you want to deploy and manage, and it's all good to go. The runtime will take care of loading everything up and connecting everything. This is one of the really cool emerging properties of interface-driven development — the fact that, instead of choosing how to connect your components because of business logic, the actual runtime does this. It uses interfaces as the first-party driving force for how to connect these components together. So if I just load in component A and component B and component C, and component A has a piece of business logic that needs to talk to, let's say, a Hello World interface — once it talks along that Hello World interface, given that the link is already constructed, the runtime would basically be able to know where to send it because of the interface, and not because of the component.
+
+And so once we start getting a bit more complicated, and component A needs to connect to component B and C, and both of those components exhibit the same interface — that's where it gets a bit more tricky, because now we don't really know where to send this wRPC. So that's one of the main reasons why wasmCloud uses links. Links actually give that context awareness to be able to have the runtime decide.
+
+So recently, I came across a need where I have an external service that I need to be able to control, communicate, and interact with from my internal lattice, which is a set of components. In order to do that, I had to set up a wRPC server. Just for absolute completeness, wRPC is that transport layer which actually is the glue that bonds all of these things to be able to connect to each other along NATS — NATS is the transport. So I came across a couple of issues. Firstly, I thought I'd just be able to put in the component ID and abstract it as a component. And then there were some other efforts, such as needing to add a header. And as I said before, I came into wasmCloud from the top down rather than the bottom up, so my driving force is that I need to be able to control and do all of my business logic on the component layer, just to create that clean bed of computation on top of NATS, which can control the infrastructure as it needs to be controlled.
+
+So in order to do that — components, at the minute, do not have any way to communicate with that underlying infrastructure. Anything that's external to that, like we brought up in the pull request, components currently cannot control. The approach I took was: what is the least amount of work I can do to get something feasible? So I took the inspiration of the existing set-link-name function that exists in the bus protocol, and it basically does the same kind of thing. Instead, we now have a set-target-component. So just to create a good distinction here: when we talk about the internal lattice, the internal lattice uses link names to decide where to route invocations. However, in this current prototype, I use components to decide where to route invocations. The reason is that these services and resources we're talking to are external to the lattice. You can almost think of it like oil and water — you have this very crystalline structure that's totally coupled together of these components, but when you start talking to external services, that same coupling cannot be applied, because those external services do not obey the same link-name rules as you would in the internal lattice.
+
+**LUK3ARK** [41:21](https://youtu.be/J_0RQg8Qk4g?t=2481)
+
+Once we start talking to external components, we actually have to switch our perspective and say, okay, instead of calling these based on internal link names, we call the components. The reason we have to do that is because the wasmCloud runtime itself is not aware of the external services. It's almost like if you're calling an API — you don't know anything about them, they just have to tell you how you can communicate with them. So this is along the same lines, where this pull request is meant to give the ability to route and indicate other services external to the lattice that wasmCloud has no recollection or knowledge of from the get-go.
+
+The reason I want to talk about this as an initiative is that this isn't the only way to do it. At the moment, this is the least-cost approach. But the things we need to talk about, such as security — because now components can actually decide where to route information — do we then start delegating these permissions to NATS credentials, or is there another way to do it? We can potentially create middlewares that are gateways to whitelist these services that wasmCloud can talk to. So it's basically a three-dimensional problem, like the picture I put in the PR: everyone has to decide how much work we want the user to do in order to make an external service compatible with wasmCloud, what the underlying requirements for that compatibility are (such as needing to use wRPC), and how much validation and verification we need in that communication. For example, if I was just putting a component ID, I can fire it anywhere on this subject-based partitioning layer, and it's absolutely fine, but then the developer doesn't have any feedback, such as "this doesn't exist" or "you're not allowed to access this." So I just kind of want a balance, where we can control declaratively what external components we can talk to, and what implications, if any, that would include.
+
+**Brooks Townsend** [45:15](https://youtu.be/J_0RQg8Qk4g?t=2715)
+
+Luke, thank you so much for going through your thinking and how you got to this. It's super helpful. Let me go back to the original and I can paint this too, so that folks can see this. I really like your two-tiered lattice explanation. You are totally willing to have an external service implement wRPC, and essentially you just want to be able to hook into the RPC layer that we set up at a platform layer — which is available on all of the hosts — to invoke something that a host may not be managing. And that's totally possible with NATS and with different transports.
+
+**LUK3ARK** [46:42](https://youtu.be/J_0RQg8Qk4g?t=2802)
+
+No, no. I was just giving confirmation. Absolutely. And just to be very specific about that, I want to be able to do that on the component layer, rather than the infrastructure layer. One of my priors is that this would become more successful and feasible the closer we get to full control and interaction business logic that is completely encapsulated in this component layer, rather than the underlying hacks — in quotation marks — that we have to do to talk to external and existing systems.
+
+**Colin Murphy** [47:38](https://youtu.be/J_0RQg8Qk4g?t=2858)
+
+I've always seen wasmCloud as the answer to the issues at kind of an enterprise level — how do you control what people are doing, and at the same time say what people can do? It's a very different thing if you're coming at it from that perspective. It's a way to very finely control things, because you kind of have the platform provider and you have the users, and that's the thing that Kubernetes has always been unable to do, right? So, differentiator against Kubernetes, and components versus Docker, same thing. That's always been the tension between wasmCloud and other WebAssembly runtimes for server-side WebAssembly: this is the sandbox versus we want the sandbox, we don't want the sandbox, we want the control over what people do, we want people to do what they want. But the other wrinkle to this is, we always bring up that providers are eventually going to be WebAssembly as well. So if providers are eventually going to be WebAssembly, then we kind of need to solve something like this anyway, right? So it definitely is a problem. I haven't read enough of this PR to have an opinion, but what you're describing is definitely an issue and something that's going to have to be solved.
+
+**Brooks Townsend** [49:26](https://youtu.be/J_0RQg8Qk4g?t=2966)
+
+Masood, go ahead.
+
+**Masood (ossfellow)** [49:31](https://youtu.be/J_0RQg8Qk4g?t=2971)
+
+At some level, I think this really needs to be like the other one — on the issue, and we put our thoughts out. But something that immediately came to my mind when Luk posted this is that, in some sense, this is kind of the way that we expect, in the future, the platform to integrate with providers that now natively support wRPC. Because if you remember, our providers are a way of bridging the gap between the platform and the legacy environment — such as, let's say, Redis, which doesn't understand wRPC or interfaces and so on. So in some sense, we can say that if, in the future, the platform — I mean WebAssembly and the component model — becomes more and more popular, then some service providers start natively supporting these protocols. And then you say, why do I need a provider here? If I can authenticate to a workload identity to establish some sort of trust, and it already natively supports wRPC — being it provider, being it component, or whatever — then I let it over my lattice with proper authorization to communicate. And then you name it whatever you want, virtual component or something. I'm not saying this is necessarily the solution, but it is the way that, in the future, we should expect when other services start supporting these protocols to plug into your platform.
+
+**LUK3ARK** [51:57](https://youtu.be/J_0RQg8Qk4g?t=3117)
+
+Yeah, just to go off on that, I completely agree. Let's just take the case of Redis. At some point, if Redis integrates a feature to allow us to communicate with them, then we don't need the Redis provider anymore to be that gateway between wasmCloud and the legacy system.
+
+**Colin Murphy** [52:22](https://youtu.be/J_0RQg8Qk4g?t=3142)
+
+But the thing to remember about that is that means Redis needs to integrate that. You still need something somewhere saying this component can talk to Redis and this component can't.
+
+**LUK3ARK** [52:40](https://youtu.be/J_0RQg8Qk4g?t=3160)
+
+Yeah, definitely, as long as that's there.
+
+**Brooks Townsend** [52:50](https://youtu.be/J_0RQg8Qk4g?t=3170)
+
+Yeah, for sure. We do have a policy service in wasmCloud, so we always have that — it's invoked every time a component calls a specific interface for the first time, or what have you. So you can write policies around denying that stuff. We'd want to draw that up to show how. What this really makes me start thinking about in general is that there are two parts to this. There's the acknowledgement that there are services that interact with the outside world that know how to speak wRPC — which is a pattern that so many of our providers follow. The Redis provider, for example, understands and uses that information to open up a socket, a connection to a Redis database — it's all kind of a translation. So this virtual component idea really strikes me as similar to providers, and it makes me wonder if we could integrate this somewhat into our provider model.
+
+**LUK3ARK** [54:28](https://youtu.be/J_0RQg8Qk4g?t=3268)
+
+A dynamic provider declaration, or something like that.
+
+**Brooks Townsend** [54:32](https://youtu.be/J_0RQg8Qk4g?t=3272)
+
+Yeah, something like that. Right now, providers don't really do that much that's special to be managed by a wasmCloud host. We tell the host to download the binary and start it and pass it this nicely formatted, base64-encoded string with all the information the provider needs to connect to NATS. But if you just ran a binary that connected to NATS and could speak wRPC and join the lattice, then that would work the same.
+
+**Masood (ossfellow)** [55:13](https://youtu.be/J_0RQg8Qk4g?t=3313)
+
+So, Brooks, I agree with what you said, because that also reminds me of the role providers are playing. The only difference here is that right now we develop providers. What this says is that, as you said, any binary connecting to NATS — let's say the next upstream project decides they want to natively and graciously support, let's say, the messaging interface of WASI — they just become consumers of the interface, rather than us writing something that bridges the NATS API to the WIT interface and APIs that we have. So it's the same thing, just who's developing and maintaining it. And that's where it participates in the lattice — because in our case, we download it and we run it. In that case, something magically appears on the lattice and says, "I want to talk to you."
+
+**Brooks Townsend** [56:41](https://youtu.be/J_0RQg8Qk4g?t=3401)
+
+Yeah, I viewed workload identity as a potential enabler for doing this securely — for joining the lattice, knowing that you should be able to do that.
+
+**Masood (ossfellow)** [56:56](https://youtu.be/J_0RQg8Qk4g?t=3416)
+
+Anyways, Colin's point is completely valid, that we should not forget that sandbox aspect.
+
+**Brooks Townsend** [57:05](https://youtu.be/J_0RQg8Qk4g?t=3425)
+
+That is the other part of this issue that I'm curious what other folks think. Luk, apologies for kind of giving you the one-comment review on the PR, but since you threw it on the community meeting agenda, I figured we'd talk about it. This was one of the things that stood out as the most important change that happens here, which is: inside of the component, like user-provided code, is where you are deciding where you're routing your invocation to. And as currently implemented, you are not just deciding and providing that information — you are allowing that invocation to happen.
+
+**LUK3ARK** [58:00](https://youtu.be/J_0RQg8Qk4g?t=3480)
+
+Yeah, definitely. I did address some of this stuff, just some very basic ideas in the individual tier. For example, at the minute, users already have to manage their permissions for NATS and what invocations can boot where. So it's almost like, if they then decide to use this functionality, they should decide to use it with the idea in mind that they also have to make sure they're not opening up security holes. And then there's another approach you can take, where you could actually delegate these JWTs to the components themselves, and basically have each component have their own permission set based on how we need to delegate and provide that to them. But yeah, it's definitely not a one-always-fits-all.
+
+**Colin Murphy** [59:03](https://youtu.be/J_0RQg8Qk4g?t=3543)
+
+You can definitely see a service that needs to dynamically change something based on — I mean, there are white-box services where it's like, oh, I have to actually call it for this guy now, and based on this request, do something to alter my behavior, and it has that scope. If I have that in scope, I could dynamically change the provider, maybe provisioning a Redis table or something. I don't know. But yeah, that's definitely something we're going to have to get to, no matter what. These problems all have to be solved as wasmCloud evolves.
+
+**Brooks Townsend** [59:43](https://youtu.be/J_0RQg8Qk4g?t=3583)
+
+The interesting thing — and I'm not just trying to segue, but it works out great — is we can actually still dynamically configure this with the use of Wasmtime.
+
+**Brooks Townsend** [1:00:02](https://youtu.be/J_0RQg8Qk4g?t=3602)
+
+This target component, which here is set to mock-server — and thank you, Luk, again for the example — we could actually fetch the target from a piece of configuration that you provide to the component at runtime, and then maybe fall back on this or something. So it is totally possible to do this and be flexible about what you're calling. That is a big aspect, which I don't want to get too stuck in, but it's really nice to be able to reconfigure that kind of stuff at runtime. So that could be a pattern you adopt too.
+
+**LUK3ARK** [1:00:46](https://youtu.be/J_0RQg8Qk4g?t=3646)
+
+Sorry, real quick. I think eventually I want to be able to start components on clients, right — like browsers, eventually, someday. So this kind of is going in that direction, a little bit.
+
+**Brooks Townsend** [1:01:14](https://youtu.be/J_0RQg8Qk4g?t=3674)
+
+Yeah, I'm personally excited for WASI-GFX — that's what I'm waiting for. It's a super cool effort. Well, hey, we're running up to the end. I think it'd be good to go to the other items, but Luk, I think this PR proposes a bunch of super interesting ideas. Really, my biggest concern that I want to make sure we have addressed before we push it in is just a way — like Colin said — that you can't skirt around the access control model that we have now by just picking a target that exists in the lattice. But we absolutely need something like this for the more advanced wasmCloud use cases. You may not run into this for quite a long time, but you may want it for advanced use cases. And I think this will be really informative as we think about the future of providers too, because they are kind of this bridge to outside of the lattice. Luk, is there anything else you wanted to say to wrap up the discussion? What kind of follow-up should we have from this, in your perspective?
+
+**LUK3ARK** [1:02:48](https://youtu.be/J_0RQg8Qk4g?t=3768)
+
+Yeah, thanks for letting me. I guess I'm going to be using this in my personal project, just to get it working toward lockdown anyway. So I'll actually be using this in production. In terms of what's next, I think just for the next couple of days, maybe even a week, hopefully everyone can get it internalized — kind of understand, where does this take us? Does this replace existing functionality? Do we need to take the philosophy of this and put it into maybe a wider provider SDK? I guess the best way to approach it would be: what ways can we maintain security without adding more burden onto the user?
+
+**Brooks Townsend** [1:04:26](https://youtu.be/J_0RQg8Qk4g?t=3866)
+
+Yeah. You know, we do have experimental feature flags now, so there is a notion that we could try and push something like this out as we're iterating on it. Awesome. Well, just to — I know that we're at two o'clock, but we started at 1:05, so all of you people, you hang on, don't go to your other meetings. If you have to drop, that's fine. I did want to discuss two more quick things. One: on the wasmCloud organization, we have a stalebot, whose intent is to come along to pull requests or issues that have been open for a long time. We filed this issue over 90 days ago, so the GitHub action comes around and says, hey, there hasn't been any action, we're going to close it in a week. I think this has at best gotten a mixed reaction in the org. Originally, proposing it was to make sure that if something's been open for a long time and it's not getting fixed, maybe it's not so important. But it also has the other side of not making people feel very welcome to file issues, because their thing is getting closed for going stale when really it's not their fault. So, heads up — we're definitely trending in the direction of not having it close issues automatically, because issues are important and we should be fixing them. If anybody feels violently that we should keep the action, let me know.
+
+**Brooks Townsend** [1:06:34](https://youtu.be/J_0RQg8Qk4g?t=3994)
+
+Taylor, on the wasi-config thing — was this a quick one, or did you want a little feedback?
+
+**LUK3ARK** [1:06:50](https://youtu.be/J_0RQg8Qk4g?t=4010)
+
+I wanted to get a little bit of feedback, and some of the people who I know would give feedback are still here, and some had to leave. So we can just kick it to next week. Just put it at the front and make sure it gets done.
+
+**Brooks Townsend** [1:07:21](https://youtu.be/J_0RQg8Qk4g?t=4041)
+
+Sounds good. I think I talked for quite a long time in the beginning of the call, not remembering that we had two things. Hey, demos are cooler anyway. Well, I will share that the wasi-config PR is still present in the community agenda, so everybody's welcome to take a look at that for some light pre-reading. But otherwise, I think we're out of time. Thanks everybody for coming into the community call this week and listening to some awesome discussion. Again, a big thank you to Luke for your awesome PR and spurring some discussion there. It's really exciting stuff thinking about this in the wasmCloud future context. I'll go ahead and stop the stream. Thanks everyone for coming, and we'll see you next week on Wednesday. We will not be at the conference yet, so we will be here. Have a great day — have a wasmCloud day — and we'll see you next week. Thanks, everybody.

@@ -1,0 +1,201 @@
+---
+date: '2025-01-22'
+title: 'Transcript: WebAssembly on Kubernetes: Benchmarking wasmCloud & Embedding wash'
+description: 'Full transcript of the January 22, 2025 wasmCloud community call covering WebAssembly Kubernetes benchmarking with k6, embedding wadm and wasmCloud into wash, and the Q1 roadmap.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasmcloud benchmark
+  - k6 load testing
+  - wash dev
+  - webassembly news
+image: https://i.ytimg.com/vi/nRoFMDo7ggU/maxresdefault.jpg
+showTitle: true
+slug: 2025-01-22-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2025-01-22-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=nRoFMDo7ggU" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=nRoFMDo7ggU" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+*wasmCloud Weekly Community Call — Wed, Jan 22, 2025 · 50 minutes*
+
+**Speakers:** Liam Randall, Taylor Thomas, Jiaxiao "Mossaka" Zhou, Community Participant
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Liam Randall** [01:42](https://youtu.be/nRoFMDo7ggU?t=102)
+
+Okay, hello everybody. Welcome to wasmCloud Wednesday, for Wednesday, January 22, for the community meeting. I'm going to share super, super briefly, because the first item on our agenda is actually not a demo, but even more exciting — I wanted to welcome a couple of our new wasmCloud maintainers. This is all taking place under this team in GitHub, and we have a little bit of a spiel in the wasmCloud Slack, but I wanted to give a warm welcome and thank you to Jiaxiao "Mossaka" Zhou, Mark Kovari — who's here on the call and can wave at you — ossfellow on GitHub, Masoud, who is here all the time giving us such awesome feedback; Luke Ark, who is a huge member of the wasmCloud community and has essentially built an entire platform on wasmCloud and consistently pushes wasmCloud to its full limit, always willing to submit fixes and help us out; and Aditya, who's here on the call, always in the community calls.
+
+<img src="/img/community/2025-01-22/image001.webp" alt="The wasmCloud maintainers team page on GitHub" />
+
+I don't actually remember when Aditya started looking at wasmCloud, but he essentially started with good first issues and has now contributed an entire implementation of a wRPC interface in the providers, which is awesome. Masoud gives such wonderful feedback, and in the road-mapping sessions and community sessions really keeps us at a high bar — staying true to what we promised to do, especially with NATS key-value and NATS blob store. Mark, beyond being here and waving at people, you've submitted PRs for so many different things across wasmCloud — it's kind of hard to keep track. You're over in wadm helping us get rid of some old things, and over in wasmCloud doing everything from examples to PRs. And then Joe, who is not here on the call, goes by Mossaka. If you're involved in the Wasm standards or the WASI Cloud effort, or you've been to a conference for anything related to WebAssembly, you've seen him doing talks. He's actually contributed a fully featured Azure Blob Store provider to wasmCloud, and expressed a good bit of interest in being more involved in the community. Based on his expertise on the Wasm side, we're super happy to have him join.
+
+So thank you, everybody. We went through a round of maintainer nominations a week or two ago — thank you all for accepting. You've probably already seen these people interacting with you in the community, and you'll continue to. Really happy to expand the wasmCloud team with some more maintainers. Mark, Masoud, Aditya — would any of you like to give your acceptance speeches now, or did you want to do that later?
+
+**Community Participant** [05:55](https://youtu.be/nRoFMDo7ggU?t=355)
+
+I'm prepared. You know, I talked to a lot of people, and I'm always ready to go.
+
+**Liam Randall** [06:05](https://youtu.be/nRoFMDo7ggU?t=365)
+
+Well, in all seriousness, if you guys want to say anything, then you're welcome to, but thank you and welcome. All right, why don't we go ahead and get started with the regular agenda. Let me share my whole screen, because everybody gets to see the fun stuff. We've got a couple demos and discussions today, and then one final discussion to go over the wasmCloud roadmap, which we planned during the community meeting last week.
+
+The first demo and discussion — as promised, and as I was maybe unreasonably passionate about during the road-mapping session — is embedding wadm and wasmCloud into `wash`. This one did make it onto our roadmap with a promise to essentially spike on it. Roman filed this feature quite a long time ago — thank you, Roman, who's not here. He suggested: we have a Rust binary in `wash`, and the wasmCloud host is basically just a lightweight binary around the wasmCloud host library, so why don't we just embed the wasmCloud host crate into `wash`? We had a totally valid discussion — and I'm not just saying that because Taylor is here — about why this might not be a good idea. I know that Hyperkube was one thing that included all the Kubernetes CLI and it was big, and that's not what we want `wash` to be. So what I wanted to do for this spike is show what it would actually be like if we embedded wadm and wasmCloud into `wash`.
+
+<img src="/img/community/2025-01-22/image002.webp" alt="The embedded wash module with start_nats, start_wadm, and start_host functions" />
+
+The main difference is, when we set up a process like `wash dev` — which is supposed to be an ephemeral environment — we stand up the local wasmCloud platform, load your component and any capabilities it has, you do your hot reloading, and then when you're done we close it all down. Right now we download NATS, wadm, and wasmCloud from their GitHub releases — we embed the version in `wash` so it's kind of stable — and then we actually execute those binaries. So when you run `wash up` we start the binaries, and when you Ctrl-C, we stop those binaries. If you turn on this flag, we now call a couple of functions in this little embedded module. This is full POC: `start_nats`, `start_wadm`, and `start_host`. We start the NATS server and attach it to this process, so when you kill the `wash` process the NATS server goes away. We start wadm using the latest PR, which lets you call `start_wadm`, doing the same thing the wadm binary does. And we do the same for starting a host — we create a host configuration, because this is for development use, turn on file loading in the experimental features, run a host, and return the public key.
+
+So basically, just like wadm and wasmCloud are thin binary wrappers around their own libraries, now we've brought those libraries into `wash`. Let me run `wash` CLI locally, maybe with a local component, and enable the embedded flag — this goes through the code path I've shown you. While we wait for that to compile, let me talk about the NATS embedding piece. This is one of the more complicated bits. NATS is a Go binary and library. If you're writing a binary in Go, you can do what we've done with wadm and wasmCloud — bring in the library and run it inside your own program. With Rust it's a little different, but we have a little experimental library for embedding the NATS server dynamic library and linking it — you can dynamically link it, or statically link the actual Go binary to `wash`. The FFI here is really simple; there's an `unsafe` because it's an FFI call. The Go binary is an example of embedding NATS server: we take in a couple of flags and command-line options, and here's the line of code that actually starts the NATS server. For distributing this we'll need to statically link it, because we're not going to expect people to build this library.
+
+<img src="/img/community/2025-01-22/image003.webp" alt="Terminal showing NATS, wadm, and wasmCloud running inside a single wash process" />
+
+I actually already had NATS running, so let me run this again. You can see we start the NATS server, just like starting the NATS binary, and then we're running wadm and wasmCloud after that. It looks like it sort of worked — let me do an `app list`. Maybe wadm didn't start. Looks like I had some screens left over. One more time. I didn't fully test all the edge cases, of course, but that's how it goes. I think it might be getting tripped up with a stream I was using. For real, for real this time. So essentially what happens is we start NATS, we start wadm, we start wasmCloud, and all of those processes are included in this one running `wash` process. If I do a `ps` and look for NATS, wasmCloud, wadm, `wash` — where you'd previously see three, you can see we actually just have that one process where I'm running `wash` from `cargo run`. So this combines everything into a single binary, which is great.
+
+The other piece — actually a new feature in wadm, Mark, I think you did this one — is being able to change the stream persistence for the wadm streams and key-value buckets to in-memory. The big aspect is that once we close down this dev session, all of the streams and key-value buckets from the dev session just get deleted. This eliminates a whole host of frustrating things around links being left over from a previous installation, or wadm not cleaning up configuration and development manifests if you kill NATS first. Things meant to be ephemeral get cleaned up automatically, which keeps cleanup in `wash` really easy, because it's a single process. And we didn't actually need to download any binaries to make this happen, so this will work offline better too.
+
+The actual size difference of the release binary: if I build a Linux binary for `wash`, statically linked for the musl target, that comes out at 21 megabytes. Then under `wash` downloads, wadm is another 22 megabytes, NATS is 14 megabytes, and wasmCloud is 34 — so in total you're downloading quite a bit. The statically linked `wash` binary that includes the wadm and wasmCloud libraries is 31 megabytes, so the actual `wash` binary increases by 10 megs — but you don't need to download wadm or wasmCloud. It'll increase a little more because we need to statically link the NATS server shared object, which is about 15 megs, so the `wash` binary looks like it'll about double to around 45 megabytes. I'd like to make sure that's consistent for all targets, but it really didn't blow up too much. My conclusion is that the binary size didn't grow enough to be concerned about. I'd like to revisit this with a more focused lens on error handling and the whole process, but I'd like to proceed — I think this would be a great enhancement to the dev process experience.
+
+Taylor, one thing I know will be of interest: the other debate in that thread was that this doesn't necessarily represent what someone would do for real. How would you think this is handled for people who still want to download the things, or download specific things but not others?
+
+**Taylor Thomas** [16:50](https://youtu.be/nRoFMDo7ggU?t=1010)
+
+Yeah, that's a good question. For `wash dev`, I think it's less likely that someone would want to run their own standalone wasmCloud, wadm, or even NATS — the only scenario would be if you were connecting your dev process to a different lattice, which feels like a whole lot. I think more likely somebody may want to use `wash up` in detached mode to run a local wasmCloud platform with NATS, wadm, and wasmCloud and then just forget about it. That isn't how we recommend running things in production, but you could totally do it on a Raspberry Pi — that's what I do. So I think it'd still be useful to manage NATS, wadm, and wasmCloud, but for dev, honestly, the embedded mode is a reasonable default.
+
+**Liam Randall** [17:40](https://youtu.be/nRoFMDo7ggU?t=1060)
+
+My thought is that this should be the default, and then we have the conversation as a community. I'm curious what other people who use wasmCloud use `wash up` for. If it really is always just for dev, then keeping around the ability to download stuff doesn't add much. But if it's something where people spin up an ad-hoc thing that connects into a lattice for debugging — which I'll admit I've done — maybe we keep those things around. So no sense throwing away good code; I'm willing to keep that for a little while. When it's more feature-complete, maybe we get a draft PR up, do a full build, and see the different binary target size differences to make sure it's not, like, 200 megabytes on x86 Mac. Thanks, folks, for watching the demo.
+
+Taylor, I know you have a demo, but before you go — Joe, I'm going to put you a little on the spot. We did a shout-out to the new maintainers earlier in the call, so welcome and thank you so much for getting involved. I actually don't know if you've been on the community call, or maybe not in a while.
+
+**Jiaxiao "Mossaka" Zhou** [22:59](https://youtu.be/nRoFMDo7ggU?t=1379)
+
+I think this is the first time being here.
+
+**Liam Randall** [23:04](https://youtu.be/nRoFMDo7ggU?t=1384)
+
+Wow. So we do normally ask people if they want to do an intro. Would you like to do a quick intro about what you do and all that stuff?
+
+**Jiaxiao "Mossaka" Zhou** [23:15](https://youtu.be/nRoFMDo7ggU?t=1395)
+
+Yeah, of course. Hey everyone, my name is Joe. I'm a dev at Microsoft, and I work on a lot of WebAssembly upstream — WebAssembly plus OCI plus Kubernetes stuff. I'm pretty interested in a lot of the WASI proposals, like WASI key-value and WASI blob store, all under the same umbrella called WASI Cloud. I think that's part of the contribution I made to wasmCloud that made me a maintainer of this project. I'm super proud to be that.
+
+**Liam Randall** [23:55](https://youtu.be/nRoFMDo7ggU?t=1435)
+
+Thank you, Joe, and thanks for doing an intro, especially on the spot. Totally more to come from WASI Cloud and everything WebAssembly. Speaking of other people who've worked on WASI Cloud — Taylor, I think it may be time for your demo. Seamless transition.
+
+**Taylor Thomas** [24:35](https://youtu.be/nRoFMDo7ggU?t=1475)
+
+Yes, totally seamless — because my demo has nothing to do with that today. But yes, I do work on WASI Cloud with Joe; Joe and I have fun over there. I'm going to demo a new chart we landed in the main repo. This is going to be a ye-olde terminal demo, but we always try to keep it exciting. What we've noticed is that people really want the ability to do benchmarking of their different things. We're also going to use this to release standard benchmarks for wasmCloud relatively soon, which Lucas demoed about a month ago.
+
+<img src="/img/community/2025-01-22/image004.webp" alt="Installing the wasmCloud benchmark Helm chart from OCI into a Kubernetes cluster" />
+
+We have a new benchmarking chart, and this is targeted at people who are running inside of Kubernetes — though technically it could be used to benchmark something outside Kubernetes, and you'd just be using Kubernetes for the load testing, which is perfectly acceptable. Let me send the link through chat. I have my normal cluster — you can see my NATS and wasmCloud inside the cluster, running through the Kubernetes operator we have. I'll do this with Helm, so I can install a benchmark. I'm calling it "my benchmark," and I'm installing it from OCI — this is now available from OCI, and you can pull it down and install it because Helm has support for that. The only thing required is setting a test URL, which is the URL you want to hit to get the thing going. It'll take a second while it downloads. It's going to spin up a whole Grafana, Loki, Tempo stack — a simple stack that's isolated from the rest of your stuff. So even if you already have Grafana, Tempo, and Loki, the whole point is this is self-contained purely for this test. When it's done, it prints out what you can do to get the logs and see the Grafana dashboards.
+
+<img src="/img/community/2025-01-22/image005.webp" alt="Grafana dashboard showing a k6 load test running against a wasmCloud service" />
+
+So I'm going to port-forward with the command it gave me and share a new screen. This is the chart — it has all the documentation. I'll go to localhost:3000 and you'll see it pops up, and the test just starts. If you've never used k6 before, k6 is a load-testing tool released under the Grafana project — very useful. There's a k6 operator, which is what this chart installs, and that lets you distribute load onto various servers or node pools. This runs about a one-minute test, using OTel — you can see the event sent out as soon as it started the test, and the time it finished. This was doing, I think, a 5,000-request-per-second load test, just running on my machine on a little orb-stack thing, so don't trust any numbers here. But the whole point is I can watch this rotate through basically in real time and see what's going on with the test.
+
+<img src="/img/community/2025-01-22/image006.webp" alt="Grafana panels showing latency percentiles, success rates, and per-pod CPU and memory usage" />
+
+I can run all these tests, and then with the normal Grafana view I can look at the memory and CPU usage for each of the pods in any namespace I select. It'll do all the latency things — P99, P95, P50 — and any failure rates, which there shouldn't be right here, and then the success rates over time. So this basically captures all that for you and gives it a nice graph. This is all technically in the Prometheus that's installed too. One thing I'm working on next is a script for our testing — to fetch the data from Prometheus and tell us what rates it got to. There are multiple ways to configure this: you can pass in tolerations and selectors to target it to specific pools you're using for load testing, and it supports basically the exact same format you'd expect for a k6 test scenario. You can add multiple scenarios that run one after the other or at the same time, however you want. So that's the benchmarking chart. Any questions?
+
+**Community Participant** [30:42](https://youtu.be/nRoFMDo7ggU?t=1842)
+
+Since it is using OTel, if I had to look up, let's say, traces for what was happening inside that test, where would I go?
+
+**Taylor Thomas** [30:49](https://youtu.be/nRoFMDo7ggU?t=1849)
+
+I think those are in Tempo here, for parts of them — for anything coming from the k6 test. If you want to look at traces for wasmCloud itself, we can't assume how you've set up your OTel. We have full OTel support for wasmCloud, so you'd look wherever your wasmCloud OTel stuff is set to export to. This is getting the OTel data from k6 and tracing it, so anything sent out via k6 comes in here, but anything else goes into whatever you have configured for your normal wasmCloud lattice.
+
+**Liam Randall** [31:34](https://youtu.be/nRoFMDo7ggU?t=1894)
+
+So Taylor, is the chart like wasmCloud and the test just showing a full example — or can I use this with my existing wasmCloud deployed in Kubernetes, where I've got a couple of HTTP and messaging services? Can I hook this into my cluster, locally or whatever?
+
+**Taylor Thomas** [31:50](https://youtu.be/nRoFMDo7ggU?t=1910)
+
+Yes, and that's what it's designed to do. This is meant to be put in to run against existing things, and it has to have a service somewhere that it can hit — either generated by the operator or one you've created that's pointing at it. Right now this just supports HTTP. We can also make it support messaging — we have a NATS one — but I wanted to focus on HTTP first because it's the most common and gives people a basis for their cluster performance. All it needs and cares about is an HTTP endpoint to hit. Technically you could even use this chart to test something that isn't wasmCloud-related, but it's really meant to show the wasmCloud side — pointing at whatever URL you have internal or external to your cluster, and returning the results.
+
+**Community Participant** [33:14](https://youtu.be/nRoFMDo7ggU?t=1994)
+
+This may be a dumb question — feels like using this locally is pretty easy. Any benchmark thing people should watch out for, like long-running cleanup or any concerns there?
+
+**Taylor Thomas** [33:30](https://youtu.be/nRoFMDo7ggU?t=2010)
+
+It's only meant to be deployed, and when you're done with it you can delete the Helm release entirely. The thing that's in there is installing the k6 operator, so you'll need to be able to install CRDs — but really, we don't have to manually glue together k6 stuff. If you can't support CRDs, you can't use this right now, but you can take the same principles and use them, and we can keep adding knobs and dials as people use this. It works the same whether I run it locally or in an AKS cluster, because you're relying on the fact that there are containers there that can run — the core competency of Kubernetes. As I showed in the extra instructions, there's an example values file in the chart that shows how to schedule this on another node pool. That's generally what we'd recommend when testing in staging or prod environments. The load test is low overhead all things considered, but k6 can really take up a bunch of CPU because it's slamming things, so you'll want to make sure you're scheduled in that pool.
+
+**Liam Randall** [35:24](https://youtu.be/nRoFMDo7ggU?t=2124)
+
+I'm going to hijack this for a demo again, because I was doing one thing wrong — don't mind me — but it does actually work. The thing I was not doing was awaiting a future. So thanks, Rust. We started `wash dev` — it's everything we talked about before. You can see all the output, NATS to the foreground so you can see it. This is the dev process, and you can see it actually records the streams for wasmCloud config and lattice data, which is important. But the main thing to note is that it is not restoring wadm.
+
+<img src="/img/community/2025-01-22/image007.webp" alt="wash dev session showing the application list cleared after teardown" />
+
+If I do a `wash app list`, I can see my current development session. I can curl localhost and get my component that's running. As soon as I Ctrl-C this process out, I can start it back up again, do another `wash app list`, and you can see my previous version of the application is gone — this is what we do for `wash dev` now too, during the teardown process. We delete the application and then hope everything is okay. But if I wanted to simulate a more drastic failure, then I just killed it — we didn't have any time to do cleanup. I bring the next dev session back up, look at the app list, and the old one is still deleted. That's because the wadm bucket was created a couple seconds ago, and we're getting rid of it after each dev session. So that was the other thing I wanted to show, to prove I wasn't just showing smoke and mirrors.
+
+The really other thing on our agenda today is to point out the wasmCloud roadmap page. If you go from the wasmCloud homepage to docs, this is the full overview of the Q1 roadmap, which we planned last week. It links to a bit of a retrospective on what the Q4 roadmap focused on — we made big improvements on the Golang side, performance improvements, auto-generated docs, and refocusing on `wash dev` — and continues with a lot of those things.
+
+<img src="/img/community/2025-01-22/image008.webp" alt="The wasmCloud Q1 roadmap docs page and GitHub project board" />
+
+A lot of this quarter is focused around stabilization, rigor, capability providers, our SDKs, development of Wasm standards and WASI P3, and integrating those into wasmCloud as soon as we can. Other high-level goals we keep as core tenets are enabling developers to build WebAssembly components without vendor lock-in or platform-specific dependencies — you've all already drunk the Kool-Aid, so I don't need to. We've moved all our planning to GitHub Projects. The first item has already been done — thank you, Taylor, for the Helm chart for benchmarking wasmCloud applications. I'll update my ticket to say that embedding wasmCloud in `wash` is kind of in progress. If we can do just one item a week, I don't know if we have enough weeks, but we'll be close. We have a little automation around this roadmap — if we complete an issue, it gets moved to complete.
+
+**Community Participant** [40:15](https://youtu.be/nRoFMDo7ggU?t=2415)
+
+Great. Question about that draft issue around using the provider SDK as a testing framework. At least when I checked, it didn't have any details. Can you elaborate on what the intent is there, please?
+
+**Liam Randall** [40:39](https://youtu.be/nRoFMDo7ggU?t=2439)
+
+Yeah, of course. We talked about this one during the road-mapping discussion, but it's exploration. I think the process of writing a wasmCloud provider leaves a lot to be desired — it'd be more accurate to say the wasmCloud test util. Holistically, I'd like to make that experience better, and to turn it into a full issue we probably need to do a little more work.
+
+**Community Participant** [41:23](https://youtu.be/nRoFMDo7ggU?t=2483)
+
+So I want to provide a clarification — I think I said something earlier that could have been misleading. The integration test for the NATS blob store provider is using test containers; it's not using the wasmCloud testing framework. The issue seems to be around wRPC calls within that harness. I've checked and triple-checked — I spent quite a bit of time trying to resolve it — and the issue really is around making wRPC calls.
+
+**Liam Randall** [42:29](https://youtu.be/nRoFMDo7ggU?t=2549)
+
+Okay, that is really good context. Then this issue — revisiting provider testing — probably needs to be approached a little more broadly. I think what it's going to take is us on the maintainer side, or someone who's written quite a few providers — and there's a lot of overlap there, a lot of the maintainers are provider writers — to revisit that process. The test-containers one could be related to the way you use wRPC, in which case maybe we upstream better best practices. Anyone who's written a lot of providers, please contribute. Let's get it onto the roadmap, and we can bring in individual folks.
+
+**Community Participant** [44:09](https://youtu.be/nRoFMDo7ggU?t=2649)
+
+One more question — not necessarily roadmap, even though it's part of it. For the PR going out this weekend for SBOM and provenance, since the target is wasmCloud workflows: when we're modifying workflows, how do we test it without putting something out?
+
+**Liam Randall** [44:48](https://youtu.be/nRoFMDo7ggU?t=2688)
+
+I mean, that's just a wider issue. This kind of test — there is `act`, which gets you part of the way. GitHub knows this is an issue; I just don't think they've prioritized solving this side of things. It is very difficult to test.
+
+**Community Participant** [45:06](https://youtu.be/nRoFMDo7ggU?t=2706)
+
+It's my least favorite. The reason I was inquiring was whether maybe we have something in-house, some way to test workflows before pushing them out.
+
+**Liam Randall** [45:26](https://youtu.be/nRoFMDo7ggU?t=2726)
+
+Right now there's no really good answer here — pick your poison for your situation. I've always said that the first company or startup that can find some way to unify this is going to be very popular. There are lots of things out there doing that, but they come with their own advantages and disadvantages. The thing we try to do — and none of them have I really loved — is we have some stuff in Makefiles, so you run `make` and if you're running locally it's roughly the same. We have the Nix stuff, but you have to know Nix, and that's hermetic, which introduces other problems. If anyone's passionate about this and wants to get involved in wasmCloud, I think nobody would complain if you came in. The chat is backing me up here. `act` is one of those tools — it's literally a community-provided thing, so the fact that it works is always amazing. But we do some pretty crazy stuff in our pipelines, and we're only adding more — I'm adding benchmark testing, which involves using a kube config to spin up a whole bunch of nodes and some cloud config. So the short story of that long rant is that I don't think it's something entirely neutral, though we have been trying to improve our own pipelines so they're at least faster than they were.
+
+**Liam Randall** [47:56](https://youtu.be/nRoFMDo7ggU?t=2876)
+
+All right, folks. We ran a little over, like last week. Anyone want to bring something up for discussion — talk about the ecosystem or anything in wasmCloud? I'm just going to say this out loud, because I saw a comment come in on the stream: someone named Jake on LinkedIn, who was watching, mentioned they were working on some fun stuff on the NATS side of things. If that's you, please let us know in the Slack channel or somewhere, so we can let you demo it inside this call. I'm calling it out here because it's easier than trying to respond to a comment in whichever social media platform it's coming from. Look at that — streaming on LinkedIn.
+
+**Liam Randall** [49:05](https://youtu.be/nRoFMDo7ggU?t=2945)
+
+One more thing, everybody: Cloud Native Rejects closes on Sunday. So if you have those rejections — especially if there were some that weren't selected for KubeCon — please submit. Rejects is always fun. My secret confession is that I often like the Rejects track more than some of the tracks at KubeCon, because there are so many interesting and crazy things that make you wonder why they weren't selected, but are really interesting talks. So submit to that if you got rejected from the other ones, or even if you just want to submit a talk — Rejects is a real and very chill conference.
+
+**Liam Randall** [49:55](https://youtu.be/nRoFMDo7ggU?t=2995)
+
+All right, thanks for coming to wasmCloud Wednesday. We'll talk to you a little bit later — see you the next Wednesday of January, and that's it. Have a great one, everybody.

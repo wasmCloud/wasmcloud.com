@@ -1,42 +1,143 @@
 ---
 date: '2025-03-12'
-title: 'Meeting Agenda - 2025-03-12'
-description: 'wasmCloud community call demoing wadm config reconciliation speedups, completing the wash-cli and wash-lib merge into a single wash crate, and KubeCon EU news.'
+title: 'wadm Config Reconciliation, the Single wash CLI & KubeCon EU'
+description: "wasmCloud community call: faster wadm config reconciliation on the Wasm component model, the merged wash CLI, and a KubeCon EU + WasmIO preview."
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wadm
+  - wash cli
+  - webassembly kubernetes
+  - kubecon eu
+  - webassembly news
+chapters:
+  - { seconds: 260, label: "Welcome to wasmCloud Wednesday for March 12" }
+  - { seconds: 300, label: "Demo: the wadm config reconciliation slowdown" }
+  - { seconds: 540, label: "The fix: reacting to config events for sub-second deploys" }
+  - { seconds: 827, label: "Release cadence: shipping patches as soon as they land" }
+  - { seconds: 880, label: "wash-cli and wash-lib merge into a single wash crate" }
+  - { seconds: 1405, label: "KubeCon EU and WasmIO: talks, booths, and workshops" }
+  - { seconds: 1600, label: "Publishing a demo component to an OCI registry" }
+  - { seconds: 1974, label: "Tracing and observability in internal providers" }
+  - { seconds: 2485, label: "NATS blobstore provider and the testing framework" }
+  - { seconds: 2709, label: "Wrap-up and what's next" }
+image: https://i.ytimg.com/vi/Ccw7V__Q0Gc/maxresdefault.jpg
+showTitle: true
+slug: 2025-03-12-community-meeting
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- DEMO: wadm config deployment improvements
-- DISCUSSION: wash-cli and wash-lib are dead ... Long live wash
-- DISCUSSION: Countdown to KubeCon EU
+<YouTube url="https://www.youtube.com/watch?v=Ccw7V__Q0Gc" />
+
+<p style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=Ccw7V__Q0Gc" target="_blank" rel="noopener noreferrer">
+      Watch on YouTube ↗
+    </a>
+  </small>
+</p>
+
+The March 12, 2025 wasmCloud community call is a tooling-focused update for anyone building on the **Wasm component model**. Brooks Townsend demos a [wadm](https://github.com/wasmCloud/wadm) reconciliation fix that takes local application deploys from around 15 seconds down to under one second by reacting to configuration events instead of waiting for a heartbeat. The team also marks the completion of the long-running merge of `wash-cli` and `wash-lib` into a single `wash` crate, previews wasmCloud's presence at KubeCon EU and WasmIO in Barcelona, and digs into tracing and observability for capability providers.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- A bug in **[wadm](https://github.com/wasmCloud/wadm)**'s reconciliation logic made components with runtime configuration sit in `reconciling` until the next host heartbeat — fixing it so the scaler reacts to the config-created event cuts local deploys from roughly **15 seconds to under one second**
+- wasmCloud uses the **WASI runtime config** interface to supply configuration to components and capability providers at runtime — things like a response language or a port to listen on — and that config is now reconciled before the component or provider starts
+- Community contributor **mark** added the ability for `wash up` to pull the latest patch version of the bundled NATS server and wadm automatically, so most users get the reconciliation speedup just by upgrading
+- The **`wash-cli` and `wash-lib` crates are now merged into a single `wash` crate** on crates.io; `wash-lib` lives on as a module with the same structure, so embedding users see minimal breakage, and the feature freeze on `wash` is lifted
+- Thanks to maintainer **Ahmed** for doing the bulk of the merge work; consolidating to one crate means one release instead of two and sets up future internal refactors of one of wasmCloud's longest-lived crates
+- **KubeCon EU** (London) and **WasmIO** (Barcelona) are weeks away, with wasmCloud talks across the maintainer and platform-engineering tracks, a wasmCloud booth all week now that the project is incubating in the CNCF, and a Couchbase-led wasmCloud workshop at WasmIO
+- For **tracing in internal (host-built-in) providers**, trace context is carried automatically through the function context, so you generally don't call the propagate-trace step the way external wRPC providers do; the built-in HTTP server uses **hyper** directly for the most control and performance
+- Improving the **integration testing framework** (especially around the provider SDK and its global state) is on the Q1 roadmap
+
+## Chapters
+
+- [4:20 — Welcome to wasmCloud Wednesday for March 12](https://youtu.be/Ccw7V__Q0Gc?t=260)
+- [5:00 — Demo: the wadm config reconciliation slowdown](https://youtu.be/Ccw7V__Q0Gc?t=300)
+- [9:00 — The fix: reacting to config events for sub-second deploys](https://youtu.be/Ccw7V__Q0Gc?t=540)
+- [13:47 — Release cadence: shipping patches as soon as they land](https://youtu.be/Ccw7V__Q0Gc?t=827)
+- [14:40 — wash-cli and wash-lib merge into a single wash crate](https://youtu.be/Ccw7V__Q0Gc?t=880)
+- [23:25 — KubeCon EU and WasmIO: talks, booths, and workshops](https://youtu.be/Ccw7V__Q0Gc?t=1405)
+- [26:40 — Publishing a demo component to an OCI registry](https://youtu.be/Ccw7V__Q0Gc?t=1600)
+- [32:54 — Tracing and observability in internal providers](https://youtu.be/Ccw7V__Q0Gc?t=1974)
+- [41:25 — NATS blobstore provider and the testing framework](https://youtu.be/Ccw7V__Q0Gc?t=2485)
+- [45:09 — Wrap-up and what's next](https://youtu.be/Ccw7V__Q0Gc?t=2709)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### Demo: wadm Config Reconciliation Speedups
 
-### DEMO: wadm config deployment improvements
+Brooks opened with a demo born out of a pairing session with wasmCloud users who hit annoying behavior in the local dev experience. He deployed a lightly modified Rust "hello world" component that supplies a piece of runtime configuration via the [WASI runtime config](/docs/overview/interfaces/) interface — the same mechanism you'd use to set things like a response language or a listening port on either a [component](/docs/overview/workloads/components/) or a capability provider.
 
-- We recently fixed a bug with wadm config deployment which will result in improved reconciliation times for local deployments. 
-- We can do config on components or providers using wasi runtime config. Previously, when we deployed example applications using runtime config locally, we would wait for a moment for the wasm component to reconcile. This was strange, since components are small and there was no clear reason why it should take this amount of time to start. 
-- The source was a small bug in reconciliation logic for wadm&mdash;now fixed.
-- Tl;dr this patch bump should result in much quicker reconciliation for wadm locally — deployments should go from 15s to less than 1s. 
+The symptom: the HTTP server provider reconciled quickly and the link was defined, but the component then sat in `reconciling` far longer than a ~200 KB Wasm module should need to start. The root cause was a small bug in [wadm](https://github.com/wasmCloud/wadm)'s reconciliation logic. wadm reconciles a component's configuration first, then starts the component — but when the config was created it didn't trigger a pass on the component's scaler, so nothing started until the next host heartbeat arrived. The fix makes the individual scaler react to the configuration-created event (with similar experimentation under way for links), so the component is scheduled immediately. The result: local deploys drop from around 15 seconds to under one second, and end-to-end tests appeared to run nearly twice as fast.
 
-### DISCUSSION: wash-cli and wash-lib are dead ... Long live wash
+Brooks also credited community contributor **mark**, who implemented `wash up` pulling the latest patch version of the bundled NATS server and wadm automatically — so most users pick up the reconciliation improvement simply by upgrading.
 
-- The `wash-cli` and `wasi-lib` crate merge is now complete.
-- With the completion of the merge, the feature freeze on wash is now over.
-- If you previously used `cargo` to install `wash-cli`, you'll now want to use the `wash` crate instead.
+### Release Cadence: Ship Patches as They Land
 
-### DISCUSSION: Countdown to KubeCon EU
+Brooks reiterated wasmCloud's recent practice of cutting releases as soon as new functionality or patches are ready. This wadm patch shipped with just the one fix, which keeps changelogs clean and gets improvements into users' hands as quickly as possible. Feedback on the faster cadence is welcome.
 
-- Search for wasm in the KubeCon schedule&mdash;there are a number of wasmCloud events, and we hope to see you there!
+### wash-cli and wash-lib Are Dead — Long Live wash
 
-## Recording
+The long-running effort to merge `wash-cli` and `wash-lib` into a single **`wash`** crate is complete. The `wash` name on crates.io was transferred from its original owner (a big thank-you to them). The old `wash-cli` and `wash-lib` crates remain published but will no longer receive updates.
 
-{/* Automated - No need to adjust this unless automation fails */}
+For most users this is a non-event — unless you installed via `cargo install wash-cli`, in which case you'll switch your scripts to install `wash`. There were no feature changes between 0.39 and 0.40, so upgrading is safe. Library consumers will find that `wash-lib` now lives as a module inside the merged crate with the same internal structure, minimizing breakage; file an issue if anything is misplaced. Huge thanks to maintainer **Ahmed**, who did the vast majority of the merge work. With the merge done, the feature freeze on `wash` is lifted, and the team expects future internal refactors to modernize one of wasmCloud's longest-lived crates. For more on the CLI, see the [wash docs](/docs/wash/) and the [developer guide](/docs/wash/developer-guide/).
 
-<YouTube url="https://www.youtube.com/watch?v=Ccw7V__Q0Gc" />
+### Countdown to KubeCon EU and WasmIO
+
+WebAssembly is woven throughout the KubeCon EU (London) schedule, and the dedicated **WasmIO** conference runs right before KubeCon in Barcelona. Liam ran through the wasmCloud-adjacent talks across the platform-engineering and maintainer tracks (including "wasmCloud's Wild Ride to Standards" and "Can You Maintain 1000 Apps? wasmCloud and Kubernetes"), Jonas's talks on meshing WebAssembly and SPIFFE identity for Wasm workloads, and Taylor's runtime and ecosystem-review sessions. Now that wasmCloud is incubating in the CNCF, there will be a wasmCloud booth open all week, plus time at the TAG Runtime booth and the Couchbase team's wasmCloud workshop at WasmIO. If you're attending, say hello in [Slack](https://slack.wasmcloud.com/) or stop by the booth.
+
+### Publishing a Demo Component
+
+Colin Murphy asked where to publish a demo component for a talk. Brooks recommended **[GitHub Packages](/docs/overview/packaging/)**, which is well supported — you can `wash push` directly to GitHub (the package starts private, so flip it to public), using either your own org or the wasmCloud org with a scoped personal access token. See the [build-and-publish guide](/docs/wash/developer-guide/build-and-publish/) for the workflow.
+
+### Tracing and Observability in Internal Providers
+
+Community member ossfellow asked whether internal (host-built-in) providers face restrictions on using the observability macro. Brooks explained there are no hard restrictions: for **internal** providers, trace context is carried automatically through the function context, so you generally don't need to call the propagate-trace step the way an external [wRPC](/docs/overview/transport/) provider does. The remaining work is making sure a trace context on an *incoming* HTTP request creates a new span in the same trace, and that outgoing requests inject trace context into headers for downstream systems. For the built-in HTTP path, the recommendation is to work directly with the Wasmtime `wasi-http` types and use **hyper** as the low-level framework — hyper sits under `reqwest` anyway, so it gives the most control and best performance.
+
+### NATS Blobstore Provider and the Testing Framework
+
+ossfellow also checked in on the NATS blobstore provider PR. The remaining blocker was a set of CI failures on `main` (a tracing-crate stack overflow surfaced only in debug-mode tests, unrelated to the PR's content) — Brooks offered to handle a rebase. The conversation circled back to a recurring theme: the integration testing framework needs investment. The `wasmCloud-test-util` exists, but integrating with the provider SDK is challenging because of global state that forces tests to run one at a time. Revisiting the testing framework is on the Q1 roadmap, and the team agreed to track the gaps as testing debt.
+
+## WebAssembly News and Updates
+
+This week's headline news from the broader WebAssembly ecosystem is the run-up to **KubeCon EU** in London and the dedicated **WasmIO** conference in Barcelona, where WebAssembly has been incorporated across cloud-native tracks rather than siloed into a single co-located event. wasmCloud's incubation in the [CNCF](https://www.cncf.io/) means a full-week project booth and presence at the TAG Runtime booth. On the tooling side, the consolidation of `wash` into a single crate and the [wadm](https://github.com/wasmCloud/wadm) reconciliation speedup are the practical updates most builders will feel day-to-day. For the WebAssembly standards picture, the [Bytecode Alliance](https://bytecodealliance.org/) and the [component model](https://component-model.bytecodealliance.org/) repositories remain the canonical places to follow progress.
+
+## What is wasmCloud?
+
+[wasmCloud](https://wasmcloud.com/) is a CNCF project that lets you build applications using [WebAssembly components](/docs/overview/workloads/components/) and deploy them anywhere — cloud, edge, or Kubernetes clusters. It uses the [WebAssembly component model](/docs/overview/workloads/components/) to let you write business logic in any supported language (Rust, Go, Python, TypeScript, and C#) while the platform handles capabilities like HTTP, messaging, and key-value storage through a pluggable provider architecture. wasmCloud's host is built on [Wasmtime](https://wasmtime.dev/), and applications are described declaratively and reconciled by [wadm](https://github.com/wasmCloud/wadm), wasmCloud's application deployment manager. With built-in OpenTelemetry observability and [Kubernetes integration](/docs/kubernetes-operator/), wasmCloud bridges WebAssembly's portable, sandboxed execution model and production cloud-native infrastructure.
+
+## Topic Deep Dive: The Wasm Component Model
+
+Both of this call's headline updates trace back to the **[Wasm component model](https://component-model.bytecodealliance.org/)**. The wadm reconciliation fix is about getting [WebAssembly components](/docs/overview/workloads/components/) — small, portable, typed units of business logic — scheduled the instant their configuration is ready, rather than stalling until a heartbeat. That matters precisely because components are so lightweight that a multi-second wait is pure overhead, not load time. The single `wash` crate, meanwhile, streamlines the developer tooling that builds and ships those components, from `wash build` through `wash push` to an [OCI registry](/docs/overview/packaging/). And the tracing discussion is about making component-and-provider interactions observable end-to-end — propagating trace context across the [transport](/docs/overview/transport/) so a request can be followed from an external caller, through the host, into a component, and back out again. As the component model matures, wasmCloud's bet is that the same declarative deploy, OCI distribution, and observability model works uniformly across languages and runtimes. To go deeper, start with the [components overview](/docs/overview/workloads/components/) and the [interfaces docs](/docs/overview/interfaces/), and read [how wasmCloud 1.0 brought components to the enterprise](/blog/wasmcloud-1-brings-components-to-enterprise/) for the bigger picture.
+
+## Who Should Watch This
+
+This call is especially valuable for **wasmCloud operators and platform engineers** who deploy applications locally and will feel the wadm reconciliation speedup immediately (start at the [demo](https://youtu.be/Ccw7V__Q0Gc?t=300)), **Rust developers and crate consumers** tracking the `wash-cli`/`wash-lib` merge and how to update their installs (the [merge discussion](https://youtu.be/Ccw7V__Q0Gc?t=880)), and **capability-provider authors** working on tracing and observability who want to know how internal providers differ from external ones (the [observability deep dive](https://youtu.be/Ccw7V__Q0Gc?t=1974)). Anyone heading to KubeCon EU or WasmIO will also want the events rundown.
+
+## Up Next
+
+The next two community calls before KubeCon are expected to be regular meetings, with the KubeCon-week call likely broadcast from the conference floor as a quick update. Watch for the rest of the `wash` rename cleanup landing in CI, follow-up on the NATS blobstore provider PR, and the Q1 work to revisit the integration testing framework. For deeper background, the [Documentation of the Week](/docs/overview/packaging/) is the OCI packaging guide referenced in the demo-component discussion, and the [Issue of the Week](https://github.com/wasmCloud/wadm) is the wadm reconciliation work covered above.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2025-03-12-community-meeting-transcript/)**
