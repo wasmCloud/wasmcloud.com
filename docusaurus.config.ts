@@ -137,9 +137,28 @@ const config = (async (): Promise<Config> => {
               const { defaultCreateSitemapItems, ...rest } = params;
               const items = await defaultCreateSitemapItems(rest);
               const COMMUNITY_YEAR_RE = /^\/community\/(\d{4})[-/]/;
+              // Low-value utility / auto-generated pages with no SEO value — keep out of the sitemap
+              const SITEMAP_DROP_EXACT = new Set([
+                '/search/',
+                '/blog/authors/',
+                '/blog/archive/',
+                '/community/authors/',
+                '/community/archive/',
+                '/gather/',
+                '/feedback/backstage/',
+              ]);
               return items.flatMap((item) => {
                 // Use pathname so priorities work on deploy previews too
                 const path = new URL(item.url).pathname;
+
+                const normPath = path.endsWith('/') ? path : `${path}/`;
+                if (
+                  SITEMAP_DROP_EXACT.has(normPath) ||
+                  normPath.startsWith('/blog/authors/') ||
+                  normPath.startsWith('/community/authors/')
+                ) {
+                  return [];
+                }
 
                 // Community meeting/transcript dated content:
                 //   2026 → priority 0.9 (current cadence we want indexed)
