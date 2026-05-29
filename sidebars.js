@@ -84,7 +84,15 @@ const sidebars = {
           items: [
             'kubernetes-operator/operator-manual/overview',
             'kubernetes-operator/operator-manual/helm-values',
-            'kubernetes-operator/operator-manual/cicd',
+            {
+              type: 'category',
+              label: 'CI/CD and GitOps',
+              link: { type: 'doc', id: 'kubernetes-operator/operator-manual/cicd/index' },
+              items: [
+                'kubernetes-operator/operator-manual/cicd/github-actions',
+                'kubernetes-operator/operator-manual/cicd/gitlab-ci',
+              ],
+            },
             'kubernetes-operator/operator-manual/roles-and-rolebindings',
             'kubernetes-operator/operator-manual/secrets-and-configuration',
             'kubernetes-operator/operator-manual/private-registries',

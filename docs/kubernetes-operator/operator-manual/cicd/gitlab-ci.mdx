@@ -1,0 +1,180 @@
+---
+title: 'wasmCloud on GitLab CI'
+sidebar_label: 'GitLab CI'
+sidebar_position: 2
+description: 'Build, publish, attest, and deploy wasmCloud components from GitLab CI using the cosmonic-labs/ci-components/wash CI/CD Catalog.'
+---
+
+## wasmCloud GitLab CI components
+
+The [`cosmonic-labs/ci-components/wash`](https://gitlab.com/cosmonic-labs/ci-components/wash) project is a GitLab [CI/CD Catalog](https://docs.gitlab.com/ee/ci/components/) of reusable CI components for building, publishing, signing, and attesting Wasm components. It mirrors the capabilities of the [wasmCloud GitHub Actions](./github-actions.mdx) toolkit for teams running on GitLab.
+
+:::note[Note on vocabulary]
+GitLab refers to units of CI activity as "components," which can lead to some confusion when we're talking about operations related to [WebAssembly components](../../../overview/workloads/components.mdx). On this page, we will always use the term **CI components** to refer to GitLab's components, and **Wasm components** to refer to WebAssembly binaries that conform to the Component Model.
+:::
+
+A complete production-style pipeline that uses every CI component together (i.e., merge-request workflow rules, security scanning, environments, Kubernetes deployment, and GitLab Releases) lives at [`cosmonic-labs/wasm-component-sample`](https://gitlab.com/cosmonic-labs/wasm-component-sample).
+
+The catalog is split into a language-agnostic core and a Rust layer:
+
+| Component | Purpose |
+|-----------|---------|
+| **Language-agnostic core** | |
+| [`setup`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/setup/README.md) | Installs the `wash` CLI and exposes it on `PATH` for downstream jobs |
+| [`build`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/build/README.md) | Runs `wash build`, validates the output, and copies the `.wasm` to a stable artifact path |
+| [`oci-publish`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/oci-publish/README.md) | Pushes the Wasm component to an OCI registry under one or more tags; optional cosign keyless signing |
+| **Rust layer** | |
+| [`setup-rust`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/setup-rust/README.md) | Adds the `wasm32-wasip2` Rust target and exposes a `.rust-cache` template |
+| [`setup-cargo-auditable`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/setup-cargo-auditable/README.md) | Configures `wash build` to use `cargo auditable` so Wasm components ship with an embedded SBOM |
+| [`attest-cargo-sbom`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/attest-cargo-sbom/README.md) | Extracts the CycloneDX SBOM and attaches it as a Sigstore attestation on the published image |
+
+CI components are versioned via semver tags on the catalog repository and pinned through the `include: component:` reference (`@~latest`, `@1`, `@1.2.3`).
+
+### setup
+
+The [`setup`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/setup/README.md) CI component installs `wash` and exposes `WASH_BIN_DIR` as a [dotenv report](https://docs.gitlab.com/ee/ci/yaml/artifacts_reports.html#artifactsreportsdotenv) so downstream jobs can pick it up:
+
+```yaml
+include:
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/setup@~latest
+    inputs:
+      wash_version: "v{{WASMCLOUD_VERSION}}"
+      stage: validate
+```
+
+### build
+
+The [`build`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/build/README.md) CI component runs `wash build` and copies the resulting `.wasm` to a stable artifact path. It is language-agnostic; attach a language-specific cache (e.g. `.rust-cache` from `setup-rust`) via `extends:`.
+
+```yaml
+include:
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/build@~latest
+    inputs:
+      stage: build
+      component_artifact_path: "build/greeter.wasm"
+```
+
+### oci-publish
+
+The [`oci-publish`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/oci-publish/README.md) CI component pushes the Wasm component to an OCI registry under one or more tags. With `sign: "true"` it runs [`cosign`](https://docs.sigstore.dev/cosign/overview/) keyless signing against the published image using a GitLab-issued OIDC token; see [Attestation](#attestation) below.
+
+```yaml
+include:
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/oci-publish@~latest
+    inputs:
+      stage: publish
+      image_tags: "${CI_COMMIT_REF_SLUG},${CI_COMMIT_SHORT_SHA}"
+      sign: "true"
+```
+
+### setup-rust
+
+The [`setup-rust`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/setup-rust/README.md) CI component adds the `wasm32-wasip2` Rust target and exposes a hidden `.rust-cache` job template that downstream jobs (clippy, `wash-build`) extend to share the cargo registry and target cache:
+
+```yaml
+include:
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/setup-rust@~latest
+    inputs:
+      stage: validate
+
+wash-build:
+  extends: .rust-cache
+```
+
+### setup-cargo-auditable
+
+The [`setup-cargo-auditable`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/setup-cargo-auditable/README.md) CI component rewrites `.wash/config.yaml` so that `wash build` invokes `cargo auditable build`. Every released Wasm component ships its full dependency graph embedded in the Wasm binary, ready for SBOM extraction.
+
+```yaml
+include:
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/setup-cargo-auditable@~latest
+    inputs:
+      stage: validate
+```
+
+### attest-cargo-sbom
+
+The [`attest-cargo-sbom`](https://gitlab.com/cosmonic-labs/ci-components/wash/-/blob/main/templates/attest-cargo-sbom/README.md) CI component extracts the CycloneDX SBOM from the auditable build and attaches it as a [Sigstore attestation](https://docs.sigstore.dev/cosign/attestation/) to the published image. Like `oci-publish` with `sign: "true"`, it uses a GitLab-issued OIDC token; no signing keys are stored.
+
+```yaml
+include:
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/attest-cargo-sbom@~latest
+    inputs:
+      stage: publish
+```
+
+## Attestation
+
+Sigstore keyless signing on GitLab is driven by the [`id_tokens:`](https://docs.gitlab.com/ee/ci/yaml/index.html#id_tokens) keyword, which mints a short-lived OIDC token scoped to the running job. `cosign` exchanges that token for a code-signing certificate from the Sigstore Fulcio CA, signs the artifact, and records the signature in the Rekor transparency log. There are no long-lived signing keys to manage or rotate.
+
+The two attestation flows in this catalog are:
+
+- **Image signing** &mdash; `oci-publish` with `sign: "true"` signs the published OCI image. Consumers verify with `cosign verify --certificate-identity ... --certificate-oidc-issuer https://gitlab.com`.
+- **SBOM attestation** &mdash; `attest-cargo-sbom` extracts the CycloneDX SBOM from the auditable build and attaches it to the image as a Sigstore attestation, verifiable with `cosign verify-attestation --type cyclonedx`.
+
+GitLab Ultimate users also get a parallel scanning path for free: publishing the CycloneDX SBOM as an [`artifacts:reports:cyclonedx`](https://docs.gitlab.com/ee/ci/yaml/artifacts_reports.html#artifactsreportscyclonedx) report registers the dependencies in the project's Dependency List and runs them through GitLab's own SBOM vulnerability scanner against the GitLab Advisory Database. The [sample pipeline](https://gitlab.com/cosmonic-labs/wasm-component-sample) layers [Trivy](https://aquasecurity.github.io/trivy/) on top as a third-party second opinion that gates on HIGH/CRITICAL findings.
+
+## Example: Build and publish pipeline
+
+The following pipeline assembles the core and Rust layers to build a Rust-based Wasm component with auditable dependency metadata, publish it to the project's container registry with a cosign-signed image and SBOM attestation, and cache the cargo registry/target between runs:
+
+```yaml
+stages:
+  - validate
+  - build
+  - publish
+
+include:
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/setup@~latest
+    inputs:
+      wash_version: "v{{WASMCLOUD_VERSION}}"
+      stage: validate
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/setup-rust@~latest
+    inputs:
+      stage: validate
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/setup-cargo-auditable@~latest
+    inputs:
+      stage: validate
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/build@~latest
+    inputs:
+      stage: build
+      component_artifact_path: "build/greeter.wasm"
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/oci-publish@~latest
+    inputs:
+      stage: publish
+      image_tags: "${CI_COMMIT_REF_SLUG},${CI_COMMIT_SHORT_SHA}"
+      sign: "true"
+  - component: $CI_SERVER_FQDN/cosmonic-labs/ci-components/wash/attest-cargo-sbom@~latest
+    inputs:
+      stage: publish
+
+# Attach the Rust cargo cache and auditable build outputs to wash-build.
+wash-build:
+  extends: .rust-cache
+  needs:
+    - job: setup-wash
+      artifacts: true
+    - job: setup-rust
+    - job: setup-wash-cargo-auditable
+      artifacts: true
+```
+
+The [`wasm-component-sample`](https://gitlab.com/cosmonic-labs/wasm-component-sample) repository extends this with merge-request workflow rules, `cargo fmt`/`cargo clippy` validation, a Wasm component smoke test, GitLab Secret Detection, CycloneDX + Trivy SBOM scanning, a Kubernetes `WorkloadDeployment` apply job, and a GitLab Release job tied to semver tags. Clone it as a starting point for new projects.
+
+## Required project configuration
+
+For the pipeline above to run cleanly in a fresh project:
+
+1. **Enable the GitLab container registry** for the project (Settings → General → Visibility) so `oci-publish` has a registry to push to.
+2. **Mask any external registry credentials** (e.g. `GHCR_TOKEN`, `ARTIFACTORY_TOKEN`) as CI/CD variables if the publish target isn't the project registry.
+
+For the Kubernetes deploy story shown in the sample repository, you'll additionally need:
+
+3. **Protected environments** (`staging`, `production`) so that only the right people can deploy.
+4. **File-type CI/CD variables** for cluster access:
+    - `KUBECONFIG_DRYRUN` &mdash; any cluster with the runtime-operator [CRDs](../../crds.mdx) installed; used by `manifest:validate` for `kubectl apply --dry-run=server`.
+    - `KUBECONFIG_STAGING` / `KUBECONFIG_PRODUCTION` &mdash; clusters running the [runtime-operator Helm chart](../../index.mdx) that will actually run the Wasm component.
+
+No other configuration is required &mdash; the CI components use GitLab built-ins for the container registry, OIDC, and release tooling.
+
+For closing the loop with Argo CD or Flux instead of `kubectl apply`, see [GitOps with Argo CD](./index.mdx#gitops-with-argo-cd).

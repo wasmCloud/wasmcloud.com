@@ -1,17 +1,9 @@
 ---
-title: 'CI/CD and GitOps for wasmCloud'
-sidebar_label: 'CI/CD and GitOps'
-sidebar_position: 2
-description: 'Build CI/CD and GitOps pipelines for wasmCloud — publish components to OCI registries, roll out to Kubernetes, and integrate with Argo CD or Flux.'
+title: 'wasmCloud GitHub Actions'
+sidebar_label: 'GitHub Actions'
+sidebar_position: 1
+description: 'Build, publish, and attest wasmCloud components from GitHub Actions using the official setup-wash-action and wasmCloud/actions toolkit.'
 ---
-
-## Overview
-
-wasmCloud components are distributed as [OCI artifacts](https://opencontainers.org/), so a CI/CD pipeline for wasmCloud follows a familiar pattern: build `.wasm` binaries, push them to an OCI registry, and update Kubernetes manifests to reference the new image.
-
-The wasmCloud project provides a set of official [GitHub Actions](#wasmcloud-github-actions) that handle building components, publishing to OCI registries, and generating supply-chain attestations. For teams using GitOps, [Argo CD](#gitops-with-argo-cd) or Flux can close the loop by reconciling Kubernetes state with a Git repository.
-
-![Deployment pipeline from developer push through CI, OCI registry, GitOps, and Kubernetes](../../images/deployment-pipeline.webp)
 
 ## wasmCloud GitHub Actions
 
@@ -89,7 +81,7 @@ permissions:
 
 When attestation is enabled, the `wash-oci-publish` action generates cryptographically signed metadata that links a published artifact back to the source code, build environment, and dependency tree that produced it. This enables consumers to verify that an artifact was built from a specific commit in a trusted CI pipeline.
 
-![Attestation flow](../../images/attestation.webp)
+![Attestation flow](../../../images/attestation.webp)
 
 The attestation flow works as follows:
 
@@ -146,101 +138,7 @@ jobs:
 
 This pipeline triggers on version tags (e.g. `v1.0.0`). The published image will be tagged with both `latest` and the Git tag.
 
-## GitOps with Argo CD
-
-For production deployments, a GitOps workflow keeps Kubernetes state in sync with a Git repository. [Argo CD](https://argo-cd.readthedocs.io/) is a popular GitOps tool for Kubernetes and pairs well with the wasmCloud operator.
-
-### Two-application pattern
-
-A common pattern uses two Argo CD Applications:
-
-1. **Infrastructure Application** &mdash; deploys the wasmCloud platform (operator, NATS, hosts) from the [Helm chart](../index.mdx).
-2. **Workloads Application** &mdash; deploys `WorkloadDeployment` manifests from a dedicated Git repository.
-
-This separation lets infrastructure and workload teams operate independently, each managing their own deployment cadence.
-
-### Example Argo CD Applications
-
-**Infrastructure Application** &mdash; installs the wasmCloud operator via Helm:
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: wasmcloud-platform
-  namespace: argocd
-spec:
-  project: default
-  source:
-    chart: runtime-operator
-    repoURL: ghcr.io/wasmcloud/charts
-    targetRevision: v2-canary
-    helm:
-      releaseName: wasmcloud
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: default
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-```
-
-**Workloads Application** &mdash; syncs `WorkloadDeployment` manifests from a Git repository:
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: wasmcloud-workloads
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/<org>/wasmcloud-workloads.git
-    targetRevision: main
-    path: manifests
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: default
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-```
-
-### Automating manifest updates
-
-After the CI pipeline publishes a new component image, a second workflow job can update the `WorkloadDeployment` manifest in the workloads repository and open a pull request:
-
-```yaml
-  update-manifests:
-    needs: build-and-publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          repository: <org>/wasmcloud-workloads
-          token: ${{ secrets.WORKLOADS_REPO_TOKEN }}
-
-      - name: Update image tag
-        run: |
-          sed -i "s|image: ghcr.io/<org>/my-component:.*|image: ghcr.io/<org>/my-component:${{ github.ref_name }}|" \
-            manifests/my-component.yaml
-
-      - name: Create pull request
-        uses: peter-evans/create-pull-request@v7
-        with:
-          title: "Update my-component to ${{ github.ref_name }}"
-          commit-message: "chore: update my-component to ${{ github.ref_name }}"
-          branch: "update-my-component-${{ github.ref_name }}"
-```
-
-Once merged, Argo CD detects the change and rolls out the new version automatically.
-
-:::info[]
-This pattern works with any GitOps tool that watches a Git repository for changes, including [Flux](https://fluxcd.io/).
-:::
+For closing the loop with Argo CD or Flux, see [GitOps with Argo CD](./index.mdx#gitops-with-argo-cd).
 
 ## Supply chain security
 
