@@ -79,6 +79,11 @@ export default function VideoSEO({
   const canonicalUrl = `${siteConfig.url}${permalink}`;
 
   const chapters = getChapters(frontMatter);
+  // Total video length in seconds, from the landing page's `duration:`
+  // frontmatter. Used to provide endOffset on the LAST hasPart Clip
+  // (Google Search Console flags "Missing field endOffset" without it).
+  const durationSeconds =
+    typeof frontMatter.duration === 'number' ? frontMatter.duration : undefined;
 
   const videoObject = !isTranscript
     ? {
@@ -96,13 +101,17 @@ export default function VideoSEO({
         isFamilyFriendly: true,
         publisher: VIDEO_PUBLISHER,
         ...(chapters.length > 0 && {
-          hasPart: chapters.map((c, i) => ({
-            '@type': 'Clip',
-            name: c.label,
-            startOffset: c.seconds,
-            ...(chapters[i + 1] && { endOffset: chapters[i + 1].seconds }),
-            url: `https://youtu.be/${youtubeId}?t=${c.seconds}`,
-          })),
+          hasPart: chapters.map((c, i) => {
+            const next = chapters[i + 1];
+            const endOffset = next ? next.seconds : durationSeconds;
+            return {
+              '@type': 'Clip',
+              name: c.label,
+              startOffset: c.seconds,
+              ...(endOffset !== undefined && { endOffset }),
+              url: `https://youtu.be/${youtubeId}?t=${c.seconds}`,
+            };
+          }),
         }),
       }
     : null;
