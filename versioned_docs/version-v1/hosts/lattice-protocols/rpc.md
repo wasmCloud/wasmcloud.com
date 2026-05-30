@@ -14,7 +14,7 @@ Components (via the wasmCloud host) and capability providers subscribe on NATS s
 {lattice}.{component_id}.wrpc.{protocol_version}.{namespace}:{package}/{interface}@{version}.{function}
 ```
 
-For example, the subject is as follows when invoking the HTTP hello world component in our [quickstart](/docs/v1/tour/hello-world):
+For example, the subject is as follows when invoking the HTTP hello world component in our [quickstart](/docs/v1/tour/hello-world/):
 
 ```console
 default.http-hello-world.wrpc.0.0.1.wasi:http/incoming-handler@0.2.0.handle
@@ -40,4 +40,4 @@ nats sub "*.*.wrpc.>"
 
 ### References
 
-See the [0.82 RPC Documentation](/docs/0.82/hosts/lattice-protocols/rpc) for information about the no-longer-supported wasmbus RPC protocol.
+See the [0.82 RPC Documentation](/docs/0.82/hosts/lattice-protocols/rpc/) for information about the no-longer-supported wasmbus RPC protocol.

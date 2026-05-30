@@ -20,4 +20,4 @@ wash --help
 
 ## Installation
 
-`wash` can be installed from a binary release, or with cargo. See [installation](/docs/0.82/installation) for details.
+`wash` can be installed from a binary release, or with cargo. See [installation](/docs/0.82/installation/) for details.

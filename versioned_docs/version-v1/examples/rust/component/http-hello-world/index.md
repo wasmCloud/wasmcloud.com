@@ -5,7 +5,7 @@ This is a simple Rust Wasm example that responds with a "Hello World" message fo
 ## Prerequisites
 
 - `cargo` 1.82
-- [`wash`](https://wasmcloud.com/docs/installation) 0.36.1
+- [`wash`](https://wasmcloud.com/docs/installation/) 0.36.1
 - `wasmtime` >=25.0.0 (if running with wasmtime)
 
 ## Building
@@ -34,4 +34,4 @@ curl http://127.0.0.1:8000
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities/?lang=rust) section of the wasmCloud documentation.

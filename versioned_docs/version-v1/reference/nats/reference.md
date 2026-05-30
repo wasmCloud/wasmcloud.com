@@ -48,10 +48,10 @@ wasmCloud makes use of:
 
 ## Reference Sections
 
-- **[NATS Subjects](/docs/v1/reference/nats/subjects)** - Complete subject reference for wRPC, control interface, and wadm API
-- **[NATS Streams and Buckets](/docs/v1/reference/nats/streams-and-buckets)** - JetStream resource requirements and production configuration
-- **[NATS Permissions](/docs/v1/reference/nats/permissions)** - Account and permission configuration for secure deployments
-- **[NATS Leaf Nodes](/docs/v1/reference/nats/leaf-nodes)** - Leaf node strategy and architectural patterns
+- **[NATS Subjects](/docs/v1/reference/nats/subjects/)** - Complete subject reference for wRPC, control interface, and wadm API
+- **[NATS Streams and Buckets](/docs/v1/reference/nats/streams-and-buckets/)** - JetStream resource requirements and production configuration
+- **[NATS Permissions](/docs/v1/reference/nats/permissions/)** - Account and permission configuration for secure deployments
+- **[NATS Leaf Nodes](/docs/v1/reference/nats/leaf-nodes/)** - Leaf node strategy and architectural patterns
 
 ## See Also
 

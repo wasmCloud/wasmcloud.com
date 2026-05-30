@@ -8,7 +8,7 @@ This folder contains a simple WebAssembly component written in [Rust][rust], whi
 ## Prerequisites
 
 - `cargo` 1.80
-- [`wash`](https://wasmcloud.com/docs/installation) 0.29.0
+- [`wash`](https://wasmcloud.com/docs/installation/) 0.29.0
 
 ## Building
 
@@ -44,7 +44,7 @@ You should see output that looks like the following:
 
 Want to go beyond this simple demo?
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities/?lang=rust) section of the wasmCloud documentation.
 
 ## BONUS: Using the "system" clock in a WebAssembly context
 

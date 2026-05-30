@@ -22,7 +22,7 @@ This is a Wasm component example, which, using NATS KeyValue and Messaging provi
 
 *   `cargo` 1.78
 
-*   [`wash`](https://wasmcloud.com/docs/installation) 0.29.2
+*   [`wash`](https://wasmcloud.com/docs/installation/) 0.29.2
 
 *   `wadm` 0.12.2 (only if multiple links used)
 
@@ -65,4 +65,4 @@ nats pub 'nats.atomic.delta' 100
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities/?lang=rust) section of the wasmCloud documentation.

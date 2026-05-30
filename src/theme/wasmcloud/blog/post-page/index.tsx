@@ -25,7 +25,7 @@ function BlogPostPageContent({ children }: { children: ReactNode }): JSX.Element
       <div className={clsx('container', 'margin-vert--xl', styles.container)}>
         <div className="row">
           <main className="col">
-            <Link to="/blog" className={styles.backLink}>
+            <Link to="/blog/" className={styles.backLink}>
               ← Back
             </Link>
 

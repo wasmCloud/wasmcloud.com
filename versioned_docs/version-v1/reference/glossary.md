@@ -14,7 +14,7 @@ The following is a glossary of important or frequently used terms. These terms m
 
 Built-in providers are functionalities exposed by the wasmCloud host, such that the host itself can fulfull a component's imports on certain interfaces. Built-in providers may be linked with components. This limited set of functions for capabilities such as **logging** represents wasmCloud's **trusted compute base**.
 
-For more information, see [**Providers**](/docs/v1/concepts/providers).
+For more information, see [**Providers**](/docs/v1/concepts/providers/).
 
 ### Capability
 
@@ -24,7 +24,7 @@ An abstraction for a given functionality (such as key-value storage or connectio
 
 Components are portable, interoperable WebAssembly binaries that implement stateless logic. Components are `.wasm` files that include [interface](#interface) definitions which define the contracts through which they may relate to other entities.
 
-For more information, see [**Components**](/docs/v1/concepts/components).
+For more information, see [**Components**](/docs/v1/concepts/components/).
 
 ### Host
 
@@ -42,7 +42,7 @@ For more information, see [**Interfaces**](/docs/v1/concepts/interfaces/).
 
 The lattice is a self-forming cluster of wasmCloud nodes. Each lattice is uniquely identified by a name, which is used to differentiate traffic from other lattices. Membership within a lattice requires a secret key for signing invocations and the ability to trust a specific set of public keys from other hosts.
 
-For more information, see [**Lattice**](/docs/v1/concepts/lattice).
+For more information, see [**Lattice**](/docs/v1/concepts/lattice/).
 
 ### Link
 
@@ -60,7 +60,7 @@ For more information, see the [**NATS documentation**](https://docs.nats.io/).
 
 Providers are executable host plugins that implement longer-lived processes, typically providing reusable capabilities (such as key-value storage). Providers are written in Rust or Go, may be linked to one or more components, and interact with components according to defined [interfaces](#interface).
 
-For more information, see [**Providers**](/docs/v1/concepts/providers).
+For more information, see [**Providers**](/docs/v1/concepts/providers/).
 
 ### Provider Archive
 
@@ -88,7 +88,7 @@ For more information, see the [**Wasmtime documentation**](https://docs.wasmtime
 
 wRPC stands for "WIT over RPC"&mdash;or if you want to decode it completely, **WebAssembly Interface Type over Remote Procedure Call**. wRPC is an RPC protocol for communicating according to WIT definitions over a transport layer; this is the means by which wasmCloud can dynamically link distributed WebAssembly components at runtime over the lattice.
 
-For more information, see [**Linking at Runtime**](/docs/v1/concepts/linking-components/linking-at-runtime).
+For more information, see [**Linking at Runtime**](/docs/v1/concepts/linking-components/linking-at-runtime/).
 
 ## General WebAssembly terminology
 

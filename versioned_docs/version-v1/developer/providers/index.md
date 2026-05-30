@@ -18,7 +18,7 @@ Here, you can learn how to build your own provider. We'll walk you through imple
 
 We'll work through the following steps:
 
-- [Create](/docs/v1/developer/providers/create): Create a new messaging provider from a template using `wash` and implement the `wasmcloud:messaging` interface.
-- [Build](/docs/v1/developer/providers/build): Compile the provider artifact.
-- [Test](/docs/v1/developer/providers/test): Test the provider in a local wasmCloud environment.
-- [Publish](/docs/v1/developer/providers/publish): Publish the provider to an OCI registry.
+- [Create](/docs/v1/developer/providers/create/): Create a new messaging provider from a template using `wash` and implement the `wasmcloud:messaging` interface.
+- [Build](/docs/v1/developer/providers/build/): Compile the provider artifact.
+- [Test](/docs/v1/developer/providers/test/): Test the provider in a local wasmCloud environment.
+- [Publish](/docs/v1/developer/providers/publish/): Publish the provider to an OCI registry.

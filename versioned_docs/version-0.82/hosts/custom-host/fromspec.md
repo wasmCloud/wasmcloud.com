@@ -21,7 +21,7 @@ If you want to make your own wasmCloud host, you're likely doing so because you 
 
 The host must perform the following activities:
 
-- Use the [RPC channel](/docs/0.82/hosts/lattice-protocols/rpc) to perform periodic (default every 30 seconds) health checks. Emit the appropriate events to indicate health check success or failure.
+- Use the [RPC channel](/docs/0.82/hosts/lattice-protocols/rpc/) to perform periodic (default every 30 seconds) health checks. Emit the appropriate events to indicate health check success or failure.
 - Use the RPC channel to send messages on `...linkdefs.put` and `...linkdefs.del` topics to alert capability providers as to when actors are linked.
 - Expose some form of API that can be used to start and stop actors
   - Actors must communicate with the host using the appropriate ABI.
@@ -34,7 +34,7 @@ The host must perform the following activities:
 - Properly sign invocations, including hashing specific fields of the invocation.
 - Subscribe to the appropriate lattice subjects for:
   - **RPC** - each actor must subscribe to its appropriate lattice RPC subject
-  - **[Control Interface](/docs/0.82/hosts/lattice-protocols/control-interface)** - the host must subscribe to the control interface subject(s) and respond in accordance with the interface protocol.
-  - Events - What the custom host does with the events is up to the host, but the host _must_ emit all expected events on the control connection as JSON **CloudEvents**. See the reference for the full list of required [CloudEvents](/docs/0.82/reference/cloud-event-list)
+  - **[Control Interface](/docs/0.82/hosts/lattice-protocols/control-interface/)** - the host must subscribe to the control interface subject(s) and respond in accordance with the interface protocol.
+  - Events - What the custom host does with the events is up to the host, but the host _must_ emit all expected events on the control connection as JSON **CloudEvents**. See the reference for the full list of required [CloudEvents](/docs/0.82/reference/cloud-event-list/)
 - Ensure that the `Invocation` that is sent via RPC contains a properly signed JWT with the proper invocation hash (anti-forgery token implementation). First-party wasmCloud hosts will reject invocations that do not include these.
-- Ensure that all link definitions, OCI reference maps, and claims are properly stored in the [NATS JetStream Key-Value bucket](/docs/0.82/deployment/lattice/metadata).
+- Ensure that all link definitions, OCI reference maps, and claims are properly stored in the [NATS JetStream Key-Value bucket](/docs/0.82/deployment/lattice/metadata/).

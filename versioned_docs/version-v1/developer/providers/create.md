@@ -68,7 +68,7 @@ Feel free to take a look around the provider project. The important files are:
 
 1. `src/nats.rs`: We're going to be primarily implementing functionality here.
 1. `wasmcloud.toml`: Build information and metadata for the provider
-1. `wit/provider.wit`: The [interface](/docs/v1/concepts/interfaces) this provider implements and uses
+1. `wit/provider.wit`: The [interface](/docs/v1/concepts/interfaces/) this provider implements and uses
 
 ## Implementing the interface
 
@@ -226,7 +226,7 @@ We perform the same steps to fetch the NATS client, and instead of publishing a 
 
 ## Testing the provider
 
-Now that you've implemented all of the `import` and `export` functions for this provider, it's ready to test. Inside of the project directory you can run `wash build` to compile and package your provider into a provider archive. For more information on building, check out the [build](/docs/v1/developer/providers/build) page. We'll use a prebuilt wasmCloud example component that uses `wasmcloud:messaging` to test this provider.
+Now that you've implemented all of the `import` and `export` functions for this provider, it's ready to test. Inside of the project directory you can run `wash build` to compile and package your provider into a provider archive. For more information on building, check out the [build](/docs/v1/developer/providers/build/) page. We'll use a prebuilt wasmCloud example component that uses `wasmcloud:messaging` to test this provider.
 
 To generate the example component, use the following command. You can do this inside of your current project directory or as a separate folder:
 

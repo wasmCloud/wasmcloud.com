@@ -27,7 +27,7 @@ This application requires a few other pieces to function:
 ## Prerequisites
 
 - `cargo` >= 1.81
-- [`wash`](https://wasmcloud.com/docs/installation) >=0.30.0
+- [`wash`](https://wasmcloud.com/docs/installation/) >=0.30.0
 - `docker` (or some other means to easily run Postgres instances)
 
 

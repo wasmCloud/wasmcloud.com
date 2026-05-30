@@ -12,7 +12,7 @@ The following is a list of developer workflows _sorted_ from **_most to least co
 
 ## Building Components
 
-The most common thing application developers will do is build [components](/docs/v1/concepts/components). Components encompass pure business logic in wasmCloud, and only communicate with non-functional requirements through capability providers and abstract [interfaces](/docs/v1/concepts/interfaces).
+The most common thing application developers will do is build [components](/docs/v1/concepts/components/). Components encompass pure business logic in wasmCloud, and only communicate with non-functional requirements through capability providers and abstract [interfaces](/docs/v1/concepts/interfaces/).
 
 Once you've established a dependency on a library that exposes the interface abstraction you're looking for, you can start your iteration loop.
 
@@ -27,7 +27,7 @@ The developer's _iteration loop_ for building a component looks something like t
       1. Modify your component code, run `wash build` to recompile and re-sign the component, repeat the above step
 1. _Repeat_
 
-As of wash 0.18.0, there is now a `wash dev` command that automates this process for you. See the [Customizing the component](/docs/v1/developer/components/update) section for more details on how to use it.
+As of wash 0.18.0, there is now a `wash dev` command that automates this process for you. See the [Customizing the component](/docs/v1/developer/components/update/) section for more details on how to use it.
 
 ## Building Providers
 

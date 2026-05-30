@@ -10,7 +10,7 @@ This folder contains an example WebAssembly plugin for `wash` that you can use a
 ## Prerequisites
 
 - `cargo` >=1.75
-- [`wash`](https://wasmcloud.com/docs/installation) >=0.28.1
+- [`wash`](https://wasmcloud.com/docs/installation/) >=0.28.1
 
 ## Building
 
