@@ -19,7 +19,7 @@ Every actor in the ecosystem is a WebAssembly module that contains an embedded [
 
 In our ecosystem, the issuer of an actor is the unique public key of an **account** (see the _Key Types_ section below), and the subject of an actor is the actor's public key.
 
-The [wash](/docs/0.82/ecosystem/wash) tool is responsible for creating keys and extracting and embedding signed JWTs within actor modules.
+The [wash](/docs/0.82/ecosystem/wash/) tool is responsible for creating keys and extracting and embedding signed JWTs within actor modules.
 
 Each JWT embedded within an actor is cryptographically signed using the [ed25519](https://ed25519.cr.yp.to/) signature algorithm. For information on why we chose this method of security over others, please check out our [Archictural Decision Record](https://wasmcloud.github.io/adr/).
 
@@ -72,6 +72,6 @@ While the number of key encodings available is larger than this list, the follow
 - Capability Pro**v**ider (Ser**v**ice) - Produces public keys with the **V** prefix.
 - Server/**N**ode - Produces public keys with the **N** (node) prefix, used by the host runtime.
 - **O**perator - Produces public keys with the **O** prefix.
-- **C**luster - Produces public keys with the **C** prefix, used by the [lattice](/docs/0.82/reference/glossary#lattice).
+- **C**luster - Produces public keys with the **C** prefix, used by the [lattice](/docs/0.82/reference/glossary/#lattice).
 
 As mentioned, _by convention_, actor tokens are issued by accounts. **A**ccounts are, by convention, issued by operators. Ser**v**ices (capability pro**v**iders) are also issued/signed by accounts. Servers (wasmcloud processes/**n**odes) are currently self-issued/self-signed, leaving the crucial lattice security up to the **C**luster keys.

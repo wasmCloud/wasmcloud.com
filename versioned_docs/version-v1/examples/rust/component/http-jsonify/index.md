@@ -5,7 +5,7 @@ This is a simple Rust Wasm example that converts an incoming HTTP request to a J
 ## Prerequisites
 
 - `cargo` >=1.75
-- [`wash`](https://wasmcloud.com/docs/installation) >=0.27.0
+- [`wash`](https://wasmcloud.com/docs/installation/) >=0.27.0
 - `wasmtime` >=19.0.0 (if running with wasmtime)
 
 ## BUilding
@@ -37,4 +37,4 @@ curl http://127.0.0.1:8000
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities/?lang=rust) section of the wasmCloud documentation.

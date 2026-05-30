@@ -27,4 +27,4 @@ wasmCloud is designed around the following core tenets:
 
 ### Still have questions?
 
-Check out our [FAQ](/docs/0.82/reference/faq).
+Check out our [FAQ](/docs/0.82/reference/faq/).

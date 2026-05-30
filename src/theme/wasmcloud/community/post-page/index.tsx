@@ -42,7 +42,7 @@ function CommunityPostPageContent({ children }: { children: ReactNode }): JSX.El
       <div className={clsx('container', 'margin-vert--xl', styles.container)}>
         <div className="row">
           <main className="col">
-            <Link to="/community" className={styles.backLink}>
+            <Link to="/community/" className={styles.backLink}>
               ← Back
             </Link>
 

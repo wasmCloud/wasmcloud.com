@@ -53,6 +53,6 @@ traits:
         weight: 20
 ```
 
-The application will be in the `Failed` state if there aren't connected hosts with the `zone=us-east-1` and `zone=us-west-1` [labels](/docs/v1/deployment/hosts/labels).
+The application will be in the `Failed` state if there aren't connected hosts with the `zone=us-east-1` and `zone=us-west-1` [labels](/docs/v1/deployment/hosts/labels/).
 
 You can get more information about why an application is in the failed status by running `wash app status <app>` to see the reason why the application is in the failed state.

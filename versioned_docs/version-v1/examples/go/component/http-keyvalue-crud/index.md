@@ -15,7 +15,7 @@ Before starting, ensure that you have the following installed in addition to the
 
 - [`tinygo`](https://tinygo.org/getting-started/install/) for compiling Go (always use the latest version)
 - [`wasm-tools`](https://github.com/bytecodealliance/wasm-tools#installation) for Go bindings
-- [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation) for building and running the components and wasmCloud environment
+- [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation/) for building and running the components and wasmCloud environment
 
 ## 👟 Run the example
 
@@ -34,7 +34,7 @@ cd examples/component/http-keyvalue-crud
 In addition to the standard elements of a Go project, the example directory includes the following files and directories:
 
 - `/build`: Target directory for compiled `.wasm` binaries
-- `/gen`: Target directory for Go bindings of [interfaces](https://wasmcloud.com/docs/v1/concepts/interfaces)
+- `/gen`: Target directory for Go bindings of [interfaces](https://wasmcloud.com/docs/v1/concepts/interfaces/)
 - `/wit`: Directory for WebAssembly Interface Type (WIT) packages that define interfaces
 - `bindings.wadge.go`: Automatically generated test bindings
 - `wadm.yaml`: Declarative application manifest
@@ -103,4 +103,4 @@ You can stop the `wash dev` process with `Ctrl-C`.
 
 When running this example with the `wash dev` command, wasmCloud uses its included NATS key-value store to back key-value operations, but the application could use another store like Redis with no change to the Go code. 
 
-You can learn more about capabilities like key-value storage are fulfilled by swappable providers in the [wasmCloud Quickstart](https://wasmcloud.com/docs/v1/tour/hello-world).  
+You can learn more about capabilities like key-value storage are fulfilled by swappable providers in the [wasmCloud Quickstart](https://wasmcloud.com/docs/v1/tour/hello-world/).  

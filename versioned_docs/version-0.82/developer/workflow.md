@@ -16,7 +16,7 @@ The following is a list of developer workflows _sorted_ from **_most to least co
 
 ### Building Actors
 
-The most common thing application developers will do is build actors. Actors encompass pure business logic, and only communicate with non-functional requirements through capability providers and abstract [interfaces](/docs/0.82/concepts/interface-driven-development).
+The most common thing application developers will do is build actors. Actors encompass pure business logic, and only communicate with non-functional requirements through capability providers and abstract [interfaces](/docs/0.82/concepts/interface-driven-development/).
 
 Once you've established a dependency on a library that exposes the interface abstraction you're looking for, you can start your iteration loop.
 
@@ -32,7 +32,7 @@ The developer's _iteration loop_ for building an actor looks something like this
    1. Leverage the `wasmcloud:testing` interface and the [test provider](https://github.com/wasmCloud/wasmcloud-test)
 1. _Repeat_
 
-As of wash 0.18.0, there is now a `wash dev` command that automates this process for you. See the [Customizing the actor](/docs/0.82/developer/actors/update) section for more details on how to use it.
+As of wash 0.18.0, there is now a `wash dev` command that automates this process for you. See the [Customizing the actor](/docs/0.82/developer/actors/update/) section for more details on how to use it.
 
 ### Building Providers
 

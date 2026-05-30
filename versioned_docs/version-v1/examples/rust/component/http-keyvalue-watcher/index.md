@@ -4,13 +4,13 @@ description: "Rust Wasm component example: monitor and react to key-value store 
 
 # HTTP KeyValue Watcher
 
-This component demonstrates a Wasm-based system for monitoring and reacting to key-value store operations through HTTP interfaces. It integrates with [wasi-http](https://github.com/WebAssembly/wasi-http) for handling Outgoing HTTP responses and [wasi-keyvalue](https://github.com/WebAssembly/wasi-keyvalue) for key-value store interactions. The component establishes watch triggers based on link configuration and executes configurable reactions when events occur. At runtime, it [links](https://wasmcloud.com/docs/v1/concepts/linking-components) to a Redis-backed implementation of the key-value store interface.
+This component demonstrates a Wasm-based system for monitoring and reacting to key-value store operations through HTTP interfaces. It integrates with [wasi-http](https://github.com/WebAssembly/wasi-http) for handling Outgoing HTTP responses and [wasi-keyvalue](https://github.com/WebAssembly/wasi-keyvalue) for key-value store interactions. The component establishes watch triggers based on link configuration and executes configurable reactions when events occur. At runtime, it [links](https://wasmcloud.com/docs/v1/concepts/linking-components/) to a Redis-backed implementation of the key-value store interface.
 
 
 ## Prerequisites
 
 - `cargo` 1.75
-- [`wash`](https://wasmcloud.com/docs/installation) 0.37.0
+- [`wash`](https://wasmcloud.com/docs/installation/) 0.37.0
 
 ## Building
 
@@ -87,4 +87,4 @@ fn on_delete(bucket: bindings::wasi::keyvalue::store::Bucket, key: String) {
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities/?lang=rust) section of the wasmCloud documentation.

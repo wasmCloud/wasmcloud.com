@@ -5,7 +5,7 @@ This is a simple Rust Wasm example that uses `wasmcloud:messaging` to echo back 
 ## Prerequisites
 
 - `cargo` 1.75
-- [`wash`](https://wasmcloud.com/docs/installation) 0.27.0
+- [`wash`](https://wasmcloud.com/docs/installation/) 0.27.0
 
 ## Building
 
@@ -32,4 +32,4 @@ HELLLLOOOOOO
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities/?lang=rust) section of the wasmCloud documentation.

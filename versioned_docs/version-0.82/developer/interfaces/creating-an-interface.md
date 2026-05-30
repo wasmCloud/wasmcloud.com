@@ -11,7 +11,7 @@ draft: false
 
 The first thing we're going to need for our _payments service_ sample capability provider is an **interface**. An interface describes the data types that actors and providers exchange, as well as the supported operations that can be invoked, and the relative directions of those operations.
 
-[Contract-driven](https://en.wikipedia.org/wiki/Design_by_contract) design and development (CDD) has been a long-favored technique for developers building microservices and other types of composable systems. Earlier in our documentation we also referred to it as [interface-driven development](/docs/0.82/concepts/interface-driven-development). Not only does CDD/IDD make our initial design experience easier, but it continues to pay dividends throughout the life cycle of our application.
+[Contract-driven](https://en.wikipedia.org/wiki/Design_by_contract) design and development (CDD) has been a long-favored technique for developers building microservices and other types of composable systems. Earlier in our documentation we also referred to it as [interface-driven development](/docs/0.82/concepts/interface-driven-development/). Not only does CDD/IDD make our initial design experience easier, but it continues to pay dividends throughout the life cycle of our application.
 
 ### Creating a smithy interface
 
@@ -259,4 +259,4 @@ rustup component add rustfmt
 
 :::
 
-Now that we have a Rust crate that we can use from both our actor and our capability provider, let's move on to the next step: [_Creating a Capability Provider in Rust_](/docs/0.82/developer/providers/rust).
+Now that we have a Rust crate that we can use from both our actor and our capability provider, let's move on to the next step: [_Creating a Capability Provider in Rust_](/docs/0.82/developer/providers/rust/).
