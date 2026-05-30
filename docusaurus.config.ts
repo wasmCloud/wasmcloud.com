@@ -161,13 +161,17 @@ const config = (async (): Promise<Config> => {
                 }
 
                 // Community meeting/transcript dated content:
-                //   2026 → priority 0.9 (current cadence we want indexed)
-                //   pre-2026 → noindex (handled in CommunityPostPage swizzle); drop from sitemap
+                //   2026 → priority 0.9 (current cadence)
+                //   2025 → priority 0.8 (indexed; content-rich backfilled pages)
+                //   pre-2025 → noindex (handled in CommunityPostPage swizzle); drop from sitemap
                 const communityYearMatch = path.match(COMMUNITY_YEAR_RE);
                 if (communityYearMatch) {
                   const year = Number(communityYearMatch[1]);
                   if (year >= 2026) {
                     return [{ ...item, priority: 0.9, changefreq: 'monthly' }];
+                  }
+                  if (year >= 2025) {
+                    return [{ ...item, priority: 0.8, changefreq: 'yearly' }];
                   }
                   return [];
                 }
