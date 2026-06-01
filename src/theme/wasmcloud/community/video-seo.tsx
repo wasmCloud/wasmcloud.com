@@ -2,9 +2,30 @@ import React from 'react';
 import Head from '@docusaurus/Head';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import type { BlogPostMetadata } from '@docusaurus/plugin-content-blog';
+import speakersData from '@site/src/data/speakers.json';
 import { isTranscriptPermalink } from './utils';
 
 type Chapter = { seconds: number; label: string };
+
+type SpeakerPerson = {
+  slug: string;
+  name: string;
+  org?: string;
+  role?: string;
+  aliases?: string[];
+};
+
+type SpeakerOrg = { url: string; type?: string };
+
+type SpeakersJson = {
+  team: SpeakerPerson[];
+  externals?: SpeakerPerson[];
+  alumni?: SpeakerPerson[];
+  organizations: Record<string, SpeakerOrg>;
+};
+
+const SPEAKERS = speakersData as SpeakersJson;
+const COSMONIC_URL = 'https://cosmonic.com';
 
 /**
  * Constants shared across every community-meeting video page. Per-page values
@@ -54,6 +75,89 @@ function getChapters(frontMatter: Record<string, unknown>): Chapter[] {
     .sort((a, b) => a.seconds - b.seconds);
 }
 
+function secondsToIsoDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  let out = 'PT';
+  if (h > 0) out += `${h}H`;
+  if (m > 0) out += `${m}M`;
+  if (s > 0 || (h === 0 && m === 0)) out += `${s}S`;
+  return out;
+}
+
+function buildActors(frontMatter: Record<string, unknown>) {
+  const raw = frontMatter.speakers;
+  if (!Array.isArray(raw)) return undefined;
+  const slugs = raw.filter((s): s is string => typeof s === 'string');
+  if (slugs.length === 0) return undefined;
+
+  const actors = slugs
+    .map((slug) => {
+      const team = SPEAKERS.team.find((p) => p.slug === slug);
+      if (team) {
+        return {
+          '@type': 'Person' as const,
+          name: team.name,
+          ...(team.role && { jobTitle: team.role }),
+          affiliation: {
+            '@type': 'Organization' as const,
+            name: 'Cosmonic',
+            url: COSMONIC_URL,
+          },
+        };
+      }
+      const alum = SPEAKERS.alumni?.find((p) => p.slug === slug);
+      if (alum) {
+        return {
+          '@type': 'Person' as const,
+          name: alum.name,
+          affiliation: {
+            '@type': 'Organization' as const,
+            name: 'Cosmonic',
+            url: COSMONIC_URL,
+          },
+        };
+      }
+      const ext = SPEAKERS.externals?.find((p) => p.slug === slug);
+      if (ext) {
+        const actor: {
+          '@type': 'Person';
+          name: string;
+          affiliation?: { '@type': string; name: string; url?: string };
+        } = {
+          '@type': 'Person',
+          name: ext.name,
+        };
+        if (ext.org) {
+          const orgInfo = SPEAKERS.organizations[ext.org];
+          actor.affiliation = {
+            '@type': orgInfo?.type ?? 'Organization',
+            name: ext.org,
+            ...(orgInfo?.url && { url: orgInfo.url }),
+          };
+        }
+        return actor;
+      }
+      return null;
+    })
+    .filter((a): a is NonNullable<typeof a> => a !== null);
+
+  return actors.length > 0 ? actors : undefined;
+}
+
+function getKeywords(frontMatter: Record<string, unknown>): string | undefined {
+  const raw = frontMatter.keywords;
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  if (Array.isArray(raw)) {
+    const cleaned = raw
+      .filter((k): k is string => typeof k === 'string' && k.trim().length > 0)
+      .map((k) => k.trim());
+    return cleaned.length > 0 ? cleaned.join(', ') : undefined;
+  }
+  return undefined;
+}
+
 /**
  * Emit Open Graph video tags and a VideoObject JSON-LD schema for community
  * meeting pages. The transcript pages share the canonical YouTube video with
@@ -85,6 +189,9 @@ export default function VideoSEO({
   const durationSeconds =
     typeof frontMatter.duration === 'number' ? frontMatter.duration : undefined;
 
+  const keywords = getKeywords(frontMatter);
+  const actor = buildActors(frontMatter);
+
   const videoObject = !isTranscript
     ? {
         '@context': 'https://schema.org',
@@ -100,6 +207,11 @@ export default function VideoSEO({
         genre: VIDEO_GENRE,
         isFamilyFriendly: true,
         publisher: VIDEO_PUBLISHER,
+        ...(durationSeconds !== undefined && {
+          duration: secondsToIsoDuration(durationSeconds),
+        }),
+        ...(keywords && { keywords }),
+        ...(actor && { actor }),
         ...(chapters.length > 0 && {
           hasPart: chapters.map((c, i) => {
             const next = chapters[i + 1];
@@ -113,6 +225,13 @@ export default function VideoSEO({
             };
           }),
         }),
+        // Enables Google Search "Key Moments" deep-link buttons: Google
+        // substitutes the user's seek point into {seek_to_second_number}.
+        potentialAction: {
+          '@type': 'SeekToAction',
+          target: `${watchUrl}&t={seek_to_second_number}`,
+          'startOffset-input': 'required name=seek_to_second_number',
+        },
       }
     : null;
 
