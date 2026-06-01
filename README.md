@@ -2,7 +2,7 @@
 
 # wasmCloud.com
 
-Repository for the wasmCloud homepage including our community, team, docs, links, and as an ingress point for interested developers. This site is built with [Docusarus](https://docusaurus.io/).
+Repository for the wasmCloud homepage including our community, team, docs, links, and as an ingress point for interested developers. This site is built with [Docusaurus](https://docusaurus.io/).
 
 ## Running the site locally
 
