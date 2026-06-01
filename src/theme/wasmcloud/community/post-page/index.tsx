@@ -13,6 +13,7 @@ import Layout from '@theme/Layout';
 import CommunityPostItem from '../post-item';
 import Link from '@docusaurus/Link';
 import VideoSEO from '../video-seo';
+import MeetingSpeakers from '../meeting-speakers';
 
 // Community meetings & transcripts older than 2025 are no longer current. Tell
 // search engines not to index them, but keep `follow` so they still pass link
@@ -51,14 +52,17 @@ function CommunityPostPageContent({ children }: { children: ReactNode }): JSX.El
             <CommunityPostItem>
               <div className="row">
                 <div className="col col--3">
-                  {!hideTableOfContents && toc.length > 0 ? (
-                    <TOC
-                      className={styles.toc}
-                      toc={toc}
-                      minHeadingLevel={tocMinHeadingLevel}
-                      maxHeadingLevel={tocMaxHeadingLevel}
-                    />
-                  ) : undefined}
+                  <div className={styles.sidebar}>
+                    {!hideTableOfContents && toc.length > 0 ? (
+                      <TOC
+                        className={styles.toc}
+                        toc={toc}
+                        minHeadingLevel={tocMinHeadingLevel}
+                        maxHeadingLevel={tocMaxHeadingLevel}
+                      />
+                    ) : undefined}
+                    <MeetingSpeakers />
+                  </div>
                 </div>
                 <div className="col col--7">{children}</div>
               </div>
