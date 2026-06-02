@@ -12,20 +12,18 @@ type SpeakerPerson = {
   name: string;
   org?: string;
   role?: string;
+  wasmcloud_role?: 'maintainer' | 'contributor' | 'community';
   aliases?: string[];
 };
 
-type SpeakerOrg = { url: string; type?: string };
+type SpeakerOrg = { url: string };
 
 type SpeakersJson = {
-  team: SpeakerPerson[];
-  externals?: SpeakerPerson[];
-  alumni?: SpeakerPerson[];
+  speakers: SpeakerPerson[];
   organizations: Record<string, SpeakerOrg>;
 };
 
 const SPEAKERS = speakersData as SpeakersJson;
-const COSMONIC_URL = 'https://cosmonic.com';
 
 /**
  * Constants shared across every community-meeting video page. Per-page values
@@ -94,52 +92,27 @@ function buildActors(frontMatter: Record<string, unknown>) {
 
   const actors = slugs
     .map((slug) => {
-      const team = SPEAKERS.team.find((p) => p.slug === slug);
-      if (team) {
-        return {
-          '@type': 'Person' as const,
-          name: team.name,
-          ...(team.role && { jobTitle: team.role }),
-          affiliation: {
-            '@type': 'Organization' as const,
-            name: 'Cosmonic',
-            url: COSMONIC_URL,
-          },
+      const person = SPEAKERS.speakers.find((p) => p.slug === slug);
+      if (!person) return null;
+      const actor: {
+        '@type': 'Person';
+        name: string;
+        jobTitle?: string;
+        affiliation?: { '@type': 'Organization'; name: string; url?: string };
+      } = {
+        '@type': 'Person',
+        name: person.name,
+      };
+      if (person.role) actor.jobTitle = person.role;
+      if (person.org) {
+        const orgInfo = SPEAKERS.organizations[person.org];
+        actor.affiliation = {
+          '@type': 'Organization',
+          name: person.org,
+          ...(orgInfo?.url && { url: orgInfo.url }),
         };
       }
-      const alum = SPEAKERS.alumni?.find((p) => p.slug === slug);
-      if (alum) {
-        return {
-          '@type': 'Person' as const,
-          name: alum.name,
-          affiliation: {
-            '@type': 'Organization' as const,
-            name: 'Cosmonic',
-            url: COSMONIC_URL,
-          },
-        };
-      }
-      const ext = SPEAKERS.externals?.find((p) => p.slug === slug);
-      if (ext) {
-        const actor: {
-          '@type': 'Person';
-          name: string;
-          affiliation?: { '@type': string; name: string; url?: string };
-        } = {
-          '@type': 'Person',
-          name: ext.name,
-        };
-        if (ext.org) {
-          const orgInfo = SPEAKERS.organizations[ext.org];
-          actor.affiliation = {
-            '@type': orgInfo?.type ?? 'Organization',
-            name: ext.org,
-            ...(orgInfo?.url && { url: orgInfo.url }),
-          };
-        }
-        return actor;
-      }
-      return null;
+      return actor;
     })
     .filter((a): a is NonNullable<typeof a> => a !== null);
 

@@ -9,32 +9,23 @@ type Person = {
   name: string;
   org?: string;
   role?: string;
+  wasmcloud_role?: 'maintainer' | 'contributor' | 'community';
   aliases?: string[];
 };
 
 type Organization = {
   url: string;
-  type?: string;
 };
 
 type SpeakersData = {
-  team: Person[];
-  externals?: Person[];
-  alumni?: Person[];
+  speakers: Person[];
   organizations: Record<string, Organization>;
 };
 
 const data = speakersData as SpeakersData;
 
-const COSMONIC_URL = 'https://cosmonic.com';
-
-type Bucket = 'team' | 'external' | 'alumni';
-
-function lookup(slug: string): { person: Person; bucket: Bucket } | null {
-  for (const p of data.team) if (p.slug === slug) return { person: p, bucket: 'team' };
-  for (const p of data.externals ?? []) if (p.slug === slug) return { person: p, bucket: 'external' };
-  for (const p of data.alumni ?? []) if (p.slug === slug) return { person: p, bucket: 'alumni' };
-  return null;
+function lookup(slug: string): Person | null {
+  return data.speakers.find((p) => p.slug === slug) ?? null;
 }
 
 function orgUrl(org?: string): string | undefined {
@@ -47,12 +38,9 @@ function orgUrl(org?: string): string | undefined {
  * sourced from frontmatter `speakers:` (array of slugs referencing
  * src/data/speakers.json).
  *
- * Cosmonic team + alumni: name links to cosmonic.com, affiliation shown
- *   after a middot. Renders as "Name · Role, Cosmonic" (team) or
- *   "Name · Cosmonic alumni" (alumni).
- *
- * External: name links to their org URL, affiliation shown as bare org name.
- *   "Name · Org". If no org is registered, name renders as plain text.
+ * Every speaker renders as "Name · [Role, ]Org" with the org name linked to
+ * its homepage. No organization gets structural privilege; affiliation is
+ * per-speaker.
  */
 export default function MeetingSpeakers(): JSX.Element | null {
   const { metadata } = useBlogPost();
@@ -62,7 +50,7 @@ export default function MeetingSpeakers(): JSX.Element | null {
 
   const entries = slugs
     .map((slug) => lookup(slug))
-    .filter((e): e is { person: Person; bucket: Bucket } => e !== null);
+    .filter((p): p is Person => p !== null);
 
   if (entries.length === 0) return null;
 
@@ -70,49 +58,33 @@ export default function MeetingSpeakers(): JSX.Element | null {
     <aside className={styles.speakers} aria-label="Speakers">
       <h3 className={styles.heading}>Speakers</h3>
       <ul className={styles.list}>
-        {entries.map(({ person, bucket }) => {
-          const cosmonic = bucket === 'team' || bucket === 'alumni';
-          const linkUrl = cosmonic ? COSMONIC_URL : orgUrl(person.org);
-
-          const nameNode = linkUrl ? (
-            <Link to={linkUrl} className={styles.name}>
-              {person.name}
-            </Link>
-          ) : (
-            <span className={styles.name}>{person.name}</span>
-          );
-
-          const cosmonicLink = (
-            <Link to={COSMONIC_URL} className={styles.affiliationLink}>
-              Cosmonic
-            </Link>
-          );
-
-          let affiliation: React.ReactNode = null;
-          if (bucket === 'team') {
-            affiliation = person.role ? (
-              <>
-                {person.role}, {cosmonicLink}
-              </>
-            ) : (
-              cosmonicLink
-            );
-          } else if (bucket === 'alumni') {
-            affiliation = <>{cosmonicLink} alumni</>;
-          } else if (person.org) {
-            const extUrl = orgUrl(person.org);
-            affiliation = extUrl ? (
-              <Link to={extUrl} className={styles.affiliationLink}>
+        {entries.map((person) => {
+          const url = orgUrl(person.org);
+          const orgNode = person.org ? (
+            url ? (
+              <Link to={url} className={styles.affiliationLink}>
                 {person.org}
               </Link>
             ) : (
               person.org
-            );
-          }
+            )
+          ) : null;
+
+          const affiliation = orgNode ? (
+            person.role ? (
+              <>
+                {person.role}, {orgNode}
+              </>
+            ) : (
+              orgNode
+            )
+          ) : person.role ? (
+            person.role
+          ) : null;
 
           return (
             <li key={person.slug} className={styles.item}>
-              {nameNode}
+              <span className={styles.name}>{person.name}</span>
               {affiliation ? (
                 <>
                   <span className={styles.divider}> · </span>
