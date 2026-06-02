@@ -12,7 +12,7 @@ type SpeakerPerson = {
   name: string;
   org?: string;
   role?: string;
-  wasmcloud_role?: 'maintainer' | 'contributor' | 'community';
+  wasmcloud_role?: 'maintainer' | 'contributor' | 'community' | 'emeritus';
   aliases?: string[];
 };
 
