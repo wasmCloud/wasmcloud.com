@@ -11,7 +11,6 @@ type SpeakerPerson = {
   slug: string;
   name: string;
   org?: string;
-  role?: string;
   wasmcloud_role?: 'maintainer' | 'contributor' | 'community' | 'emeritus';
   aliases?: string[];
 };
@@ -97,13 +96,11 @@ function buildActors(frontMatter: Record<string, unknown>) {
       const actor: {
         '@type': 'Person';
         name: string;
-        jobTitle?: string;
         affiliation?: { '@type': 'Organization'; name: string; url?: string };
       } = {
         '@type': 'Person',
         name: person.name,
       };
-      if (person.role) actor.jobTitle = person.role;
       if (person.org) {
         const orgInfo = SPEAKERS.organizations[person.org];
         actor.affiliation = {
