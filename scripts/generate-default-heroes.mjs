@@ -5,8 +5,12 @@
  * The actual image generation runs through the `nano-banana` skill (Gemini
  * CLI wrapper); this script emits the prompts the operator runs and writes
  * a manifest of expected output paths. Once nano-banana runs each prompt,
- * the resulting PNGs land in static/default-heroes/<topic>/hero-16x9.png
- * and `scripts/transform-blog-images.mjs` derives the 4:3 + 1:1 crops.
+ * the resulting PNG lands at static/default-heroes/<topic>/hero-16x9.png
+ * (PNG because nano-banana's output format is fixed). Then
+ * `scripts/transform-blog-images.mjs --defaults` derives the 4:3, 1:1, AND
+ * 16:9 WebP variants from the PNG source — the WebP variants are what
+ * blog posts reference for Article schema, since they're ~30% smaller for
+ * the same visual quality.
  *
  * Why two-step instead of a single npm script: nano-banana is an
  * interactive skill (image generation is non-deterministic, prompts are

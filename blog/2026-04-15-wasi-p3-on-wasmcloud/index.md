@@ -5,6 +5,8 @@ slug: wasi-p3-on-wasmcloud
 image: './images/p3-blog-header.webp'
 date: "2026-04-15"
 description: "Experimental WASI P3 support is available in wasmCloud today. Here's what works, what doesn't, and how to write and run an async P3 HTTP component in Rust."
+about: wasmCloud
+mentions: [WASI, WASIPreview3, Rust, wash]
 ---
 
 ![Writing and Running Async Components on wasmCloud with WASI P3](./images/p3-blog-header.webp)

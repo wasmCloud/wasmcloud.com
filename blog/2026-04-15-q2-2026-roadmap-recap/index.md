@@ -5,6 +5,8 @@ slug: 2026-04-15-q2-2026-roadmap-recap
 image: './images/q2-2026-blog-header.webp'
 date: "2026-04-15"
 description: "The Q2 2026 wasmCloud roadmap: WASI P3 support, Kubernetes integrations, host plugins, observability, and security priorities."
+about: wasmCloud
+mentions: [WASI, WASIPreview3, Kubernetes, WebAssembly]
 ---
 
 ![Q2 2026 Roadmap Recap](./images/q2-2026-blog-header.webp)

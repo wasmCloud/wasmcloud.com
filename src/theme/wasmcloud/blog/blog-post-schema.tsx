@@ -102,15 +102,23 @@ function getKeywords(frontMatter: Record<string, unknown>): string[] | undefined
   return out.length > 0 ? out : undefined;
 }
 
+/**
+ * Detect whether an image path follows the M3 hero-source convention
+ * (`.../hero.png`, `.../hero.jpg`, etc.). When it does, the build pipeline
+ * has produced sibling `hero-16x9.webp` / `hero-4x3.webp` / `hero-1x1.webp`
+ * variants that we point Google at for the Article rich-result image
+ * requirement (multiple ratios at min 50K pixels each).
+ */
+const HERO_SOURCE_RE = /\/hero\.(?:png|jpg|jpeg|webp)$/i;
+
 function buildImageProperty(
   frontMatter: Record<string, unknown>,
   metadata: ReturnType<typeof useBlogPost>['metadata'],
   siteUrl: string,
 ): string[] | undefined {
-  // Prefer the explicit `image` frontmatter (M3 will provide 16:9 / 4:3 / 1:1
-  // variants); fall back to Docusaurus's resolved frontMatter.image. If only
-  // a single image is configured, emit it 3× — Google's article guidance
-  // wants the field populated even when the variants aren't yet generated.
+  // Prefer the explicit `image` frontmatter (the M3 transform produces 16:9
+  // / 4:3 / 1:1 WebP variants next to the source hero); fall back to
+  // Docusaurus's resolved frontMatter.image.
   const raw = (frontMatter.image ?? (metadata as { frontMatter?: Record<string, unknown> }).frontMatter?.image) as
     | string
     | string[]
@@ -121,12 +129,23 @@ function buildImageProperty(
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       return rawUrl;
     }
-    // Strip Docusaurus-relative prefixes like `./images/foo.png`.
-    // Article schema requires absolute, crawlable URLs.
+    // Strip Docusaurus-relative prefixes like `./images/foo.png`. Article
+    // schema requires absolute, crawlable URLs.
     let normalized = rawUrl.replace(/^\.\/+/, '');
     if (!normalized.startsWith('/')) normalized = '/' + normalized;
     return `${siteUrl}${normalized}`;
   };
+
+  // Single string image that follows the hero convention → derive the 3-ratio
+  // WebP siblings so Article rich-result image multi-ratio requirement is met.
+  if (typeof raw === 'string' && HERO_SOURCE_RE.test(raw)) {
+    const baseDir = raw.replace(HERO_SOURCE_RE, '');
+    const variants = ['16x9', '4x3', '1x1'].map((r) =>
+      resolve(`${baseDir}/hero-${r}.webp`),
+    );
+    return variants.filter((u): u is string => typeof u === 'string');
+  }
+
   const list = Array.isArray(raw) ? raw : [raw];
   const resolved = list
     .map((u) => resolve(u))

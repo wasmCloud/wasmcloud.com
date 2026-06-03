@@ -26,7 +26,7 @@
  */
 import { readdir, stat, mkdir, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, basename, extname } from 'node:path';
+import { join, basename } from 'node:path';
 
 const ROOT = process.cwd();
 const BLOG_DIR = join(ROOT, 'blog');
@@ -75,6 +75,15 @@ async function findHero(postDir) {
   return null;
 }
 
+// Derived crops are always emitted as WebP regardless of the source format.
+// WebP is the right format for Article rich-result images: ~25–35% smaller
+// than equivalent-quality PNG/JPEG, universally supported by modern crawlers
+// and browsers, and lossless mode preserves diagram-style heroes cleanly.
+// Quality 90 + effort 5 is the production-tuned sweet spot — small enough
+// to win the page-weight battle, large enough that hero diagrams stay sharp.
+const WEBP_OPTIONS = { quality: 90, effort: 5 };
+const OUT_EXT = '.webp';
+
 async function transform(postDir, source) {
   const s = await getSharp();
   const meta = await s(source).metadata();
@@ -95,10 +104,9 @@ async function transform(postDir, source) {
   }
   const outDir = join(postDir, 'images');
   if (!existsSync(outDir)) await mkdir(outDir, { recursive: true });
-  const ext = extname(source) || '.png';
   const written = [];
   for (const ratio of RATIOS) {
-    const outFile = join(outDir, `hero-${ratio.name}${ext}`);
+    const outFile = join(outDir, `hero-${ratio.name}${OUT_EXT}`);
     const sourceMtime = (await stat(source)).mtimeMs;
     if (existsSync(outFile)) {
       const outMtime = (await stat(outFile)).mtimeMs;
@@ -106,6 +114,7 @@ async function transform(postDir, source) {
     }
     await s(source)
       .resize(ratio.width, ratio.height, { fit: 'cover', position: 'attention' })
+      .webp(WEBP_OPTIONS)
       .toFile(outFile);
     written.push(outFile);
   }
@@ -115,9 +124,12 @@ async function transform(postDir, source) {
 async function assignDefault(postDir) {
   // Soft fallback: if a post has no hero AND a default exists in static/,
   // copy hero-16x9 from the generic default to satisfy the Article schema
-  // until the post gets a custom hero. Topic-cluster assignment requires
-  // a frontmatter read (skipped here to keep the script simple); the
-  // generic wasmCloud default ships in static/default-heroes/generic/.
+  // until the post gets a custom hero. The default-hero source is whatever
+  // nano-banana produced (PNG), but the per-post copies emit WebP for
+  // page-weight parity with the per-post transform path. Topic-cluster
+  // assignment requires a frontmatter read (skipped here to keep the
+  // script simple); the generic wasmCloud default ships under
+  // static/default-heroes/generic/.
   const defaultDir = join(DEFAULT_HERO_DIR, 'generic');
   if (!existsSync(defaultDir)) {
     return { post: basename(postDir), status: 'no-hero-no-default' };
@@ -125,18 +137,75 @@ async function assignDefault(postDir) {
   if (auditOnly) return { post: basename(postDir), status: 'would-assign-default' };
   const imagesDir = join(postDir, 'images');
   if (!existsSync(imagesDir)) await mkdir(imagesDir, { recursive: true });
+  const s = await getSharp();
   for (const ratio of RATIOS) {
-    const src = join(defaultDir, `hero-${ratio.name}.png`);
-    if (!existsSync(src)) continue;
-    await copyFile(src, join(imagesDir, `hero-${ratio.name}.png`));
+    // Prefer the pre-derived WebP variant if present (faster — no transcode
+    // needed). Fall back to the PNG and convert on the fly.
+    const webpSource = join(defaultDir, `hero-${ratio.name}${OUT_EXT}`);
+    const pngSource = join(defaultDir, `hero-${ratio.name}.png`);
+    const outFile = join(imagesDir, `hero-${ratio.name}${OUT_EXT}`);
+    if (existsSync(webpSource)) {
+      await copyFile(webpSource, outFile);
+    } else if (existsSync(pngSource)) {
+      await s(pngSource).webp(WEBP_OPTIONS).toFile(outFile);
+    }
   }
   return { post: basename(postDir), status: 'assigned-default' };
 }
 
+/**
+ * Run once per default-hero topic to derive 4:3 + 1:1 WebP from the 16:9
+ * PNG that nano-banana produced. Cached by mtime. Called via `--defaults`.
+ */
+async function transformDefaults() {
+  const s = await getSharp();
+  if (!existsSync(DEFAULT_HERO_DIR)) {
+    console.log(`[defaults] ${DEFAULT_HERO_DIR} not found — skip`);
+    return { generated: 0 };
+  }
+  let generated = 0;
+  for (const entry of await readdir(DEFAULT_HERO_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const topicDir = join(DEFAULT_HERO_DIR, entry.name);
+    const source16 = join(topicDir, 'hero-16x9.png');
+    if (!existsSync(source16)) {
+      console.log(`[defaults] ${entry.name}: no hero-16x9.png — skip`);
+      continue;
+    }
+    const sourceMtime = (await stat(source16)).mtimeMs;
+    for (const ratio of RATIOS) {
+      const outFile = join(topicDir, `hero-${ratio.name}${OUT_EXT}`);
+      if (existsSync(outFile) && (await stat(outFile)).mtimeMs >= sourceMtime) {
+        continue;
+      }
+      await s(source16)
+        .resize(ratio.width, ratio.height, { fit: 'cover', position: 'attention' })
+        .webp(WEBP_OPTIONS)
+        .toFile(outFile);
+      console.log(`[defaults] ${entry.name}: wrote hero-${ratio.name}${OUT_EXT}`);
+      generated += 1;
+    }
+  }
+  console.log(`[defaults] generated ${generated} WebP variant(s).`);
+  return { generated };
+}
+
 async function main() {
+  // --defaults: derive WebP variants of the 8 nano-banana PNG heroes under
+  // static/default-heroes/ without touching individual blog posts. Useful
+  // right after running scripts/generate-default-heroes.sh.
+  if (argv.includes('--defaults')) {
+    await transformDefaults();
+    return;
+  }
   if (!existsSync(BLOG_DIR)) {
     console.error(`[transform-blog-images] blog/ not found at ${BLOG_DIR}`);
     process.exit(2);
+  }
+  // Run the defaults transform first so per-post `assignDefault` can copy
+  // the pre-built WebP variants instead of re-transcoding the PNGs.
+  if (existsSync(DEFAULT_HERO_DIR)) {
+    await transformDefaults();
   }
   const dirs = (await readdir(BLOG_DIR, { withFileTypes: true }))
     .filter((d) => d.isDirectory() && /^\d{4}-\d{2}-\d{2}-/.test(d.name))
