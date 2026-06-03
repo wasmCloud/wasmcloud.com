@@ -45,6 +45,12 @@ const prBaseRefIdx = process.argv.indexOf('--pr');
 const prBaseRef =
   isPrMode && prBaseRefIdx >= 0 ? process.argv[prBaseRefIdx + 1] : undefined;
 
+// --json-summary <path> writes a machine-readable JSON file next to the
+// console output. Used by the CI workflow to drive sticky PR comments.
+const jsonSummaryIdx = process.argv.indexOf('--json-summary');
+const jsonSummaryPath =
+  jsonSummaryIdx >= 0 ? process.argv[jsonSummaryIdx + 1] : undefined;
+
 function fail(msg) {
   console.error(`\n${msg}\n`);
   process.exit(2);
@@ -243,6 +249,45 @@ async function main() {
     console.error(`\n${allErrors.length} error(s):`);
     for (const e of allErrors.slice(0, 50)) console.error(`  ERR ${e}`);
     if (allErrors.length > 50) console.error(`  ... +${allErrors.length - 50} more`);
+  }
+
+  // Bucket warnings by category for the PR comment summary. Each warning
+  // string has the shape: "<file> $ <type>: <message>". Strip the file
+  // prefix and bucket by the trailing message.
+  function summarize(list) {
+    const byKind = {};
+    for (const w of list) {
+      const colonIdx = w.indexOf(': ');
+      const kind = colonIdx >= 0 ? w.slice(colonIdx + 2).trim() : w;
+      byKind[kind] = (byKind[kind] || 0) + 1;
+    }
+    return Object.entries(byKind)
+      .sort((a, b) => b[1] - a[1])
+      .map(([kind, count]) => ({ kind, count }));
+  }
+
+  const summary = {
+    mode: isPrMode ? 'pr' : 'full',
+    base_ref: prBaseRef || null,
+    files_checked: totalFiles,
+    payloads_checked: totalScripts,
+    error_count: allErrors.length,
+    warning_count: allWarnings.length,
+    errors_by_kind: summarize(allErrors),
+    warnings_by_kind: summarize(allWarnings),
+    sample_errors: allErrors.slice(0, 20),
+    sample_warnings: allWarnings.slice(0, 20),
+  };
+
+  if (jsonSummaryPath) {
+    const { writeFile, mkdir } = await import('node:fs/promises');
+    const { dirname } = await import('node:path');
+    await mkdir(dirname(jsonSummaryPath), { recursive: true });
+    await writeFile(jsonSummaryPath, JSON.stringify(summary, null, 2));
+    console.log(`[validate-structured-data] summary written → ${jsonSummaryPath}`);
+  }
+
+  if (allErrors.length > 0) {
     process.exit(1);
   }
   console.log('[validate-structured-data] OK');
