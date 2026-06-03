@@ -21,11 +21,11 @@ function lookup(slug: string): Person | null {
   return data.speakers.find((p) => p.slug === slug) ?? null;
 }
 
-const WASMCLOUD_ROLE_LABELS: Partial<
-  Record<NonNullable<Person['wasmcloud_role']>, string>
+const WASMCLOUD_ROLE_PILLS: Partial<
+  Record<NonNullable<Person['wasmcloud_role']>, { label: string; className: string }>
 > = {
-  maintainer: 'Maintainer',
-  emeritus: 'Emeritus Maintainer',
+  maintainer: { label: 'Maintainer', className: styles.roleMaintainer },
+  emeritus: { label: 'Emeritus Maintainer', className: styles.roleEmeritus },
 };
 
 /**
@@ -62,17 +62,16 @@ export default function MeetingSpeakers(): JSX.Element | null {
       <h3 className={styles.heading}>Speakers</h3>
       <ul className={styles.list}>
         {entries.map((person) => {
-          const label = person.wasmcloud_role
-            ? WASMCLOUD_ROLE_LABELS[person.wasmcloud_role]
+          const pill = person.wasmcloud_role
+            ? WASMCLOUD_ROLE_PILLS[person.wasmcloud_role]
             : undefined;
           return (
             <li key={person.slug} className={styles.item}>
               <span className={styles.name}>{person.name}</span>
-              {label ? (
-                <>
-                  <span className={styles.divider}> · </span>
-                  <span className={styles.affiliation}>{label}</span>
-                </>
+              {pill ? (
+                <span className={`${styles.role} ${pill.className}`}>
+                  {pill.label}
+                </span>
               ) : null}
             </li>
           );
