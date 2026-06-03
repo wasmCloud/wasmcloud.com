@@ -10,9 +10,13 @@
 FROM node:24-alpine AS build
 
 WORKDIR /repo
-COPY . .
 
+# Copy dependency manifests first so the `npm ci` layer is reused across
+# doc-content-only rebuilds. Any change to package*.json busts the cache.
+COPY package.json package-lock.json ./
 RUN npm ci
+
+COPY . .
 
 ENV OFFLINE_BUILD=1
 RUN npm run build
