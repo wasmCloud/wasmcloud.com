@@ -103,6 +103,10 @@ const config = (async (): Promise<Config> => {
             blogPostComponent: '@theme/wasmcloud/blog/post-page',
             onInlineAuthors: 'throw',
             onUntruncatedBlogPosts: 'ignore',
+            // M1 — populate metadata.lastUpdatedAt + lastUpdatedBy from git so
+            // downstream Article schema can emit dateModified accurately.
+            showLastUpdateTime: true,
+            showLastUpdateAuthor: true,
           },
           docs: {
             sidebarPath: require.resolve('./sidebars.js'),
@@ -110,6 +114,9 @@ const config = (async (): Promise<Config> => {
             remarkPlugins: [[wasmCloudVersionPlugin, { version: WASMCLOUD_VERSION }]],
             beforeDefaultRehypePlugins: [rehypeShikiPlugin],
             rehypePlugins: [rehypeNameToId],
+            // M1 — same as blog: drives TechArticle.dateModified
+            showLastUpdateTime: true,
+            showLastUpdateAuthor: true,
             lastVersion: 'current',
             versions: {
               current: {
@@ -480,6 +487,16 @@ const config = (async (): Promise<Config> => {
           url: 'https://wasmcloud.com',
           publisher: { '@id': 'https://wasmcloud.com/#organization' },
           inLanguage: 'en-US',
+          // M1 — enables Google sitelinks searchbox in brand-search results.
+          // Targets the Algolia DocSearch route which docusaurus serves at /search.
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: {
+              '@type': 'EntryPoint',
+              urlTemplate: 'https://wasmcloud.com/search?q={search_term_string}',
+            },
+            'query-input': 'required name=search_term_string',
+          },
         }),
       },
       {
