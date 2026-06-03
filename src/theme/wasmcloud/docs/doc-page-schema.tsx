@@ -51,6 +51,46 @@ function pickEnum<T extends string>(
     : fallback;
 }
 
+/**
+ * Build a Person (or Person[]) entity from the frontmatter `author:` field.
+ * Supports a bare string (`author: Brooks Townsend`), an object
+ * (`author: { name: ..., title: ..., url: ..., image: ... }`), or an array
+ * of either. Returns the wasmCloud project Organization reference (the
+ * default) when no frontmatter `author:` is present or when nothing
+ * parseable can be extracted.
+ */
+function buildOnePerson(raw: unknown): Record<string, unknown> | null {
+  if (typeof raw === 'string') {
+    const name = raw.trim();
+    return name ? { '@type': 'Person', name } : null;
+  }
+  if (raw != null && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    const out: Record<string, unknown> = { '@type': 'Person' };
+    if (typeof obj.name === 'string' && obj.name.trim()) out.name = obj.name.trim();
+    if (typeof obj.title === 'string' && obj.title.trim())
+      out.jobTitle = (obj.title as string).trim();
+    if (typeof obj.url === 'string' && obj.url.trim()) out.url = (obj.url as string).trim();
+    if (typeof obj.image === 'string' && obj.image.trim())
+      out.image = (obj.image as string).trim();
+    // Need at least one property beyond `@type`.
+    return Object.keys(out).length > 1 ? out : null;
+  }
+  return null;
+}
+
+function buildDocAuthor(fm: Record<string, unknown>): unknown {
+  const raw = fm.author;
+  if (raw == null) return PUBLISHER_REF;
+  const items = Array.isArray(raw) ? raw : [raw];
+  const persons = items
+    .map(buildOnePerson)
+    .filter((p): p is Record<string, unknown> => p !== null);
+  if (persons.length === 0) return PUBLISHER_REF;
+  if (persons.length === 1) return persons[0];
+  return persons;
+}
+
 function articleSectionFor(permalink: string): string | undefined {
   const trimmed = permalink.replace(/^\/+|\/+$/g, '');
   const segments = trimmed.split('/');
@@ -128,7 +168,7 @@ export default function DocPageSchema(): JSX.Element | null {
     mainEntityOfPage: canonicalUrl,
     inLanguage: 'en',
     isAccessibleForFree: true,
-    author: PUBLISHER_REF,
+    author: buildDocAuthor(fm),
     publisher: PUBLISHER_REF,
     audience: { '@type': 'Audience', audienceType: 'Developer' },
     applicationCategory: 'DeveloperApplication',

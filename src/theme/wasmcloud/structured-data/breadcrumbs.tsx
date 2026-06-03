@@ -43,9 +43,15 @@ const LABEL_OVERRIDES: Record<string, string> = {
   k8s: 'K8s',
 };
 
+// Version-like segments (Docusaurus versioned-docs: /docs/v1/..., /docs/0.82/...).
+const VERSION_SEGMENT_RE = /^v?\d+(\.\d+)*$/;
+
 function labelFor(segment: string): string {
   const lower = segment.toLowerCase();
   if (LABEL_OVERRIDES[lower]) return LABEL_OVERRIDES[lower];
+  // Preserve version-like segments verbatim — "v1" reads better than "V1",
+  // and "0.82" shouldn't be touched.
+  if (VERSION_SEGMENT_RE.test(segment)) return segment;
   // Title-case kebab/underscore-separated slugs
   return segment
     .split(/[-_]/)
@@ -56,6 +62,27 @@ function labelFor(segment: string): string {
       return word.charAt(0).toUpperCase() + word.slice(1);
     })
     .join(' ');
+}
+
+/**
+ * Return true if the segment at `idx` should be hidden from the breadcrumb
+ * chain (but still contribute to URL accumulation for subsequent crumbs).
+ * Skipped:
+ *   - Versioned-docs version segments when NOT the last segment.
+ *     `/docs/v1/concepts/` → Home → Docs → Concepts (version absorbed).
+ *     `/docs/v1/` (the version landing page itself) → Home → Docs → v1.
+ *   - Blog/community pagination markers (`page` + the numeric page index
+ *     that follows). `/blog/page/2/` → Home → Blog (the `/blog/page/` URL
+ *     isn't a real page and `/blog/page/2/` is best reached from `/blog/`).
+ */
+function shouldSkipSegment(segments: string[], idx: number): boolean {
+  const seg = segments[idx];
+  const isLast = idx === segments.length - 1;
+  if (VERSION_SEGMENT_RE.test(seg) && !isLast) return true;
+  if (seg === 'page') return true;
+  const prev = idx > 0 ? segments[idx - 1] : null;
+  if (prev === 'page' && /^\d+$/.test(seg)) return true;
+  return false;
 }
 
 export default function BreadcrumbsSchema(): JSX.Element | null {
@@ -81,10 +108,11 @@ export default function BreadcrumbsSchema(): JSX.Element | null {
   ];
 
   segments.forEach((segment, idx) => {
+    if (shouldSkipSegment(segments, idx)) return;
     const accumulatedPath = '/' + segments.slice(0, idx + 1).join('/') + '/';
     itemListElement.push({
       '@type': 'ListItem',
-      position: idx + 2,
+      position: itemListElement.length + 1,
       name: labelFor(segment),
       item: `${baseUrl}${accumulatedPath}`,
     });
