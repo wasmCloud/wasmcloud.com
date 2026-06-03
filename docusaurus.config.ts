@@ -10,6 +10,7 @@ import { Options as PluginGithubStarsOptions } from '@wasmcloud/docusaurus-githu
 import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-hubspot-analytics';
 import { Options as PluginReoAnalyticsOptions } from '@wasmcloud/docusaurus-reo-analytics';
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
+import communitySpeakersPlugin from './plugins/community-speakers';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import {
   transformerMetaHighlight,
@@ -245,7 +246,7 @@ const config = (async (): Promise<Config> => {
     ],
 
     plugins: [
-      './plugins/community-speakers',
+      communitySpeakersPlugin,
       [
         '@wasmcloud/docusaurus-github-stars',
         {
