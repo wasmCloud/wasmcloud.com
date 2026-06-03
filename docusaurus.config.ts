@@ -489,11 +489,14 @@ const config = (async (): Promise<Config> => {
           inLanguage: 'en-US',
           // M1 — enables Google sitelinks searchbox in brand-search results.
           // Targets the Algolia DocSearch route which docusaurus serves at /search.
+          // The URL is derived from siteBaseUrl() so deploy previews on
+          // Netlify and local dev resolve to their own search endpoint rather
+          // than silently posting against production.
           potentialAction: {
             '@type': 'SearchAction',
             target: {
               '@type': 'EntryPoint',
-              urlTemplate: 'https://wasmcloud.com/search?q={search_term_string}',
+              urlTemplate: `${siteBaseUrl()}/search?q={search_term_string}`,
             },
             'query-input': 'required name=search_term_string',
           },

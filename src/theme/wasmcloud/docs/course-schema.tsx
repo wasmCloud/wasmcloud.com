@@ -47,6 +47,28 @@ function normalizePath(permalink: string): string {
   return permalink.endsWith('/') ? permalink : permalink + '/';
 }
 
+type ProficiencyLevel = 'Beginner' | 'Intermediate' | 'Expert';
+const VALID_PROFICIENCIES: ReadonlySet<ProficiencyLevel> = new Set([
+  'Beginner',
+  'Intermediate',
+  'Expert',
+]);
+
+/**
+ * Read the M4 `proficiency:` frontmatter field if present and valid, else
+ * default to Beginner (the Quickstart's overall positioning). Same enum and
+ * convention as TechArticle's `proficiencyLevel` field in
+ * `doc-page-schema.tsx` — kept inline here rather than imported because
+ * the two files are otherwise decoupled.
+ */
+function proficiencyFrom(fm: Record<string, unknown>): ProficiencyLevel {
+  const raw = fm.proficiency;
+  if (typeof raw === 'string' && VALID_PROFICIENCIES.has(raw as ProficiencyLevel)) {
+    return raw as ProficiencyLevel;
+  }
+  return 'Beginner';
+}
+
 export default function CourseSchema(): JSX.Element | null {
   const { siteConfig } = useDocusaurusContext();
   const { metadata, frontMatter } = useDoc();
@@ -80,7 +102,7 @@ export default function CourseSchema(): JSX.Element | null {
         'Get started with wasmCloud — install the wash CLI, build a WebAssembly component, and deploy your first Wasm workload to Kubernetes in under 15 minutes.',
       provider: { '@id': PROJECT_ORG_ID },
       url: `${siteUrl}${QUICKSTART_BASE}/`,
-      educationalLevel: 'Beginner',
+      educationalLevel: proficiencyFrom(fm),
       inLanguage: 'en',
       coursePrerequisites: 'Familiarity with a developer environment; Docker or Kubernetes optional but recommended.',
       hasCourseInstance: courseInstances,
@@ -102,7 +124,7 @@ export default function CourseSchema(): JSX.Element | null {
     description: metadata.description,
     url: `${siteUrl}${path}`,
     learningResourceType: 'Tutorial',
-    educationalLevel: 'Beginner',
+    educationalLevel: proficiencyFrom(fm),
     teaches,
     inLanguage: 'en',
     isPartOf: { '@id': COURSE_ID },
