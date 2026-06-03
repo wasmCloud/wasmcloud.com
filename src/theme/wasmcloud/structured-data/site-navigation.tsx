@@ -16,6 +16,11 @@ export default function SiteNavigationSchema(): JSX.Element | null {
   const { siteConfig } = useDocusaurusContext();
   const themeConfig = siteConfig.themeConfig as ThemeConfig;
   const navbarItems = themeConfig.navbar?.items ?? [];
+  // Early-exit when the navbar is missing or empty — protects against a
+  // misconfigured themeConfig.navbar (the `?? []` upstream already returns
+  // an empty array, but bailing here avoids constructing baseUrl and an
+  // empty payload only to drop it at the bottom of the function).
+  if (navbarItems.length === 0) return null;
   const baseUrl = siteConfig.url.replace(/\/$/, '');
 
   const elements: Array<Record<string, unknown>> = [];
