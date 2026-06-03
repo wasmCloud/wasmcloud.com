@@ -266,3 +266,83 @@ These are the image-related values you can configure:
 | `nats.image.registry` | `docker.io` | NATS image registry |
 | `nats.image.repository` | `nats` | NATS image repository |
 | `nats.image.tag` | `2.11.3-alpine` | NATS image tag |
+
+## Offline documentation
+
+These docs are also published as a container image and a static tarball so
+operators can read them inside an air-gapped environment.
+
+Mirror the docs image alongside the other images:
+
+```shell
+export REGISTRY=my-registry.corp.com
+export DOCS_VERSION={{WASMCLOUD_VERSION}}
+
+oras copy ghcr.io/wasmcloud/docs:${DOCS_VERSION} \
+  ${REGISTRY}/wasmcloud/docs:${DOCS_VERSION}
+```
+
+Then run the docs as a single `Deployment` with a `ClusterIP` `Service`. Front
+it with whatever ingress your environment already uses (Traefik, Istio, your
+existing reverse proxy):
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wasmcloud-docs
+  namespace: wasmcloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wasmcloud-docs
+  template:
+    metadata:
+      labels:
+        app: wasmcloud-docs
+    spec:
+      imagePullSecrets:
+        - name: registry-credentials
+      containers:
+        - name: nginx
+          image: my-registry.corp.com/wasmcloud/docs:{{WASMCLOUD_VERSION}}
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wasmcloud-docs
+  namespace: wasmcloud
+spec:
+  selector:
+    app: wasmcloud-docs
+  ports:
+    - port: 80
+      targetPort: 80
+```
+
+The image bakes only the current (v2) docs — the archived `v1` and `0.82`
+versions are stripped at build time. It is a sealed snapshot built with
+external integrations disabled, so it makes no outbound requests to Google
+Analytics, HubSpot, Reo, Algolia, Google Fonts, or `api.github.com`. Links to
+external sites (GitHub, Slack, social) will not resolve from an air-gapped
+browser.
+
+For environments without Kubernetes, the same content is published as a
+static tarball on the [docs release page](https://github.com/wasmCloud/wasmcloud.com/releases?q=docs-v):
+
+```shell
+tar xzf wasmcloud-docs-{{WASMCLOUD_VERSION}}.tar.gz -C /var/www/docs
+# serve /var/www/docs with any static web server
+```
+
+The static site is built with `trailingSlash: true`, so URLs end in `/` and
+resolve to `<dir>/index.html`. Any HTTP server that serves `index.html` for
+directory requests will work; `python -m http.server` and the default nginx
+`try_files $uri $uri/ $uri/index.html` configuration both do.
