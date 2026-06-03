@@ -245,6 +245,7 @@ const config = (async (): Promise<Config> => {
     ],
 
     plugins: [
+      './plugins/community-speakers',
       [
         '@wasmcloud/docusaurus-github-stars',
         {
