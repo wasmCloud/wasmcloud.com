@@ -2,7 +2,10 @@ import React from 'react';
 import { useDoc } from '@docusaurus/plugin-content-docs/client';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import JsonLd from '@theme/wasmcloud/json-ld';
-import { buildEntityRefs } from '@theme/wasmcloud/structured-data/entities';
+import {
+  buildEntityNodes,
+  buildEntityRefs,
+} from '@theme/wasmcloud/structured-data/entities';
 
 /**
  * Per M4 of the structured-data spike: emit `TechArticle` JSON-LD on every
@@ -158,10 +161,32 @@ export default function DocPageSchema(): JSX.Element | null {
   const version = (metadata as { version?: string }).version;
 
   const entityRefs = buildEntityRefs(fm);
+  const entityNodes = buildEntityNodes(fm);
 
-  const payload: Record<string, unknown> = {
-    '@context': 'https://schema.org',
+  // Per the Ahrefs audit fix plan:
+  //   - `applicationCategory` is SoftwareApplication-only — drop from TechArticle.
+  //   - `runtimePlatform` is SoftwareApplication-only — drop. Fold the
+  //     `platforms:` frontmatter values into `keywords` so we don't lose
+  //     the topical signal.
+  //   - `programmingLanguage` is SoftwareSourceCode/SoftwareApplication-
+  //     only — drop. Fold `languages:` into `keywords` the same way.
+  const keywordsList: string[] = [];
+  if (tags) keywordsList.push(...tags);
+  if (languages) keywordsList.push(...languages);
+  if (platforms) keywordsList.push(...platforms);
+  // De-dupe while preserving order
+  const seenKw = new Set<string>();
+  const keywords = keywordsList.filter((k) => {
+    if (seenKw.has(k)) return false;
+    seenKw.add(k);
+    return true;
+  });
+
+  const articleSection = articleSectionFor(metadata.permalink);
+
+  const article: Record<string, unknown> = {
     '@type': 'TechArticle',
+    '@id': `${canonicalUrl}#article`,
     headline,
     ...(description && { description }),
     url: canonicalUrl,
@@ -171,23 +196,32 @@ export default function DocPageSchema(): JSX.Element | null {
     author: buildDocAuthor(fm),
     publisher: PUBLISHER_REF,
     audience: { '@type': 'Audience', audienceType: 'Developer' },
-    applicationCategory: 'DeveloperApplication',
     proficiencyLevel: proficiency,
     educationalLevel: proficiency,
     interactivityType: interactivity,
     ...(dependencies && { dependencies }),
-    ...(languages && { programmingLanguage: languages }),
-    ...(platforms && { runtimePlatform: platforms }),
-    ...(tags && { keywords: tags }),
+    ...(keywords.length > 0 && { keywords }),
     ...(version && { version }),
     ...(datePublished && { datePublished }),
     ...(dateModified && { dateModified }),
     ...(entityRefs.about && { about: entityRefs.about }),
     ...(entityRefs.mentions && { mentions: entityRefs.mentions }),
+    ...(articleSection && { articleSection }),
   };
 
-  const articleSection = articleSectionFor(metadata.permalink);
-  if (articleSection) payload.articleSection = articleSection;
+  // Wrap article + referenced entities in a single @graph so the @id
+  // refs in about/mentions resolve within the same payload (avoids the
+  // Ahrefs "dangling reference" notice).
+  const payload =
+    entityNodes.length > 0
+      ? {
+          '@context': 'https://schema.org',
+          '@graph': [article, ...entityNodes],
+        }
+      : {
+          '@context': 'https://schema.org',
+          ...article,
+        };
 
   return <JsonLd data={payload} />;
 }
