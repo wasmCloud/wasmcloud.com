@@ -2,7 +2,10 @@ import React from 'react';
 import { useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import JsonLd from '@theme/wasmcloud/json-ld';
-import { buildEntityRefs } from '@theme/wasmcloud/structured-data/entities';
+import {
+  buildEntityNodes,
+  buildEntityRefs,
+} from '@theme/wasmcloud/structured-data/entities';
 
 /**
  * Per M2 of the structured-data spike: emit the full Article-family schema
@@ -185,6 +188,7 @@ export default function BlogPostSchema(): JSX.Element | null {
     siteUrl,
   );
   const entityRefs = buildEntityRefs(frontMatter as Record<string, unknown>);
+  const entityNodes = buildEntityNodes(frontMatter as Record<string, unknown>);
 
   // M2 risk #12: Speakable is restricted to NewsArticle. Honor the
   // `speakable: true` frontmatter only when the post is typed NewsArticle.
@@ -195,9 +199,9 @@ export default function BlogPostSchema(): JSX.Element | null {
   const discussionUrl = (frontMatter as { discussionUrl?: string }).discussionUrl;
   const articleSection = (frontMatter as { articleSection?: string }).articleSection;
 
-  const payload: Record<string, unknown> = {
-    '@context': 'https://schema.org',
+  const article: Record<string, unknown> = {
     '@type': schemaType,
+    '@id': `${canonicalUrl}#article`,
     headline: title,
     description,
     url: canonicalUrl,
@@ -219,11 +223,25 @@ export default function BlogPostSchema(): JSX.Element | null {
   };
 
   if (speakableFlag) {
-    payload.speakable = {
+    article.speakable = {
       '@type': 'SpeakableSpecification',
       cssSelector: ['article > header', 'article > section:first-of-type'],
     };
   }
+
+  // Wrap article + referenced entities in a single @graph so the @id
+  // refs in about/mentions resolve within the same payload (avoids the
+  // Ahrefs "dangling reference" notice).
+  const payload =
+    entityNodes.length > 0
+      ? {
+          '@context': 'https://schema.org',
+          '@graph': [article, ...entityNodes],
+        }
+      : {
+          '@context': 'https://schema.org',
+          ...article,
+        };
 
   return <JsonLd data={payload} />;
 }

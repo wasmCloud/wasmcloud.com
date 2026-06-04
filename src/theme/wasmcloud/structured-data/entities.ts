@@ -31,8 +31,16 @@ const ENTITIES: Record<string, EntityData> = (entitiesJson as unknown as Entitie
   .entities;
 
 /** Reference form emitted in JSON-LD — `@id` only, the receiving consumer
- *  resolves the full Thing via the site-level entity graph. */
+ *  resolves the full Thing via the same @graph payload. */
 export type EntityRef = { '@id': string };
+
+/**
+ * Full inline form for in-page graph resolution. Article-family pages
+ * wrap the article + every referenced entity in a single `@graph` so the
+ * `@id` refs in `about`/`mentions` resolve within the same JSON-LD
+ * payload (Ahrefs flags otherwise-dangling refs as a schema.org notice).
+ */
+export type EntityNode = EntityData;
 
 /**
  * Resolve a single slug to an entity reference. Returns `undefined` if the
@@ -79,6 +87,35 @@ export function buildEntityRefs(
   if (about) out.about = about;
   const mentions = resolveEntities(frontMatter.mentions);
   if (mentions.length > 0) out.mentions = mentions;
+  return out;
+}
+
+/**
+ * Build the full inline entity nodes that the article's `about`/`mentions`
+ * `@id` refs point at. The caller wraps article + nodes in a single
+ * `@graph` so all `@id` references resolve within the same JSON-LD
+ * payload (avoids Ahrefs / schema.org-validator dangling-reference flags).
+ *
+ * De-dupes against the about entity so a slug that appears in both about
+ * and mentions emits only one node.
+ */
+export function buildEntityNodes(
+  frontMatter: Record<string, unknown>,
+): EntityNode[] {
+  const seen = new Set<string>();
+  const out: EntityNode[] = [];
+  const push = (slug: unknown) => {
+    if (typeof slug !== 'string') return;
+    if (seen.has(slug)) return;
+    const entry = ENTITIES[slug];
+    if (!entry) return;
+    seen.add(slug);
+    out.push(entry);
+  };
+  push(frontMatter.about);
+  if (Array.isArray(frontMatter.mentions)) {
+    for (const m of frontMatter.mentions) push(m);
+  }
   return out;
 }
 
