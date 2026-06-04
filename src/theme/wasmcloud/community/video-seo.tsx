@@ -196,11 +196,14 @@ export default function VideoSEO({
   const speakers = buildSpeakers(frontMatter);
   const entityRefs = buildEntityRefs(frontMatter);
 
-  // Stable IDs the two schemas use to cross-reference each other:
+  // Stable IDs the schemas use to cross-reference each other:
   //   VideoObject @id  →  canonical meeting URL + #video
   //   Event @id        →  canonical meeting URL + #event
   //   Article @id      →  canonical transcript URL + #article
-  // Reciprocal `transcribes` / `transcript` / `recordedAt` links use these.
+  // The Article→Video link uses `transcribes` (valid: range CreativeWork);
+  // the reverse `transcript` field on VideoObject would expect a Text value
+  // (the actual transcript content), so we only emit the Article→Video
+  // direction. `recordedAt` ↔ `recordedIn` pairs the Video with its Event.
   const meetingPageUrl = isTranscript
     ? meetingUrlForTranscript(siteUrl, permalink)
     : canonicalUrl;
@@ -238,8 +241,10 @@ export default function VideoSEO({
         ...(speakers && { actor: speakers, contributor: speakers }),
         ...(entityRefs.about && { about: entityRefs.about }),
         ...(entityRefs.mentions && { mentions: entityRefs.mentions }),
-        // Reciprocal link to the transcript Article
-        transcript: { '@id': transcriptArticleId },
+        // No reciprocal `transcript:` field — schema.org's `transcript`
+        // property on MediaObject expects a Text value (the actual
+        // transcript content), not a URI reference to another page.
+        // The Article side carries the canonical link via `transcribes`.
         // Pair the recording with its Event
         recordedAt: { '@id': eventId },
         ...(chapters.length > 0 && {
@@ -288,7 +293,12 @@ export default function VideoSEO({
         description,
         startDate: uploadDate,
         ...(eventEndDate && { endDate: eventEndDate }),
-        eventStatus: 'https://schema.org/EventCompleted',
+        // `EventCompleted` is NOT a schema.org EventStatusType value — the
+        // enumeration is {Cancelled, MovedOnline, Postponed, Rescheduled,
+        // Scheduled}. Past events that proceeded normally are `EventScheduled`
+        // (the "nothing unusual happened to the schedule" default); the
+        // past-dated `endDate` is what marks the event as having occurred.
+        eventStatus: 'https://schema.org/EventScheduled',
         eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
         location: {
           '@type': 'VirtualLocation',

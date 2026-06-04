@@ -83,16 +83,21 @@ export default function CourseSchema(): JSX.Element | null {
   const isSeriesIndex = path === QUICKSTART_BASE + '/';
 
   if (isSeriesIndex) {
-    const courseInstances = QUICKSTART_STEPS.filter((s) => !s.isIndex).map(
-      (s, idx) => ({
-        '@type': 'CourseInstance',
-        name: s.name,
-        url: `${siteUrl}${s.permalink}`,
-        courseMode: 'Online',
-        // Order is meaningful for sequential tutorials
-        position: idx + 1,
-      }),
-    );
+    // Steps are PARTS of the course, not separate instances of it.
+    // schema.org's `CourseInstance` means a specific offering of the course
+    // (date / location / instructor / mode). The wasmCloud Quickstart has
+    // one online, self-paced offering — that's the `hasCourseInstance` —
+    // and the curriculum steps are sub-resources expressed via `hasPart`.
+    //
+    // `position` is a `ListItem`-only property in schema.org and isn't
+    // valid on `CourseInstance` or `LearningResource`. Array order conveys
+    // sequence semantics; no explicit position field is needed.
+    const steps = QUICKSTART_STEPS.filter((s) => !s.isIndex).map((s) => ({
+      '@type': 'LearningResource',
+      name: s.name,
+      url: `${siteUrl}${s.permalink}`,
+      learningResourceType: 'Tutorial',
+    }));
     const course = {
       '@context': 'https://schema.org',
       '@type': 'Course',
@@ -104,8 +109,15 @@ export default function CourseSchema(): JSX.Element | null {
       url: `${siteUrl}${QUICKSTART_BASE}/`,
       educationalLevel: proficiencyFrom(fm),
       inLanguage: 'en',
-      coursePrerequisites: 'Familiarity with a developer environment; Docker or Kubernetes optional but recommended.',
-      hasCourseInstance: courseInstances,
+      coursePrerequisites:
+        'Familiarity with a developer environment; Docker or Kubernetes optional but recommended.',
+      hasCourseInstance: {
+        '@type': 'CourseInstance',
+        courseMode: 'Online',
+        courseWorkload: 'PT15M',
+        inLanguage: 'en',
+      },
+      hasPart: steps,
     };
     return <JsonLd data={course} />;
   }
