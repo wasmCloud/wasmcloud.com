@@ -328,6 +328,10 @@ export default function VideoSEO({
         // personally authored, the project entity is the appropriate author.
         author: VIDEO_PUBLISHER,
         publisher: VIDEO_PUBLISHER,
+        // Article rich-result eligibility wants an `image`. The YouTube
+        // maxresdefault thumbnail is the canonical preview for this
+        // transcript (it shares its source video with the meeting page).
+        image: thumbnailUrl,
         inLanguage: VIDEO_LANGUAGE,
         url: canonicalUrl,
         mainEntityOfPage: canonicalUrl,

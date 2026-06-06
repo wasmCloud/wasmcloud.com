@@ -212,7 +212,12 @@ export default function BlogPostSchema(): JSX.Element | null {
     publisher: PUBLISHER_REF,
     ...(datePublished && { datePublished }),
     ...(dateModified && { dateModified }),
-    ...(authors && { author: authors }),
+    // `author` is technically optional on Article-family schemas, but
+    // Google's Rich Results Test flags its absence on every Article it
+    // sees. Community transcript pages don't carry personal `authors:`
+    // in frontmatter — for those we fall back to the wasmCloud project
+    // org so the field is always present and the rich-result is eligible.
+    author: authors ?? PUBLISHER_REF,
     ...(image && { image }),
     ...(keywords && { keywords }),
     ...(wordCount !== undefined && { wordCount }),

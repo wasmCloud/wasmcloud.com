@@ -4,7 +4,6 @@ import Head from '@docusaurus/Head';
 import { HtmlClassNameProvider, ThemeClassNames } from '@docusaurus/theme-common';
 import { BlogPostProvider, useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import BlogPostPageMetadata from '@theme/BlogPostPage/Metadata';
-import BlogPostPageStructuredData from '@theme/BlogPostPage/StructuredData';
 import TOC from '@theme/TOC';
 import type { Props } from '@theme/BlogPostPage';
 import Unlisted from '@theme/ContentVisibility/Unlisted';
@@ -14,6 +13,13 @@ import CommunityPostItem from '../post-item';
 import Link from '@docusaurus/Link';
 import VideoSEO from '../video-seo';
 import MeetingSpeakers from '../meeting-speakers';
+// Replaces Docusaurus's default `<BlogPostPageStructuredData />` with our
+// richer BlogPostSchema so community pages emit the same Article-family
+// payload (with author/publisher defaulted to the wasmCloud org, an image
+// derived from frontmatter, and entity-graph mentions) as the blog. Without
+// this, the default emits `author: []` on transcript pages and Google's
+// Rich Results Test reports "Missing field 'author'".
+import BlogPostSchema from '../../blog/blog-post-schema';
 
 // Community meetings & transcripts older than 2025 are no longer current. Tell
 // search engines not to index them, but keep `follow` so they still pass link
@@ -87,7 +93,7 @@ export default function CommunityPostPage(props: Props): JSX.Element {
         className={clsx(ThemeClassNames.wrapper.blogPages, ThemeClassNames.page.blogPostPage)}
       >
         <BlogPostPageMetadata />
-        <BlogPostPageStructuredData />
+        <BlogPostSchema />
         <NoindexIfArchived />
         <CommunityPostPageSEO />
         <CommunityPostPageContent>
