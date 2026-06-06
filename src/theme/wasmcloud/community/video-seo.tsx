@@ -162,9 +162,10 @@ function meetingUrlForTranscript(siteUrl: string, permalink: string): string {
  *     result as of June 2025).
  *
  * Transcript page (M8 — Article):
- *   - Article with transcribes link back to the VideoObject's @id, plus
- *     mentions: [Person] for speakers and about/mentions Thing entities
- *     from M12's dictionary.
+ *   - Article with `associatedMedia` link to the VideoObject's @id (the
+ *     transcript's source recording), `isPartOf` a CreativeWorkSeries for
+ *     the wasmCloud Community Meeting collection, plus mentions: [Person]
+ *     for speakers and about/mentions Thing entities from M12's dictionary.
  */
 export default function VideoSEO({
   metadata,
@@ -330,14 +331,18 @@ export default function VideoSEO({
         inLanguage: VIDEO_LANGUAGE,
         url: canonicalUrl,
         mainEntityOfPage: canonicalUrl,
-        // Link back to the canonical video entity. Google understands this
-        // as "this text transcribes that video" and treats the meeting page
-        // as the canonical AV asset.
-        transcribes: { '@id': videoObjectId },
+        // Link back to the canonical video entity via `associatedMedia` —
+        // a valid Article property whose range is MediaObject (VideoObject
+        // qualifies). Schema.org does not define a `transcribes` property,
+        // so we don't emit it; the prose context + the video reference
+        // here carry the relationship.
+        associatedMedia: { '@id': videoObjectId },
         // Series-level grouping (every weekly meeting is part of the
-        // wasmCloud Community Meeting series)
+        // wasmCloud Community Meeting series). Use `CreativeWorkSeries`
+        // — schema.org has no bare `Series` type; `CreativeWorkSeries`
+        // is the correct CreativeWork-subtype expected by `isPartOf`.
         isPartOf: {
-          '@type': 'Series',
+          '@type': 'CreativeWorkSeries',
           name: 'wasmCloud Community Meeting',
           url: `${siteUrl}/community/`,
         },
