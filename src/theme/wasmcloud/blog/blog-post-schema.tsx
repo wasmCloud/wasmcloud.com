@@ -6,6 +6,14 @@ import {
   buildEntityNodes,
   buildEntityRefs,
 } from '@theme/wasmcloud/structured-data/entities';
+// Community transcript pages inherit about/mentions from their parent
+// landing page via this map (see video-seo.tsx + the prebuild generator).
+// On non-community pages and on landing pages the map is unused.
+import transcriptInheritance from '@site/src/data/transcript-inheritance.json';
+
+type InheritedRefs = { about?: string; mentions?: string[] };
+const TRANSCRIPT_INHERITANCE: Record<string, InheritedRefs> =
+  (transcriptInheritance as { entries?: Record<string, InheritedRefs> }).entries ?? {};
 
 /**
  * Per M2 of the structured-data spike: emit the full Article-family schema
@@ -187,8 +195,26 @@ export default function BlogPostSchema(): JSX.Element | null {
     metadata,
     siteUrl,
   );
-  const entityRefs = buildEntityRefs(frontMatter as Record<string, unknown>);
-  const entityNodes = buildEntityNodes(frontMatter as Record<string, unknown>);
+  // Community transcript pages don't carry their own about/mentions
+  // (those refs live on the parent landing page). Inherit from the
+  // prebuild-generated map so the transcript's BlogPosting/Article
+  // node carries the same entity graph as its meeting page.
+  const permalinkWithSlash = permalink.endsWith('/') ? permalink : permalink + '/';
+  const inherited =
+    TRANSCRIPT_INHERITANCE[permalink] || TRANSCRIPT_INHERITANCE[permalinkWithSlash];
+  const fmForRefs: Record<string, unknown> = inherited
+    ? {
+        ...(frontMatter as Record<string, unknown>),
+        ...(((frontMatter as { about?: unknown }).about === undefined &&
+          inherited.about) ? { about: inherited.about } : {}),
+        ...(!Array.isArray((frontMatter as { mentions?: unknown }).mentions) &&
+        inherited.mentions
+          ? { mentions: inherited.mentions }
+          : {}),
+      }
+    : (frontMatter as Record<string, unknown>);
+  const entityRefs = buildEntityRefs(fmForRefs);
+  const entityNodes = buildEntityNodes(fmForRefs);
 
   // M2 risk #12: Speakable is restricted to NewsArticle. Honor the
   // `speakable: true` frontmatter only when the post is typed NewsArticle.

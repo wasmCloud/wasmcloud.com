@@ -190,8 +190,19 @@ function validatePayload(payload, ctx) {
   return { errors, warnings };
 }
 
+// Pages that opt out of search indexing with `<meta name="robots" content="noindex...">`
+// are intentionally not eligible for rich results. Soft warnings about authoring
+// gaps (e.g. missing M12 about/mentions) provide zero SEO value on these pages,
+// so we suppress them. Hard schema-validity errors still fire — invalid JSON-LD
+// is invalid regardless of indexability.
+// Tolerate other attributes before `name=` (e.g. react-helmet emits
+// `data-rh=true name=robots content=...`) and quoted/unquoted attribute
+// values. The key signal is `name=robots` + `content` containing `noindex`.
+const NOINDEX_META_RE = /<meta[^>]*\bname=["']?robots["']?[^>]*\bcontent=["'][^"']*noindex/i;
+
 async function validateFile(htmlPath) {
   const html = await readFile(htmlPath, 'utf8');
+  const isNoindex = NOINDEX_META_RE.test(html);
   const errors = [];
   const warnings = [];
   let count = 0;
@@ -209,7 +220,7 @@ async function validateFile(htmlPath) {
     }
     const r = validatePayload(parsed, `${htmlPath} script #${count}`);
     errors.push(...r.errors);
-    warnings.push(...r.warnings);
+    if (!isNoindex) warnings.push(...r.warnings);
   }
   return { count, errors, warnings };
 }
