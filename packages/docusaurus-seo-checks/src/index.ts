@@ -1,5 +1,5 @@
-import { PluginOptions } from './options';
-import { Plugin, LoadContext } from '@docusaurus/types';
+import type { PluginOptions } from './options';
+import type { Plugin, LoadContext } from '@docusaurus/types';
 import rootLogger from './utils/logger';
 import { PLUGIN_NAME } from './utils/constants';
 import importChecks from './checks/import-checks';
