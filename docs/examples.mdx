@@ -273,7 +273,7 @@ Complete example applications are available in the [`examples/` directory of `wa
 |---|---|---|
 | [Blobby](#blobby) | Rust | [`ghcr.io/wasmcloud/components/blobby`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fblobby) |
 | [gRPC Hello World](#grpc-hello-world) | Rust | [`components/grpc-hello-world-client`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fgrpc-hello-world-client), [`components/grpc-hello-world-server`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fgrpc-hello-world-server) |
-| [OpenTelemetry HTTP Counter](#opentelemetry-http-counter) | Rust | [`ghcr.io/wasmcloud/components/otel-http`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fotel-http) |
+| [OpenTelemetry Config](#opentelemetry-config) | Rust | [`ghcr.io/wasmcloud/components/otel-config`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fotel-config) |
 | [QR Code Generator](#qr-code-generator) | Rust | [`ghcr.io/wasmcloud/components/qrcode`](https://github.com/orgs/wasmCloud/packages/container/package/components%2Fqrcode) |
 | [HTTP Axios](#http-axios) | TypeScript | — |
 | [HTTP Password Checker](#http-password-checker) | TypeScript | — |
@@ -302,13 +302,17 @@ Two components demonstrating how to make and serve gRPC calls from a wasmCloud c
 - **`component-client` interfaces**: Imports `wasi:http/outgoing-handler`; exports `wasi:http/incoming-handler` (via `wstd`)
 - **`component-server` interfaces**: Exports `wasi:http/incoming-handler` (via `wstd`)
 
-#### OpenTelemetry HTTP Counter
+#### OpenTelemetry Config
 
-An HTTP counter service instrumented with OpenTelemetry through the `wasi:otel` interfaces. Each request creates a parent server span, emits child spans for downstream HTTP / blobstore / keyvalue operations, records structured log entries correlated with the active trace, and exports request-count and response-size metrics.
+A component instrumented with OpenTelemetry through the `wasi:otel` interfaces, with its OTel `Resource` (service name, environment, etc.) sourced from `wasi:config/store`. Each operation emits tracing, log, and metric data; the same component identifies itself differently per environment because `workload.config` and the OTel `Resource` are wired together at deploy time rather than at compile time.
 
-- **Source**: [`wasmCloud/wasmCloud — examples/otel-http`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/otel-http)
-- **OCI artifact**: `ghcr.io/wasmcloud/components/otel-http`
-- **Interfaces**: Imports `wasi:otel/{tracing,logs,metrics,types}@0.2.0-rc.1`, `wasi:http/outgoing-handler@0.2.2`, `wasi:blobstore/{blobstore,container}@0.2.0-draft`, `wasi:keyvalue/{store,atomics}@0.2.0-draft`, `wasi:config/store@0.2.0-rc.1`, `wasi:clocks/wall-clock@0.2.0`, `wasi:logging/logging@0.1.0-draft`; exports `wasi:http/incoming-handler@0.2.2`
+The example's [`chain/`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/otel-config/chain) subdirectory wires three instances of the same component (`frontend → middle → backend`) into a call graph that exports to a shared OTLP endpoint, so the collector stitches every hop into a single end-to-end trace — a reference for the cross-workload trace roll-up pattern.
+
+The `.wash/config.yaml` in this example also exercises the [workload env / config / secrets manifest schema](./kubernetes-operator/operator-manual/secrets-and-configuration.mdx) introduced in 2.3.0 (`configs:` / `secrets:` source blocks referenced from `workload.environment.{configFrom,secretFrom}`).
+
+- **Source**: [`wasmCloud/wasmCloud — examples/otel-config`](https://github.com/wasmCloud/wasmCloud/tree/main/examples/otel-config)
+- **OCI artifact**: `ghcr.io/wasmcloud/components/otel-config`
+- **Interfaces**: Imports `wasi:otel/{tracing,logs,metrics,types}@0.2.0-rc.2`, `wasi:blobstore/{blobstore,container}@0.2.0-draft`, `wasi:keyvalue/{store,atomics}@0.2.0-draft`, `wasi:config/store@0.2.0-rc.1`, `wasi:clocks/wall-clock@0.2.0`, `wasi:random/random@0.2.2`; HTTP I/O via `wstd`'s `#[http_server]` proc macro (`wasi:http/incoming-handler` exported, `wasi:http/outgoing-handler` imported)
 
 #### QR Code Generator
 
