@@ -93,9 +93,17 @@ operator:
     - team-b
 ```
 
-When `watchNamespaces` is populated, the chart narrows the operator's reach into per-workload resources. The rules for `configmaps`, `secrets`, `events`, and `services` move out of the operator's main `ClusterRole` and into a separate `ClusterRole` (`<release>-workload-namespace`) that's bound via a `RoleBinding` in each listed namespace. The operator's core grants (workload, host, and CRD APIs) stay on the main `ClusterRole` + `ClusterRoleBinding`, since they need to be cluster-wide regardless of which namespaces hold workloads.
+When `watchNamespaces` is populated, the chart drops the operator's cluster-wide `ClusterRole` and `ClusterRoleBinding` entirely and renders a set of `Role` + `RoleBinding` pairs in each watched namespace instead. Per watched namespace:
 
-The net effect is that the operator's read/write access to namespaced workload inputs (config, secrets) and outputs (events, services) is scoped to exactly the namespaces in `watchNamespaces`, while the cluster-scoped resources it manages remain available everywhere.
+- `<release>-workload-crd` covers the `runtime.wasmcloud.dev` workload resources — `artifacts`, `workloads`, `workloadreplicasets`, `workloaddeployments`, plus their `/status` and `/finalizers` subresources
+- `<release>-workload-namespace` covers per-workload core resources — `configmaps`, `secrets`, `events`, `services` (plus `services/finalizers`)
+- `<release>-endpointslice` covers `endpointslices` for Kubernetes-native traffic routing
+
+`Host` CRD grants stay on the namespaced `Role` in the operator's own namespace (host pods aren't tenant-scoped), and `<release>-leader-election` continues to live there too. The net effect: an `operator.watchNamespaces` install holds no cluster-wide permissions for workload resources and can be deployed with namespace-admin RBAC alone for those namespaces.
+
+:::info
+This namespaced-by-default behavior for the `runtime.wasmcloud.dev` apiGroup landed in 2.3.0 ([#5208](https://github.com/wasmCloud/wasmCloud/pull/5208)). Earlier releases bound the workload CRD verbs cluster-wide even when `watchNamespaces` was set.
+:::
 
 ### `operator.hostNamespaces`
 
