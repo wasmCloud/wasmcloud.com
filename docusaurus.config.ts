@@ -11,6 +11,7 @@ import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-
 import { Options as PluginReoAnalyticsOptions } from '@wasmcloud/docusaurus-reo-analytics';
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
 import communitySpeakersPlugin from './plugins/community-speakers';
+import transcriptInheritancePlugin from './plugins/transcript-inheritance';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import {
   transformerMetaHighlight,
@@ -254,6 +255,7 @@ const config = (async (): Promise<Config> => {
 
     plugins: [
       communitySpeakersPlugin,
+      transcriptInheritancePlugin,
       [
         '@wasmcloud/docusaurus-github-stars',
         {
