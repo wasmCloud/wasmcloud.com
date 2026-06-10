@@ -184,6 +184,20 @@ export default function DocPageSchema(): JSX.Element | null {
 
   const articleSection = articleSectionFor(metadata.permalink);
 
+  // Google's Article rich-result wants an `image`. Doc pages don't
+  // typically carry their own hero, so we prefer an explicit frontmatter
+  // `image:` if set and fall back to the wasmCloud social card. The
+  // fallback is a real 1200x630 PNG hosted on the site so the rich-result
+  // image requirement (min 50K pixels, crawlable) is satisfied.
+  const FALLBACK_IMAGE = `${siteUrl}/logo/wasmcloud-social.png`;
+  const fmImage = typeof fm.image === 'string' && fm.image.trim() ? fm.image.trim() : undefined;
+  const image =
+    fmImage && (fmImage.startsWith('http://') || fmImage.startsWith('https://'))
+      ? fmImage
+      : fmImage
+        ? `${siteUrl}${fmImage.startsWith('/') ? '' : '/'}${fmImage.replace(/^\.\/+/, '')}`
+        : FALLBACK_IMAGE;
+
   const article: Record<string, unknown> = {
     '@type': 'TechArticle',
     '@id': `${canonicalUrl}#article`,
@@ -193,6 +207,7 @@ export default function DocPageSchema(): JSX.Element | null {
     mainEntityOfPage: canonicalUrl,
     inLanguage: 'en',
     isAccessibleForFree: true,
+    image,
     author: buildDocAuthor(fm),
     publisher: PUBLISHER_REF,
     audience: { '@type': 'Audience', audienceType: 'Developer' },
