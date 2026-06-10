@@ -1,0 +1,421 @@
+---
+date: '2026-06-03'
+title: 'Transcript: wasmCloud 2.3: wasmCloud Benchmarks, WASI P3 Canary & SQLX Native Async'
+description: 'Full transcript of the June 3, 2026 wasmCloud community call covering wasmCloud 2.3, trace propagation, CNCF wasmCloud on Hetzner baremetal benchmarking, the WASI P3 canary image, and SQLX in Wasm.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasi p3
+  - wasm runtime autoscaling
+  - webassembly kubernetes
+  - rust webassembly
+  - wasmtime webassembly runtime
+  - webassembly news
+image: https://i.ytimg.com/vi/61sPi3TCWDk/maxresdefault.jpg
+showTitle: true
+slug: 2026-06-03-community-meeting-transcript
+speakers:
+  - bailey-hayes
+  - liam-randall
+  - eric-gregory
+  - roman-volosatovs
+  - jeremy-fleitz
+  - frank-schaffa
+  - victor-adossi
+  - yordis-prieto
+about: wasmCloud
+mentions:
+  - WASIPreview3
+  - WASI
+  - ComponentModel
+  - Wasmtime
+  - OpenTelemetry
+  - NATS
+  - Kubernetes
+  - OCIRegistry
+  - runtimeOperator
+  - Rust
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-06-03-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=61sPi3TCWDk" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=61sPi3TCWDk" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+*wasmCloud Weekly Community Call — Wed, Jun 3, 2026 · 57 minutes*
+
+{/* Speakers: Bailey Hayes, Liam Randall, Eric Gregory, Roman Volosatovs, Jeremy Fleitz, Frank Schaffa, Victor Adossi, Yordis Prieto */}
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [05:43](https://youtu.be/61sPi3TCWDk?t=343)
+
+Hello, and welcome to our wasmCloud community call for June 3, 2026. We've got a pretty full agenda today — a lot of it I'm just going to go through some of the things we've landed over the past two weeks and why we revved basically to a minor version for **v2.3.0**. Obviously we had a lot of stuff; if you go look at the generated notes there's even more stuff. So I'm just trying to highlight some of the things that I think are above the fold, but there's plenty more to be called out here. Before I dive into that too much, do we have any other agenda items folks would like to add before we go too deep? If not, I'll keep going. All right.
+
+So there were a lot of different changes that we landed. The biggest one I want to first highlight is that we made it so that from `wash dev` it's really nice to be able to pass in configuration secrets and environment variables into your config YAMLs. We've got an example for that. So if we go to our examples inside the repo and jump into this one specifically — this is the **OTel config example** — we'll walk you through how to basically build a component that deeply uses OTel. I've given a demo of this one before, so I'm not going to run through it necessarily, unless folks want to see it. It's easy to run.
+
+Essentially we've got the component path that we're running, the address that we're using, using local blob store key-value backed by a file system, we're able to pass in an environment variable that describes the exporter endpoint, and so these values — this environment value is passed to the dev host, so these are all dev-host configuration values, and then for these, these are the workload configuration values: the environment variables that the guest gets, the secret that the guest builds off of. We basically use Docker Compose syntax for how you can refer to these either from an environment variable like this or from a file like that. So that feature has landed and you are welcome to play with it.
+
+Part of this was also making sure we fully restrict allowed hosts. So when you're running this, you might see a relevant error that we have docked: this demo by default actually reaches out and talks to `example.com` or `httpbin.org` — if you haven't added them as allowed hosts the workload is permitted to speak to, it'll give you an error basically saying that. If you want to try that out, you can also use this exact same demo for that.
+
+There's one other major change here that I think is worth knowing about, which is we now also do **trace propagation**. That basically means that when we're running across multiple different hosts, or even propagating a span between different workloads that aren't even WebAssembly workloads but are all interacting with the same thing — if you run this exact demo with the exact same component but passed in with a different `configurable` for each one, I'll show you how that works. With three different instances of `wash dev` with their different configs, we're able to propagate those traces, and each one is attached to the same call chain.
+
+The main trick here is, as you can see, we're passing in the exact same example component, but with this special configuration for each one. And if I pull up their config and I go to chain, all that's in this chain is actually just their config that we're passing through. You'll see that this one's basically the same except the address is specific to it — this one is the backend address for `8002`, and this one is going to reach out to `example.com`. I'm only going to pull up one other.
+
+**Bailey Hayes** [10:30](https://youtu.be/61sPi3TCWDk?t=630)
+
+So let's do the front end, so coming in through the first part of this call chain — this one is serving on `8001` and it is going to make a call to the next hop in this chain, right here, so serving on `8000` calling `8001`. That's how you get this chain, and you can actually see that propagate through on each of your spans, and all of that maps to one single trace, which is nice. That's sort of a good chunk of this work.
+
+Now one thing that has solved a lot of different issues for folks is that we've changed the way that we build our test infrastructure. So I just want to make sure people are aware that this has changed: we're now using **`xtask`** inside wasmCloud. Right now we only have one task using `xtask` and that is our `build-test-fixtures` task, which builds our tests over here — a bunch of different Wasm-type tests.
+
+It fixed a whole host of issues where basically we had `cargo`, and `cargo` — if you're familiar with Docker — `cargo` is kind of like the same sort of thing, except `cargo` is very, very, very specific about being able to do one thing and one thing well. This was probably one of the roughest edges that most people reported when they were getting started with wasmCloud for the first time, and we were able to close out a ton of those different issues. It's a little bit harder to capture, since a lot of them are old, but essentially by doing this — decoupling it so that it's something that runs out of process — when the first time you clone wasmCloud, just make sure you run this, and then you're able to basically run our tests straight off of that.
+
+This was one of the blockers for something else we've been cooking for a while, which is our **bench infrastructure**. Once we had that in place, we now have something kind of neat: we're running off of every release a bench run on a hosted bare-metal **Hetzner** — it's an AMD Ryzen 5. There it is. So it is tuned for doing performance benchmarking, and now we have actually two different types of micro-benchmarks that we're running against this.
+
+This one is a **Criterion** benchmark, so if you want to find our benches inside our repo, let me drop a link to that. But essentially, if you're running locally you would just say let's do this one — let's do HTTP invoke. I'm not actually going to run it because I'm going to keep talking, so I'm giving it a `--no-run`. But essentially, if you ever want to run the benches locally yourself you can turn on or off WASI P3 for the bench if you want to use it, and then you get this run. As you can see in these benchmarks, we're running it with **P2 versus P3** for a handful of these — looking at HTTP throughput, the difference between cold and hot invocation.
+
+With this other benchmark — right now I'm running this HTTP invoke one that we just ran here with the other one, it's actually **iai-callgrind** based, which is part of **Valgrind**, but let me — it's going so slow — the project got renamed from `iai-callgrind` to `gungron`, but effectively what it is, is counting instructions. So it has a much better deterministic profile; it's not going to have as much noise.
+
+The downside is that when you read this, it doesn't quite make a lot of sense — versus when you read this one, you see wall time. That's something easy for humans to understand and you can measure things like requests per second, whereas instruction count doesn't mean too much to most people, but is super valuable when you're trying to really measure things happening within nanoseconds. Yeah. Frank.
+
+**Frank Schaffa** [15:14](https://youtu.be/61sPi3TCWDk?t=914)
+
+Oh, this is wonderful. One question, did you run this with OTel enabled?
+
+**Bailey Hayes** [15:22](https://youtu.be/61sPi3TCWDk?t=922)
+
+Did I run it with OTel enabled? I did not pass it in OTel collectors, so I did not have OTel enabled.
+
+**Frank Schaffa** [15:28](https://youtu.be/61sPi3TCWDk?t=928)
+
+Okay, I was just curious to see what would be the impact of when you have OTel enabled.
+
+**Bailey Hayes** [15:35](https://youtu.be/61sPi3TCWDk?t=935)
+
+Yeah, the way our host works is that if you pass in an OTel exporter to it, it will say "okay, I'm going to enable basically the OTel plugin." When we run these benches — well, you've got a full runbook if you ever want to try to replicate benchmarks, because benchmarks are useless unless you can actually replicate them from other people — but for us, it doesn't even have an OTel stack attached to it or anything like that.
+
+I would also say that OTel does tend to have a pretty significant performance impact anytime you've enabled it, but it also depends greatly on how much sampling you're doing. I would also do that more as a **k6**-like macro benchmark rather than these, which are very, very tuned to be micro-benchmarks. So like not these here — got a couple different crates for it, but all the stuff that we're using to measure this, the way that I'm displaying it on the pages: I've got Criterion, which is the one that has the wall time, and iai-callgrind, which is also called `gungron`, that is doing the instruction counting.
+
+These are very much, like if you actually look at what the benches themselves hold, super tuned to "I'm just trying to measure component composition." I'm not trying to measure the whole world in a micro-benchmark. In this case HTTP invoke is very specifically trying not to include any kind of extra additional network noise beyond the direct HTTP call. I don't want anything else in that path, because I only care about our actual throughput inside the runtime — everything else just introduces noise.
+
+**Frank Schaffa** [17:27](https://youtu.be/61sPi3TCWDk?t=1047)
+
+Yeah, so it definitely makes sense, but I was just curious to see if you somehow measure the impact of OTel. Maybe that's something to do offline.
+
+**Bailey Hayes** [17:39](https://youtu.be/61sPi3TCWDk?t=1059)
+
+Yeah, well, adding new types of benches is now super easy — it's just through a matrix, and in the runbook also includes how to add more benches. I expect to have a ton more different kinds now. The caveat is, as we add more, the bench runner is going to take more and more, so we should be careful about what our "golden path validation suite" is for these. However, being able to add new types of experiments is really important.
+
+I also want to highlight, especially for maintainers — one thing that I added is the ability to actually compare direct against refs. So let's say you added your own new benchmark you wanted to validate. In this case I ran — I wanted to test `gungron`, I upgraded versions, and so when I want to compare against that, I've got a `compare` here, and here's the two runs that I did. That'll show me that these are basically the same — there were some variances in that run, but it was below the threshold of like considering it a regression. You do expect some changes, especially if you're doing the Criterion version versus the iai-callgrind version.
+
+Anyways, as people make PRs you can actually trigger this. So anytime we think we're doing something that's performance-sensitive, you can pass in the SHA of the PR that you're building against, or the branch, and this will go and run it on the host for you and do a comparison between that and main, which is pretty nice. As we add other benches, you can decide exactly which one you want to run as part of that trigger, and you would just only be running that set of benches you think you're doing the experiment on. So if we wanted, we could add OTel right here and start measuring that one a little bit closer.
+
+**Frank Schaffa** [19:53](https://youtu.be/61sPi3TCWDk?t=1193)
+
+Okay. Thanks.
+
+**Bailey Hayes** [19:56](https://youtu.be/61sPi3TCWDk?t=1196)
+
+So that's the new benchmarking infrastructure.
+
+Something else that we did: we added basically — whenever you get a span, you'll see `wasi:blob-store` or `wasi:keyvalue` as a prefix to your span. Before we would say things like `get-data` or `get-container`, and it wasn't obvious which plugin was surfacing it and which interface. So now we have an easy common way for all of the host plugins that are built in to show exactly what they're surfacing as part of their spans.
+
+We upgraded to **Wasmtime 45**. We upgraded to **wasi-otel RC2**. Now this one is pretty cool: Jeremy added namespace scoping for our operator for a lot of the things that we deploy, and we also now have tests that basically say if any time we expect everything to be namespace-deployed and it's not in its cluster role, we will regress and we'll flag that. So we've got some good guards around it now. Any more you want to say on that one, Jeremy?
+
+**Jeremy Fleitz** [20:57](https://youtu.be/61sPi3TCWDk?t=1257)
+
+No, you completely covered it. Really what was driving that is — you know, obviously, like the financial organizations, the governments, the ones that are very, very secure — they really hate cluster-scoped namespacing. That was the whole driving factor for this one.
+
+**Bailey Hayes** [21:14](https://youtu.be/61sPi3TCWDk?t=1274)
+
+Yeah, so I think I still encourage people to keep using this stuff, giving us feedback. We have a pretty nice pipeline now for end-to-end test integration for our operator and how it deploys.
+
+Another part — and I showed this often in a past community call — is that we now also have **fuzz testing** for our operator, where we want to have fuzzing basically focused on where we're passing in host interfaces inside our workload deployment YAML, validating the serialization and deserialization, that we don't have any kinds of panics within our operators. So that's now also continuously running.
+
+We also now produce a **WASI P3 canary image**. If we go out here and we go to our packages and I open up the `wash` one — slowly — you'll see that we now have a canary for WASI P3. So we're getting really close to launching WASI P3, like potentially as early as next week. If you want a host that has P3 enabled by default, it's this one, and you could just start using it. I did not do the binaries, I only did the OCI, but once P3 is launched, we're going to flip this on to be enabled by default for everybody, and so there won't be this separate canary image — it'll just be the normal canary and it'll have WASI P3 inside it.
+
+Some folks have trouble building all the different Rust dependencies that we have themselves. If you're in a regulated environment, there's a lot of different dependencies that come in, and so that helps them quite a bit.
+
+Let me see what else we got going on. A lot of different changes — I showed you the demo for the OTel trace roll-up. Let me just drop this example in the chat for folks to try out themselves. Pretty happy with how it turned out.
+
+For the last bit, I wanted to make a call to action: WASI P3 is getting close to being ready. We have this tracking issue for our WASI P3 work, and something that we need more of is some good examples and templates for starting with P3. I strongly recommend starting with Rust — we're not quite ready for TypeScript yet, although I understand that's getting very close.
+
+We could stand to do a big documentation pass on wasmcloud.com on some of the differences between P2 and P3, and get ready for a blog post for that. Since all that's happening basically next week, now is a really great time to give me feedback on if this is all working for you, or if we've got some big problems that we need to address post-launch. So just wanted to make that big call out.
+
+Then this issue, Jeremy is going to pick up next, I think. Drop that one, Neil, if you want to talk about that one, Jeremy.
+
+**Jeremy Fleitz** [24:27](https://youtu.be/61sPi3TCWDk?t=1467)
+
+Actually, I mean it's pretty self-explanatory here, but this was opened early in January and really just continues the wasmCloud v2 journey to Kubernetes. This is really just around autoscaling. There is some crude, rudimentary autoscale you could do today, but this really just aligns it with using the **Horizontal Pod Autoscaler** that's used for container-type deployments, so that your Wasm workloads can be handled the exact same way.
+
+**Bailey Hayes** [24:57](https://youtu.be/61sPi3TCWDk?t=1497)
+
+Yeah, so with that — and basically the X has changed. There was a bunch of different reported issues and bugs that we had on our roadmap to resolve that wrapped that up. If I go to our project board where we're at right now — we have one month to complete this out, but we've done a ton of work here in our Q2 planning. Basically Jeremy's taking that one; we've got a couple others assigned. So there are a few that are a bit blocked — this one is basically waiting on P3, this one I can give an update on: Alex has landed a lot of the changes inside `wasm-tools`, and then has a PR up in Wasmtime that I'm code-reviewing right now, and we'll try that out inside wasmCloud. So I think that one is actually on track. I think this one we can definitely also complete inside this month.
+
+A lot of these others are a little bit smaller. There's obviously more work to be done for a benchmarking suite — I've shown you a lot of the benchmarking infrastructure. The next pass here on this one would be probably **k6** with a macro benchmark. I was able to quickly add a prototype of that, but I didn't have time to take it all the way over the line, so that one's probably a good one to take at some point — should be easy to add to basically our existing benchmarking infrastructure, and we can mark that one as done.
+
+I think this one is going to be needed sooner rather than later, because we're starting to see this really great growth of languages that now support GC, and it's not enabled by default yet in Wasmtime, so being able to flip flags like that on is going to be super high priority, coming soon. I think this one's very tractable and straightforward to implement, so I think we'll see that one land probably over the next week or so.
+
+So anyways, that's our roadmap update. I think we're very much on track. Once we land host component plugins, I think the others — like I called it out for secrets somewhere in here, yeah — I think this one would be a really good candidate for a host component plugin. So some of these are kind of — there's a little bit of a dependency chain here, but for the most part, for us to get all this done in Q2, we're on track. That is it for the rundown for where we're at with wasmCloud v2.3 and WASI P3.
+
+Liam, did you want to share some of the updates you've been doing on the devrel side? I unfortunately saw that he just now went off camera, so that was kind of bad timing, I guess. Oh well. Any questions, folks? All right. With all that, that is basically it for planned content today. Also, Aditya wasn't able to join — everybody, send him good vibes and good luck, because it's finals week for him, so good luck, man.
+
+**Liam Randall** [28:31](https://youtu.be/61sPi3TCWDk?t=1711)
+
+I apologize, my daughter's school called, she was literally — we went to hand me the mic, I think I threw you on mute, so I apologize. I can do my demo now if we want.
+
+Just a quick update: we've been doing a ton of work behind the scenes here with wasmcloud.com, and Eric has been doing yeoman's work in landing just a lot of long-term cleanup and documentation tidiness. There's a few things that we're doing behind the scenes. One of the big efforts is to make WebAssembly and wasmCloud more accessible by LLMs, and to enable them to self-discover docs, tutorials, and things like that.
+
+We've been landing not only JSON-LD behind the scenes for every page that should land here in the next day or two, but also we've done a huge revamp on not only community pages but even on our YouTube channel itself. As you go back in time, you'll start to see that now there is an AI-generated summary with chapter links for every meeting, and then this is now reflected all the way through into YouTube itself. What we're trying to do here is just make the content that we're generating here on a weekly basis more discoverable — easier for folks to access, to cross-link these things better.
+
+Then there will be some work to take each doc page here, once we land JSON-LD, and link back to community meetings and demonstrations to say, "hey, this was discussed in this meeting." Maybe we'll do it as a sidebar component, just to let people pivot back and forth between the resources that are better here. So it's been a lot of work, but with some of the new AI plugins, we've been able to automate a lot of the heavy lifting behind the scenes to get this done. Any questions? Okay. Great. Yeah, just pretty straightforward.
+
+**Bailey Hayes** [30:53](https://youtu.be/61sPi3TCWDk?t=1853)
+
+Yeah, I've noticed LLMs definitely are willing to research things, right? They'll go out and look to see if there are any GitHub issues for a given problem, and if there are, and it says it doesn't work, they're like, "all right, yeah, it doesn't work."
+
+I think us working to make sure that we have up-to-date docs — but my key learning of the week was: make sure that I triage our GitHub issues. Because when there is a GitHub issue that says something doesn't work, but it actually does work, you definitely get a pretty bad signal from the LLM where it's not going to try a thing. So if you see me triaging inside wasmCloud and other things like that, and also removing TODOs in our code and being really clear, it's on the roadmap item, or like "this, this, this works, except this one edge case, this one variant." Instead of what is more natural for us previously as programmers to just be like "TODO: complete this." You need to be very clear what you're doing inside GitHub issues, inside the code, because that is all now totally fair game for what LLMs are going to look at.
+
+All right, you want to see one more cool demo? I've got one more thing that I've been playing around with. Over here in **SQLX**, I'm going to share my whole screen again. Over here in Launch Five, SQLX — I have opened in the wrong place. Going back over. Okay.
+
+I have some examples, but I'm hoping to upstream to SQLX. People on the call generally know what SQLX is — let me do a preview. And this is in the Rust ecosystem. I'll just say things, because some people might not be familiar: it's basically a pure-Rust crate, that — which isn't quite true. So I actually should give them a hard time for this. It does pull in, depending on which driver you're using, different types of C drivers, like the SQLite one. But if you're using Postgres, you can go down a path of a pure-Rust crate. It's a really nice way to basically code to one crate and be able to point to Postgres or MySQL.
+
+So I've created an example, and this is actually the reason why I made the call-out about GitHub issues coming and biting you. It was actually my own GitHub issue that I had filed a while ago in the Rust ecosystem: the Rust standard library, and Tokio and `mio` and `socket2` and all these different crates in the ecosystem have been adding WASI P2 support. I initially ran into an issue — well, I ran into a bunch of different ones, they've all been worked out now. There was one where this common crate that SQLX depends on for both MySQL and Postgres is called the `whoami` crate. I tried to make that feature optional, so that I could disable it and it not try to look up my username, which is obviously something that we did want to make available in a WASI sandboxed ecosystem environment.
+
+Because that issue existed, I had a hard time getting my LLM to start making this. But once I created this example, and then I went over to wasmCloud and was like, "hey, here's a reference example," it was like, "oh, this is the standard way to create a SQLX component," and it was super happy to go and do it.
+
+So this is what it looks like to write a component in **WASI P2 using native async** in the sequence. This is it — less than 50 lines of code, and it will just connect. It actually uses inside **Tokio** the `net` crate, which is where they do basically their connection pooling work.
+
+**Bailey Hayes** [34:59](https://youtu.be/61sPi3TCWDk?t=2099)
+
+The only trick here, the only thing that tips my hand that this is anything other than completely off-the-shelf native Rust, is that I basically tell it that I want a `current_thread` Tokio runtime, because I don't have threads in WASI P2 — and so I want you to drive all these features with pollables. There's one minor trick that's in here, which is basically to use `tokio::net` — I have to tell Tokio to use `unstable`, so they have not stabilized it yet for their WASI P2 backend. I expect that to happen over the next several months.
+
+But between this and that one — that one trick right here — SQLX off the shelf works. My changes here is basically: I like it, so I want to put a test on it — it's called the "**Beyoncé Rule**" — so I'm going to put that here in their CI, if they accept it, and basically validate that it works both for MySQL and Postgres. I was pretty happy with that — it just kind of worked out.
+
+If you want to see it run later, once I put up this PR, basically all it looks like is you do a `docker run`. Actually, why don't we just do this — we'll just do one of these with `docker run`. I'm running it myself right now. Okay, I'm not going to mess with it.
+
+This is the output that I got earlier: I `docker run` Postgres, I went and did a `cargo build`, and then I ran directly against Wasmtime off the shelf and connected to that local database. Then as you saw in my little thing, it just does some addition — it's not too fancy, but enough to say "A, it works." So that is basically the SQLX set. Once I get that up, I'll drop a link to that in the wasmCloud channel in general, because I think it's cool and it's pretty exciting. It's that easy to get running with components now with the Rust ecosystem.
+
+**Liam Randall** [37:09](https://youtu.be/61sPi3TCWDk?t=2229)
+
+Bailey, that was awesome. I have a question for you though. On the wasmCloud roadmap, we've talked about a couple of big features that are landing here to enable services, so things like `implements`, and then a new pass at wasmCloud host plugins, if I said that correct. It seems like if that just works out of the box — are you going to have to rebuild that once you do your host plugins and `implements` to support that? Or will this still just work as it is?
+
+**Bailey Hayes** [37:48](https://youtu.be/61sPi3TCWDk?t=2268)
+
+I would say those are pretty separate issues, but if you're confused, everybody's confused, so maybe it's worth walking through.
+
+**Liam Randall** [37:57](https://youtu.be/61sPi3TCWDk?t=2277)
+
+I understand that you'll need to make like a host plugin for this, and that `implements` gives you, you know, the ability to run multiple copies — instantiate multiple copies with different configuration. But I was just wondering if the SQLX work that you're showing here is just going to work TM, as WASI P3 and `implements` and other things cross the line.
+
+**Bailey Hayes** [38:28](https://youtu.be/61sPi3TCWDk?t=2308)
+
+Yeah. Okay, so you're talking about this feature — when I think totally separate from the host component feature, so if I write a host that supports the **component model `implements` proposal** — component model, here I think actually it's already merged, so it's a little bit… the thing about the component model repo that I don't love is that it's kind of hard to decouple, modularize the different features that we've landed inside it. It's all globbed together, so it's a little bit harder to navigate, especially for people who don't read it every day.
+
+But essentially, inside WIT, we actually call it out here, I believe — if you look and add something like `implements` that allows you to have multiple stores that are part of your WIT-definition bindings, so I can say I want to use this as `other-cache`. When I build guest bindings inside my guest code, I should be able to refer to something as `other-cache`. Today we don't have a `wit-bindgen` implementation of this, so you don't have a guest binding of it — but what we do have is the host binding side of it. If I go to Wasmtime and I go to Alex's change — oh man, it's in here somewhere. It's hard to find — it's in here somewhere.
+
+Basically there's host-side bindings, so Wasmtime now has an API on its linker to say "I've got something that says it's `other-cache`," basically, and it's up to you to wire that up. "Up to you" being somebody like wasmCloud to wire that up. So inside our code — let me see, I think we'll do workload deployment, and if we see the name somewhere on the workload — well, we don't have it in our example, but in our spec we have an optional field for you to basically alias an interface. As you import an interface, I can say `other-cache` here, so if you say in your workload that you've got an alias to another cache, then we can look at the host-side Wasmtime bindings and say "that one goes there, I'll give you this one," and do that linking at runtime.
+
+So we've got work to implement that — implement `implements`, that's one — inside the host-side bindings, and I'm also picking up the work to implement `implements` inside the guest-side binding, so that way a single guest component can say "I have my in-memory cache, and I have my remote cache," and inside their code they can say "right now I want to go talk to the in-memory one," and then the next call be like "I want to go to the other one." Without having guest bindings for that to express it, you don't have a way to do it currently, so that work is happening and will be pretty powerful.
+
+Once you have that, in theory, you could wire up any kind of component. For us, we start with workload deployments, but as we add things like host component plugins that are already attached to our existing plugin framework, then those host component plugins could also refer to different backends. We can also make that work with native plugins — they're going to be wired up.
+
+Now, the important call-out here is that these are **static bindings**, so the names are static. The name would have to be — you get one Couchbase, or you get one Postgres, or you've got some handshake that says they work together. So it's not going to work the way that some people might think that they're dynamic — that you can just pass any backend at any instance of them — that's not how bindings work.
+
+**Liam Randall** [42:57](https://youtu.be/61sPi3TCWDk?t=2577)
+
+So, thank you so much for that, for connecting those dots. You're right, I did not have that level of specificity, and that helps quite a bit. But then from a platform-engineering perspective: if I wanted to run different versions of SQLX, is it — are they going to be bound to a workload then? Would I, if I think of them as tenants — like Team One has SQLX, Team Two has SQLX, Team Three has SQLX, and they all have three different configs — is that how it's going to come together?
+
+**Bailey Hayes** [43:34](https://youtu.be/61sPi3TCWDk?t=2614)
+
+SQLX is a library dependency of the guest component. It is not observable to the host or anybody else, so different components can have different versions of library dependencies. It's internal to the guest.
+
+**Liam Randall** [43:53](https://youtu.be/61sPi3TCWDk?t=2633)
+
+Okay. So there wouldn't be a service for SQLX. Maybe a better example might be Postgres, then. If I had three different versions, three different bindings for Postgres, would it be bound on a workload level or like a team level?
+
+**Bailey Hayes** [44:08](https://youtu.be/61sPi3TCWDk?t=2648)
+
+Well, it depends how you build your host. So you could have a service that knows about having different bindings and knows about those names and implements them — so a service could say "I can implement and point to Postgres A and B." A service is workload-tenant-bound. You could also have your own host component when we implement that, and the host component is also something that the end user, who's building it as a platform team, would build for the host. Again, they would need to know ahead of time that "I only support Postgres A, B, and C," and they would implement that inside their host component plugin.
+
+**Liam Randall** [44:54](https://youtu.be/61sPi3TCWDk?t=2694)
+
+Okay. I know I used the wrong words there. Thank you for your patience and helping me to actually articulate my question — and Victor, you as well. In chat I was asking about how this is going to come together with the services. I think ultimately when you get it across the line, you'll have some demos, and I think just seeing that will help just tie it all together.
+
+**Bailey Hayes** [45:16](https://youtu.be/61sPi3TCWDk?t=2716)
+
+And today, if you wanted to do that, you would just do it with separate hosts with different configurations — it's kind of like what Victor was saying there. That already works today.
+
+**Liam Randall** [45:25](https://youtu.be/61sPi3TCWDk?t=2725)
+
+Yeah, of course. Okay. Thank you so much.
+
+**Bailey Hayes** [45:31](https://youtu.be/61sPi3TCWDk?t=2731)
+
+Hey, Yordis. How you doing, man?
+
+**Yordis Prieto** [45:35](https://youtu.be/61sPi3TCWDk?t=2735)
+
+Finally joining.
+
+**Bailey Hayes** [45:39](https://youtu.be/61sPi3TCWDk?t=2739)
+
+Got anything cool?
+
+**Yordis Prieto** [45:42](https://youtu.be/61sPi3TCWDk?t=2742)
+
+Only C++ is a missing one for the maps types, but everything else is already merged.
+
+**Bailey Hayes** [45:49](https://youtu.be/61sPi3TCWDk?t=2749)
+
+Oh, snap. Okay. Well, I maintain that one, so maybe I need to get my butt over there and get it done.
+
+**Yordis Prieto** [45:57](https://youtu.be/61sPi3TCWDk?t=2757)
+
+Yeah, I need you, because I don't think that people understand that — hey, give me directions, because I can make it work, but I don't know much about C++.
+
+**Bailey Hayes** [46:12](https://youtu.be/61sPi3TCWDk?t=2772)
+
+Yeah, and nobody — that's what I was going to say.
+
+**Victor Adossi** [46:16](https://youtu.be/61sPi3TCWDk?t=2776)
+
+Hey, I had a question about the — basically like the essentially like database load balancer, or I don't know, maybe load balancer's not the right word, because it's — I feel like it's not like a connection pool. Yeah, a connection puller, that's like — anyway, about that, are there any interfaces now, or plans in the future, for additional interfaces for doing like dynamic configuration of the service? I'm not sure that's something we want or is good, but I think it would be interesting, right? So like —
+
+**Bailey Hayes** [47:07](https://youtu.be/61sPi3TCWDk?t=2827)
+
+If the service imports `wasi:config`, that's dynamic config, and it would know if somebody did a set on it basically, and could react.
+
+**Victor Adossi** [47:18](https://youtu.be/61sPi3TCWDk?t=2838)
+
+Yeah, have we shown people that matter?
+
+**Bailey Hayes** [47:19](https://youtu.be/61sPi3TCWDk?t=2839)
+
+No, but yeah.
+
+**Victor Adossi** [47:22](https://youtu.be/61sPi3TCWDk?t=2842)
+
+Like that's up for grabs, right? Like the idea of profiles, or the service being able to pick up on configs — let's say landing in Kubernetes or secrets being added — and then sort of knowing about a given profile and being able to route requests to it. Now, how the component would know what its profiles would be and all that is a different question.
+
+**Bailey Hayes** [47:52](https://youtu.be/61sPi3TCWDk?t=2872)
+
+Yeah, I caution using the word "profiles," because profiles is actually a tool convention in WebAssembly — it means something different.
+
+**Victor Adossi** [47:59](https://youtu.be/61sPi3TCWDk?t=2879)
+
+Oh, okay, not that — connection configuration, sure. Connection config, or sort of shared connection config.
+
+**Bailey Hayes** [48:12](https://youtu.be/61sPi3TCWDk?t=2892)
+
+I will say that I think we want — I think dynamic config: cool. Dynamic secret: not cool, I think, in that you want to roll out so that that can be hard, though, for something that you're trying to do as a connection puller, right? Like that thing — generally you would want to have other stuff. But what you don't want to lose, basically, is: I want the service to allow me to schedule deployments, I need to know that those resources that it needs to work are available, and that's why you do that ahead of time. Like, "okay, this thing ran and it connected out to stuff — now, don't schedule additional workloads on me, because I don't know if I can connect to those other services," right?
+
+**Victor Adossi** [48:57](https://youtu.be/61sPi3TCWDk?t=2937)
+
+And that's another thing that I think is really interesting: I think we have a new channel for like administrative control of the load balancer. Because one of the things you usually do with like a PgBouncer, a PgCat, or whatever, is actually **pause connections**, and sort of like you have a sort of point of leverage where you can just have every — let's say, if a slow query is not downtime for you, right. This is how most people achieve their downtime-free database migrations or whatever, or changes — like if they're going to swap out a database from underneath. So I think having WIT interfaces behind that stuff is interesting as well.
+
+**Bailey Hayes** [49:37](https://youtu.be/61sPi3TCWDk?t=2977)
+
+Yeah, I think today's answer — or like not even today's answer, the tomorrow answer — with we have host component plugins, we have `implements`, we have the ability to compile the crates that you need to actually create your own PgBouncer compiled to Wasm. Even in that world, I would actually say that I would still — if I was doing like a production discussion at scale project — I would still actually have a real PgBouncer infrastructure there, and I would configure my host so that they can continue to be treated as basically cattle, and they always point to that PgBouncer. The PgBouncer is the thing that I changed, because you're going to want to deploy those to each edge or each zone.
+
+I mean, this is — I'm talking global scale, for that. Like baby scale, sure, use the component. But for massive scale I still think that you want your host to basically be the cattle, you don't want them to be the critical load balancer yet. For those types of things there's very, very, very specialized implementations that people use that we don't have the expressivity yet, I think, in the WebAssembly runtime side of the world to be able to have something that's long-running like that.
+
+**Victor Adossi** [51:00](https://youtu.be/61sPi3TCWDk?t=3060)
+
+Yeah, that's interesting. I wonder if it's an interesting way to like control — as a control path for the cluster. So like normally you have to have like — let's say if you have this external PgBouncer, or the usual kind of setup, now you need this sort of like other control plane to like send the pause to make sure you're either not — you know, you're just sort of not letting requests go through, right? Then you do the switchover, or whatever, and then you let requests sort of go again, you unpause them. I wonder if — because what happens when you hit pause is completely up to the host, right? Like if the service decides to call out to an actual PgBouncer and do the pause, that's interesting too — that's also technically possible. But I wonder if it's interesting to like, with a workload deploy not only the clients that use the database, but the sort of like management interface as well. Like, is that interesting? Because I think you could do it.
+
+**Bailey Hayes** [52:22](https://youtu.be/61sPi3TCWDk?t=3142)
+
+As a host component — we have host components.
+
+**Victor Adossi** [52:26](https://youtu.be/61sPi3TCWDk?t=3146)
+
+Yeah, and host components.
+
+**Bailey Hayes** [52:27](https://youtu.be/61sPi3TCWDk?t=3147)
+
+And I mean, our host components do already have lifecycle built into them for like a shutdown API or on-workload-bind, so you do know when new people are added and that you're servicing them. Right now we're very much bound to a very specific — I'm going to use the word "profile" inside our host — where we're very geared towards, let's say, an 8-gigabyte RAM, six-core host. Wasm — sometimes — that's what we're profiling against right now, and so that would be good for just servicing that workload's host, right? You could easily have a host component that can handle the couple hundred of components that are clients and running through it. That's fine, and that's what we're really designing for.
+
+I still kind of caution on the like — okay, we're doing a database A/B migration across the globe in that world. That's why I'm like, ooh, I want that one to be more external — like the thing that's the client-side connection pool is what we're aiming for, right?
+
+I do think that because you have start/stop, because you know who's implementing what, and you have tendency for — even you could even do it by date — like, in a managed database, you also have the concept of other databases that you connect to inside that one managed database. I've gotta explain that, because I know you know, but maybe not other people know — but as part of that, we can do that as part of the `implements` API, and we can talk to different ones.
+
+**Victor Adossi** [54:05](https://youtu.be/61sPi3TCWDk?t=3245)
+
+If you're talking about Postgres, do you mean the **cluster** — multiple databases in the same cluster? Because every single Postgres instance is actually a cluster, which is what they chose to name it. But yeah, that's interesting. This is all around like awesome, awesome feature, pretty excited.
+
+**Bailey Hayes** [54:26](https://youtu.be/61sPi3TCWDk?t=3266)
+
+I think we should keep pushing in that direction, I guess, as well. TLDR, we should keep pushing. I'm not going to tell people to do it, yeah, but soon, maybe.
+
+There's also plenty of distributed databases that are also of interest that'd be cool to add. And again, now we don't have to bake in all these different people's dependencies into our tree. People can just rock up with whatever esoteric database they want — although, as you said in chat, the only answer is Postgres. But if they wanted, they could easily have support for a lot of different ones, and we wouldn't care — it's just a socket.
+
+**Yordis Prieto** [55:12](https://youtu.be/61sPi3TCWDk?t=3312)
+
+Okay, but the real question is: is it a cluster or not? What would you call it? Let's fix this for Postgres.
+
+**Bailey Hayes** [55:19](https://youtu.be/61sPi3TCWDk?t=3319)
+
+Oh gosh, I don't know. My brain is still in MySQL land with `single_store` — that's the wire protocol we did, and we didn't…
+
+**Yordis Prieto** [55:28](https://youtu.be/61sPi3TCWDk?t=3328)
+
+If you say "cluster" to me, my brain goes out to multiple nodes — like nothing is related to "oh, here's a Postgres database." It's like, okay, please rename it.
+
+**Victor Adossi** [55:38](https://youtu.be/61sPi3TCWDk?t=3338)
+
+Yeah, it's a very super-old Postgres-ism that immediately confuses anyone that sees it in, you know, at any point after like 2008.
+
+**Yordis Prieto** [55:48](https://youtu.be/61sPi3TCWDk?t=3348)
+
+Okay, that makes sense, because in 15 years we didn't have multi-node problems — it's like single box, call it.
+
+**Jeremy Fleitz** [55:58](https://youtu.be/61sPi3TCWDk?t=3358)
+
+As long as they don't rename it to "component" or "instance," I will be totally fine.
+
+**Yordis Prieto** [56:05](https://youtu.be/61sPi3TCWDk?t=3365)
+
+I will hate the person — probably was Bailey — that named "wit world."
+
+**Bailey Hayes** [56:11](https://youtu.be/61sPi3TCWDk?t=3371)
+
+That one me, man. That one me. I pushed back.
+
+**Yordis Prieto** [56:13](https://youtu.be/61sPi3TCWDk?t=3373)
+
+That person, I'm sorry, I'm not going to give you flowers.
+
+**Bailey Hayes** [56:18](https://youtu.be/61sPi3TCWDk?t=3378)
+
+I actually suggested that should be "profile," which is really funny — but then they were like, "no, profiles are trying to make that be a different thing in WebAssembly tool conventions," so potentially "profile" might also be one of those overloaded words.
+
+**Yordis Prieto** [56:34](https://youtu.be/61sPi3TCWDk?t=3394)
+
+That person definitely didn't Google "what are the top three most difficult words to pronounce in English."
+
+**Bailey Hayes** [56:45](https://youtu.be/61sPi3TCWDk?t=3405)
+
+Yeah, we have plenty of impossible-to-pronounce words. But that one is one of the top.
+
+**Bailey Hayes** [56:54](https://youtu.be/61sPi3TCWDk?t=3414)
+
+I mean, part of me says: worlds themselves inside components kind of fade away. You're just talking about the component that you're targeting and the platform that you're targeting, because you're going to be able to run anywhere, and it's going to be less interesting to you, I think, for the specific name of the world, so much as the environment that you actually just want to run this thing in. That's maybe overly hopeful, but to kind of wish that would fade a little bit further into the background as these tools just work.
+
+That was fun. All right, y'all got three minutes left. I think I'm going to call it. Good call today. See you next week.
+
+[57:42](https://youtu.be/61sPi3TCWDk?t=3462)
+
+Bye.

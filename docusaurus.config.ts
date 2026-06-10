@@ -23,6 +23,12 @@ import rehypeNameToId from 'rehype-name-to-id';
 import { WASMCLOUD_VERSION } from './src/wasmcloud-version';
 import wasmCloudVersionPlugin from './src/remark/wasmcloud-version';
 
+// When OFFLINE_BUILD=1 (used by the `docs-v*` release workflow that builds the
+// air-gapped container image and tarball), skip every plugin and head tag that
+// would cause an air-gapped browser to call out — analytics, search, fonts —
+// and trim the build to the current docs version only.
+const offlineBuild = process.env.OFFLINE_BUILD === '1';
+
 const rehypeShikiPlugin = [
   rehypeShiki,
   {
@@ -77,7 +83,10 @@ const config = (async (): Promise<Config> => {
     url: siteBaseUrl(),
     baseUrl: '/',
     trailingSlash: true,
-    onBrokenLinks: 'throw',
+    // Offline build excludes v1 / 0.82 docs; links from current → those
+    // versions become unresolvable, so downgrade to warn for this build path
+    // only. The production build keeps the throw behavior.
+    onBrokenLinks: offlineBuild ? 'warn' : 'throw',
     onBrokenMarkdownLinks: 'warn',
     favicon: '/favicon.ico',
 
@@ -119,6 +128,9 @@ const config = (async (): Promise<Config> => {
             showLastUpdateTime: true,
             showLastUpdateAuthor: true,
             lastVersion: 'current',
+            // Air-gapped image only ships the current (v2) docs; v1 and 0.82
+            // are skipped to keep image size sane.
+            ...(offlineBuild ? { onlyIncludeVersions: ['current'] } : {}),
             versions: {
               current: {
                 label: 'v2',
@@ -289,25 +301,29 @@ const config = (async (): Promise<Config> => {
           onUntruncatedBlogPosts: 'ignore',
         } satisfies PluginContentBlogOptions,
       ],
-      [
-        '@docusaurus/plugin-google-analytics',
-        {
-          trackingID: process.env.GOOGLE_ANALYTICS_ID || 'localdev',
-          anonymizeIP: true,
-        } satisfies PluginGoogleAnalyticsOptions,
-      ],
-      [
-        '@wasmcloud/docusaurus-hubspot-analytics',
-        {
-          hubspotId: process.env.HUBSPOT_ID || 'localdev',
-        } satisfies PluginHubspotAnalyticsOptions,
-      ],
-      [
-        '@wasmcloud/docusaurus-reo-analytics',
-        {
-          clientID: process.env.REO_CLIENT_ID || 'localdev',
-        } satisfies PluginReoAnalyticsOptions,
-      ],
+      ...(offlineBuild
+        ? []
+        : [
+            [
+              '@docusaurus/plugin-google-analytics',
+              {
+                trackingID: process.env.GOOGLE_ANALYTICS_ID || 'localdev',
+                anonymizeIP: true,
+              } satisfies PluginGoogleAnalyticsOptions,
+            ],
+            [
+              '@wasmcloud/docusaurus-hubspot-analytics',
+              {
+                hubspotId: process.env.HUBSPOT_ID || 'localdev',
+              } satisfies PluginHubspotAnalyticsOptions,
+            ],
+            [
+              '@wasmcloud/docusaurus-reo-analytics',
+              {
+                clientID: process.env.REO_CLIENT_ID || 'localdev',
+              } satisfies PluginReoAnalyticsOptions,
+            ],
+          ]),
       customPostCssPlugin, // PostCSS plugin function registration
       [
         'docusaurus-plugin-llms',
@@ -341,13 +357,20 @@ const config = (async (): Promise<Config> => {
             // used for styling, see src/styles/theme/_navbar.css
             className: 'navbar__link--version-dropdown',
           },
-          {
-            href: 'https://github.com/wasmcloud/wasmcloud',
-            'aria-label': 'Star wasmCloud on GitHub',
-            position: 'right',
-            html: `<span class="badge badge--outline">Star us! ★ <github-count repo="wasmcloud/wasmcloud">1500</github-count></span>`,
-            className: 'sidebar-hidden',
-          },
+          // The <github-count> custom element fetches api.github.com at runtime
+          // to populate the live star count. Dropped in offline builds so
+          // air-gapped browsers do not attempt that request.
+          ...(offlineBuild
+            ? []
+            : [
+                {
+                  href: 'https://github.com/wasmcloud/wasmcloud',
+                  'aria-label': 'Star wasmCloud on GitHub',
+                  position: 'right' as const,
+                  html: `<span class="badge badge--outline">Star us! ★ <github-count repo="wasmcloud/wasmcloud">1500</github-count></span>`,
+                  className: 'sidebar-hidden',
+                },
+              ]),
           await svgIconNavItem({
             svgIconPath: './static/icons/github.svg',
             label: 'GitHub',
@@ -436,11 +459,15 @@ const config = (async (): Promise<Config> => {
         ],
         copyright: `Copyright © ${new Date().getFullYear()} wasmCloud LLC. All rights reserved. The Linux Foundation has registered trademarks and uses trademarks. For a list of trademarks of The Linux Foundation, please see our Trademark Usage page: https://www.linuxfoundation.org/trademark-usage. Built with Docusaurus.`,
       },
-      algolia: {
-        apiKey: 'f0ef30f3d98ce5e9a7dd7579bb221dfc',
-        indexName: 'wasmcloud',
-        appId: '2IM4TMH501',
-      },
+      ...(offlineBuild
+        ? {}
+        : {
+            algolia: {
+              apiKey: 'f0ef30f3d98ce5e9a7dd7579bb221dfc',
+              indexName: 'wasmcloud',
+              appId: '2IM4TMH501',
+            },
+          }),
     } satisfies PresetClassicThemeConfig,
 
     markdown: {
@@ -504,25 +531,33 @@ const config = (async (): Promise<Config> => {
           },
         }),
       },
-      {
-        tagName: 'link',
-        attributes: { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-      },
-      {
-        tagName: 'link',
-        attributes: {
-          rel: 'preconnect',
-          href: 'https://fonts.gstatic.com',
-          crossorigin: 'crossorigin',
-        },
-      },
-      {
-        tagName: 'link',
-        attributes: {
-          href: 'https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Lexend:wght@100..900&family=Inter:wght@100..900&display=swap',
-          rel: 'stylesheet',
-        },
-      },
+      // Google Fonts: skipped in the offline build so air-gapped browsers do
+      // not request fonts.googleapis.com / fonts.gstatic.com. Falls back to
+      // the OS sans-serif via the CSS stack already declared in
+      // src/styles/index.css.
+      ...(offlineBuild
+        ? []
+        : [
+            {
+              tagName: 'link',
+              attributes: { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+            },
+            {
+              tagName: 'link',
+              attributes: {
+                rel: 'preconnect',
+                href: 'https://fonts.gstatic.com',
+                crossorigin: 'crossorigin',
+              },
+            },
+            {
+              tagName: 'link',
+              attributes: {
+                href: 'https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Lexend:wght@100..900&family=Inter:wght@100..900&display=swap',
+                rel: 'stylesheet',
+              },
+            },
+          ]),
     ],
 
     onBrokenAnchors: 'throw',
