@@ -3,9 +3,18 @@ import Head from '@docusaurus/Head';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import type { BlogPostMetadata } from '@docusaurus/plugin-content-blog';
 import speakersData from '@site/src/data/speakers.json';
+// Auto-generated at prebuild time by scripts/generate-transcript-inheritance.mjs.
+// Maps each transcript permalink to its parent landing page's about/mentions
+// frontmatter so transcript Article JSON-LD inherits the same entity graph
+// without the author having to duplicate the refs across both files.
+import transcriptInheritance from '@site/src/data/transcript-inheritance.json';
 import JsonLd from '@theme/wasmcloud/json-ld';
 import { buildEntityRefs } from '@theme/wasmcloud/structured-data/entities';
 import { isTranscriptPermalink } from './utils';
+
+type InheritedRefs = { about?: string; mentions?: string[] };
+const TRANSCRIPT_INHERITANCE: Record<string, InheritedRefs> =
+  (transcriptInheritance as { entries?: Record<string, InheritedRefs> }).entries ?? {};
 
 type Chapter = { seconds: number; label: string };
 
@@ -162,9 +171,10 @@ function meetingUrlForTranscript(siteUrl: string, permalink: string): string {
  *     result as of June 2025).
  *
  * Transcript page (M8 — Article):
- *   - Article with transcribes link back to the VideoObject's @id, plus
- *     mentions: [Person] for speakers and about/mentions Thing entities
- *     from M12's dictionary.
+ *   - Article with `associatedMedia` link to the VideoObject's @id (the
+ *     transcript's source recording), `isPartOf` a CreativeWorkSeries for
+ *     the wasmCloud Community Meeting collection, plus mentions: [Person]
+ *     for speakers and about/mentions Thing entities from M12's dictionary.
  */
 export default function VideoSEO({
   metadata,
@@ -194,7 +204,29 @@ export default function VideoSEO({
 
   const keywords = getKeywords(frontMatter);
   const speakers = buildSpeakers(frontMatter);
-  const entityRefs = buildEntityRefs(frontMatter);
+  // Transcript pages typically don't repeat `about:` / `mentions:` in their
+  // own frontmatter — those refs live on the parent landing page. When this
+  // is a transcript page and its own frontmatter omits one of the refs, fall
+  // back to the inheritance map (generated at prebuild from landing-page
+  // frontmatter; see scripts/generate-transcript-inheritance.mjs). Avoids the
+  // M10 validator warning `no about or mentions (M12 entity refs)` on
+  // transcript Article nodes.
+  const permalinkWithSlash = permalink.endsWith('/') ? permalink : permalink + '/';
+  const inheritedRefs: InheritedRefs | undefined = isTranscript
+    ? TRANSCRIPT_INHERITANCE[permalink] || TRANSCRIPT_INHERITANCE[permalinkWithSlash]
+    : undefined;
+  const frontMatterForRefs = inheritedRefs
+    ? {
+        ...frontMatter,
+        ...(frontMatter.about === undefined && inheritedRefs.about
+          ? { about: inheritedRefs.about }
+          : {}),
+        ...(!Array.isArray(frontMatter.mentions) && inheritedRefs.mentions
+          ? { mentions: inheritedRefs.mentions }
+          : {}),
+      }
+    : frontMatter;
+  const entityRefs = buildEntityRefs(frontMatterForRefs);
 
   // Stable IDs the schemas use to cross-reference each other:
   //   VideoObject @id  →  canonical meeting URL + #video
@@ -327,17 +359,25 @@ export default function VideoSEO({
         // personally authored, the project entity is the appropriate author.
         author: VIDEO_PUBLISHER,
         publisher: VIDEO_PUBLISHER,
+        // Article rich-result eligibility wants an `image`. The YouTube
+        // maxresdefault thumbnail is the canonical preview for this
+        // transcript (it shares its source video with the meeting page).
+        image: thumbnailUrl,
         inLanguage: VIDEO_LANGUAGE,
         url: canonicalUrl,
         mainEntityOfPage: canonicalUrl,
-        // Link back to the canonical video entity. Google understands this
-        // as "this text transcribes that video" and treats the meeting page
-        // as the canonical AV asset.
-        transcribes: { '@id': videoObjectId },
+        // Link back to the canonical video entity via `associatedMedia` —
+        // a valid Article property whose range is MediaObject (VideoObject
+        // qualifies). Schema.org does not define a `transcribes` property,
+        // so we don't emit it; the prose context + the video reference
+        // here carry the relationship.
+        associatedMedia: { '@id': videoObjectId },
         // Series-level grouping (every weekly meeting is part of the
-        // wasmCloud Community Meeting series)
+        // wasmCloud Community Meeting series). Use `CreativeWorkSeries`
+        // — schema.org has no bare `Series` type; `CreativeWorkSeries`
+        // is the correct CreativeWork-subtype expected by `isPartOf`.
         isPartOf: {
-          '@type': 'Series',
+          '@type': 'CreativeWorkSeries',
           name: 'wasmCloud Community Meeting',
           url: `${siteUrl}/community/`,
         },

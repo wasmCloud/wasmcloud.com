@@ -44,7 +44,10 @@ const softwareApplicationSchema = {
         'wasmCloud is an open source CNCF project that enables teams to build, manage, and scale polyglot Wasm applications across any cloud, Kubernetes, or edge.',
       url: 'https://wasmcloud.com',
       downloadUrl: 'https://wasmcloud.com/docs/installation/',
-      softwareHelp: 'https://wasmcloud.com/docs/',
+      softwareHelp: {
+        '@type': 'CreativeWork',
+        url: 'https://wasmcloud.com/docs/',
+      },
       license: 'https://www.apache.org/licenses/LICENSE-2.0',
       isAccessibleForFree: true,
       author: { '@id': 'https://wasmcloud.com/#organization' },

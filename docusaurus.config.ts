@@ -11,6 +11,7 @@ import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-
 import { Options as PluginReoAnalyticsOptions } from '@wasmcloud/docusaurus-reo-analytics';
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
 import communitySpeakersPlugin from './plugins/community-speakers';
+import transcriptInheritancePlugin from './plugins/transcript-inheritance';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import {
   transformerMetaHighlight,
@@ -266,21 +267,13 @@ const config = (async (): Promise<Config> => {
 
     plugins: [
       communitySpeakersPlugin,
-      // github-stars: both the build-time prefetch and the runtime
-      // <github-count> custom element call api.github.com. Skip the plugin
-      // entirely in offline builds (no usages outside the navbar, which is
-      // also gated above).
-      ...(offlineBuild
-        ? []
-        : [
-            [
-              '@wasmcloud/docusaurus-github-stars',
-              {
-                preloadRepo:
-                  process.env.NODE_ENV === 'production' ? 'wasmCloud/wasmCloud' : undefined,
-              } satisfies PluginGithubStarsOptions,
-            ],
-          ]),
+      transcriptInheritancePlugin,
+      [
+        '@wasmcloud/docusaurus-github-stars',
+        {
+          preloadRepo: process.env.NODE_ENV === 'production' ? 'wasmCloud/wasmCloud' : undefined,
+        } satisfies PluginGithubStarsOptions,
+      ],
       [
         '@wasmcloud/docusaurus-seo-checks',
         {
