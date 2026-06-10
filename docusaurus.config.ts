@@ -243,9 +243,24 @@ const config = (async (): Promise<Config> => {
                   return { ...item, priority: 0.5, changefreq: 'monthly' };
                 }
 
-                // v1 docs — archived
+                // v1 docs — archived. High-value pages that still hold rankings
+                // stay crawlable until a v2 successor inherits them; the rest stay low.
                 if (path.startsWith('/docs/v1/')) {
-                  return { ...item, priority: 0.3, changefreq: 'yearly' };
+                  const STILL_RANKING_V1 = new Set([
+                    '/docs/v1/kubernetes',
+                    '/docs/v1/intro',
+                    '/docs/v1/concepts',
+                    '/docs/v1/concepts/lattice',
+                    '/docs/v1/concepts/components',
+                    '/docs/v1/ecosystem/wadm',
+                    '/docs/v1/ecosystem/wasmtime',
+                    '/docs/v1/deployment/nats/cluster-config',
+                  ]);
+                  const norm = path.replace(/\/$/, '');
+                  if (STILL_RANKING_V1.has(norm)) {
+                    return { ...item, priority: 0.6, changefreq: 'monthly' };
+                  }
+                  return { ...item, priority: 0.3, changefreq: 'monthly' };
                 }
 
                 // 0.82 docs — already disallowed in robots.txt, minimal priority
