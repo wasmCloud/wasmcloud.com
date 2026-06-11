@@ -1,0 +1,217 @@
+---
+date: '2026-06-10'
+title: 'Transcript: Wasm Autoscaling on Kubernetes, wasmCloud 2.3.0, and the WASI Preview 3 Vote'
+description: 'Full transcript of the June 10, 2026 wasmCloud community call covering Wasm runtime autoscaling on Kubernetes with KEDA, the 2.3.0 release, multi-subscription workloads, and the WASI P3 launch vote.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm runtime autoscaling
+  - webassembly kubernetes
+  - wasi p3
+  - wasi preview 3
+  - kubernetes hpa
+  - nats kubernetes
+  - helm wasmcloud
+  - webassembly news
+image: https://i.ytimg.com/vi/v0o4ptC_jqQ/maxresdefault.jpg
+showTitle: true
+slug: 2026-06-10-community-meeting-transcript
+speakers:
+  - jeremy-fleitz
+  - bailey-hayes
+  - eric-gregory
+  - aditya
+about: wasmCloud
+mentions:
+  - Kubernetes
+  - WASIPreview3
+  - Wasmtime
+  - NATS
+  - JCO
+  - ComponentModel
+  - wash
+  - runtimeOperator
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-06-10-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=v0o4ptC_jqQ" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=v0o4ptC_jqQ" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+*wasmCloud Weekly Community Call — Wed, Jun 10, 2026 · 27 minutes*
+
+{/* Speakers: Jeremy Fleitz, Bailey Hayes, Eric Gregory, Aditya Salunkhe */}
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Jeremy Fleitz** [0:12](https://youtu.be/v0o4ptC_jqQ?t=12)
+
+Okay, welcome to the weekly wasmCloud community call, June 10. Today we've got quite a few things on our agenda. Let me just share my screen. This will be posted later today, but I know GitHub's having a couple issues — looks like now it's just API authentication issues.
+
+So today we're going to be going through — I'm going to be showing off **auto-scaling workloads**. This closes out one of the open issues in our project roadmap. Then we'll cover some additional **Helm enhancements**, really just for additional knobs, especially if you want to further dictate how wasmCloud is installed — including if you're using your own custom host. And then Bailey is going to be showing off something she's been working on with **workloads with multiple subscriptions and handlers**, and we'll also be doing our documentation of the week.
+
+So to start off with the first one — with auto-scaling workloads — this was opened up inside our project roadmap for this current quarter, and I was trying to get this across the line. It's really, really close, and I have a demo just showing off exactly how this all works. What this does, for the **workload deployment CRD** that we use inside Kubernetes to schedule a workload to a host, this adds now the **`/scale` subresource**, which allows for basically the **Horizontal Pod Autoscaler** in Kubernetes to work with our workload deployment. It works based on using that subresource, and it sets up the replica path and the label selector path.
+
+Now, HPA literally stands for *Horizontal Pod Autoscaler*. Since we're not really scheduling per pod for a workload component — because that would just completely defeat part of the purpose of getting high density — each host is still just a single pod. We don't want to scale the actual host pods, we want to scale the actual workload deployments.
+
+**Eric Gregory** [2:25](https://youtu.be/v0o4ptC_jqQ?t=145)
+
+Colin, I don't think you're on mute there, but I just —
+
+**Jeremy Fleitz** [2:28](https://youtu.be/v0o4ptC_jqQ?t=148)
+
+Mute him. Yeah, yeah.
+
+So, anyways, this PR is what adds that, and just to show off exactly how this all works: I have a test demo script that I'm going to be uploading into our public **Cosmonic Labs** section, so you can use this against wasmCloud as well. The first thing you do is set up your Kind cluster, just following the documentation that's up on wasmCloud Docs, and then you install **Prometheus** and **KEDA** (Kubernetes event-driven autoscaling — that is also a CNCF addition to Kubernetes). That allows you to take KEDA to point at Prometheus and take an external metric for controlling the Horizontal Pod Autoscaler CRD.
+
+Now, what this demo does — I did not want to add any more complexity to it. Typically, what you would do in this case is have this actually talking to your ingress to measure backpressure, to see if responses are taking too long. What I actually did instead is, inside the workload, I'm just deploying the typical Hello wasmCloud workload component, and the target metric is just a simple gauge metric coming across, saying "I want to always keep 10 requests per instance out there." So my local script makes about 450 requests a second. What I expect is at first you just see one instance handling all 450 requests, but then over time it's going to keep scaling up to roughly 46 workload deployments at 10 requests per second, so it should still equal about 460 coming in.
+
+So, going back to the setup here, I do have Prometheus and KEDA installed, just by the Helm charts. I also configured **OTel** to use **.NET Aspire** as well, just for a quick dashboard to show how it is routing inside the workload components. As far as deploying wasmCloud, I followed the same steps but I did override some values in the host group section — this was really just adding `meters enabled`, so that's going to allow for each HTTP invocation to be reported back to the OTel collector endpoint. That's going to report every five seconds, so there's going to be a little bit of delay coming around.
+
+As far as the KEDA side of things on the KEDA CRD: I said go ahead and make it so you can have up to 1,000 workload components deployed. The minimum should be one. It is the Hello World workload deployment, and then just to add some stabilization — so it's not constantly updating the workload deployment over and over again — I said go ahead and update it every 10 seconds, just to give time for the whole reconciliation process to come around.
+
+So, already got all this stuff configured, and I have a load script here that I'm going to run. This is just going to start calling out to `localhost` and constantly pinging that kubectl — I'm sorry, that Kind cluster locally. And since the Kind cluster followed the wasmCloud deployment steps, that's just simply port 80 going straight to the manifest. So if I look at my workload deployment here, this is the Hello World application. If you notice, this is taking any ingress coming in from the Kubernetes Service called `hello-world`. If I look at that, this has all the **Endpoint Slices** registered to all three hosts, because it's already spun up to at least three instances spread across all the hosts. This is where it ties NodePort `3950` to the target port `80` on the host. Port `3950` on the wasmCloud standard Kind default install already has a local port-forward to it, so that's why I can just say `curl localhost` and it routes automatically.
+
+**Jeremy Fleitz** [7:09](https://youtu.be/v0o4ptC_jqQ?t=429)
+
+So now, if I look at my hosts here, these are all three hosts I have running right now. I can go inside each one and I can see this one already has 12 of the instances. There's no other wasm components running other than this test. This one right here has 10, so I've got 22, and got seven, so that's 29. If I look at my watch here, it has now a total of 38. If I were to take these two numbers, I'm going to get close to 460 transactions a second. As long as this is right around 10, it's not going to try to scale up anymore.
+
+I'm hoping that it might… we might say, change a little bit there, but while that's still going I'm just going to bring up the Aspire metrics here and just show how this is all routing.
+
+Now, I did restart my host a few times, and so I got — I probably should have cleared this out before the demo, but three of these are going to have actual metrics coming across. If I do the total count here, this host right here, the total number of replicas of the host components on this one, is doing roughly 255,000 requests, and this one over here is close — not the same — but if I look at the overall, what I've processed so far is 707,063.
+
+So I'm just going to go back here to see where we're at, and we're still just hanging on at 38. I'm just going to go ahead and kill this load process here. Actually, it looks like I've already saw it go down to 35 just by automatically doing that. Just wait a moment here. Yep. Since I started taking the load off, it's going to start degrading the number of replicas down. Once again, I have every five seconds to report the metrics, and then every 10 seconds for it to actually update the workload deployment.
+
+So this is really just showing true **workload horizontal autoscaling, not pod autoscaling**. Once again, you would normally put this against your ingress for backpressure, not really in this type of case. So I will pause if anybody has any questions on this. Okay, I don't think I see anybody's hands. Oh, yeah — all right, awesome.
+
+Okay, so going on to the next thing: **Helm enhancements**. This is something that Bailey and I and the team were talking about, and this also came up from Mike on our wasmCloud Slack channel yesterday. He ran into an issue with using it — I think **Synadia**, thank you. He's using that, which is a distributed NATS cluster, and he was asking, "How can I set NATS inside wasmCloud to point to Synadia versus the installed NATS instance?" And yes, you can do that, but it's actually kind of hard. It doesn't make sense to.
+
+I mean, you can use Kustomize, but the way you use Kustomize is you set up an external service inside Kubernetes that would basically route to the thing of the same name, so you're not changing the hard-coded name our Helm chart is looking at. So this really triggered: okay, what all do we want to make configurable inside the Helm chart? And it's really everything. Anything that's hard-coded should be a default value — that's our opinionated install — but if you do have a cluster you're deploying into, especially if you're self-hosting your NATS install (maybe you have a NATS team focused on the health of NATS), then yes, you should be able to use that.
+
+**Jeremy Fleitz** [11:36](https://youtu.be/v0o4ptC_jqQ?t=696)
+
+The other thing we came up with: there are times you actually might want to have a **control-plane / scheduler NATS URL** — just for communicating between the host and the runtime operators — as well as a separate NATS installation for just your workload components to talk on. That way you don't have any cross-talk on subjects and things like that that might happen. So that's why we're adding even another NATS configuration as well.
+
+There's also the ability to bring in your own **environment variables**, as well as passing additional arguments into the actual containers being deployed. The argument side makes a lot of sense for if you bring your own custom host — there might be times where you have the default host out of the box but you do want to add a, well, not using the host plugin component plugin (that's coming up as a feature) — maybe you want to compile it all together. You might have some additional arguments you also want to pass. So this is going to be coming up shortly in one of the next releases.
+
+Any questions for everybody on the call? I need to do better looking at the…
+
+**Bailey Hayes** [12:57](https://youtu.be/v0o4ptC_jqQ?t=777)
+
+Oh, you're doing great. Our next scheduled release for folks wondering is Tuesday?
+
+**Jeremy Fleitz** [13:04](https://youtu.be/v0o4ptC_jqQ?t=784)
+
+Yes. Thank you. All right, so those were the two things I wanted to cover at first. I'm just going to hand it over to Bailey.
+
+**Bailey Hayes** [13:14](https://youtu.be/v0o4ptC_jqQ?t=794)
+
+Yeah, okay. So you just actually showed the data NATS URL field that we pass into Kubernetes, and one of the changes that I did is reflecting that essentially into what we run when we run `wash dev` — when we run a `wash dev` host.
+
+So a couple of different changes, but basically two larger PRs that have landed on `main` now, so I'm going to demo this straight off of `main`. Let's look at the configuration first. So I'm building one component, and this is basically my HTTP handler. So the main endpoint, when I hit my localhost, this is the first component that we'll hit, but I'm also running a multi-component…
+
+**Aditya Salunkhe** [14:00](https://youtu.be/v0o4ptC_jqQ?t=840)
+
+I already have two built-ins. Sorry.
+
+**Bailey Hayes** [14:05](https://youtu.be/v0o4ptC_jqQ?t=845)
+
+Hey —
+
+**Aditya Salunkhe** [14:07](https://youtu.be/v0o4ptC_jqQ?t=847)
+
+My bad.
+
+**Bailey Hayes** [14:08](https://youtu.be/v0o4ptC_jqQ?t=848)
+
+Sorry, it's good to see you. Okay, so if we're running with other components inside our workload, this top-level component is going to route to these others — to both `task-leet` and `task-reverse`. This is a template that we had already provided, but it didn't allow you to do **multiple subscriptions**, and there's a couple of reasons why.
+
+Reason number one is that we didn't have any **configuration affordance** for you to be able to do that. What I mean by that is we didn't have a way for us on a **per-component level** to be able to say: I have my own configuration. And I wanted to say `subscriptions: ...`, so this one is going to subscribe to the `task.leet` topic, and this one's going to subscribe to the `task.reverse` topic.
+
+If we look at the architecture: we have a client, we're going to hit our HTTP API, and then this is actually going to post to our message broker. Off of those subscriptions, depending on the subscription topic, either it'll go to `task-leet` or it'll go to `task-reverse`.
+
+I'm just going to run that over here, open up a couple, and we'll say `wash dev`. Open it up — and then here's our little task API. One thing I added to this template is that I also expanded out the UI that we bundle in, mainly because I actually showed my partner this demo, and she was like, "this is pretty lame." And I was like, actually, the cool part is *this*. This is the cool part.
+
+But yeah, okay, I'll run the demo. We're first going to do **leet speak**. So I type something like this and I get this type of leet-speak back. If I change it to reverse and send a task — I didn't come up with a unique other task other than just reversing the words. So this demo now has the second component in it, and it reverses the words. It also has this little prefix; I don't know if you noticed that when I switched to leet speak it pretends to be a robot. When I switched to reverse, it shows me that I'm actually doing a little reverse. That actually is coming from inside the component.
+
+So, anyways, now we've got this little architecture view. I hope we can use this pattern continuing forward on our examples and templates, where if it's not the coolest of demos, at least have the architecture on the UI page so people understand what you're trying to highlight to them, and why we think it's interesting.
+
+So essentially we now support being able to pass in **local environment variables** and **local config on a per-component basis** inside our dev configuration — so for your local dev. Another key point of what we had to change to make all of this work: if you go into `target/release`, here's my Wasm, and if I do `wasm-tools` — let's look at the reverse WIT. You'll see that it's a consumer (so it's pulling in consumer types), but most importantly, it's a **handler** — so it's exporting being able to handle these messages.
+
+**Bailey Hayes** [17:34](https://youtu.be/v0o4ptC_jqQ?t=1054)
+
+If we look at our HTTP API for how it does that, basically it's just posting based on whatever that `task` is. It's going to say, go to that subject that I'm configured to go to. So it isn't directly linked per se to those components — they're all picking it up off of the message broker.
+
+If I go to `task-leet`, for example — here you'll see that it's subscribed, and then it does its little leet-speak. But the main point here is that this is its one export. Here's the trick: this is its one export, but also look at this one — oh no, it has the *exact same export*.
+
+That was the challenge that we ran into. Previously we were trying to prevent cycles. So whenever we ran — I'll do a bad job saying things while doing two things at once — whenever we were instantiating a workload, we were looking for cycles where it was like, "oh, we've got duplicate exports, so that's going to be ambiguous for us to be able to do intercomponent linking." But it's actually not ambiguous if other components inside the workload aren't trying to **import** that export. So you don't have a cycle there.
+
+That landed as part of this change right here. So basically now we say, all right, when we're linking up our components, we still have a check on the **import**. So let's say I have components A, B, and C, and component A says "I want to import messaging handler" — that export I showed earlier — but then both B and C both export messaging handler. That would be an ambiguous import and will fail at runtime. The solution for somebody who runs into that would be to either compose their components together by being careful about which instance you actually want to link to (and do that with `wac`), or put it in a different component workload entirely — decouple those from the workload deployment.
+
+It's not a problem if each one of these components all have the same export, because the host knows which component instance it wants to call when it's doing that routing. Another aspect of the change here is we made it so that the **in-memory messaging plugin** knows how to do that sort of subject routing. So I did that with in-memory. One other thing is that if I had specified a data NATS URL like what Jeremy just demoed for the Kubernetes side, then it would have actually automatically loaded the **NATS plugin**, and in that scenario I would have also needed to run NATS locally. So we default still to the in-memory version for local development to make it easier — people don't have to bring their own infrastructure to get things working. But if they want, they can also use our NATS plugin to do this as well.
+
+So I think that is sort of the roundup of some of those big changes that landed. Questions?
+
+Oh, yeah, and I did it for **TypeScript** too. If we go over to the TypeScript repo, you'll see basically the exact same template name, and with the exact same HTML essentially in it. When you run it, you can't even tell that you're running TypeScript components versus Rust components. We could probably, if we really wanted to, even do an interchange where one `task` worker is Rust and the other is TypeScript, and vice versa. But right now we just have all the Rust or all the TypeScript versions, and I'll post that PR in the chat. I think that's it for me, unless folks have questions.
+
+**Jeremy Fleitz** [21:48](https://youtu.be/v0o4ptC_jqQ?t=1308)
+
+All right, awesome. So now we have our documentation side. Eric, do you want me to go over that, or do you want to present?
+
+**Eric Gregory** [21:58](https://youtu.be/v0o4ptC_jqQ?t=1318)
+
+Maybe if you've got the agenda, maybe go ahead.
+
+**Jeremy Fleitz** [22:03](https://youtu.be/v0o4ptC_jqQ?t=1323)
+
+Absolutely. Okay, so there's two things we wanted to present to everybody. First off is our **2.3.0 release** that literally came out last week. It just adds several new enhancements to wasmCloud. It does have some additional fixes to the OTel support, as well as how to do workload environment config and secrets inside the `wash` config YAML for `wash dev`, so please check this out inside our blog.
+
+One other thing to call out: it does have a `loud` host now in there too, especially inside the examples. So this is a good way to show, even from an egress side, that from a workload component you're able to control what data is passed and where.
+
+The other thing we wanted to call out is we have some updated documentation on our **ingress**. This is really useful — once again, just looking at our wasmCloud Slack, with the change from going from the runtime gateway (that's now deprecated) to being more **Kubernetes-native** by using Services and Endpoints. This really just goes into an overall architecture on how you can configure it: first into an Ingress, which then goes to Service / kube-proxy, looks at the Service as well as the **Endpoint Slices** registered (like I showed inside the demo), and then that's how it's going to know which IP address to pass to the host pod. The host will then inspect what the header is coming in, as well as the request coming in, to figure out which WebAssembly component the whole thing gets routed to. So this section right here, underneath the operator manual, is very useful for explaining how everything now works the 2.3.0 way, after the runtime gateway.
+
+The last thing to call out — and it's very, very important — was the **WASI P3 vote is tomorrow**. Bailey, I'm not sure if you want to add anything more to this or not.
+
+**Bailey Hayes** [24:21](https://youtu.be/v0o4ptC_jqQ?t=1461)
+
+Guess what folks, we're almost there. It's very exciting. It's very nerve-wracking.
+
+Eric has a really great PR up on `wasi.dev` that's in review — kind of doing the refresh from everything around **WASI Preview 3**, calling out the **WASI test suite**.
+
+Victor, along with Tomas, has successfully gotten test suite compliance for **JCO**. So you can go and pull off `main` of the WASI test suite, which is in the WebAssembly repo, and run that — and you can see that **JCO is compliant**. That makes it the second reference implementation. **Wasmtime** was already compliant, and so with two reference implementations, and so long as we have full consensus tomorrow, we will be launching.
+
+What does that mean for us? We're going to enable **WASI P3 by default** pretty soon after that. Alex is going to go and enable the **component model async feature flags** by default over in Wasmtime. It won't be — I don't think it'll be in Wasmtime 46. The latest release is Wasmtime 45; 46 has already branched off and is undergoing continuous fuzzing. But **Wasmtime 47**, I believe, will be the one that will have all this enabled by default, and aiming to also bundle in the WIT interfaces from **WASI 0.3.0**.
+
+So, once we vote, we say we want it. I will create a release that creates OCI artifacts with WASI 0.3.0 inside it. So there's going to be some automation glue spreading out after we launch, but that is the go-ahead for everybody to begin integrating and embedding and enabling it by default. So, yay! Exciting —
+
+**Jeremy Fleitz** [26:15](https://youtu.be/v0o4ptC_jqQ?t=1575)
+
+— times.
+
+**Bailey Hayes** [26:16](https://youtu.be/v0o4ptC_jqQ?t=1576)
+
+Any questions on that? Oh — oh, yeah, **Aditya**, I've been playing with your PR. It's great. Nice work, man.
+
+You're working on being able to share values basically inside the same store. You and I are talking about what it would look like with multiple stores. I've got thoughts there. We need to talk through that at some point, but maybe — maybe not today. It's a little confusing, but maybe if you get a chance to read some of the docs that I sent you, then we can dive into it together next time. Cool.
+
+**Jeremy Fleitz** [27:00](https://youtu.be/v0o4ptC_jqQ?t=1620)
+
+Okay, I think that is everything on the agenda. So, opening up to the floor if anybody has any other things to discuss.
+
+All right, and if not, then happy wasmCloud Wednesday, and we will catch you all next week. All right. Thanks, everybody. And if there's anything else prior to that, hit up our wasmCloud Slack group.
+
+**Bailey Hayes** [27:30](https://youtu.be/v0o4ptC_jqQ?t=1650)
+
+Thanks, folks. Bye bye.
