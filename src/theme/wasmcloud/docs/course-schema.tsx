@@ -1,0 +1,147 @@
+import React from 'react';
+import { useDoc } from '@docusaurus/plugin-content-docs/client';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import JsonLd from '@theme/wasmcloud/json-ld';
+
+/**
+ * M7 — Course + LearningResource schema for the Quickstart series.
+ *
+ * The component is a no-op on doc pages outside `/docs/quickstart/`. On the
+ * series index (`/docs/quickstart/`) it emits a `Course` JSON-LD listing
+ * each step's URL. On each step page it emits a `LearningResource` that
+ * references the parent course via `isPartOf`.
+ *
+ * Note on rich-result eligibility: Google's Course list carousel rich
+ * result requires ≥3 courses on the same site (per Google's docs). With
+ * only one Quickstart series, the carousel is not attainable; this emits
+ * Course schema for parser ingestion and Course-detail rich result
+ * eligibility, not the carousel.
+ *
+ * `HowTo` is intentionally NOT used — Google deprecated it for general use
+ * in September 2023.
+ */
+
+const PROJECT_ORG_ID = 'https://wasmcloud.com/#organization';
+const QUICKSTART_BASE = '/docs/quickstart';
+const COURSE_ID = 'https://wasmcloud.com/docs/quickstart/#course';
+
+const QUICKSTART_STEPS = [
+  {
+    permalink: '/docs/quickstart/',
+    name: 'Quickstart — Build & Deploy Your First Wasm App',
+    isIndex: true,
+  },
+  {
+    permalink: '/docs/quickstart/develop-a-webassembly-component/',
+    name: 'Develop a WebAssembly component',
+    isIndex: false,
+  },
+  {
+    permalink: '/docs/quickstart/deploy-a-webassembly-workload/',
+    name: 'Deploy a WebAssembly workload',
+    isIndex: false,
+  },
+] as const;
+
+function normalizePath(permalink: string): string {
+  return permalink.endsWith('/') ? permalink : permalink + '/';
+}
+
+type ProficiencyLevel = 'Beginner' | 'Intermediate' | 'Expert';
+const VALID_PROFICIENCIES: ReadonlySet<ProficiencyLevel> = new Set([
+  'Beginner',
+  'Intermediate',
+  'Expert',
+]);
+
+/**
+ * Read the M4 `proficiency:` frontmatter field if present and valid, else
+ * default to Beginner (the Quickstart's overall positioning). Same enum and
+ * convention as TechArticle's `proficiencyLevel` field in
+ * `doc-page-schema.tsx` — kept inline here rather than imported because
+ * the two files are otherwise decoupled.
+ */
+function proficiencyFrom(fm: Record<string, unknown>): ProficiencyLevel {
+  const raw = fm.proficiency;
+  if (typeof raw === 'string' && VALID_PROFICIENCIES.has(raw as ProficiencyLevel)) {
+    return raw as ProficiencyLevel;
+  }
+  return 'Beginner';
+}
+
+export default function CourseSchema(): JSX.Element | null {
+  const { siteConfig } = useDocusaurusContext();
+  const { metadata, frontMatter } = useDoc();
+  const fm = frontMatter as unknown as Record<string, unknown>;
+  const siteUrl = siteConfig.url.replace(/\/$/, '');
+  const path = normalizePath(metadata.permalink);
+
+  if (!path.startsWith(QUICKSTART_BASE + '/') && path !== QUICKSTART_BASE + '/') {
+    return null;
+  }
+
+  const isSeriesIndex = path === QUICKSTART_BASE + '/';
+
+  if (isSeriesIndex) {
+    // Steps are PARTS of the course, not separate instances of it.
+    // schema.org's `CourseInstance` means a specific offering of the course
+    // (date / location / instructor / mode). The wasmCloud Quickstart has
+    // one online, self-paced offering — that's the `hasCourseInstance` —
+    // and the curriculum steps are sub-resources expressed via `hasPart`.
+    //
+    // `position` is a `ListItem`-only property in schema.org and isn't
+    // valid on `CourseInstance` or `LearningResource`. Array order conveys
+    // sequence semantics; no explicit position field is needed.
+    const steps = QUICKSTART_STEPS.filter((s) => !s.isIndex).map((s) => ({
+      '@type': 'LearningResource',
+      name: s.name,
+      url: `${siteUrl}${s.permalink}`,
+      learningResourceType: 'Tutorial',
+    }));
+    const course = {
+      '@context': 'https://schema.org',
+      '@type': 'Course',
+      '@id': COURSE_ID,
+      name: 'wasmCloud Quickstart',
+      description:
+        'Get started with wasmCloud — install the wash CLI, build a WebAssembly component, and deploy your first Wasm workload to Kubernetes in under 15 minutes.',
+      provider: { '@id': PROJECT_ORG_ID },
+      url: `${siteUrl}${QUICKSTART_BASE}/`,
+      educationalLevel: proficiencyFrom(fm),
+      inLanguage: 'en',
+      coursePrerequisites:
+        'Familiarity with a developer environment; Docker or Kubernetes optional but recommended.',
+      hasCourseInstance: {
+        '@type': 'CourseInstance',
+        courseMode: 'Online',
+        courseWorkload: 'PT15M',
+        inLanguage: 'en',
+      },
+      hasPart: steps,
+    };
+    return <JsonLd data={course} />;
+  }
+
+  // Step page — emit LearningResource referencing the parent course
+  const teaches =
+    typeof fm.teaches === 'string'
+      ? fm.teaches
+      : metadata.title || 'wasmCloud Quickstart step';
+  const timeRequired =
+    typeof fm.time_required === 'string' ? fm.time_required : undefined;
+  const learningResource = {
+    '@context': 'https://schema.org',
+    '@type': 'LearningResource',
+    name: metadata.title,
+    description: metadata.description,
+    url: `${siteUrl}${path}`,
+    learningResourceType: 'Tutorial',
+    educationalLevel: proficiencyFrom(fm),
+    teaches,
+    inLanguage: 'en',
+    isPartOf: { '@id': COURSE_ID },
+    ...(timeRequired && { timeRequired }),
+    provider: { '@id': PROJECT_ORG_ID },
+  };
+  return <JsonLd data={learningResource} />;
+}

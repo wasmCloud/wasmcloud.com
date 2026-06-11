@@ -10,6 +10,8 @@ import { Options as PluginGithubStarsOptions } from '@wasmcloud/docusaurus-githu
 import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-hubspot-analytics';
 import { Options as PluginReoAnalyticsOptions } from '@wasmcloud/docusaurus-reo-analytics';
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
+import communitySpeakersPlugin from './plugins/community-speakers';
+import transcriptInheritancePlugin from './plugins/transcript-inheritance';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import {
   transformerMetaHighlight,
@@ -20,6 +22,12 @@ import {
 import rehypeNameToId from 'rehype-name-to-id';
 import { WASMCLOUD_VERSION } from './src/wasmcloud-version';
 import wasmCloudVersionPlugin from './src/remark/wasmcloud-version';
+
+// When OFFLINE_BUILD=1 (used by the `docs-v*` release workflow that builds the
+// air-gapped container image and tarball), skip every plugin and head tag that
+// would cause an air-gapped browser to call out — analytics, search, fonts —
+// and trim the build to the current docs version only.
+const offlineBuild = process.env.OFFLINE_BUILD === '1';
 
 const rehypeShikiPlugin = [
   rehypeShiki,
@@ -75,7 +83,10 @@ const config = (async (): Promise<Config> => {
     url: siteBaseUrl(),
     baseUrl: '/',
     trailingSlash: true,
-    onBrokenLinks: 'throw',
+    // Offline build excludes v1 / 0.82 docs; links from current → those
+    // versions become unresolvable, so downgrade to warn for this build path
+    // only. The production build keeps the throw behavior.
+    onBrokenLinks: offlineBuild ? 'warn' : 'throw',
     onBrokenMarkdownLinks: 'warn',
     favicon: '/favicon.ico',
 
@@ -102,6 +113,10 @@ const config = (async (): Promise<Config> => {
             blogPostComponent: '@theme/wasmcloud/blog/post-page',
             onInlineAuthors: 'throw',
             onUntruncatedBlogPosts: 'ignore',
+            // M1 — populate metadata.lastUpdatedAt + lastUpdatedBy from git so
+            // downstream Article schema can emit dateModified accurately.
+            showLastUpdateTime: true,
+            showLastUpdateAuthor: true,
           },
           docs: {
             sidebarPath: require.resolve('./sidebars.js'),
@@ -109,7 +124,13 @@ const config = (async (): Promise<Config> => {
             remarkPlugins: [[wasmCloudVersionPlugin, { version: WASMCLOUD_VERSION }]],
             beforeDefaultRehypePlugins: [rehypeShikiPlugin],
             rehypePlugins: [rehypeNameToId],
+            // M1 — same as blog: drives TechArticle.dateModified
+            showLastUpdateTime: true,
+            showLastUpdateAuthor: true,
             lastVersion: 'current',
+            // Air-gapped image only ships the current (v2) docs; v1 and 0.82
+            // are skipped to keep image size sane.
+            ...(offlineBuild ? { onlyIncludeVersions: ['current'] } : {}),
             versions: {
               current: {
                 label: 'v2',
@@ -161,13 +182,17 @@ const config = (async (): Promise<Config> => {
                 }
 
                 // Community meeting/transcript dated content:
-                //   2026 → priority 0.9 (current cadence we want indexed)
-                //   pre-2026 → noindex (handled in CommunityPostPage swizzle); drop from sitemap
+                //   2026 → priority 0.9 (current cadence)
+                //   2025 → priority 0.8 (indexed; content-rich backfilled pages)
+                //   pre-2025 → noindex (handled in CommunityPostPage swizzle); drop from sitemap
                 const communityYearMatch = path.match(COMMUNITY_YEAR_RE);
                 if (communityYearMatch) {
                   const year = Number(communityYearMatch[1]);
                   if (year >= 2026) {
                     return [{ ...item, priority: 0.9, changefreq: 'monthly' }];
+                  }
+                  if (year >= 2025) {
+                    return [{ ...item, priority: 0.8, changefreq: 'yearly' }];
                   }
                   return [];
                 }
@@ -218,9 +243,24 @@ const config = (async (): Promise<Config> => {
                   return { ...item, priority: 0.5, changefreq: 'monthly' };
                 }
 
-                // v1 docs — archived
+                // v1 docs — archived. High-value pages that still hold rankings
+                // stay crawlable until a v2 successor inherits them; the rest stay low.
                 if (path.startsWith('/docs/v1/')) {
-                  return { ...item, priority: 0.3, changefreq: 'yearly' };
+                  const STILL_RANKING_V1 = new Set([
+                    '/docs/v1/kubernetes',
+                    '/docs/v1/intro',
+                    '/docs/v1/concepts',
+                    '/docs/v1/concepts/lattice',
+                    '/docs/v1/concepts/components',
+                    '/docs/v1/ecosystem/wadm',
+                    '/docs/v1/ecosystem/wasmtime',
+                    '/docs/v1/deployment/nats/cluster-config',
+                  ]);
+                  const norm = path.replace(/\/$/, '');
+                  if (STILL_RANKING_V1.has(norm)) {
+                    return { ...item, priority: 0.6, changefreq: 'monthly' };
+                  }
+                  return { ...item, priority: 0.3, changefreq: 'monthly' };
                 }
 
                 // 0.82 docs — already disallowed in robots.txt, minimal priority
@@ -241,6 +281,8 @@ const config = (async (): Promise<Config> => {
     ],
 
     plugins: [
+      communitySpeakersPlugin,
+      transcriptInheritancePlugin,
       [
         '@wasmcloud/docusaurus-github-stars',
         {
@@ -274,25 +316,29 @@ const config = (async (): Promise<Config> => {
           onUntruncatedBlogPosts: 'ignore',
         } satisfies PluginContentBlogOptions,
       ],
-      [
-        '@docusaurus/plugin-google-analytics',
-        {
-          trackingID: process.env.GOOGLE_ANALYTICS_ID || 'localdev',
-          anonymizeIP: true,
-        } satisfies PluginGoogleAnalyticsOptions,
-      ],
-      [
-        '@wasmcloud/docusaurus-hubspot-analytics',
-        {
-          hubspotId: process.env.HUBSPOT_ID || 'localdev',
-        } satisfies PluginHubspotAnalyticsOptions,
-      ],
-      [
-        '@wasmcloud/docusaurus-reo-analytics',
-        {
-          clientID: process.env.REO_CLIENT_ID || 'localdev',
-        } satisfies PluginReoAnalyticsOptions,
-      ],
+      ...(offlineBuild
+        ? []
+        : [
+            [
+              '@docusaurus/plugin-google-analytics',
+              {
+                trackingID: process.env.GOOGLE_ANALYTICS_ID || 'localdev',
+                anonymizeIP: true,
+              } satisfies PluginGoogleAnalyticsOptions,
+            ],
+            [
+              '@wasmcloud/docusaurus-hubspot-analytics',
+              {
+                hubspotId: process.env.HUBSPOT_ID || 'localdev',
+              } satisfies PluginHubspotAnalyticsOptions,
+            ],
+            [
+              '@wasmcloud/docusaurus-reo-analytics',
+              {
+                clientID: process.env.REO_CLIENT_ID || 'localdev',
+              } satisfies PluginReoAnalyticsOptions,
+            ],
+          ]),
       customPostCssPlugin, // PostCSS plugin function registration
       [
         'docusaurus-plugin-llms',
@@ -326,13 +372,20 @@ const config = (async (): Promise<Config> => {
             // used for styling, see src/styles/theme/_navbar.css
             className: 'navbar__link--version-dropdown',
           },
-          {
-            href: 'https://github.com/wasmcloud/wasmcloud',
-            'aria-label': 'Star wasmCloud on GitHub',
-            position: 'right',
-            html: `<span class="badge badge--outline">Star us! ★ <github-count repo="wasmcloud/wasmcloud">1500</github-count></span>`,
-            className: 'sidebar-hidden',
-          },
+          // The <github-count> custom element fetches api.github.com at runtime
+          // to populate the live star count. Dropped in offline builds so
+          // air-gapped browsers do not attempt that request.
+          ...(offlineBuild
+            ? []
+            : [
+                {
+                  href: 'https://github.com/wasmcloud/wasmcloud',
+                  'aria-label': 'Star wasmCloud on GitHub',
+                  position: 'right' as const,
+                  html: `<span class="badge badge--outline">Star us! ★ <github-count repo="wasmcloud/wasmcloud">1500</github-count></span>`,
+                  className: 'sidebar-hidden',
+                },
+              ]),
           await svgIconNavItem({
             svgIconPath: './static/icons/github.svg',
             label: 'GitHub',
@@ -421,11 +474,15 @@ const config = (async (): Promise<Config> => {
         ],
         copyright: `Copyright © ${new Date().getFullYear()} wasmCloud LLC. All rights reserved. The Linux Foundation has registered trademarks and uses trademarks. For a list of trademarks of The Linux Foundation, please see our Trademark Usage page: https://www.linuxfoundation.org/trademark-usage. Built with Docusaurus.`,
       },
-      algolia: {
-        apiKey: 'f0ef30f3d98ce5e9a7dd7579bb221dfc',
-        indexName: 'wasmcloud',
-        appId: '2IM4TMH501',
-      },
+      ...(offlineBuild
+        ? {}
+        : {
+            algolia: {
+              apiKey: 'f0ef30f3d98ce5e9a7dd7579bb221dfc',
+              indexName: 'wasmcloud',
+              appId: '2IM4TMH501',
+            },
+          }),
     } satisfies PresetClassicThemeConfig,
 
     markdown: {
@@ -474,27 +531,48 @@ const config = (async (): Promise<Config> => {
           url: 'https://wasmcloud.com',
           publisher: { '@id': 'https://wasmcloud.com/#organization' },
           inLanguage: 'en-US',
+          // M1 — enables Google sitelinks searchbox in brand-search results.
+          // Targets the Algolia DocSearch route which docusaurus serves at /search.
+          // The URL is derived from siteBaseUrl() so deploy previews on
+          // Netlify and local dev resolve to their own search endpoint rather
+          // than silently posting against production.
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: {
+              '@type': 'EntryPoint',
+              urlTemplate: `${siteBaseUrl()}/search?q={search_term_string}`,
+            },
+            'query-input': 'required name=search_term_string',
+          },
         }),
       },
-      {
-        tagName: 'link',
-        attributes: { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-      },
-      {
-        tagName: 'link',
-        attributes: {
-          rel: 'preconnect',
-          href: 'https://fonts.gstatic.com',
-          crossorigin: 'crossorigin',
-        },
-      },
-      {
-        tagName: 'link',
-        attributes: {
-          href: 'https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Lexend:wght@100..900&family=Inter:wght@100..900&display=swap',
-          rel: 'stylesheet',
-        },
-      },
+      // Google Fonts: skipped in the offline build so air-gapped browsers do
+      // not request fonts.googleapis.com / fonts.gstatic.com. Falls back to
+      // the OS sans-serif via the CSS stack already declared in
+      // src/styles/index.css.
+      ...(offlineBuild
+        ? []
+        : [
+            {
+              tagName: 'link',
+              attributes: { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+            },
+            {
+              tagName: 'link',
+              attributes: {
+                rel: 'preconnect',
+                href: 'https://fonts.gstatic.com',
+                crossorigin: 'crossorigin',
+              },
+            },
+            {
+              tagName: 'link',
+              attributes: {
+                href: 'https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Lexend:wght@100..900&family=Inter:wght@100..900&display=swap',
+                rel: 'stylesheet',
+              },
+            },
+          ]),
     ],
 
     onBrokenAnchors: 'throw',

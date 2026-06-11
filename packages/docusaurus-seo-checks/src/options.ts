@@ -1,7 +1,7 @@
 import { Joi } from '@docusaurus/utils-validation';
 import type { OptionValidationContext } from '@docusaurus/types';
-import { CheckLevel, DefaultCheckOptions } from './checks/generate-check';
-import { ImportedChecksOptions } from './checks/import-checks';
+import type { CheckLevel, DefaultCheckOptions } from './checks/generate-check';
+import type { ImportedChecksOptions } from './checks/import-checks';
 
 type Options = ImportedChecksOptions;
 

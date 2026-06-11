@@ -1,0 +1,72 @@
+name: Tag after release-bump merge
+
+# When a `release-bump`-labeled PR (opened by update-version.yml) merges to
+# main, push `docs-v<version>`. That tag triggers release-docs.yml, which
+# publishes the offline docs image + tarball matching the new docs pin.
+#
+# Version is extracted from the PR title set by update-version.yml:
+#   "docs: update wasmCloud version to 2.1.0"
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+# Opt into Node 24 for bundled-JS actions ahead of GitHub's June 16, 2026 cutoff.
+# https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  tag:
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'release-bump')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          fetch-depth: 0
+          # Use bot PAT so the tag push triggers release-docs.yml. A tag pushed
+          # by the default GITHUB_TOKEN does not fire downstream workflows.
+          token: ${{ secrets.WASMCLOUD_BOT_PAT }}
+
+      - name: Extract version from PR title
+        id: ver
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          prefix='docs: update wasmCloud version to '
+          if [[ "$PR_TITLE" != "${prefix}"* ]]; then
+            echo "::error::PR title does not match expected prefix; got '$PR_TITLE'"
+            exit 1
+          fi
+          version="${PR_TITLE#${prefix}}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]]; then
+            echo "::error::extracted version '$version' is not valid semver"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Push docs-v${{ steps.ver.outputs.version }} tag
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          set -euo pipefail
+          tag="docs-v${VERSION}"
+          if git rev-parse --verify --quiet "refs/tags/${tag}"; then
+            echo "::notice::tag ${tag} already exists; skipping"
+            exit 0
+          fi
+          git tag -a "${tag}" -m "Offline docs release ${tag} (cuts ghcr.io/wasmcloud/docs:${VERSION})"
+          git push origin "${tag}"
+          echo "Pushed ${tag}; release-docs.yml will take over."

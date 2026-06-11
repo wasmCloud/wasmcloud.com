@@ -1,0 +1,150 @@
+#!/usr/bin/env node
+/**
+ * M3 — Default blog hero generator (driver for the nano-banana skill).
+ *
+ * The actual image generation runs through the `nano-banana` skill (Gemini
+ * CLI wrapper); this script emits the prompts the operator runs and writes
+ * a manifest of expected output paths. Once nano-banana runs each prompt,
+ * the resulting PNG lands at static/default-heroes/<topic>/hero-16x9.png
+ * (PNG because nano-banana's output format is fixed). Then
+ * `scripts/transform-blog-images.mjs --defaults` derives the 4:3, 1:1, AND
+ * 16:9 WebP variants from the PNG source — the WebP variants are what
+ * blog posts reference for Article schema, since they're ~30% smaller for
+ * the same visual quality.
+ *
+ * Why two-step instead of a single npm script: nano-banana is an
+ * interactive skill (image generation is non-deterministic, prompts are
+ * usually iterated). Generating a manifest of prompts is the durable
+ * artifact; the actual `nano-banana generate` invocations are a one-time
+ * operator step recorded in the spike doc.
+ *
+ * Run:
+ *   node scripts/generate-default-heroes.mjs
+ *
+ * Output:
+ *   static/default-heroes/PROMPTS.md  — prompts for the operator to run
+ */
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+const ROOT = process.cwd();
+const OUT_DIR = join(ROOT, 'static', 'default-heroes');
+
+// Brand palette per CLAUDE.md
+const PALETTE = {
+  greenAqua: '#00C389',
+  spaceBlue: '#002E5D',
+  gunmetal: '#253746',
+  yellow: '#FFB600',
+};
+
+const PALETTE_STRING = `wasmCloud brand palette: primary Green Aqua ${PALETTE.greenAqua}, background Space Blue ${PALETTE.spaceBlue}, secondary Gunmetal ${PALETTE.gunmetal}, accent Yellow ${PALETTE.yellow}`;
+
+const COMMON_STYLE =
+  'production blog hero, technical infographic style, clean geometric, flat illustration, no photorealism, no text overlay, abstract conceptual';
+
+const TOPICS = [
+  {
+    slug: 'webassembly',
+    title: 'WebAssembly',
+    prompt:
+      'Abstract visualization of WebAssembly bytecode as flowing modular blocks composing into a single integrated whole. Stack-based virtual machine metaphor — geometric tiles snapping together along typed interfaces. Centered composition.',
+  },
+  {
+    slug: 'aiops',
+    title: 'AIOps',
+    prompt:
+      'Neural network meets observability dashboard. Flowing data streams converging into a central insight node, with anomaly indicators and topology graphs in the background. Modern AI operations visualization.',
+  },
+  {
+    slug: 'component-model',
+    title: 'Component Model',
+    prompt:
+      'Interconnected modular components with visible typed interfaces between them — like blueprint-style schematic with clean connecting lines. Each block a distinct shape, connections explicit. Convey isolation + composition.',
+  },
+  {
+    slug: 'kubernetes',
+    title: 'Kubernetes / cloud-native',
+    prompt:
+      'wasmCloud-on-Kubernetes topology — geometric pods orbiting a central runtime operator, with Wasm components rendered as smaller hexagonal tiles inside larger Kubernetes-styled containers. Convey integration not replacement.',
+  },
+  {
+    slug: 'ai-mcp-agentic',
+    title: 'AI / MCP / agentic',
+    prompt:
+      'Model Context Protocol sandbox visualization — an AI agent figure inside a glowing capability-bounded enclosure, with explicit permission tokens depicted as keys flowing in and out. Convey deny-by-default sandboxing of AI workloads.',
+  },
+  {
+    slug: 'wasi',
+    title: 'WASI',
+    prompt:
+      'System-interface schematic — WebAssembly module at center with WASI APIs depicted as labeled abstract terminals fanning out: HTTP, filesystem, sockets, clocks. Clean blueprint look, no text labels needed.',
+  },
+  {
+    slug: 'community',
+    title: 'Open source / community',
+    prompt:
+      'Diverse community of contributor avatars arranged around a central wasmCloud logo, with code commit and pull-request iconography flowing between them. Convey collaborative open source development.',
+  },
+  {
+    slug: 'generic',
+    title: 'Generic / default',
+    prompt:
+      'wasmCloud wordmark prominently centered against a Space Blue gradient background, with subtle Wasm component-tile pattern in the background at low opacity. Brand-anchored fallback hero.',
+  },
+];
+
+const NANOBANANA_COMMAND_TEMPLATE = (topic) =>
+  [
+    'nano-banana generate \\',
+    '  --aspect-ratio 16:9 \\',
+    '  --resolution 4k \\',
+    `  --output-path static/default-heroes/${topic.slug}/hero-16x9.png \\`,
+    `  --style "${COMMON_STYLE}" \\`,
+    `  --prompt "${topic.prompt} ${PALETTE_STRING}"`,
+  ].join('\n');
+
+async function main() {
+  await mkdir(OUT_DIR, { recursive: true });
+  for (const topic of TOPICS) {
+    await mkdir(join(OUT_DIR, topic.slug), { recursive: true });
+  }
+
+  const lines = [
+    '# Default blog hero generation prompts',
+    '',
+    'Auto-generated by `scripts/generate-default-heroes.mjs`. Run each prompt below',
+    'through the `nano-banana` skill (Gemini CLI). Each generates one 16:9 hero;',
+    '`scripts/transform-blog-images.mjs` then derives the 4:3 + 1:1 crops via sharp.',
+    '',
+    `Brand palette: ${PALETTE_STRING}`,
+    '',
+    `Common style directives: ${COMMON_STYLE}`,
+    '',
+    '---',
+    '',
+  ];
+  for (const topic of TOPICS) {
+    lines.push(`## ${topic.title} (\`${topic.slug}\`)`);
+    lines.push('');
+    lines.push(`Output: \`static/default-heroes/${topic.slug}/hero-16x9.png\``);
+    lines.push('');
+    lines.push('```bash');
+    lines.push(NANOBANANA_COMMAND_TEMPLATE(topic));
+    lines.push('```');
+    lines.push('');
+  }
+  lines.push('---');
+  lines.push('');
+  lines.push('After generating, run `node scripts/transform-blog-images.mjs` to derive');
+  lines.push('the 4:3 and 1:1 crops from each 16:9 source.');
+  lines.push('');
+  await writeFile(join(OUT_DIR, 'PROMPTS.md'), lines.join('\n'));
+  console.log(`[generate-default-heroes] manifest written to ${join(OUT_DIR, 'PROMPTS.md')}`);
+  console.log(`  ${TOPICS.length} topic prompts ready for nano-banana`);
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

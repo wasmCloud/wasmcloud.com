@@ -3,7 +3,6 @@ import clsx from 'clsx';
 import { HtmlClassNameProvider, ThemeClassNames } from '@docusaurus/theme-common';
 import { BlogPostProvider, useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import BlogPostPageMetadata from '@theme/BlogPostPage/Metadata';
-import BlogPostPageStructuredData from '@theme/BlogPostPage/StructuredData';
 import Layout from '@theme/Layout';
 import TOC from '@theme/TOC';
 import type { Props } from '@theme/BlogPostPage';
@@ -11,6 +10,11 @@ import Unlisted from '@theme/ContentVisibility/Unlisted';
 import styles from './styles.module.css';
 import BlogPostItem from '../post-item';
 import Link from '@docusaurus/Link';
+// M2 — Replaces Docusaurus's default `<BlogPostPageStructuredData />` with
+// our richer schema that supports `schema_type` selector (BlogPosting /
+// NewsArticle / TechArticle), `about` / `mentions` entity refs from M12,
+// per-author `sameAs`, and NewsArticle-restricted `speakable`.
+import BlogPostSchema from '../blog-post-schema';
 
 function BlogPostPageContent({ children }: { children: ReactNode }): JSX.Element {
   const { metadata, toc } = useBlogPost();
@@ -25,7 +29,7 @@ function BlogPostPageContent({ children }: { children: ReactNode }): JSX.Element
       <div className={clsx('container', 'margin-vert--xl', styles.container)}>
         <div className="row">
           <main className="col">
-            <Link to="/blog" className={styles.backLink}>
+            <Link to="/blog/" className={styles.backLink}>
               ← Back
             </Link>
 
@@ -61,7 +65,7 @@ export default function BlogPostPage(props: Props): JSX.Element {
         className={clsx(ThemeClassNames.wrapper.blogPages, ThemeClassNames.page.blogPostPage)}
       >
         <BlogPostPageMetadata />
-        <BlogPostPageStructuredData />
+        <BlogPostSchema />
         <BlogPostPageContent>
           <BlogPostContent />
         </BlogPostPageContent>

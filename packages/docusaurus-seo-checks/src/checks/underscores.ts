@@ -1,5 +1,6 @@
 import { stripIndents } from 'common-tags';
-import generateCheck, { DefaultCheckOptions } from './generate-check';
+import generateCheck from './generate-check';
+import type { DefaultCheckOptions } from './generate-check';
 
 export type UnderscoresCheckOptions = DefaultCheckOptions<{}>;
 
