@@ -1,6 +1,8 @@
 import * as React from 'react';
 
 const LIVE_NOW = 'Live now!';
+const DEFAULT_MESSAGE = 'Join us!';
+const MEETING_TIME_ZONE = 'America/New_York';
 
 const DAYS_MS = 24 * 60 * 60 * 1000;
 const HOURS_MS = 60 * 60 * 1000;
@@ -11,34 +13,37 @@ const MEETING_DAY = 3; // Wednesday
 const MEETING_HOUR = 13; // 1pm
 const MEETING_LENGTH = 1; // 1 hour
 
+type MeetingWindow = {
+  nowMs: number;
+  startMs: number;
+  endMs: number;
+};
+
 function useIsLive() {
-  const [countdown, setCountdown] = React.useState('Join us!');
+  const [countdown, setCountdown] = React.useState(DEFAULT_MESSAGE);
 
   React.useEffect(() => {
-    let timeout = null;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
 
     function updateCountdown() {
-      const now = new Date();
       try {
-        const [start, end] = getStartEnd();
+        const { nowMs, startMs, endMs } = getMeetingWindow();
 
-        if (now >= start && now <= end) {
+        if (nowMs >= startMs && nowMs <= endMs) {
           setCountdown(LIVE_NOW);
         } else {
-          // calculate the time until the next wasmCloud Wednesday
-          const diff = start.getTime() - now.getTime();
+          const diff = startMs - nowMs;
           const days = Math.floor(diff / DAYS_MS);
-          const hours = Math.floor((diff % DAYS_MS) / HOURS_MS);
+          const hours = Math.floor((diff % DAYS_MS) / (60 * 60 * 1000));
           const minutes = Math.floor((diff % HOURS_MS) / MINUTES_MS);
 
-          // update the countdown
           setCountdown(`${days ? `${days}d ` : ''}${hours ? `${hours}h ` : ''}${minutes}m`);
         }
 
         timeout = setTimeout(updateCountdown, 60 * 1000); // 60 seconds
       } catch {
         // unable to determine dates, just show the default message
-        setCountdown('Join us!');
+        setCountdown(DEFAULT_MESSAGE);
       }
     }
 
@@ -50,62 +55,160 @@ function useIsLive() {
   }, []);
 
   const isLive = countdown === LIVE_NOW;
-  const [start] = getStartEnd();
-  const tenMinutesBeforeStart = new Date(start.getTime() - TEN_MINUTES_MS);
-  const now = new Date();
-  const showLinks = isLive || now >= tenMinutesBeforeStart;
+  let showLinks = isLive;
+  try {
+    const { nowMs, startMs } = getMeetingWindow();
+    showLinks = isLive || nowMs >= startMs - TEN_MINUTES_MS;
+  } catch {
+    showLinks = isLive;
+  }
 
   return { countdown, isLive, showLinks };
 }
 
-function getStartEnd() {
-  const now = new Date(getTimeInNYC());
-  const start = new Date(getTimeInNYC({ hour: MEETING_HOUR, minute: 0 }));
+function getMeetingWindow(): MeetingWindow {
+  const now = new Date();
+  const zonedNow = getZonedParts(now, MEETING_TIME_ZONE);
 
-  const meetingDayIsLaterThisWeek = now.getDay() < MEETING_DAY;
-  const meetingDayIsToday = now.getDay() === MEETING_DAY;
-  const meetingIsNotOver = meetingDayIsToday && now.getHours() < MEETING_HOUR + MEETING_LENGTH;
+  let dayOffset = (MEETING_DAY - zonedNow.weekday + 7) % 7;
+  const meetingIsToday = dayOffset === 0;
+  const nowMinutes = zonedNow.hour * 60 + zonedNow.minute;
+  const meetingEndMinutes = (MEETING_HOUR + MEETING_LENGTH) * 60;
 
-  if (meetingDayIsLaterThisWeek || (meetingDayIsToday && meetingIsNotOver)) {
-    start.setDate(start.getDate() + (start.getDay() - MEETING_DAY));
-  } else {
-    start.setDate(start.getDate() + (MEETING_DAY + 7 - start.getDay()));
+  if (meetingIsToday && nowMinutes >= meetingEndMinutes) {
+    dayOffset = 7;
   }
 
-  const end = new Date(start);
-  end.setHours(start.getHours() + MEETING_LENGTH);
+  const targetDate = new Date(Date.UTC(zonedNow.year, zonedNow.month - 1, zonedNow.day));
+  targetDate.setUTCDate(targetDate.getUTCDate() + dayOffset);
 
-  return [start, end];
-}
-
-function getTimeInNYC({ hour, minute }: { hour?: number; minute?: number } = {}) {
-  const now = new Date();
-  now.setHours(hour ?? now.getHours(), minute ?? now.getMinutes(), 0, 0);
-
-  // Using Intl.DateTimeFormat to get the NYC TZ offset in the format we need. This
-  // accounts for Wednesdays that are in daylight saving time.
-  const offsetToNy = parseInt(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Australia/Sydney',
-      timeZoneName: 'shortOffset',
-      hour: 'numeric',
-    })
-      .formatToParts()
-      .find(({ type }) => type === 'timeZoneName')
-      .value.replace(/GMT([+-]\d+)/, '$1'),
-    10,
+  const startMs = zonedDateTimeToUtcMs(
+    {
+      year: targetDate.getUTCFullYear(),
+      month: targetDate.getUTCMonth() + 1,
+      day: targetDate.getUTCDate(),
+      hour: MEETING_HOUR,
+      minute: 0,
+    },
+    MEETING_TIME_ZONE,
   );
 
-  // Adjust the current UTC time to NYC time by adding the offset
-  now.setUTCHours(now.getUTCHours() + offsetToNy);
+  return {
+    nowMs: now.getTime(),
+    startMs,
+    endMs: startMs + MEETING_LENGTH * 60 * 60 * 1000,
+  };
+}
 
-  // Format the offset to a string with leading zero like "+05:00"
-  const prefix = offsetToNy < 0 ? '-' : '+';
-  const padding = Math.abs(offsetToNy) < 10 ? '0' : '';
-  const offsetString = `${prefix}${padding}${Math.abs(offsetToNy)}:00`;
+type ZonedParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  weekday: number;
+};
 
-  // Return the time in NYC as an ISO string, replacing the Z with the correct timezone offset
-  return now.toISOString().replace(/Z$/, offsetString);
+type ZonedDateTime = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+};
+
+function getZonedParts(date: Date, timeZone: string): ZonedParts {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    weekday: 'short',
+    hour12: false,
+  }).formatToParts(date);
+
+  const values = new Map(parts.map(({ type, value }) => [type, value]));
+  const weekday = values.get('weekday');
+
+  return {
+    year: Number(values.get('year')),
+    month: Number(values.get('month')),
+    day: Number(values.get('day')),
+    hour: Number(values.get('hour')),
+    minute: Number(values.get('minute')),
+    second: Number(values.get('second')),
+    weekday: weekdayToIndex(weekday),
+  };
+}
+
+function weekdayToIndex(weekday?: string): number {
+  switch (weekday) {
+    case 'Sun':
+      return 0;
+    case 'Mon':
+      return 1;
+    case 'Tue':
+      return 2;
+    case 'Wed':
+      return 3;
+    case 'Thu':
+      return 4;
+    case 'Fri':
+      return 5;
+    case 'Sat':
+      return 6;
+    default:
+      throw new Error(`Unsupported weekday: ${weekday}`);
+  }
+}
+
+function getOffsetMinutes(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    timeZoneName: 'shortOffset',
+    hour: '2-digit',
+  }).formatToParts(date);
+
+  const offset = parts.find(({ type }) => type === 'timeZoneName')?.value;
+  if (!offset || !offset.startsWith('GMT')) {
+    throw new Error(`Unsupported time zone offset: ${offset}`);
+  }
+  if (offset === 'GMT') return 0;
+
+  const match = /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/.exec(offset);
+  if (!match) {
+    throw new Error(`Unable to parse time zone offset: ${offset}`);
+  }
+
+  const [, sign, hours, minutes = '00'] = match;
+  const totalMinutes = Number(hours) * 60 + Number(minutes);
+  return sign === '-' ? -totalMinutes : totalMinutes;
+}
+
+function zonedDateTimeToUtcMs(dateTime: ZonedDateTime, timeZone: string): number {
+  const utcGuess = Date.UTC(
+    dateTime.year,
+    dateTime.month - 1,
+    dateTime.day,
+    dateTime.hour,
+    dateTime.minute,
+    0,
+  );
+
+  let offsetMinutes = getOffsetMinutes(new Date(utcGuess), timeZone);
+  let adjusted = utcGuess - offsetMinutes * MINUTES_MS;
+  const correctedOffsetMinutes = getOffsetMinutes(new Date(adjusted), timeZone);
+
+  if (correctedOffsetMinutes !== offsetMinutes) {
+    offsetMinutes = correctedOffsetMinutes;
+    adjusted = utcGuess - offsetMinutes * MINUTES_MS;
+  }
+
+  return adjusted;
 }
 
 export default useIsLive;
