@@ -54,7 +54,7 @@ pub trait HostPlugin: Any + Send + Sync + 'static {
     async fn on_workload_bind(
         &self,
         workload: &UnresolvedWorkload,
-        interfaces: HashSet<WitInterface>,
+        interfaces: WitInterfaces<'_>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -65,7 +65,7 @@ pub trait HostPlugin: Any + Send + Sync + 'static {
     async fn on_workload_item_bind<'a>(
         &self,
         item: &mut WorkloadItem<'a>,
-        interfaces: HashSet<WitInterface>,
+        interfaces: WitInterfaces<'_>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -83,7 +83,7 @@ pub trait HostPlugin: Any + Send + Sync + 'static {
     async fn on_workload_unbind(
         &self,
         workload_id: &str,
-        interfaces: HashSet<WitInterface>,
+        interfaces: WitInterfaces<'_>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -112,9 +112,26 @@ The `HostPlugin` trait uses several types from the `wash_runtime` crate:
 
 - **`WitWorld`** - Contains `imports` and `exports` as `HashSet<WitInterface>`, representing the WIT interfaces the plugin provides.
 - **`WitInterface`** - Describes a specific interface with `namespace`, `package`, `interfaces` (a set of interface names), an optional `version`, an optional `name` (used for multi-backend binding), and a `config` map.
+- **`WitInterfaces<'a>`** - A borrowed wrapper around `&HashSet<WitInterface>` passed to `on_workload_bind`, `on_workload_item_bind`, and `on_workload_unbind`. Provides `iter()`, `get(namespace, package, interfaces)`, and `contains(namespace, package, interfaces)` lookup helpers, avoiding a clone of the interface set per callback. Introduced in 2.4.0; earlier releases passed an owned `HashSet<WitInterface>` by value.
 - **`UnresolvedWorkload`** - A workload that has been initialized but not yet bound to plugins.
 - **`WorkloadItem<'a>`** - An enum passed to `on_workload_item_bind`. Variants are `WorkloadItem::Component(&mut WorkloadComponent)` and `WorkloadItem::Service(&mut WorkloadService)`. Implements `Deref<Target = WorkloadMetadata>`, so `item.linker()` is accessible directly without pattern matching. Use `item.is_component()` / `item.is_service()` when you need to handle the two variants differently.
 - **`ResolvedWorkload`** - A fully bound workload ready for execution.
+
+### Looking up other plugins
+
+Plugins that delegate to another plugin (for example, a custom backend that wraps `wasi:keyvalue` storage) can resolve siblings by ID from the runtime `Ctx`:
+
+```rust
+// Fallible: composes with `?` and returns a descriptive error if the
+// plugin isn't registered or the type doesn't match.
+let kv = ctx.try_get_plugin::<WasiKeyvalue>("wasi-keyvalue")?;
+
+// Infallible: panics on missing plugin or type mismatch. Use only
+// when the plugin is guaranteed by your host's registration logic.
+let kv = ctx.get_plugin::<WasiKeyvalue>("wasi-keyvalue");
+```
+
+Introduced in 2.4.0 ([#5237](https://github.com/wasmCloud/wasmCloud/pull/5237)). Earlier releases exposed only `get_plugin(id) -> Option<Arc<T>>`, which forced callers to write a guard block on every lookup; the new pair is the recommended pattern going forward.
 
 ### Example: Custom logging plugin
 
@@ -125,7 +142,7 @@ use std::collections::HashSet;
 use async_trait::async_trait;
 use wash_runtime::{
     engine::workload::WorkloadItem,
-    plugin::HostPlugin,
+    plugin::{HostPlugin, WitInterfaces},
     wit::{WitInterface, WitWorld},
 };
 
@@ -167,7 +184,7 @@ impl HostPlugin for CustomLogger {
     async fn on_workload_item_bind<'a>(
         &self,
         item: &mut WorkloadItem<'a>,
-        interfaces: HashSet<WitInterface>,
+        interfaces: WitInterfaces<'_>,
     ) -> anyhow::Result<()> {
         // WorkloadItem implements Deref<Target = WorkloadMetadata>, so linker()
         // is accessible directly without pattern matching:
@@ -175,6 +192,9 @@ impl HostPlugin for CustomLogger {
         //
         // Use item.is_component() / item.is_service() if you need to
         // handle components and services differently.
+        //
+        // Use interfaces.contains("wasi", "logging", &["logging"]) to gate
+        // bind logic on which interfaces the workload actually requires.
         Ok(())
     }
 
