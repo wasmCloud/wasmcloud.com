@@ -187,15 +187,29 @@ This build command will execute the `install-and-build` script defined in your T
 | `wasi_webgpu` | boolean | `false` | Enable WASI WebGPU support |
 | `wasi_keyvalue_path` | string | - | Path for WASI key-value store data |
 | `wasi_blobstore_path` | string | - | Path for WASI blob store data |
+| `data_nats_url` | string | - | Unified NATS URL for blobstore, keyvalue, and messaging plugins (introduced in 2.4.0). Per-plugin URLs override it. |
+
+:::info[2.4.0: unified `data_nats_url`]
+Setting `dev.data_nats_url` points the blobstore, keyvalue, and messaging plugins at a single NATS endpoint at once, mirroring the production host's `--data-nats-url`. The existing per-plugin URLs (`wasi_keyvalue_nats_url`, `wasi_blobstore_nats_url`, etc.) still work and take precedence when set. This release also brings a NATS-backed blobstore to `wash dev` for the first time.
+:::
 
 ##### `dev.components[]`
 
-Additional components to load alongside your main component.
+Additional components to load alongside your main component. Starting in 2.4.0, each entry accepts per-component overrides of the workload-wide environment, config, and allowed-host lists; the override fields mirror the `localResources` shape on a `WorkloadDeployment`.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string | Name identifier for the component |
 | `file` | string | Path to the component Wasm file |
+| `environment` | object | Environment variables (`wasi:cli/env`) merged over `workload.environment`. This component wins on key conflicts. *Introduced in 2.4.0.* |
+| `config` | map | Opaque key-value config merged over `workload.config`. This component wins on key conflicts. *Introduced in 2.4.0.* |
+| `allowedHosts` | array | Outbound HTTP allowlist. When set, **replaces** `workload.allowedHosts` for this component (`[]` denies all egress); when omitted the workload list applies. *Introduced in 2.4.0.* |
+
+:::info[2.4.0: workload values apply to every component]
+Workload-wide `workload.environment`, `workload.config`, and `workload.allowedHosts` are now the base layer for every component in a dev workload, including sidecars loaded via `dev.components[]` and the service from `dev.service_file`. Before 2.4.0, only the main dev component received these values; sidecars saw default `LocalResources` and were silently missing env vars and allowed-host policy.
+
+Multi-component messaging workloads also become possible in this release: more than one component in the same workload can now export the same host-invoked interface (for example, two NATS subscription handlers), where workload linking previously rejected duplicates.
+:::
 
 ##### `dev.volumes[]`
 
