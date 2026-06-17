@@ -71,6 +71,24 @@ When `global.tls.enabled` is `false`, the chart ignores `global.certificates.gen
 
 Controls whether the chart generates self-signed TLS certificates for NATS and the control plane. Set to `false` when bringing your own certificate secrets. See the [TLS: bring your own certificates](../../recipes/tls-bring-your-own-certificates.mdx) recipe for the full BYOC flow.
 
+### `global.nats.schedulerUrl` and `global.nats.dataUrl`
+
+Introduced in 2.4.0. The chart now exposes two NATS URLs separately:
+
+- `global.nats.schedulerUrl` — the **control-plane** URL the operator (`-nats-url`) and the host runtime (`--scheduler-nats-url`) connect to for workload scheduling and host heartbeats.
+- `global.nats.dataUrl` — the **data-plane** URL the host runtime (`--data-nats-url`) uses for Wasm workload messaging, key-value, and blobstore backends.
+
+Both default to `nats://nats.<release-namespace>.svc.cluster.local:4222` when left empty (matching pre-2.4 behavior). Splitting them lets workloads target a separate NATS cluster from the scheduler — useful when application traffic and operator coordination live on different brokers.
+
+```yaml
+global:
+  nats:
+    schedulerUrl: "nats://control-plane.example.internal:4222"
+    dataUrl: "nats://data-plane.example.internal:4222"
+```
+
+Per-host-group overrides are also available via [`runtime.hostGroups[].schedulerNatsUrl`](#runtimehostgroupsschedulernatsurl-and-runtimehostgroupsdatanatsurl) and `runtime.hostGroups[].dataNatsUrl`.
+
 ## `operator`, `nats`, `runtime` — pod labels and annotations
 
 Introduced in 2.0.3. Each deployment accepts `podLabels` and `podAnnotations` that are merged into the pod template. This is most commonly used for service mesh injection:
@@ -147,6 +165,26 @@ Set to `false` when namespace boundaries are part of your tenant isolation model
 
 See [Troubleshooting: Workload stays unscheduled with `allowSharedHosts: false`](../../troubleshooting.mdx#workload-stays-unscheduled-with-allowsharedhosts-false) for the symptom and resolution patterns.
 
+### `operator.env`, `operator.envFrom`, and `operator.extraArgs`
+
+Introduced in 2.4.0. Three passthrough fields that let chart users wire operator-side configuration without forking the chart:
+
+- `operator.env` — additional environment variables for the operator container, appended after the chart-managed vars. Standard Kubernetes env shape (supports `valueFrom` with `secretKeyRef` / `configMapKeyRef`).
+- `operator.envFrom` — populate the operator container's environment from ConfigMaps or Secrets, using the standard Kubernetes `envFrom` shape.
+- `operator.extraArgs` — additional CLI args appended verbatim to the operator container, for operator flags the chart does not template (e.g. `-leader-elect`, `-cpu-backpressure-threshold=75`).
+
+```yaml
+operator:
+  env:
+    - name: LOG_LEVEL
+      value: debug
+  envFrom:
+    - secretRef:
+        name: operator-extra-config
+  extraArgs:
+    - "-leader-elect"
+```
+
 ### `operator.image.tag`
 
 Defaults to the chart's `appVersion`. Override only when you need to pin to a specific operator build that differs from the chart release:
@@ -173,6 +211,26 @@ gateway:
 ```
 
 ## `runtime`
+
+### `runtime.env`, `runtime.envFrom`, and `runtime.extraArgs`
+
+Introduced in 2.4.0. Chart-wide host configuration applied to **every** host group's container. Per-host-group values (see [`runtime.hostGroups[].env`](#runtimehostgroupsenv-envfrom-and-extraargs) etc.) are appended after these, letting one group extend the chart-wide defaults without redefining them.
+
+- `runtime.env` — additional environment variables applied to every host group container, appended after the chart-managed vars (`WASMCLOUD_HOST_IP`, `WASMCLOUD_HOST_ENVIRONMENT`) and before any per-host-group `env`.
+- `runtime.envFrom` — populate every host group container's environment from ConfigMaps or Secrets.
+- `runtime.extraArgs` — additional CLI args appended to every host group container, for host flags the chart does not template. Merged with per-host-group `extraArgs`.
+
+```yaml
+runtime:
+  env:
+    - name: RUST_LOG
+      value: info
+  envFrom:
+    - configMapRef:
+        name: shared-host-config
+  extraArgs:
+    - "--max-concurrent-workloads=64"
+```
 
 ### `runtime.hostGroups`
 
@@ -214,6 +272,68 @@ runtime:
 ```
 
 When you override this, ensure the namespace exists and is included in [`operator.hostNamespaces`](#operatorhostnamespaces) so the operator has the pod RBAC and informer cache access it needs to manage host pod lifecycle there. Each host's `Host.environment` will reflect the namespace where its pod runs, which is what `allowSharedHosts: false` matches against for namespace-scoped scheduling.
+
+### `runtime.hostGroups[].schedulerNatsUrl` and `runtime.hostGroups[].dataNatsUrl`
+
+Introduced in 2.4.0. Per-host-group overrides for the NATS URLs the host runtime connects to. Both fall back to the chart-wide [`global.nats.schedulerUrl` / `global.nats.dataUrl`](#globalnatsschedulerurl-and-globalnatsdataurl) when empty, which in turn fall back to the in-cluster NATS service.
+
+```yaml
+runtime:
+  hostGroups:
+    - name: edge
+      replicas: 2
+      dataNatsUrl: "nats://edge-data.example.internal:4222"
+```
+
+Use this when a single chart release runs host groups against different data-plane brokers (for example, regional NATS clusters for an edge group while the default group stays on the in-cluster broker).
+
+### `runtime.hostGroups[].env`, `envFrom`, and `extraArgs`
+
+Introduced in 2.4.0. Per-host-group versions of the chart-wide [`runtime.env`](#runtimeenv-runtimeenvfrom-and-runtimeextraargs) / `envFrom` / `extraArgs` fields. These are **appended** after the chart-wide values, so a group can extend the shared defaults without redeclaring them.
+
+```yaml
+runtime:
+  env:
+    - name: RUST_LOG
+      value: info
+  hostGroups:
+    - name: gpu
+      replicas: 1
+      env:
+        - name: RUST_LOG
+          value: debug   # overrides the chart-wide value for this group only
+      extraArgs:
+        - "--wasi-webgpu-debug"
+```
+
+### `runtime.hostGroups[].volumes`, `volumeMounts`, and `ports`
+
+Introduced in 2.4.0. Optional passthrough fields rendered directly into the host group's pod and container spec, letting chart users mount ConfigMaps / Secrets / persistent volumes and expose extra container ports without forking the chart.
+
+- `runtime.hostGroups[].volumes` — appended to the pod's `spec.volumes`. Standard Kubernetes volume shape.
+- `runtime.hostGroups[].volumeMounts` — appended to the host container's `volumeMounts`. Pair each entry with a matching `volumes` entry above.
+- `runtime.hostGroups[].ports` — appended to the host container's `ports`. Typically used to expose a metrics scrape port for Prometheus.
+
+```yaml
+runtime:
+  hostGroups:
+    - name: default
+      replicas: 3
+      volumes:
+        - name: app-config
+          configMap:
+            name: my-host-config
+      volumeMounts:
+        - name: app-config
+          mountPath: /etc/wasmcloud/config
+          readOnly: true
+      ports:
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+```
+
+All three fields render unconditionally, so they survive a `global.tls.enabled: false` install. **Do not re-list the HTTP port in `ports`** — the chart already renders it from `.http.port`, and a duplicate `containerPort` fails Deployment validation. See [Filesystems and Volumes](./filesystems-and-volumes.mdx) for the broader volume story.
 
 ### `runtime.hostGroups[].http.port`
 
