@@ -1,7 +1,7 @@
 import React from 'react';
 import { useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import { usePluginData } from '@docusaurus/useGlobalData';
-import speakersData from '@site/src/data/speakers.json';
+import peopleData from '@site/src/data/people.json';
 import { isTranscriptPermalink } from '../utils';
 import styles from './styles.module.css';
 
@@ -13,14 +13,14 @@ type Person = {
   aliases?: string[];
 };
 
-type SpeakersData = {
-  speakers: Person[];
+type PeopleData = {
+  people: Person[];
 };
 
-const data = speakersData as SpeakersData;
+const data = peopleData as PeopleData;
 
 function lookup(slug: string): Person | null {
-  return data.speakers.find((p) => p.slug === slug) ?? null;
+  return data.people.find((p) => p.slug === slug) ?? null;
 }
 
 const WASMCLOUD_ROLE_PILLS: Partial<
@@ -57,6 +57,11 @@ const DATE_FROM_PERMALINK_RE = /\/(\d{4}-\d{2}-\d{2})-community-meeting/;
  *     meeting page's frontmatter, looked up by date via globalData populated
  *     by the community-speakers plugin. This keeps speaker data in one place
  *     and prevents drift between the two surfaces.
+ *
+ * Person records resolved from `src/data/people.json` — the canonical
+ * people registry. `authors.yml` is generated from the same file at
+ * prebuild time, so blog bylines and meeting speaker pills share a
+ * single source of truth.
  */
 export default function MeetingSpeakers(): JSX.Element | null {
   const { metadata } = useBlogPost();
