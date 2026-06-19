@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from '@docusaurus/Link';
 import { useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import { usePluginData } from '@docusaurus/useGlobalData';
 import peopleData from '@site/src/data/people.json';
@@ -32,12 +33,17 @@ const WASMCLOUD_ROLE_PILLS: Partial<
 
 type CommunitySpeakersData = { speakersByDate: Record<string, string[]> };
 
+type PeoplePagesData = {
+  profileSlugs: string[];
+  authorsKeyToSlug: Record<string, string>;
+};
+
 const DATE_FROM_PERMALINK_RE = /\/(\d{4}-\d{2}-\d{2})-community-meeting/;
 
 /**
  * Renders a "Speakers" section listing people who appeared in the meeting,
  * sourced from frontmatter `speakers:` (array of slugs referencing
- * src/data/speakers.json).
+ * src/data/people.json).
  *
  * Each speaker renders as "Name · <wasmCloud project role>" — surfacing
  * the project-relevant signal (Maintainer / Emeritus Maintainer) without
@@ -69,6 +75,10 @@ export default function MeetingSpeakers(): JSX.Element | null {
   const pluginData = usePluginData('community-speakers-plugin') as
     | CommunitySpeakersData
     | undefined;
+  const peoplePages = usePluginData('people-pages-plugin') as
+    | PeoplePagesData
+    | undefined;
+  const profileSlugs = new Set(peoplePages?.profileSlugs ?? []);
 
   let slugs: string[] | undefined = fm.speakers;
   if (isTranscriptPermalink(metadata.permalink)) {
@@ -93,9 +103,19 @@ export default function MeetingSpeakers(): JSX.Element | null {
           const pill = person.wasmcloud_role
             ? WASMCLOUD_ROLE_PILLS[person.wasmcloud_role]
             : undefined;
+          // Link the name to /people/<slug> when a profile page exists.
+          // Bare span for speakers without a profile (community guests
+          // and emeritus/contributor entries without a /people/ route).
+          const name = profileSlugs.has(person.slug) ? (
+            <Link to={`/people/${person.slug}/`} className={styles.name}>
+              {person.name}
+            </Link>
+          ) : (
+            <span className={styles.name}>{person.name}</span>
+          );
           return (
             <li key={person.slug} className={styles.item}>
-              <span className={styles.name}>{person.name}</span>
+              {name}
               {pill ? (
                 <span className={`${styles.role} ${pill.className}`}>
                   {pill.label}

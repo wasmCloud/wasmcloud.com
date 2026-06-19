@@ -1,10 +1,16 @@
 import React, { type ReactNode } from 'react';
 import clsx from 'clsx';
 import Link, { type Props as LinkProps } from '@docusaurus/Link';
+import { usePluginData } from '@docusaurus/useGlobalData';
 import AuthorSocials from '@theme/Blog/Components/Author/Socials';
 import type { Props } from '@theme/Blog/Components/Author';
 import Heading from '@theme/Heading';
 import styles from './styles.module.css';
+
+type PeoplePagesData = {
+  profileSlugs: string[];
+  authorsKeyToSlug: Record<string, string>;
+};
 
 function MaybeLink(props: LinkProps): ReactNode {
   if (props.href) {
@@ -42,8 +48,21 @@ function AuthorBlogPostCount({ count }: { count: number }) {
 // Explainer: https://kyleshevlin.com/prefer-multiple-compositions/
 // For now, we almost use the same design for all cases, so it's good enough
 export default function BlogAuthor({ as, author, className, count }: Props): ReactNode {
-  const { name, title, url, imageURL, email, page } = author;
-  const link = page?.permalink || url || (email && `mailto:${email}`) || undefined;
+  const { name, title, url, imageURL, email, page, key } = author;
+
+  // Redirect the byline to `/people/<slug>/` when the author has a
+  // profile page (registered by people-pages-plugin). Falls through to
+  // the Docusaurus-default link priority otherwise: auto-generated
+  // `/blog/authors/<key>/` index (only present when the authorsMap
+  // entry has `page: true`) → `url` → mailto:email.
+  const peoplePages = usePluginData('people-pages-plugin') as
+    | PeoplePagesData
+    | undefined;
+  const profileSlug = key ? peoplePages?.authorsKeyToSlug[key] : undefined;
+  const profileUrl = profileSlug ? `/people/${profileSlug}/` : undefined;
+
+  const link =
+    profileUrl || page?.permalink || url || (email && `mailto:${email}`) || undefined;
 
   return (
     <div className={clsx('avatar margin-bottom--sm', className, styles[`author-as-${as}`])}>

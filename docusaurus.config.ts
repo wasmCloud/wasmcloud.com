@@ -11,6 +11,7 @@ import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-
 import { Options as PluginReoAnalyticsOptions } from '@wasmcloud/docusaurus-reo-analytics';
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
 import communitySpeakersPlugin from './plugins/community-speakers';
+import peoplePagesPlugin from './plugins/people-pages';
 import transcriptInheritancePlugin from './plugins/transcript-inheritance';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import {
@@ -230,6 +231,16 @@ const config = (async (): Promise<Config> => {
                   return { ...item, priority: 0.7, changefreq: 'monthly' };
                 }
 
+                // People profile pages — high priority (people the
+                // project wants surfaced in search). Index slightly
+                // higher than the per-profile pages.
+                if (path === '/people/') {
+                  return { ...item, priority: 0.8, changefreq: 'monthly' };
+                }
+                if (path.startsWith('/people/')) {
+                  return { ...item, priority: 0.7, changefreq: 'monthly' };
+                }
+
                 // Community meeting notes & transcripts
                 if (path.startsWith('/community/') || path === '/community/') {
                   if (path === '/community/' || path === '/community') {
@@ -282,6 +293,7 @@ const config = (async (): Promise<Config> => {
 
     plugins: [
       communitySpeakersPlugin,
+      peoplePagesPlugin,
       transcriptInheritancePlugin,
       [
         '@wasmcloud/docusaurus-github-stars',
