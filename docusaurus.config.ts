@@ -439,6 +439,10 @@ const config = (async (): Promise<Config> => {
                 label: 'Community Meeting Notes',
                 to: '/community',
               },
+              {
+                label: 'Maintainers',
+                to: '/people',
+              },
             ],
           },
           {
