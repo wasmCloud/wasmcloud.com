@@ -197,20 +197,20 @@ function externalWorkSubjectOf(
         ...(yearDate && { datePublished: yearDate }),
       };
     case 'video':
-      // VideoObject requires name + description + thumbnailUrl + uploadDate.
-      // External works don't capture thumbnails, so promote to a plain
-      // Article (still a CreativeWork; correctly classifies the linked
-      // page) rather than emit an invalid VideoObject.
-      if (!yearDate) return null;
+      // VideoObject requires name + description + thumbnailUrl + uploadDate;
+      // we don't capture thumbnails for external videos, so promote to
+      // Article instead. Article in turn requires publisher — skip
+      // entries that have no `venue` rather than emit an invalid one
+      // (the entry still renders in the "Around the web" list, it just
+      // doesn't appear in `subjectOf`).
+      if (!yearDate || !w.venue) return null;
       return {
         '@type': 'Article',
         headline: w.title,
         ...(w.url && { url: w.url }),
         author: { '@id': personId },
         datePublished: yearDate,
-        ...(w.venue && {
-          publisher: { '@type': 'Organization', name: w.venue },
-        }),
+        publisher: { '@type': 'Organization', name: w.venue },
       };
     default:
       return null;
