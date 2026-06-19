@@ -1,6 +1,7 @@
 import React from 'react';
 import { useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import { usePluginData } from '@docusaurus/useGlobalData';
 import JsonLd from '@theme/wasmcloud/json-ld';
 import {
   buildEntityNodes,
@@ -49,6 +50,7 @@ function resolveSchemaType(raw: unknown): SchemaType {
 }
 
 type AuthorMetadata = {
+  key?: string;
   name?: string;
   title?: string;
   url?: string;
@@ -56,11 +58,32 @@ type AuthorMetadata = {
   socials?: Record<string, string>;
 };
 
-function buildAuthors(metadata: ReturnType<typeof useBlogPost>['metadata']) {
+type PeoplePagesData = {
+  profileSlugs: string[];
+  authorsKeyToSlug: Record<string, string>;
+};
+
+function buildAuthors(
+  metadata: ReturnType<typeof useBlogPost>['metadata'],
+  peoplePages: PeoplePagesData | undefined,
+  siteUrl: string,
+) {
   // Docusaurus's BlogPostMetadata exposes authors as objects shaped by
   // `blog/authors.yml`. Build Person entities per Google's Article guidance:
   // separate Person object per author, name only in `.name`, jobTitle for
   // role, sameAs for external profile URLs.
+  //
+  // For authors who have a `/people/<slug>/` profile page (registered by
+  // people-pages-plugin), emit an `@id` REFERENCE to the canonical Person
+  // node at `${siteUrl}/people/<slug>/#person` instead of an inline copy.
+  // The profile page is the single source of truth — `knowsAbout`,
+  // `worksFor`, full `sameAs`, `subjectOf` all live there. Inline copies
+  // would create competing Person entities for the same human, which is
+  // exactly what Google's E-E-A-T pass flags.
+  //
+  // For authors WITHOUT a profile page (Caz, emeritus, external
+  // contributors), keep emitting an inline Person — the canonical node
+  // doesn't exist on-site to reference.
   const authors = (metadata as { authors?: AuthorMetadata[] }).authors ?? [];
   if (!Array.isArray(authors) || authors.length === 0) {
     return undefined;
@@ -68,6 +91,17 @@ function buildAuthors(metadata: ReturnType<typeof useBlogPost>['metadata']) {
   return authors
     .filter((a): a is AuthorMetadata => a != null && typeof a === 'object')
     .map((a) => {
+      const profileSlug = a.key ? peoplePages?.authorsKeyToSlug[a.key] : undefined;
+      if (profileSlug) {
+        // @id reference — the full Person lives at /people/<slug>/. Keep
+        // `name` for graph readability (Google docs explicitly allow it on
+        // @id refs and it helps validators), drop everything else.
+        return {
+          '@type': 'Person',
+          '@id': `${siteUrl}/people/${profileSlug}/#person`,
+          ...(a.name && { name: a.name }),
+        };
+      }
       const out: Record<string, unknown> = {
         '@type': 'Person',
         ...(a.name && { name: a.name }),
@@ -167,6 +201,9 @@ function buildImageProperty(
 export default function BlogPostSchema(): JSX.Element | null {
   const { siteConfig } = useDocusaurusContext();
   const { metadata } = useBlogPost();
+  const peoplePages = usePluginData('people-pages-plugin') as
+    | PeoplePagesData
+    | undefined;
   const { frontMatter, permalink, title, description, date, unlisted } = metadata;
   const siteUrl = siteConfig.url.replace(/\/$/, '');
 
@@ -187,7 +224,7 @@ export default function BlogPostSchema(): JSX.Element | null {
       ? new Date(lastUpdated).toISOString()
       : datePublished;
 
-  const authors = buildAuthors(metadata);
+  const authors = buildAuthors(metadata, peoplePages, siteUrl);
   const wordCount = getWordCount(metadata);
   const keywords = getKeywords(frontMatter as Record<string, unknown>);
   const image = buildImageProperty(
