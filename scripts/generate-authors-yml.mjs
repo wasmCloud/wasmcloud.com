@@ -47,6 +47,37 @@ function yamlString(s) {
   return `'${String(s).replace(/'/g, "''")}'`;
 }
 
+// Classify a `same_as` URL into a Docusaurus authors.yml `socials:` platform
+// key. Keep this aligned with src/theme/Blog/Components/Author/Socials/index.tsx's
+// SocialPlatformConfigs (which knows the icon set) and with the hosts already
+// handled by src/components/PersonPage/index.tsx#platformLabel — both surfaces
+// should classify the same URL the same way. Unknown hosts fall through to
+// `website` so they still surface as a generic chip rather than getting
+// silently dropped.
+function classifySameAs(url) {
+  let host;
+  try {
+    host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return null;
+  }
+  if (host === 'github.com') return 'github';
+  if (host === 'linkedin.com') return 'linkedin';
+  if (host === 'x.com' || host === 'twitter.com') return 'x';
+  if (host === 'bsky.app' || host.endsWith('.bsky.app')) return 'bluesky';
+  // Treat any Mastodon-style instance as `mastodon` — Docusaurus's classic
+  // Author swizzle picks the icon by platform key, not by host, so several
+  // instances all map to one key here.
+  if (
+    host === 'mastodon.social' ||
+    host === 'hachyderm.io' ||
+    host.endsWith('.hachyderm.io') ||
+    host.endsWith('.mastodon.social')
+  )
+    return 'mastodon';
+  return 'website';
+}
+
 async function main() {
   const raw = await readFile(PEOPLE_PATH, 'utf8');
   const data = JSON.parse(raw);
@@ -84,6 +115,31 @@ async function main() {
     if (p.byline_title) lines.push(`  title: ${yamlString(p.byline_title)}`);
     if (p.url) lines.push(`  url: ${yamlString(p.url)}`);
     if (p.image_url) lines.push(`  image_url: ${yamlString(p.image_url)}`);
+    // Project the canonical `same_as` array into a Docusaurus authors.yml
+    // `socials:` block keyed by platform. This is the one input the existing
+    // BlogAuthor swizzle reads for social-icon chips, AND is what
+    // buildAuthors() in blog-post-schema.tsx promotes to Article.author.sameAs.
+    // Without this projection, authors without a /people/<slug>/ profile page
+    // (Caz, emeritus, external contributors) would emit blog Person JSON-LD
+    // with no sameAs at all — Google's audit flag.
+    if (Array.isArray(p.same_as) && p.same_as.length > 0) {
+      // De-dup by platform — first URL per platform wins. People.json may
+      // carry e.g. two Mastodon instances; the second silently loses (rare
+      // and not worth a schema change).
+      const seenPlatform = new Set();
+      const socialLines = [];
+      for (const url of p.same_as) {
+        if (typeof url !== 'string') continue;
+        const platform = classifySameAs(url);
+        if (!platform || seenPlatform.has(platform)) continue;
+        seenPlatform.add(platform);
+        socialLines.push(`    ${platform}: ${yamlString(url)}`);
+      }
+      if (socialLines.length > 0) {
+        lines.push('  socials:');
+        lines.push(...socialLines);
+      }
+    }
     lines.push('');
   }
 
