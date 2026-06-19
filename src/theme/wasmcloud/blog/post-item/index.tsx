@@ -7,6 +7,7 @@ import type BlogPostItemType from '@theme/BlogPostItem';
 import { useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import type { WrapperProps } from '@docusaurus/types';
 import MDXContent from '@theme/MDXContent';
+import AboutTheAuthors from '../about-the-authors';
 
 type Props = WrapperProps<typeof BlogPostItemType>;
 
@@ -29,6 +30,7 @@ function CommunityPostItem({ children, className }: Props): JSX.Element {
         <div className={styles.content}>
           <MDXContent>{children}</MDXContent>
         </div>
+        <AboutTheAuthors />
       </div>
     </div>
   );
