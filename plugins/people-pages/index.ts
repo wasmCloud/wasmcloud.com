@@ -69,6 +69,11 @@ export interface Appearance {
    *  frontmatter. Blog post relative paths (`./images/foo.webp`) are
    *  resolved to `/blog/<dirname>/images/foo.webp`. */
   image?: string;
+  /** One-line summary from the post/meeting frontmatter (`description:`).
+   *  Used to populate VideoObject.description / Article.description in
+   *  the Person page's `subjectOf` JSON-LD — both fields are required
+   *  by Google's rich-results validator. */
+  description?: string;
 }
 
 export interface PersonPageData {
@@ -225,8 +230,15 @@ async function collectAppearances(repoRoot: string) {
     // `scripts/generate-blog-thumbnails.mjs`, which mirrors the relative
     // path under `static/blog-thumbs/<dir>/`. Absolute URLs pass through.
     const image = resolveImage(fm.image, `/blog-thumbs/${entry.name}`);
+    const description = typeof fm.description === 'string' ? fm.description : undefined;
 
-    const appearance: Appearance = { title, url, date, ...(image && { image }) };
+    const appearance: Appearance = {
+      title,
+      url,
+      date,
+      ...(image && { image }),
+      ...(description && { description }),
+    };
     for (const key of authors) {
       (byAuthor[key] ??= []).push(appearance);
     }
@@ -247,8 +259,15 @@ async function collectAppearances(repoRoot: string) {
     const slug = typeof fm.slug === 'string' ? fm.slug : `${date}-community-meeting`;
     const url = `/community/${slug}/`;
     const image = resolveImage(fm.image, `/community`);
+    const description = typeof fm.description === 'string' ? fm.description : undefined;
 
-    const appearance: Appearance = { title, url, date, ...(image && { image }) };
+    const appearance: Appearance = {
+      title,
+      url,
+      date,
+      ...(image && { image }),
+      ...(description && { description }),
+    };
     for (const speakerSlug of speakers) {
       (bySpeaker[speakerSlug] ??= []).push(appearance);
     }

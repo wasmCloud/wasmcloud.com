@@ -32,7 +32,13 @@ type Person = {
   external_works?: ExternalWork[];
 };
 
-type Appearance = { title: string; url: string; date: string; image?: string };
+type Appearance = {
+  title: string;
+  url: string;
+  date: string;
+  image?: string;
+  description?: string;
+};
 
 type PersonPageData = {
   person: Person;
@@ -88,6 +94,129 @@ function initialsOf(name: string): string {
   return tokens[0] + tokens[tokens.length - 1];
 }
 
+/** Build a single `subjectOf` entry for an on-site blog post. Article
+ *  schema requires headline + author + publisher + datePublished + image
+ *  for rich-results eligibility; we satisfy all of these except `image`
+ *  for posts that don't ship a hero (rare). */
+function blogPostSubjectOf(
+  a: Appearance,
+  personId: string,
+  siteUrl: string,
+  organizationId: string,
+): Record<string, unknown> {
+  const fullUrl = `${siteUrl}${a.url}`;
+  const absImage = a.image
+    ? a.image.startsWith('http')
+      ? a.image
+      : `${siteUrl}${a.image}`
+    : undefined;
+  return {
+    '@type': 'Article',
+    '@id': `${fullUrl}#article`,
+    headline: a.title,
+    url: fullUrl,
+    mainEntityOfPage: fullUrl,
+    datePublished: a.date,
+    author: { '@id': personId },
+    publisher: { '@id': organizationId },
+    ...(absImage && { image: absImage }),
+    ...(a.description && { description: a.description }),
+  };
+}
+
+/** Build a single `subjectOf` entry for an on-site community meeting.
+ *  VideoObject schema requires name + description + thumbnailUrl +
+ *  uploadDate for rich-results eligibility. Community meetings all have
+ *  YouTube `maxresdefault.jpg` thumbnails so `thumbnailUrl` is reliable
+ *  here; `description` comes from the meeting page's frontmatter, with
+ *  a sensible fallback when absent. */
+function communityMeetingSubjectOf(
+  a: Appearance,
+  siteUrl: string,
+  organizationId: string,
+): Record<string, unknown> {
+  const fullUrl = `${siteUrl}${a.url}`;
+  return {
+    '@type': 'VideoObject',
+    '@id': `${fullUrl}#video`,
+    name: a.title,
+    description: a.description ?? `wasmCloud community call — ${a.title}.`,
+    url: fullUrl,
+    uploadDate: a.date,
+    publisher: { '@id': organizationId },
+    ...(a.image && { thumbnailUrl: a.image }),
+  };
+}
+
+/** Build a single `subjectOf` entry for an external work the person
+ *  authored or appeared in. Returns null when the entry can't satisfy
+ *  the minimum required schema.org fields for its type (e.g. a `talk`
+ *  with no venue + year would fail Event validation; better to skip
+ *  the entry than emit an invalid one). */
+function externalWorkSubjectOf(
+  w: NonNullable<Person['external_works']>[number],
+  personId: string,
+): Record<string, unknown> | null {
+  if (!w.title) return null;
+  const yearDate = w.year ? `${w.year}-01-01` : undefined;
+
+  switch (w.type ?? 'writing') {
+    case 'writing':
+      // Article requires headline + datePublished + publisher. Skip if
+      // we can't supply all three.
+      if (!yearDate || !w.venue) return null;
+      return {
+        '@type': 'Article',
+        headline: w.title,
+        ...(w.url && { url: w.url, mainEntityOfPage: w.url }),
+        datePublished: yearDate,
+        author: { '@id': personId },
+        publisher: { '@type': 'Organization', name: w.venue },
+      };
+    case 'talk':
+      // Event requires name + startDate + location.
+      if (!yearDate || !w.venue) return null;
+      return {
+        '@type': 'Event',
+        name: w.title,
+        ...(w.url && { url: w.url }),
+        startDate: yearDate,
+        location: { '@type': 'Place', name: w.venue },
+        organizer: { '@type': 'Organization', name: w.venue },
+        eventStatus: 'https://schema.org/EventScheduled',
+        performer: { '@id': personId },
+      };
+    case 'podcast':
+      // PodcastEpisode requires name + url + partOfSeries.
+      if (!w.url || !w.venue) return null;
+      return {
+        '@type': 'PodcastEpisode',
+        name: w.title,
+        url: w.url,
+        partOfSeries: { '@type': 'PodcastSeries', name: w.venue },
+        ...(yearDate && { datePublished: yearDate }),
+      };
+    case 'video':
+      // VideoObject requires name + description + thumbnailUrl + uploadDate.
+      // External works don't capture thumbnails, so promote to a plain
+      // Article (still a CreativeWork; correctly classifies the linked
+      // page) rather than emit an invalid VideoObject.
+      if (!yearDate) return null;
+      return {
+        '@type': 'Article',
+        headline: w.title,
+        ...(w.url && { url: w.url }),
+        author: { '@id': personId },
+        datePublished: yearDate,
+        ...(w.venue && {
+          publisher: { '@type': 'Organization', name: w.venue },
+        }),
+      };
+    default:
+      return null;
+  }
+}
+
 /** Build the Person JSON-LD entity. Only emits properties we have data
  *  for — empty arrays and undefined fields are dropped. Note we don't
  *  emit a BreadcrumbList ourselves: Docusaurus auto-emits one for every
@@ -96,36 +225,29 @@ function initialsOf(name: string): string {
 function personJsonLd(data: PersonPageData, siteUrl: string) {
   const { person, org_url, blog_posts, community_meetings } = data;
   const pageUrl = `${siteUrl}/people/${person.slug}/`;
+  const personId = `${pageUrl}#person`;
+  const organizationId = `${siteUrl}/#organization`;
 
   const sameAs = new Set<string>();
   if (person.url) sameAs.add(person.url);
   for (const link of person.same_as ?? []) sameAs.add(link);
 
-  const subjectOf = [
-    ...blog_posts.map((a) => ({
-      '@type': 'Article' as const,
-      headline: a.title,
-      url: `${siteUrl}${a.url}`,
-      datePublished: a.date,
-    })),
-    ...community_meetings.map((a) => ({
-      '@type': 'VideoObject' as const,
-      name: a.title,
-      url: `${siteUrl}${a.url}`,
-      uploadDate: a.date,
-    })),
-    ...(person.external_works ?? []).map((w) => ({
-      '@type': externalWorkSchemaType(w.type),
-      ...(w.title && { name: w.title, headline: w.title }),
-      ...(w.url && { url: w.url }),
-      ...(w.venue && { publisher: { '@type': 'Organization', name: w.venue } }),
-    })),
+  const subjectOf: Record<string, unknown>[] = [
+    ...blog_posts.map((a) =>
+      blogPostSubjectOf(a, personId, siteUrl, organizationId),
+    ),
+    ...community_meetings.map((a) =>
+      communityMeetingSubjectOf(a, siteUrl, organizationId),
+    ),
+    ...(person.external_works ?? [])
+      .map((w) => externalWorkSubjectOf(w, personId))
+      .filter((x): x is Record<string, unknown> => x !== null),
   ];
 
   const ld: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Person',
-    '@id': `${pageUrl}#person`,
+    '@id': personId,
     name: person.name,
     url: pageUrl,
     mainEntityOfPage: pageUrl,
@@ -141,7 +263,7 @@ function personJsonLd(data: PersonPageData, siteUrl: string) {
   }
   ld.affiliation = {
     '@type': 'Organization',
-    '@id': `${siteUrl}/#organization`,
+    '@id': organizationId,
     name: 'wasmCloud',
     url: `${siteUrl}/`,
   };
@@ -151,21 +273,6 @@ function personJsonLd(data: PersonPageData, siteUrl: string) {
   }
   if (subjectOf.length > 0) ld.subjectOf = subjectOf;
   return ld;
-}
-
-function externalWorkSchemaType(t?: ExternalWorkType) {
-  switch (t) {
-    case 'writing':
-      return 'Article' as const;
-    case 'talk':
-      return 'Event' as const;
-    case 'podcast':
-      return 'PodcastEpisode' as const;
-    case 'video':
-      return 'VideoObject' as const;
-    default:
-      return 'CreativeWork' as const;
-  }
 }
 
 /** Pick the best label for an external link. Restricted to GitHub,
