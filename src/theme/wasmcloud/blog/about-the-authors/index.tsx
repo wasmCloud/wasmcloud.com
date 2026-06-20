@@ -68,7 +68,7 @@ function AuthorCard({
         )}
         {profileUrl && (
           <Link to={profileUrl} className={styles.profileLink}>
-            View profile{author.name ? ` of ${author.name}` : ''} →
+            <span>View profile{author.name ? ` of ${author.name}` : ''}</span>
           </Link>
         )}
       </div>
@@ -117,7 +117,9 @@ export default function AboutTheAuthors(): ReactNode {
       <h2 id="about-the-authors-heading" className={styles.heading}>
         About the {authors.length === 1 ? 'author' : 'authors'}
       </h2>
-      <div className={styles.cards}>
+      <div
+        className={`${styles.cards}${authors.length > 1 ? ` ${styles.multi}` : ''}`}
+      >
         {authors.map((author, i) => (
           <AuthorCard
             key={author.key ?? author.name ?? i}
