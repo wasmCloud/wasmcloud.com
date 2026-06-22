@@ -81,6 +81,17 @@ function hostnameOf(url: string): string {
   }
 }
 
+/** Normalize a date string to ISO 8601 with timezone for JSON-LD emission.
+ *  Google's Rich Results validator flags bare `YYYY-MM-DD` as "invalid
+ *  date, missing timezone" on Article.datePublished / VideoObject.uploadDate
+ *  / Event.startDate. Anchoring publication dates at midnight UTC keeps
+ *  the displayed calendar date stable across consumers that normalize to
+ *  UTC (which is most of them). Passes through strings that already
+ *  carry a `T` (assumed already-formatted ISO 8601). */
+function toIso8601Date(date: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00Z` : date;
+}
+
 /** Two-letter initials from the person's name. Falls back to one
  *  letter for single-token names; empty string for empty input (caller
  *  should guard). */
@@ -116,7 +127,7 @@ function blogPostSubjectOf(
     headline: a.title,
     url: fullUrl,
     mainEntityOfPage: fullUrl,
-    datePublished: a.date,
+    datePublished: toIso8601Date(a.date),
     author: { '@id': personId },
     publisher: { '@id': organizationId },
     ...(absImage && { image: absImage }),
@@ -142,7 +153,7 @@ function communityMeetingSubjectOf(
     name: a.title,
     description: a.description ?? `wasmCloud community call — ${a.title}.`,
     url: fullUrl,
-    uploadDate: a.date,
+    uploadDate: toIso8601Date(a.date),
     publisher: { '@id': organizationId },
     ...(a.image && { thumbnailUrl: a.image }),
   };
@@ -158,7 +169,10 @@ function externalWorkSubjectOf(
   personId: string,
 ): Record<string, unknown> | null {
   if (!w.title) return null;
-  const yearDate = w.year ? `${w.year}-01-01` : undefined;
+  // External works only carry a year (no month/day). Anchor at Jan 1
+  // midnight UTC so Google's validator accepts the value as ISO 8601
+  // with timezone — bare `YYYY-MM-DD` is flagged as "missing timezone".
+  const yearDate = w.year ? `${w.year}-01-01T00:00:00Z` : undefined;
 
   switch (w.type ?? 'writing') {
     case 'writing':
