@@ -355,15 +355,37 @@ export default async function peoplePagesPlugin(
       const { createData, addRoute, setGlobalData } = actions;
       setGlobalData(content.globalData);
 
+      // Most recent appearance date for a profile, as a millisecond
+      // timestamp. These routes are synthesized via addRoute and have no
+      // source file, so the sitemap plugin can't derive <lastmod> on its
+      // own — we feed it `metadata.lastUpdatedAt` (which it reads before
+      // falling back to a git lookup). A profile's content effectively
+      // changes when the person gains a new blog post or meeting, so the
+      // newest appearance is the honest freshness signal.
+      const latestAppearanceMs = (route: PersonPageData): number | undefined => {
+        const ms = [...route.blog_posts, ...route.community_meetings]
+          .map((a) => new Date(a.date).getTime())
+          .filter((t) => Number.isFinite(t));
+        return ms.length ? Math.max(...ms) : undefined;
+      };
+
+      let indexLatestMs: number | undefined;
+
       for (const route of content.routes) {
         const data = await createData(
           `person-${route.person.slug}.json`,
           JSON.stringify(route, null, 2),
         );
+        const lastUpdatedAt = latestAppearanceMs(route);
+        if (lastUpdatedAt !== undefined) {
+          indexLatestMs =
+            indexLatestMs === undefined ? lastUpdatedAt : Math.max(indexLatestMs, lastUpdatedAt);
+        }
         addRoute({
           path: `/people/${route.person.slug}/`,
           component: '@site/src/components/PersonPage/index.tsx',
           modules: { data },
+          ...(lastUpdatedAt !== undefined && { metadata: { lastUpdatedAt } }),
           exact: true,
         });
       }
@@ -378,6 +400,9 @@ export default async function peoplePagesPlugin(
         path: '/people/',
         component: '@site/src/components/PeopleIndexPage/index.tsx',
         modules: { data: indexData },
+        // The directory listing is "current" as of its most recently
+        // active profile.
+        ...(indexLatestMs !== undefined && { metadata: { lastUpdatedAt: indexLatestMs } }),
         exact: true,
       });
     },
