@@ -15,6 +15,7 @@ import Link from '@docusaurus/Link';
 // NewsArticle / TechArticle), `about` / `mentions` entity refs from M12,
 // per-author `sameAs`, and NewsArticle-restricted `speakable`.
 import BlogPostSchema from '../blog-post-schema';
+import AboutTheAuthors from '../about-the-authors';
 
 function BlogPostPageContent({ children }: { children: ReactNode }): JSX.Element {
   const { metadata, toc } = useBlogPost();
@@ -47,7 +48,13 @@ function BlogPostPageContent({ children }: { children: ReactNode }): JSX.Element
                     />
                   ) : undefined}
                 </div>
-                <div className="col col--9">{children}</div>
+                <div className="col col--9">
+                  {children}
+                  {/* Mounted inside the body column so the block aligns
+                   *  with the prose, not with the post-item's full width
+                   *  (which extends across the TOC's `col col--3`). */}
+                  <AboutTheAuthors />
+                </div>
               </div>
             </BlogPostItem>
           </main>
