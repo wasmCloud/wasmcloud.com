@@ -93,14 +93,22 @@ function buildAuthors(
     .map((a) => {
       const profileSlug = a.key ? peoplePages?.authorsKeyToSlug[a.key] : undefined;
       if (profileSlug) {
-        // @id reference — the full Person lives at /people/<slug>/. Keep
-        // `name` for graph readability (Google docs explicitly allow it on
-        // @id refs and it helps validators), drop everything else.
-        return {
+        // @id reference — the full Person (knowsAbout, sameAs, subjectOf)
+        // lives at /people/<slug>/#person. We also inline `name`, `url`,
+        // and `image` here because Google's Rich Results validator
+        // doesn't dereference @id at validation time and flags `author.url`
+        // as missing when it isn't on the inline reference. Carrying
+        // these three fields on the ref satisfies the per-page check
+        // while the canonical Person remains the entity-graph source
+        // of truth.
+        const ref: Record<string, unknown> = {
           '@type': 'Person',
           '@id': `${siteUrl}/people/${profileSlug}/#person`,
-          ...(a.name && { name: a.name }),
+          url: `${siteUrl}/people/${profileSlug}/`,
         };
+        if (a.name) ref.name = a.name;
+        if (a.imageURL) ref.image = a.imageURL;
+        return ref;
       }
       const out: Record<string, unknown> = {
         '@type': 'Person',
