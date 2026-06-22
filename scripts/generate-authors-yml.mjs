@@ -115,20 +115,35 @@ async function main() {
     if (p.byline_title) lines.push(`  title: ${yamlString(p.byline_title)}`);
     if (p.url) lines.push(`  url: ${yamlString(p.url)}`);
     if (p.image_url) lines.push(`  image_url: ${yamlString(p.image_url)}`);
-    // Project the canonical `same_as` array into a Docusaurus authors.yml
-    // `socials:` block keyed by platform. This is the one input the existing
-    // BlogAuthor swizzle reads for social-icon chips, AND is what
-    // buildAuthors() in blog-post-schema.tsx promotes to Article.author.sameAs.
-    // Without this projection, authors without a /people/<slug>/ profile page
-    // (Caz, emeritus, external contributors) would emit blog Person JSON-LD
-    // with no sameAs at all — Google's audit flag.
-    if (Array.isArray(p.same_as) && p.same_as.length > 0) {
-      // De-dup by platform — first URL per platform wins. People.json may
-      // carry e.g. two Mastodon instances; the second silently loses (rare
+    // Project the canonical `same_as` array (plus the top-level `url`
+    // when it's classifiable as a social platform) into a Docusaurus
+    // authors.yml `socials:` block keyed by platform. This is the one
+    // input the existing BlogAuthor swizzle reads for social-icon
+    // chips, AND is what buildAuthors() in blog-post-schema.tsx
+    // promotes to Article.author.sameAs.
+    //
+    // Including `url` here is what makes the blog byline's chip list
+    // match the /people/<slug>/ profile page's chip list (the
+    // PersonPage builds its chip set from `{url} ∪ same_as` then
+    // filters by host). For maintainers whose `url` is a GitHub
+    // profile, this gets the GitHub chip into the byline.
+    //
+    // Without this projection, authors without a /people/<slug>/
+    // profile page would emit blog Person JSON-LD with no sameAs at
+    // all — Google's audit flag.
+    {
+      // De-dup by platform — first URL per platform wins. `url` is
+      // considered first so the canonical GitHub-style profile takes
+      // precedence over any same_as duplicate. people.json may carry
+      // e.g. two Mastodon instances; the second silently loses (rare
       // and not worth a schema change).
       const seenPlatform = new Set();
       const socialLines = [];
-      for (const url of p.same_as) {
+      const candidates = [
+        ...(typeof p.url === 'string' ? [p.url] : []),
+        ...(Array.isArray(p.same_as) ? p.same_as : []),
+      ];
+      for (const url of candidates) {
         if (typeof url !== 'string') continue;
         const platform = classifySameAs(url);
         if (!platform || seenPlatform.has(platform)) continue;

@@ -19,6 +19,37 @@ type Author = {
   socials?: Record<string, string>;
 };
 
+// Mirror the `/people/<slug>/` PersonPage allowlist (see
+// `platformLabel` in src/components/PersonPage/index.tsx). The
+// authors.yml `socials:` block is generated from each person's
+// `same_as` URLs and includes a `website` fallback for any host
+// that doesn't match one of the recognized social platforms — that
+// fallback is intentionally not rendered on the profile page, so we
+// suppress it here too to keep the two surfaces visually aligned.
+// JSON-LD `sameAs` (built independently in blog-post-schema.tsx) is
+// unaffected and continues to carry the full URL list for the
+// schema.org entity graph.
+const VISIBLE_SOCIAL_PLATFORMS = new Set([
+  'github',
+  'linkedin',
+  'x',
+  'bluesky',
+  'mastodon',
+]);
+
+function visibleSocials(
+  socials: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!socials) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, url] of Object.entries(socials)) {
+    if (VISIBLE_SOCIAL_PLATFORMS.has(key) && typeof url === 'string' && url) {
+      out[key] = url;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 function AuthorCard({
   author,
   profileSlug,
@@ -30,6 +61,7 @@ function AuthorCard({
   // Name link target: profile page → author URL (linkedin/github) →
   // unlinked. The visible "View profile →" CTA below is profile-only.
   const nameLinkTarget = profileUrl ?? author.url;
+  const filteredSocials = visibleSocials(author.socials);
 
   return (
     <div className={styles.card}>
@@ -58,12 +90,19 @@ function AuthorCard({
           </div>
         )}
         {author.title && <div className={styles.title}>{author.title}</div>}
-        {author.socials && Object.keys(author.socials).length > 0 && (
+        {filteredSocials && (
           <div className={styles.socials}>
             {/* AuthorSocials only reads `socials` off the author object;
-             *  bridge the type since our local `Author` is a strict
-             *  subset of the upstream Props['author']. */}
-            <AuthorSocials author={author as unknown as Parameters<typeof AuthorSocials>[0]['author']} />
+             *  bridge the type and pass a shallow copy with the
+             *  filtered socials map so unrecognized `website`-fallback
+             *  links don't render as chips. */}
+            <AuthorSocials
+              author={
+                { ...author, socials: filteredSocials } as unknown as Parameters<
+                  typeof AuthorSocials
+                >[0]['author']
+              }
+            />
           </div>
         )}
         {profileUrl && (
