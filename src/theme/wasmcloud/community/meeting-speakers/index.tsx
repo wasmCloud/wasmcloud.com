@@ -1,7 +1,8 @@
 import React from 'react';
+import Link from '@docusaurus/Link';
 import { useBlogPost } from '@docusaurus/plugin-content-blog/client';
 import { usePluginData } from '@docusaurus/useGlobalData';
-import speakersData from '@site/src/data/speakers.json';
+import peopleData from '@site/src/data/people.json';
 import { isTranscriptPermalink } from '../utils';
 import styles from './styles.module.css';
 
@@ -13,14 +14,14 @@ type Person = {
   aliases?: string[];
 };
 
-type SpeakersData = {
-  speakers: Person[];
+type PeopleData = {
+  people: Person[];
 };
 
-const data = speakersData as SpeakersData;
+const data = peopleData as PeopleData;
 
 function lookup(slug: string): Person | null {
-  return data.speakers.find((p) => p.slug === slug) ?? null;
+  return data.people.find((p) => p.slug === slug) ?? null;
 }
 
 const WASMCLOUD_ROLE_PILLS: Partial<
@@ -32,12 +33,17 @@ const WASMCLOUD_ROLE_PILLS: Partial<
 
 type CommunitySpeakersData = { speakersByDate: Record<string, string[]> };
 
+type PeoplePagesData = {
+  profileSlugs: string[];
+  authorsKeyToSlug: Record<string, string>;
+};
+
 const DATE_FROM_PERMALINK_RE = /\/(\d{4}-\d{2}-\d{2})-community-meeting/;
 
 /**
  * Renders a "Speakers" section listing people who appeared in the meeting,
  * sourced from frontmatter `speakers:` (array of slugs referencing
- * src/data/speakers.json).
+ * src/data/people.json).
  *
  * Each speaker renders as "Name · <wasmCloud project role>" — surfacing
  * the project-relevant signal (Maintainer / Emeritus Maintainer) without
@@ -57,6 +63,11 @@ const DATE_FROM_PERMALINK_RE = /\/(\d{4}-\d{2}-\d{2})-community-meeting/;
  *     meeting page's frontmatter, looked up by date via globalData populated
  *     by the community-speakers plugin. This keeps speaker data in one place
  *     and prevents drift between the two surfaces.
+ *
+ * Person records resolved from `src/data/people.json` — the canonical
+ * people registry. `authors.yml` is generated from the same file at
+ * prebuild time, so blog bylines and meeting speaker pills share a
+ * single source of truth.
  */
 export default function MeetingSpeakers(): JSX.Element | null {
   const { metadata } = useBlogPost();
@@ -64,6 +75,10 @@ export default function MeetingSpeakers(): JSX.Element | null {
   const pluginData = usePluginData('community-speakers-plugin') as
     | CommunitySpeakersData
     | undefined;
+  const peoplePages = usePluginData('people-pages-plugin') as
+    | PeoplePagesData
+    | undefined;
+  const profileSlugs = new Set(peoplePages?.profileSlugs ?? []);
 
   let slugs: string[] | undefined = fm.speakers;
   if (isTranscriptPermalink(metadata.permalink)) {
@@ -88,9 +103,19 @@ export default function MeetingSpeakers(): JSX.Element | null {
           const pill = person.wasmcloud_role
             ? WASMCLOUD_ROLE_PILLS[person.wasmcloud_role]
             : undefined;
+          // Link the name to /people/<slug> when a profile page exists.
+          // Bare span for speakers without a profile (community guests
+          // and emeritus/contributor entries without a /people/ route).
+          const name = profileSlugs.has(person.slug) ? (
+            <Link to={`/people/${person.slug}/`} className={styles.name}>
+              {person.name}
+            </Link>
+          ) : (
+            <span className={styles.name}>{person.name}</span>
+          );
           return (
             <li key={person.slug} className={styles.item}>
-              <span className={styles.name}>{person.name}</span>
+              {name}
               {pill ? (
                 <span className={`${styles.role} ${pill.className}`}>
                   {pill.label}

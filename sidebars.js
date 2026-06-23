@@ -195,6 +195,11 @@ const sidebars = {
     },
     {
       type: 'link',
+      label: 'Maintainers',
+      href: '/people/',
+    },
+    {
+      type: 'link',
       label: 'Roadmap ↗',
       href: 'https://github.com/orgs/wasmCloud/projects/7',
     },

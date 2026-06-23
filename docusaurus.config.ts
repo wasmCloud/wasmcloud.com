@@ -11,6 +11,7 @@ import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-
 import { Options as PluginReoAnalyticsOptions } from '@wasmcloud/docusaurus-reo-analytics';
 import { Options as PluginSEOChecksOptions } from '@wasmcloud/docusaurus-seo-checks';
 import communitySpeakersPlugin from './plugins/community-speakers';
+import peoplePagesPlugin from './plugins/people-pages';
 import transcriptInheritancePlugin from './plugins/transcript-inheritance';
 import rehypeShiki, { RehypeShikiOptions } from '@shikijs/rehype';
 import {
@@ -151,6 +152,11 @@ const config = (async (): Promise<Config> => {
             rehypePlugins: [rehypeNameToId],
           },
           sitemap: {
+            // Emit a per-URL <lastmod> (YYYY-MM-DD). This is the freshness
+            // signal search engines actually act on for crawl scheduling and
+            // discovery of new/updated pages (priority/changefreq are weak
+            // hints). Defaults to null in the plugin, so it must be set.
+            lastmod: 'date',
             changefreq: 'weekly',
             priority: 0.5,
             filename: 'sitemap.xml',
@@ -224,9 +230,22 @@ const config = (async (): Promise<Config> => {
                   if (path === '/blog/' || path === '/blog') {
                     return { ...item, priority: 0.8, changefreq: 'daily' };
                   }
+                  // Pagination & tag archives — thin, paginated, near-duplicate
+                  // listing pages with no standalone ranking value. Keep them
+                  // out of the sitemap so crawl budget goes to real content.
                   if (path.startsWith('/blog/page/') || path.startsWith('/blog/tags/')) {
-                    return { ...item, priority: 0.3, changefreq: 'weekly' };
+                    return [];
                   }
+                  return { ...item, priority: 0.7, changefreq: 'monthly' };
+                }
+
+                // People profile pages — high priority (people the
+                // project wants surfaced in search). Index slightly
+                // higher than the per-profile pages.
+                if (path === '/people/') {
+                  return { ...item, priority: 0.8, changefreq: 'monthly' };
+                }
+                if (path.startsWith('/people/')) {
                   return { ...item, priority: 0.7, changefreq: 'monthly' };
                 }
 
@@ -235,9 +254,10 @@ const config = (async (): Promise<Config> => {
                   if (path === '/community/' || path === '/community') {
                     return { ...item, priority: 0.7, changefreq: 'monthly' };
                   }
-                  // Pagination/tag archives — low priority
+                  // Pagination & tag archives — thin listing pages, dropped
+                  // from the sitemap (see blog section above).
                   if (path.startsWith('/community/page/') || path.startsWith('/community/tags/')) {
-                    return { ...item, priority: 0.3, changefreq: 'weekly' };
+                    return [];
                   }
                   // Individual meeting notes & transcripts
                   return { ...item, priority: 0.5, changefreq: 'monthly' };
@@ -263,9 +283,11 @@ const config = (async (): Promise<Config> => {
                   return { ...item, priority: 0.3, changefreq: 'monthly' };
                 }
 
-                // 0.82 docs — already disallowed in robots.txt, minimal priority
+                // 0.82 docs — disallowed in robots.txt, so they must NOT be in
+                // the sitemap: listing a robots-blocked URL is a contradictory
+                // signal that Search Console flags. Drop them entirely.
                 if (path.startsWith('/docs/0.82/')) {
-                  return { ...item, priority: 0.1, changefreq: 'yearly' };
+                  return [];
                 }
 
                 // Everything else (standalone pages like /contact, etc.)
@@ -282,6 +304,7 @@ const config = (async (): Promise<Config> => {
 
     plugins: [
       communitySpeakersPlugin,
+      peoplePagesPlugin,
       transcriptInheritancePlugin,
       [
         '@wasmcloud/docusaurus-github-stars',
@@ -426,6 +449,10 @@ const config = (async (): Promise<Config> => {
               {
                 label: 'Community Meeting Notes',
                 to: '/community',
+              },
+              {
+                label: 'Maintainers',
+                to: '/people',
               },
             ],
           },

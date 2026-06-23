@@ -2,7 +2,7 @@ import React from 'react';
 import Head from '@docusaurus/Head';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import type { BlogPostMetadata } from '@docusaurus/plugin-content-blog';
-import speakersData from '@site/src/data/speakers.json';
+import peopleData from '@site/src/data/people.json';
 // Auto-generated at prebuild time by scripts/generate-transcript-inheritance.mjs.
 // Maps each transcript permalink to its parent landing page's about/mentions
 // frontmatter so transcript Article JSON-LD inherits the same entity graph
@@ -28,12 +28,12 @@ type SpeakerPerson = {
 
 type SpeakerOrg = { url: string };
 
-type SpeakersJson = {
-  speakers: SpeakerPerson[];
+type PeopleJson = {
+  people: SpeakerPerson[];
   organizations: Record<string, SpeakerOrg>;
 };
 
-const SPEAKERS = speakersData as SpeakersJson;
+const PEOPLE = peopleData as PeopleJson;
 
 /**
  * Constants shared across every community-meeting video page. Per-page values
@@ -108,14 +108,14 @@ function buildSpeakers(frontMatter: Record<string, unknown>): PersonEntity[] | u
 
   const people = slugs
     .map((slug) => {
-      const person = SPEAKERS.speakers.find((p) => p.slug === slug);
+      const person = PEOPLE.people.find((p) => p.slug === slug);
       if (!person) return null;
       const entity: PersonEntity = {
         '@type': 'Person',
         name: person.name,
       };
       if (person.org) {
-        const orgInfo = SPEAKERS.organizations[person.org];
+        const orgInfo = PEOPLE.organizations[person.org];
         entity.affiliation = {
           '@type': 'Organization',
           name: person.org,
