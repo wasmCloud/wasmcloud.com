@@ -1,0 +1,318 @@
+---
+date: '2026-06-17'
+title: 'Transcript: Tracking Wasmtime 46, the Component Model implements Feature, and WASI P3 Concurrency'
+description: 'Full transcript of the June 17, 2026 wasmCloud community call covering Wasmtime 46 with WASI P3 by default, the component-model implements feature with static bindings, and WASI P3 cross-component streaming and concurrency.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasi p3
+  - wasi preview 3
+  - wasmtime 46
+  - component model implements
+  - static bindings
+  - cross-component streaming
+  - wasm runtime autoscaling
+  - webassembly news
+image: https://i.ytimg.com/vi/fywk-w1u0xc/maxresdefault.jpg
+showTitle: true
+slug: 2026-06-17-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - Wasmtime
+  - WASIPreview3
+  - WASI
+  - ComponentModel
+  - JCO
+  - StarlingMonkey
+  - wac
+  - witBindgen
+  - wasmTools
+  - Kubernetes
+  - HorizontalPodAutoscaler
+  - KEDA
+  - wash
+  - runtimeOperator
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-06-17-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=fywk-w1u0xc" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=fywk-w1u0xc" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+*wasmCloud Weekly Community Call — Wed, Jun 17, 2026 · 37 minutes*
+
+{/* Speakers: Bailey Hayes, Aditya Salunkhe */}
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:11](https://youtu.be/fywk-w1u0xc?t=11)
+
+Hello, and welcome to wasmCloud's community call for June 17. We've got a lot of things happening now that WASI P3 rolled out last week, so a lot of our topics are going to be related to that, basically. So I'm just going to share my screen for our agenda here. The first one is that we're closely tracking Wasmtime 46, especially since we've got a handful of changes that tightly depend on it. So I wanted to call that out first. So if you go to wasmCloud, I do have a draft PR up for it, but really the big thing is that other people can target PRs straight to this branch here, Wasmtime 46, and that will include some `implements`, but not the completed `implements`. We need Wasmtime 47 for full `implements`, and I'll talk about that more in detail. But the big hallmark here is that it includes WASI 0.3.0 interfaces, so you can build HTTP just straight off of the stable release, and Wasmtime 46 will be the first one that ships with it. Its release is supposed to be, I believe, on the 20th. So next week we'll be aiming to merge this in, and part of the changes that are going to be on this branch here is basically making WASI P3 enabled by default. So, enable it by default, clean up some of the things — like we had a separate WASI P3 Docker image, we don't need that anymore — making sure that we've already done the full port to Wasmtime 46 and we're testing with that. That's effectively this one, but on our agenda we've got a couple other changes that are brewing, so I think it's worth going through those. Aditya, I said I was going to do your code review, and I didn't, but I did fix a big bug, so that's what I did instead. But this is what's next, and essentially getting us set up so that it's possible for us to be able to enable some of these proposals. Now, a good chunk of them actually are about to be enabled by default in our next Wasmtime release. Some of the ones that I wanted to target, like GC and exception handling, but that's okay. There's always more. So, having something like this in a way to reflect it. Any more you want to add on this one, Aditya?
+
+**Aditya Salunkhe** [2:38](https://youtu.be/fywk-w1u0xc?t=158)
+
+Nothing much. Just that, yeah, I also wanted to cover that most of them are going to be enabled by default, so yeah. But yeah, you just go for many more proposals, so should be a good one.
+
+**Bailey Hayes** [2:54](https://youtu.be/fywk-w1u0xc?t=174)
+
+Yeah, I've been... I was really chomping at the bit to try out some of the Kotlin stuff, for example, which requires garbage collection. But with that enabled by default, you can just go build off of the Kotlin folks' sample and just drop it straight in. You don't have to do any extra config, which is better — that's where we want to be. But this will let us make it easier for us to add other Wasm proposals and explore and test with that, so that one will be good.
+
+I wanted to talk a little bit about `implements` status. So, what is `implements` should probably be the first question. Let me see if I've got a tracking issue here for how much that one is covered. One of the big things that I wanted to be able to support is to create static bindings for both guests and hosts that say who you're talking to, rather than what we did in wasmCloud V1, which was we sort of set a state flag that said talk to this link by a link name, and then the system would just look up that and direct based off of that name. Well, this is kind of like that, but actually with static bindings, and we can verify at deployment time: do we have the bindings for this exact thing that you're asking for? Like, can this host talk to Postgres? If not, I can tell you at deploy time that it's not going to work, and that is a really powerful and important feature to have. Everything that we're doing here is supposed to be declarative and very much something really nice for you to run, like for example in Kubernetes in production.
+
+So this has been a tracking wasmCloud feature for a while, but really it is based very much on this `implements` feature of the component model, and we search for it here — it's actually merged now. Let me go to closed here. So we basically have this spec out, and we have a last test around it. The spec's been updated, and that is all main, and part of that is a label tag. So if you're not familiar, in the component model features that are not yet stabilized, we use emojis basically in the spec to say this is an emoji-gated feature. So right now it's emoji-gated with this little label tag. And so if you go to the actual repo — let me take this emoji here — you can see what the actual spec looks like, and so you'll see that in our binary output we have the import name here, and then we thread it through just like that, and so it's basically part of the binary definition.
+
+Now, taking it all the way out, this has already been merged in support fully inside wasm-tools, and now Wasmtime, as of yesterday. So inside the Wasmtime side of the world, I landed the change here — this was the last remaining thing on the host bindgen that we needed to get supported, which was supporting resources with this. So that got merged, and now where I'm working on making this all work is inside wac. I have this PR that I'm going to move out of draft once I finish doing one last pass inside my WIP bindgen piece that depends on it. But effectively, now we can round-trip, compose components together, encode/decode component-linked graphs, and reflect these on each side. And so I've got the wRPC bindgen inside for it, but all of that — you know, y'all are like, "well, show me the wasmCloud" — so I have this working end to end for wasmCloud too. And I think some of the stuff that makes it a little bit more tractable, like what does this actually do...
+
+**Bailey Hayes** [7:30](https://youtu.be/fywk-w1u0xc?t=450)
+
+So this is an integration test with a single Postgres database image, and I'm using Testcontainers to spin one up, so it's a real Postgres database. And then I have two different users for that database, team A and team B, and part of this test is writing rows to that database and then validating that they aren't using the same connection to that database when I'm reading and writing to it — instead they're basically isolated from each other. But we were able to use a single Postgres plugin for all of it. And so at an architecture level, the way this shakes out is that essentially we have a concept of multiplexing across different backend providers, and each backend provider, when you register, it will say "I serve this type of backend." And so from your workload deployment, you say which backend you want to use, and then that will do the binding given that name to the appropriate plugin backend. So in the scenario of Postgres, we basically said "I'm team A, I want team A's Postgres," and so that's how that connection got wired up based on config.
+
+So I think that's the speed-round version of that feature. I obviously have a number of changes that I'm iterating on here locally, but it is making good progress and rolling out. So I hope to have a couple more PRs. They're going to be in draft because they're going to depend on upstream things like wRPC bindgen and the wac change that I showed just a second ago, but as those get released, I'll be able to flip my draft status over to ready to review. And I put it all behind an `implements` flag, so you'll have to opt into that. But yeah, that is the long and short of status on where we are with `implements`. Any questions on that? All right. So the next one, we've got a couple things rolling there. Aditya, do you want to speak to your PR at all on this?
+
+**Aditya Salunkhe** [9:53](https://youtu.be/fywk-w1u0xc?t=593)
+
+Well, yeah... it's a bit ad hoc, so. Yeah.
+
+**Bailey Hayes** [10:00](https://youtu.be/fywk-w1u0xc?t=600)
+
+That's cool. I think, you know, I solved one of the issues that you ran into, and you tested this out against your changes, right?
+
+**Aditya Salunkhe** [10:08](https://youtu.be/fywk-w1u0xc?t=608)
+
+Yeah, and that worked.
+
+**Bailey Hayes** [10:12](https://youtu.be/fywk-w1u0xc?t=612)
+
+This change basically enables P3 streaming with our HTTP handler, both with gRPC and regular HTTP — something that wasn't working for us before. There were upstream bugs. Those upstream bugs have been resolved, so I went through and threaded that through, and now that's working. But we've got more changes. So, yeah — which PR is it, Aditya? This is it, this one?
+
+**Aditya Salunkhe** [10:41](https://youtu.be/fywk-w1u0xc?t=641)
+
+Yeah, I believe so.
+
+**Bailey Hayes** [10:43](https://youtu.be/fywk-w1u0xc?t=643)
+
+All right, tell me about it.
+
+**Aditya Salunkhe** [10:47](https://youtu.be/fywk-w1u0xc?t=647)
+
+So this basically intended to do three things, which Bailey's PR already crossed out one of them, which was the HTTP P3 streaming part. The other two things that this PR aims to cover is basically resource linking across components. For instance, if you have a component A that creates a resource, passes it into another component dynamically, well, resource linking basically means the second component is able to access the first component's resources and call its methods, if that makes sense. And we support this dynamically through the linker, because not all people are going to be composing their components together for the shared state. And the second thing that this PR is going to introduce is cross-component stream support for async stuff. Basically, our upstream, I think, intentionally opted out async and stream values from being lifted and lowered. Well, this PR aims to reintroduce that with type safety. And yeah, this basically had a bit of an error, which I was able to resolve in Wasmtime, and now the streams, they work.
+
+**Bailey Hayes** [12:31](https://youtu.be/fywk-w1u0xc?t=751)
+
+Yeah, I was trying to find your commit on Wasmtime. Do you remember what day it was?
+
+**Aditya Salunkhe** [12:35](https://youtu.be/fywk-w1u0xc?t=755)
+
+It's actually linked to the pull request.
+
+**Bailey Hayes** [12:37](https://youtu.be/fywk-w1u0xc?t=757)
+
+Thanks, man.
+
+**Aditya Salunkhe** [12:38](https://youtu.be/fywk-w1u0xc?t=758)
+
+Yeah, just scroll down. Yeah, the closed one. No, no...
+
+**Bailey Hayes** [12:49](https://youtu.be/fywk-w1u0xc?t=769)
+
+Cool. And this is going to be in Wasmtime 46?
+
+**Aditya Salunkhe** [12:54](https://youtu.be/fywk-w1u0xc?t=774)
+
+Yeah, 46.
+
+**Bailey Hayes** [12:55](https://youtu.be/fywk-w1u0xc?t=775)
+
+Let me double check. Yep, okay, you're good. Yeah, so for your PR, you're going to rebase this on the Wasmtime 46 branch.
+
+**Aditya Salunkhe** [13:11](https://youtu.be/fywk-w1u0xc?t=791)
+
+Yeah, I should close this one up and create a new pull request. I'll just go ahead and do that.
+
+**Bailey Hayes** [13:20](https://youtu.be/fywk-w1u0xc?t=800)
+
+Okay, yeah, that makes sense. I think so. Like, TL;DR to folks: you could do both of those things that this gives you today. If you compose your components together, when a composed component is operating, it has multiple memories, and then inside Wasmtime, basically we figured out how to link components together so that they can share resources, streams, all that natively. With wasmCloud, one of our hallmark features is that we basically let you have multiple components in the same workload definition, have them talk to each other, and we let you do this by also having them do it with separate lifetimes. So a service can run for a long time, but you can also have individual components that are bursty, and your service may route to individual components and not instantiate all of the components inside the workload at the same time, like you would if you had composed them together. And so you've basically added a bunch of features on the linker that lets components in the same workload talk to each other, which is pretty cool.
+
+**Aditya Salunkhe** [14:21](https://youtu.be/fywk-w1u0xc?t=861)
+
+Yeah, there's another thing that we ran into when we have components that are long running. Take for example the P3 streaming stuff: when a component is invoked and the store stays alive, the store contains what we call the core instances of the entire workload, so a whole mapped-out, graph-based view of all the components that are going to be linked via the calls and all the shims, and a whole bunch of other stuff. And the thing is, for long-running stuff, this is not a good thing for concurrency. If we have, say, for example, multiple clients calling the same P3 streaming endpoint, we run into the core-instance maxing-out problem. So one of the ways that I thought would be helpful was removing the eager instantiation, taking that as an inspiration and using lazy instantiation, so that at least in-flight requests are supported even though the concurrency still largely remains the same. And the second change that Bailey actually suggested was having ephemeral stores that were linking to safe call sites — so essentially they are basically suspension points in the code base, where take for example you're waiting on a future and you're awaiting a result, and those instances you can just hand off those core instances to a temporary store, so that your core store stays alive but the temporary store, the ephemeral store, can just drop off those core instances when that specific task is finished. So that did give our setup a bit of stability, but again it didn't quite solve the problem of limited core instances that were maxing out from the engine pool. So we were wondering if there was any kind of brainstorming that we could do that would probably resolve concurrency issues with P3, because P3 mainly brings in concurrency and async. And I believe if wasmCloud does intend to add in streaming to our workload handling capability, as opposed to the pre-existing fire-and-forget notion, I think this is a problem worth discussing. Any thoughts?
+
+**Bailey Hayes** [17:32](https://youtu.be/fywk-w1u0xc?t=1052)
+
+It's a great overview, Aditya. Before I jump in, floor for anybody else. Okay, yeah, so speaking to the core-instance problem, I think we should add a little bit more information on that. Essentially, inside a component, a component itself doesn't do compute on its own. If you crack open a component, it has core module instances inside it, and it's actually fairly rare to only have one core module instance inside it. Just about always, you'll see people have a WASI adapter inside it, so there's usually two, sometimes there's three — like if you built with JCO, you would actually have a core module instance for StarlingMonkey for the JavaScript runtime. So one component may have many core module instances, and so when we instantiate a component, we're instantiating those core module instances, and each one of them takes up memory. And so when we're talking about doing long-running streams, we're holding on to that full component and its core module instances in memory because each of them maybe are interrupting for that whole call. And so ultimately, yes, getting rid of the eager instantiation — being lazy about instantiating — might solve some cases where maybe you have lots of workloads and they're not participating in the path of the hot loop of the stream. But in the diabolical case, they might all be part of it, and in that scenario you have them all instantiated on the same store, and we have things on the same store because that's how our linker works, right? That's how we're passing values around. And so part of the problem is right now we have surfaced on our workload spec this max number of basically component replicas and instances, but that doesn't necessarily map down to the max number of core instances. It's just how many of this one component can I instantiate.
+
+Now part of the solution here that I think would be interesting for you, Aditya, is the stuff that we demoed last week with auto scaling. I know right now you had a hard limit on the number of hosts that you could have, but I think having elastic hosts would help some of this. You've got a huge burst — well, let's scale out another host with the horizontal pod autoscaler, and then scale out the workload deployment instances across your set of hosts elastically, and then you can handle that immediate load rather than dropping requests on the floor. And so what you're running into is not having a sufficient limit on how many requests that host can handle before OOMing, and then the second part of the problem is ultimately a host under that level of load wasn't able to handle it.
+
+Oh, and I see a question from Bharat. Yes, you should be able to use that signature, Bharat, now just straight from 0.3 in, if you are on the Wasmtime 46 branch — and probably also you need that branch to rebase on all my code change. Basically, we were not streaming. It was a bug that I ran into with upstream Wasmtime that Joel eventually fixed, and basically I was able to turn that all the way on. I'm actually not sure when it was fixed. I was mad at myself for not having a tracking issue inside wasmCloud on it, but anyways, tested it last night. It worked out okay.
+
+**Aditya Salunkhe** [21:47](https://youtu.be/fywk-w1u0xc?t=1307)
+
+Yeah, thanks, Bailey. So, basically, elastic hosts, yeah.
+
+**Bailey Hayes** [21:53](https://youtu.be/fywk-w1u0xc?t=1313)
+
+Part of it, I think. Also, in a production scenario, you're going to have a load balancer that's taking in those HTTP requests, you're going to have a metric server that's making sure your host pod is able to reflect the resource utilization that's happening and when to scale out more pods. And then that's only part of it. Right now, one of the answers that I gave you was: if you use wasm-tools and you inspect a component, you can see how many core module instances are in it, and for the most part we could come up with some estimates for how much resource we think this one component might use. We could come up with a Wasm cost equivalent to, like, keep cost almost — looking at a component, which would be fun. It would be napkin math, but it would be better than nothing, which is right now where we're at. And I think that would help you also right-size how much load this host can support, like what's my number.
+
+**Aditya Salunkhe** [23:10](https://youtu.be/fywk-w1u0xc?t=1390)
+
+So realistically speaking, this isn't something that we can fix on our host, because this is as far as the optimization goes, because core instances, they're always going to take up space no matter what we do, so ultimately...
+
+**Bailey Hayes** [23:28](https://youtu.be/fywk-w1u0xc?t=1408)
+
+Yes. Yeah, so if you need to serve, let's say, 100 concurrent requests, then you have 100 concurrent component instances instantiated, and all of their core modules, yeah.
+
+**Aditya Salunkhe** [23:40](https://youtu.be/fywk-w1u0xc?t=1420)
+
+And that is just dramatic.
+
+**Bailey Hayes** [23:44](https://youtu.be/fywk-w1u0xc?t=1424)
+
+But there are ways to say, okay, well, I want to be able to handle that load. I want to right-size my cluster to handle 100,000 requests per second. Well, we can measure that and be able to surface basically "this is the size of infrastructure you need to be able to do that," and we can surface that in some pretty cool ways with WebAssembly. That's really hard to do for containers, so that could be another really awesome thing that we explore as part of our next quarter planning for wasmCloud.
+
+**Aditya Salunkhe** [24:17](https://youtu.be/fywk-w1u0xc?t=1457)
+
+Yeah, that would be great. So, all in all, is it fair to say WebAssembly invocations or workload invocations aren't necessarily good for long-lived, high-concurrency-supporting instances?
+
+**Bailey Hayes** [24:38](https://youtu.be/fywk-w1u0xc?t=1478)
+
+I think where I'd put it is: on a single host, it is challenging, because ultimately they are instantiated for concurrency. But what you can do is just say "I will run 20 of these concurrently, and I'll run 20 more concurrently on this other host," and then I would have that support. I think there's also some opportunity here for instance reuse, but ultimately instance reuse is still your concurrency number, right? Like, you're going to have separate instances for that concurrency.
+
+**Aditya Salunkhe** [25:20](https://youtu.be/fywk-w1u0xc?t=1520)
+
+Well, that was it from my side. And thank you again so much for just clearing that up.
+
+**Bailey Hayes** [25:27](https://youtu.be/fywk-w1u0xc?t=1527)
+
+Yeah. Well, I mean, if you run into it, everybody's going to run into it. And then Bharat was helping us out making HTTP streaming so much better. I'm really excited about their change to do like a long-running process with parsing audio and be able to show back pressure and stuff. That's a great area to jump in on right now, because we clearly don't have much there yet, but we want to. I can't wait. And let me know if that fix works for you, or if you run into anything else, Bharat — happy to help more. Obviously, I had to go kind of heads-down last week to get P3 out, but I'm back after a successful release. Any other questions or discussion topics we want to go through? All right. Well, Aditya, I look forward to a very large PR for `implements`. I'll keep an eye open for your PR that's pointing at the Wasmtime 46 branch. And I think I have another one that is a couple different types of architectures that you can do with P3. I want to take a pass on the ephemeral stores for services, which is separate from ephemeral stores for individual components, because we want them basically to have different lifetimes, is the TL;DR. So for every lifetime you get a store is sort of the rule — that's the way to think about it.
+
+**Aditya Salunkhe** [27:27](https://youtu.be/fywk-w1u0xc?t=1647)
+
+Is this for the async scheduler inside the store?
+
+**Bailey Hayes** [27:30](https://youtu.be/fywk-w1u0xc?t=1650)
+
+Basically, yeah. Basically what I want — and I showed you this at the end of last week, which I'm still working on, the same files that I showed you last time — but basically I want a service to be able to act as both your ingress and your egress. And obviously the changes I landed last week for being able to do the multiple handler routing is part of that, right? That paved the way for being able to actually do more. And by us breaking up the stores between individual components — like doing the ephemeral thing, and the two components passing stuff — and by having the service actually be your router, so let your service be the long-lived thing, and if you're doing streaming, just route the request straight to the component to handle it, then you don't have to have the whole thing instantiated, which should help reduce the pressure with some of the problems that you were saying too.
+
+**Aditya Salunkhe** [28:27](https://youtu.be/fywk-w1u0xc?t=1707)
+
+Yeah, that does make sense. I'm looking forward to that as well. Hopefully I can get it reviewed this weekend. And did we have another PR for the allowed hosts or the strictness-level check?
+
+**Bailey Hayes** [28:52](https://youtu.be/fywk-w1u0xc?t=1732)
+
+It's stricter. Yeah, it is stricter. Did you run into any issues with that? I think that's part of the latest release. You can set allowed hosts on a per-component level, and also for the whole workload, and we basically are validating that now to say "look, if you didn't pass anything in, that means nothing's allowed," and we'll block it.
+
+**Aditya Salunkhe** [29:21](https://youtu.be/fywk-w1u0xc?t=1761)
+
+Yeah, I didn't get a chance to test that out. I'll just try that out.
+
+**Bailey Hayes** [29:27](https://youtu.be/fywk-w1u0xc?t=1767)
+
+Yeah, that should be in the latest release that we got out last night, 2.40. And then Eric wrote a nice blog post on that, so that's worth highlighting — I'll bring that up if folks didn't see it, go to our blog, 2.40. I breezed past this, but we talked about it last week on the multi-handler workloads. The way this one works as part of this release is so that host interfaces can multiplex across different handlers, but then I want services and eventually host components to be able to do that. So that was the first thing to land, and then I loved Jeremy's demo with KEDA auto scaling, which is part of the solution for handling highly concurrent workloads. And yeah, so we've got more coming, but that was the set. So I expect the next blog post to be very much P3-oriented, and with some of the new features that are landing with Wasmtime.
+
+**Aditya Salunkhe** [30:36](https://youtu.be/fywk-w1u0xc?t=1836)
+
+Yeah, P3 was a really big release, though. There's a lot of good features that landed.
+
+**Bailey Hayes** [30:43](https://youtu.be/fywk-w1u0xc?t=1843)
+
+It's interesting, because we're on 2.40 right? So it feels to me like — look at this, look here. Every two weeks it is a new set of features that have been dropping. So we're moving at a really great pace, and I'm really happy with that. And if you look at our roadmap, implementing the config piece of it, we're almost there — we might actually hit our goals for what we planned for this. And one of my biggest philosophies is to always have aggressive goals on a status. Maybe we should be more aggressive next time we plan stuff. A lot of these remind me — they are the PRs that I'm talking about that I've made a lot of progress on and I'm landing — but I think we are darn close to having hit our roadmap. And my usual rule of thumb for roadmaps is like, you should expect a C-plus. You should always hit most of them, and you should be able to get mostly a passing grade, but if you do it all, what are you even doing? You're not even being aggressive enough, you're not even trying. So I think we could maybe even make it harder for us next time, but we'll see. We'll check back in when this quarter ends in a week and a half.
+
+**Aditya Salunkhe** [32:12](https://youtu.be/fywk-w1u0xc?t=1932)
+
+When does this quarter end? July?
+
+**Bailey Hayes** [32:14](https://youtu.be/fywk-w1u0xc?t=1934)
+
+July 1.
+
+**Aditya Salunkhe** [32:15](https://youtu.be/fywk-w1u0xc?t=1935)
+
+Okay, I don't have time to slack around then.
+
+**Bailey Hayes** [32:20](https://youtu.be/fywk-w1u0xc?t=1940)
+
+Yeah, me too. But it's... we can do it. I think we can do it.
+
+**Aditya Salunkhe** [32:29](https://youtu.be/fywk-w1u0xc?t=1949)
+
+Yeah, yeah. I think I should just move that to in progress.
+
+**Bailey Hayes** [32:35](https://youtu.be/fywk-w1u0xc?t=1955)
+
+I can do it while I'm here, I think. Oh, yeah. Then hopefully we'll look at that landed. I just showed you my `implements` progress on that. Obviously, we've got a bunch of WASI P3 stuff. I'm just kind of using this as, like, "is WASI P3 done yet, y'all" tracking issue. We're working on adding k6 to our benchmarking suite, which was one of the things that we had called out. We also already landed micro benchmarks, but macro benchmarks are also super important, and covering basically our host operator is really important. This is one of the — what I showed you last week is a lot of that body of changes, and when I say "you," I actually just mean Aditya here. Sorry, I didn't do it on the stream. I will get that a little bit closer to actually ready. I was getting some early implementer feedback on that one. And then I think this one actually might be subsumed by this one. We'll see, Aditya, so you don't necessarily have to start on that one just yet. And then I actually have this covered in this one. So let me just go ahead and take that. And then, yeah, I'm not sure what we want to do there. This one we might want to just reevaluate.
+
+**Aditya Salunkhe** [33:54](https://youtu.be/fywk-w1u0xc?t=2034)
+
+Yeah, I do need to check up on Wasmtime, so.
+
+**Bailey Hayes** [34:00](https://youtu.be/fywk-w1u0xc?t=2040)
+
+Yeah, I don't think we're going to have this one. Mindy's working on it as fast and hard as he can. We're blocked basically by not having the wasi-graphics runtime crate being published on crates.io and that being a dependency for us. And then this one probably not either. It really needs all of these others to land first before we approach that. But that's still like a B-plus, A-minus, instead of, you know, like I said, C-plus is what you should shoot for.
+
+**Aditya Salunkhe** [34:35](https://youtu.be/fywk-w1u0xc?t=2075)
+
+That's a side track, yeah. We're getting the main stuff done, really happy about it. Oh, yes — as a public service announcement, I'm going to be attending KubeCon India, and if any of you folks are going to be attending it, let me know over on the Slack, and hopefully we can meet and we can talk about wasmCloud.
+
+**Bailey Hayes** [34:58](https://youtu.be/fywk-w1u0xc?t=2098)
+
+Cool. And let us know — give us a KubeCon report when you get back for the next wasmCloud community call. I'd like to hear what were people's questions. One of the things that I always want to know is what's the barometer on WebAssembly understanding, you know?
+
+**Aditya Salunkhe** [35:13](https://youtu.be/fywk-w1u0xc?t=2113)
+
+Yeah, I think there's just one talk about Wasm, so yeah, but it's about Wasm edge, so I'm looking forward to it. Oh, is Bharat going to be there?
+
+**Bailey Hayes** [35:27](https://youtu.be/fywk-w1u0xc?t=2127)
+
+That would be cool. Y'all should catch up if you are. Is it in Mumbai?
+
+**Aditya Salunkhe** [35:33](https://youtu.be/fywk-w1u0xc?t=2133)
+
+Yeah, it is in Mumbai.
+
+**Bailey Hayes** [35:34](https://youtu.be/fywk-w1u0xc?t=2134)
+
+Cool, I've only been to the Mumbai airport, which was hard, but I didn't get to explore the city at all. So I hope you have fun there. Sounds like maybe that's where you're from, if you're staying with your mom.
+
+**Aditya Salunkhe** [35:49](https://youtu.be/fywk-w1u0xc?t=2149)
+
+Yeah.
+
+**Bailey Hayes** [35:49](https://youtu.be/fywk-w1u0xc?t=2149)
+
+Cool. All right. Well, yeah, try to spread the good word of WebAssembly and wasmCloud for us.
+
+**Aditya Salunkhe** [35:59](https://youtu.be/fywk-w1u0xc?t=2159)
+
+I'll be God's messenger.
+
+**Bailey Hayes** [36:03](https://youtu.be/fywk-w1u0xc?t=2163)
+
+Love it. Thank you. All right. Well, you guys should sync up on Slack and try to catch up, and maybe do some hacking.
+
+**Aditya Salunkhe** [36:15](https://youtu.be/fywk-w1u0xc?t=2175)
+
+Yeah, definitely, most definitely. Oh, yes — he is going to be there. Nice.
+
+**Bailey Hayes** [36:28](https://youtu.be/fywk-w1u0xc?t=2188)
+
+Alrighty. Well, thanks again, Aditya, and everybody else for joining. We'll see you next week.
+
+**Aditya Salunkhe** [36:36](https://youtu.be/fywk-w1u0xc?t=2196)
+
+Thank you, Bailey.
+
+**Bailey Hayes** [36:38](https://youtu.be/fywk-w1u0xc?t=2198)
+
+See you guys.
