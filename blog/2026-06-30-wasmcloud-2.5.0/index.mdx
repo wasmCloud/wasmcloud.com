@@ -34,7 +34,7 @@ mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS, 
 
 ## Wasmtime 46 and WASI 0.3 by default
 
-Wasmtime 46 brings the engine refactor that makes this release's other headlines possible. WASI 0.3 is now on by default across the wash binary: `--wasip3` / `WASH_WASIP3` and `DevConfig.wasip3` all default to `enabled`. If you'd like to opt out for whatever reason, you can do so with `--wasip3 false` or `wasip3: false` in `.wash/config.yaml`.
+Wasmtime 46 brings the engine refactor that makes this release's other headlines possible. WASI 0.3 is now the default and only supported target across the `wash` binary — the earlier `wasip3` Cargo feature flag has been removed, and there is no runtime toggle. Every `wash-runtime` build in 2.5.0 and onward ships with WASI 0.3 always enabled.
 
 The Wasmtime update also lifts a few API constraints into the wash-runtime surface: 
 
@@ -57,26 +57,26 @@ The new API is a `WasmProposal` enum with `with_wasm_proposal()` on the builder 
 - **`wash dev`** reads a `dev.wasm_proposals` list out of `.wash/config.yaml`, validated at startup.
 - **`runtime-operator` Helm chart** accepts a per-host-group `wasmProposals: []` list that the chart renders as `--wasm-proposal` arguments on the host container. The chart's appVersion bumps to 0.6.0 in step with the new field.
 
-One implementation note documented in the same release: `with_wasip3()` implies `component-model-async`, so a host group that opts into WASI 0.3 has the async proposal whether or not it's listed explicitly. 
+One implementation note documented in the same release: WASI 0.3 always brings the `component-model-async` proposal along with it, so every 2.5.0 host has the async proposal available whether or not it's listed explicitly in the proposals set. 
 
 ## Multiplexing host plugins with the WebAssembly Component Model's `implements` clause
 
 The most user-visible payoff of this release is finally being able to do this in a WIT world:
 
 ```wit
-package my-app:multi-tenant;
+package my-app:kv-cached;
 
-world multi-tenant {
-    import team-a: wasi:keyvalue/store@0.2.0-draft;
-    import team-b: wasi:keyvalue/store@0.2.0-draft;
+world kv-cached {
+    import cache: wasi:keyvalue/store@0.2.0-draft;
+    import store: wasi:keyvalue/store@0.2.0-draft;
     export wasi:http/incoming-handler@0.2.2;
 }
 ```
 
-That's two labeled imports of the same `wasi:keyvalue/store` interface, expressed via the Component Model's `implements` clause (the `import <label>: <iface>;` syntax). Inside the guest, each label surfaces as its own import namespace — `team_a::open("bucket")` and `team_b::open("bucket")` reach two different backends (say, Redis and NATS) without the guest having to know which is which.
+That's two labeled imports of the same `wasi:keyvalue/store` interface, expressed via the Component Model's `implements` clause (the `import <label>: <iface>;` syntax). The guest now has control over which store each call hits: `cache::open("session-data")` and `store::open("orders")` reach two different backends (say, a fast local cache and a durable NATS-backed store) without the guest needing to know which is which.
 
 :::info[Feature flag required for now]
-`(implements ..)` multiplexing ships behind the `wasm_component_model_implements` Cargo feature, which is not in the default `wash-runtime` feature set. That means the stock `ghcr.io/wasmcloud/wash:2.5.0` binary and the stock `ghcr.io/wasmcloud/runtime-operator:2.5.0` image don't enable multi-backend binding out of the box. To use it today, build a custom host image with `CARGO_FEATURES=wasm_component_model_implements` (the source Dockerfile takes this as a build arg) and point the chart at it via [`runtime.image.tag`](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeimagetag). The `implements` proposal is being tracked upstream in Wasmtime; once it lands in a tagged release, the feature will move onto the default surface.
+`(implements ..)` multiplexing ships behind the `wasm_component_model_implements` Cargo feature, which is not in the default `wash-runtime` feature set. That means the stock `ghcr.io/wasmcloud/wash:2.5.0` binary and the stock `ghcr.io/wasmcloud/runtime-operator:2.5.0` image don't enable multi-backend binding out of the box. To use it today, build a custom host image with `CARGO_FEATURES=wasm_component_model_implements` (the source Dockerfile takes this as a build arg) and point the chart at it via [`runtime.image.tag`](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeimagetag). The `implements` proposal is a WebAssembly Component Model feature being finalized upstream; once it graduates and lands in a tagged Wasmtime release, the workspace fork can go and this can move onto the default surface.
 :::
 
 The 2.5.0 release lands multiplexing infrastructure and support for `wasi:keyvalue`, `wasmcloud:postgres`, and `wasmcloud:messaging/consumer`. The engine itself was taught to surface `(implements ..)` imports as named `WitInterface`s so the plugin dispatcher can bind each labeled import to the right backend at workload start.
@@ -132,7 +132,7 @@ Three breaking changes in 2.5.0 worth flagging up front:
 
 ## What's coming
 
-The next round of work tracks the `implements` proposal toward upstream Wasmtime; once it lands in a tagged Wasmtime release, we'll drop the workspace fork in favor of the upstream version. The async keyvalue and blobstore WIT also has follow-on backend work in flight: a draft "async backends" PR from Bailey ([#5297](https://github.com/wasmCloud/wasmCloud/pull/5297)) is the next step toward pairing real async backends with the new interface shapes.
+The next round of work tracks the `implements` Component Model proposal toward finalization; once it lands in a tagged Wasmtime release, we'll drop the workspace fork in favor of the upstream version. The async keyvalue and blobstore WIT also has follow-on backend work in flight: a draft "async backends" PR from Bailey ([#5297](https://github.com/wasmCloud/wasmCloud/pull/5297)) is the next step toward pairing real async backends with the new interface shapes.
 
 ## Get started with wasmCloud 2.5.0
 
