@@ -164,7 +164,25 @@ spec:
 
 Use the `hostInterfaces` field to define host interfaces used by the workload. Each entry requires `namespace`, `package`, and `interfaces`, and may optionally include `config` and `name`.
 
-The optional `name` field enables **multi-backend binding**: when a component needs multiple implementations of the same interface type (e.g., two `wasi:keyvalue` backends), each entry can be given a unique name. The name maps directly to the `identifier` argument in resource-opening functions such as `store::open("cache")`.
+The optional `name` field enables **multi-backend binding**, meaning a component can import the same interface twice under distinct labels and have each labeled import routed to its own backend. This uses the Component Model's `implements` clause: the component declares each labeled import in its WIT world, and the runtime routes calls through the labeled namespace to the matching `hostInterfaces` entry.
+
+Enabled in 2.5.0, the Component Model's `implements` proposal (Cargo feature `wasm_component_model_implements`) is what allows the runtime to bind the labeled imports at start time.
+
+A component that needs two `wasi:keyvalue` backends declares two labeled imports in its WIT world:
+
+```wit
+world my-app {
+    import cache: wasi:keyvalue/store@0.2.0-draft;
+    import sessions: wasi:keyvalue/store@0.2.0-draft;
+    export wasi:http/incoming-handler@0.2.2;
+}
+```
+
+Inside the guest, each label surfaces as its own import namespace: `cache::open("kv-bucket")` and `sessions::open("session-bucket")` reach two different backends without the guest needing to know which is which. The string passed to `open()` is the bucket name; the routing label is the WIT namespace, not an argument.
+
+:::info[Feature flag required]
+Multi-backend binding via `(implements ..)` requires a `wash-runtime` build with the `wasm_component_model_implements` Cargo feature enabled, which in turn requires a Wasmtime build with `resource-implements`. The default `ghcr.io/wasmcloud/wash:{{WASMCLOUD_VERSION}}` and `ghcr.io/wasmcloud/runtime-operator:{{WASMCLOUD_VERSION}}` images ship without this feature. To use multi-backend binding today, build a custom host image with `CARGO_FEATURES=wasm_component_model_implements` (the source Dockerfile accepts this as a build arg) and point the chart at it via [`runtime.image.tag`](./operator-manual/helm-values.mdx#runtimeimagetag). The `implements` clause is a Component Model spec addition currently being finalized upstream in the WebAssembly Component Model repository. Once Wasmtime ships it in a tagged release, this feature will move onto the default surface.
+:::
 
 ```yaml
 hostInterfaces:
