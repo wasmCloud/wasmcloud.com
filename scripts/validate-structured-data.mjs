@@ -23,8 +23,8 @@
  *   On main: node scripts/validate-structured-data.mjs
  *   Nightly: node scripts/validate-structured-data.mjs
  */
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { readdir, readFile } from 'node:fs/promises';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
@@ -33,6 +33,8 @@ const BUILD_DIR = join(process.cwd(), 'build');
 // so we tolerate quoted, single-quoted, and unquoted attribute forms. The
 // negative-lookahead-style filtering happens via the optional-quote group.
 const SCRIPT_RE = /<script[^>]*\btype=(?:"application\/ld\+json"|'application\/ld\+json'|application\/ld\+json)[^>]*>([\s\S]*?)<\/script>/g;
+const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---/;
+const SLUG_RE = /^slug:\s*(.+)$/m;
 const ARTICLE_TYPES = new Set([
   'Article',
   'BlogPosting',
@@ -74,6 +76,41 @@ async function* walkHtml(root) {
 }
 
 /** Best-effort PR mode: derive changed routes from changed files. */
+function routeWithTrailingSlash(route) {
+  return route.endsWith('/') ? route : `${route}/`;
+}
+
+function readFrontmatterSlug(filePath) {
+  try {
+    const text = readFileSync(filePath, 'utf8');
+    const frontmatter = FRONTMATTER_RE.exec(text)?.[1];
+    if (!frontmatter) return null;
+    const slug = SLUG_RE.exec(frontmatter)?.[1]?.trim();
+    if (!slug) return null;
+    return slug.replace(/^['"]|['"]$/g, '');
+  } catch {
+    return null;
+  }
+}
+
+function blogRouteForSource(filePath) {
+  const slug = readFrontmatterSlug(filePath);
+  if (slug) {
+    return routeWithTrailingSlash(slug.startsWith('/') ? slug : `/blog/${slug}`);
+  }
+  const inferred = filePath.replace(/^blog\//, '').replace(/\/index\.mdx?$/, '/');
+  return routeWithTrailingSlash(`/blog/${inferred}`);
+}
+
+function communityRouteForSource(filePath) {
+  const slug = readFrontmatterSlug(filePath);
+  if (slug) {
+    return routeWithTrailingSlash(slug.startsWith('/') ? slug : `/community/${slug}`);
+  }
+  const inferred = filePath.replace(/^community\//, '').replace(/\.mdx?$/, '/');
+  return routeWithTrailingSlash(`/community/${inferred}`);
+}
+
 function changedRoutesFromGit(baseRef) {
   try {
     const out = execFileSync('git', ['diff', '--name-only', `${baseRef}...HEAD`], {
@@ -84,27 +121,33 @@ function changedRoutesFromGit(baseRef) {
     for (const f of files) {
       // Heuristics map source files → likely route paths. Conservative: any
       // change to docs/blog/community produces only the specific route's
-      // HTML being re-validated; any change to src/theme/wasmcloud/* triggers
-      // a full sweep (safer because theme changes affect everything).
-      if (f.startsWith('src/theme/')) return null; // signal: full sweep
+      // HTML being re-validated; any change to shared rendering / routing
+      // code triggers a full sweep (safer because those changes fan out).
+      if (
+        f.startsWith('src/theme/') ||
+        f.startsWith('src/components/') ||
+        f.startsWith('plugins/') ||
+        f === 'docusaurus.config.ts' ||
+        f.startsWith('src/data/')
+      ) {
+        return null; // signal: full sweep
+      }
       if (f.startsWith('docs/')) {
         const slug = f
           .replace(/^docs\//, '')
           .replace(/\/index\.mdx?$/, '/')
           .replace(/\.mdx?$/, '/');
-        routes.add('/docs/' + slug);
+        routes.add(routeWithTrailingSlash('/docs/' + slug));
       } else if (f.startsWith('blog/')) {
-        const slug = f.replace(/^blog\//, '').replace(/\/index\.mdx?$/, '/');
-        routes.add('/blog/' + slug);
+        routes.add(blogRouteForSource(f));
       } else if (f.startsWith('community/')) {
-        const slug = f.replace(/^community\//, '').replace(/\.mdx?$/, '/');
-        routes.add('/community/' + slug);
+        routes.add(communityRouteForSource(f));
       } else if (f.startsWith('src/pages/')) {
         const slug = f
           .replace(/^src\/pages\//, '')
           .replace(/\/index\.(tsx?|mdx?|jsx?)$/, '/')
           .replace(/\.(tsx?|mdx?|jsx?)$/, '/');
-        routes.add('/' + slug);
+        routes.add(routeWithTrailingSlash('/' + slug));
       }
     }
     return routes;
