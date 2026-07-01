@@ -15,7 +15,7 @@ mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS, 
 
 * **WASI 0.3 is on by default** with the platform's update to [Wasmtime](https://wasmtime.dev/) 46 
 * **Top-level Wasm proposals are now runtime-configurable** per host, per host group, or per `wash dev` config
-* **`(implements ..)` have landed**, meaning a workload can now import the same interface multiple times under distinct labels and route each call to its own backend.
+* **`(implements ..)` have landed** (behind a feature flag for now), meaning a workload can now import the same interface multiple times under distinct labels and route each call to its own backend.
 
 2.5.0 also ships async-shaped `wasmcloud:keyvalue` and `wasmcloud:blobstore` WIT (with TTL, CAS, and richer errors), a Helm chart hardening pass with NetworkPolicies on the runtime-operator pods, an operator host-controller refactor to Server-Side Apply, and a passel of `wash` quality-of-life fixes.
 
@@ -28,7 +28,7 @@ mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS, 
 | Wasmtime | 45 | 46 |
 | WASI default | 0.2 | 0.3 |
 | Engine Wasm proposals | compile-time | runtime-configurable per host |
-| Host-plugin routing | one backend per interface | multiplexed via `(implements ..)` |
+| Host-plugin routing | one backend per interface | multiplexed via `(implements ..)` (feature-flagged) |
 | Async `wasmcloud:keyvalue` / `wasmcloud:blobstore` WIT | not shipped | shipped (TTL, CAS, typed errors) |
 | Helm chart NetworkPolicies | not shipped | runtime-operator and host group pods |
 
@@ -74,6 +74,10 @@ world multi-tenant {
 ```
 
 That's two labeled imports of the same `wasi:keyvalue/store` interface, expressed via the Component Model's `implements` clause (the `import <label>: <iface>;` syntax). Inside the guest, each label surfaces as its own import namespace — `team_a::open("bucket")` and `team_b::open("bucket")` reach two different backends (say, Redis and NATS) without the guest having to know which is which.
+
+:::info[Feature flag required for now]
+`(implements ..)` multiplexing ships behind the `wasm_component_model_implements` Cargo feature, which is not in the default `wash-runtime` feature set. That means the stock `ghcr.io/wasmcloud/wash:2.5.0` binary and the stock `ghcr.io/wasmcloud/runtime-operator:2.5.0` image don't enable multi-backend binding out of the box. To use it today, build a custom host image with `CARGO_FEATURES=wasm_component_model_implements` (the source Dockerfile takes this as a build arg) and point the chart at it via [`runtime.image.tag`](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeimagetag). The `implements` proposal is being tracked upstream in Wasmtime; once it lands in a tagged release, the feature will move onto the default surface.
+:::
 
 The 2.5.0 release lands multiplexing infrastructure and support for `wasi:keyvalue`, `wasmcloud:postgres`, and `wasmcloud:messaging/consumer`. The engine itself was taught to surface `(implements ..)` imports as named `WitInterface`s so the plugin dispatcher can bind each labeled import to the right backend at workload start.
 
