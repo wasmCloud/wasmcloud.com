@@ -85,7 +85,7 @@ On Kubernetes, a [`WorkloadDeployment`](/docs/kubernetes-operator/crds/#workload
 
 CEL admission validation enforces what the multiplex actually expects: exact duplicates (same namespace, package, name, and version) are rejected, at most one *unnamed* entry per `namespace:package` is allowed (the default route for non-`implements` imports), and the operator's merge logic follows the component-model canonical-version rules: `0.2.1` and `0.2.6` collapse to the higher, `0.2` and `0.3` stay distinct, differently-named entries never merge.
 
-One small but crucial structural change went in along the way: [#5280](https://github.com/wasmCloud/wasmCloud/pull/5280) (**breaking**) moves the `bucket` resource (and `error`, `key-response`, `set-options`) out of `wasmcloud:keyvalue/store` into a new shared `types` interface. `store`, `atomics`, `cas`, `batch`, and `watcher` all `use types.{bucket, error}`. Without this change, a guest that imported a labeled (multiplexed) `store` couldn't *also* use `cas`/`atomics`/`batch` on the same bucket; those sibling interfaces used to `use store.{bucket}`, which resolved to the unlabeled `store`, so the guest's labeled `kv::Bucket` failed to unify with the `store::Bucket` they borrow. Defining `bucket` in a shared `types` interface makes the resource identity match across all five. The shape mirrors what `wasmcloud:blobstore` already had.
+One structural detail worth noting ([#5280](https://github.com/wasmCloud/wasmCloud/pull/5280)): `wasmcloud:keyvalue` puts the `bucket` resource (and `error`, `key-response`, `set-options`) in a shared `types` interface rather than in `store`. `store`, `atomics`, `cas`, `batch`, and `watcher` all `use types.{bucket, error}`, so a guest that imports a labeled (multiplexed) `store` can *also* use `cas`/`atomics`/`batch` against the same bucket — the resource identity matches across all five interfaces. `wasmcloud:blobstore` uses the same pattern with its `container` interface.
 
 ## Async `wasmcloud:keyvalue` and `wasmcloud:blobstore` WIT
 
@@ -116,10 +116,9 @@ If you've been hand-patching NetworkPolicies onto a wasmCloud release, this rele
 
 ## What's breaking
 
-Three breaking changes in 2.5.0 worth flagging up front:
+Two breaking changes in 2.5.0 worth flagging up front:
 
 - **`wash-runtime` no longer has a `wasip3` feature flag** ([#5279](https://github.com/wasmCloud/wasmCloud/pull/5279)). The runtime is always WASI 0.3-enabled. Custom-host builds that compiled with `--no-default-features` to omit WASI 0.3 will need to drop that flag and pick up the full runtime instead.
-- **`wasmcloud:keyvalue` restructure** ([#5280](https://github.com/wasmCloud/wasmCloud/pull/5280)). The `bucket` resource (and `error`, `key-response`, `set-options`) moved from the `store` interface into a new shared `types` interface. WIT files that import these from `store` need to update to import them from `types` instead. The shape mirrors what `wasmcloud:blobstore` already had.
 - **Rust MSRV is now 1.94.0.** The Wasmtime 46 dependency requires it. Building wasmCloud or `wash-runtime` from source requires a Rust toolchain at 1.94.0 or later.
 
 ## What's coming
