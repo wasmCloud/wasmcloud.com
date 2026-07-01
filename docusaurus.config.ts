@@ -6,6 +6,7 @@ import {
 } from '@docusaurus/preset-classic';
 import { Options as PluginContentBlogOptions } from '@docusaurus/plugin-content-blog';
 import { Options as PluginGoogleAnalyticsOptions } from '@docusaurus/plugin-google-analytics';
+import { Options as PluginGoogleTagManagerOptions } from '@docusaurus/plugin-google-tag-manager';
 import { Options as PluginGithubStarsOptions } from '@wasmcloud/docusaurus-github-stars';
 import { Options as PluginHubspotAnalyticsOptions } from '@wasmcloud/docusaurus-hubspot-analytics';
 import { Options as PluginReoAnalyticsOptions } from '@wasmcloud/docusaurus-reo-analytics';
@@ -342,6 +343,12 @@ const config = (async (): Promise<Config> => {
       ...(offlineBuild
         ? []
         : [
+            [
+              '@docusaurus/plugin-google-tag-manager',
+              {
+                containerId: process.env.GTM_CONTAINER_ID || 'localdev',
+              } satisfies PluginGoogleTagManagerOptions,
+            ],
             [
               '@docusaurus/plugin-google-analytics',
               {
