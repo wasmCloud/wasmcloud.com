@@ -4,6 +4,17 @@ on:
   push:
     tags:
       - 'docs-v*'
+  # workflow_dispatch is a no-PAT escape hatch. When update-version.yml or
+  # tag-after-merge.yml can't run (e.g. WASMCLOUD_BOT_PAT expired), dispatch
+  # this workflow directly with a version input to publish the offline docs
+  # bundle from main HEAD. The GitHub Release, tarball, and container image
+  # all get created against `docs-v<version>` using GITHUB_TOKEN alone.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g., 2.5.1). Publishes docs-v<version> Release + ghcr.io/wasmcloud/docs:<version> image."
+        required: true
+        type: string
 
 concurrency:
   group: release-docs-${{ github.ref }}
@@ -24,12 +35,18 @@ jobs:
       version: ${{ steps.extract.outputs.version }}
     steps:
       - id: extract
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         shell: bash
         run: |
-          # tag form: docs-v2.1.0 -> 2.1.0
-          version="${GITHUB_REF_NAME#docs-v}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            version="${INPUT_VERSION}"
+          else
+            # tag form: docs-v2.1.0 -> 2.1.0
+            version="${GITHUB_REF_NAME#docs-v}"
+          fi
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
-            echo "::error::tag ${GITHUB_REF_NAME} does not match docs-vMAJOR.MINOR.PATCH(-prerelease)"
+            echo "::error::version '$version' does not match MAJOR.MINOR.PATCH(-prerelease)"
             exit 1
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
@@ -66,6 +83,12 @@ jobs:
         uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
         with:
           name: Offline docs ${{ needs.version.outputs.version }}
+          # Pin tag_name so workflow_dispatch (which runs on refs/heads/main)
+          # creates the release against docs-v<version> instead of the main ref.
+          # For a normal tag-push event this matches GITHUB_REF_NAME so it's a
+          # no-op; for workflow_dispatch, the action creates the tag against
+          # target_commitish (main HEAD) using GITHUB_TOKEN.
+          tag_name: docs-v${{ needs.version.outputs.version }}
           generate_release_notes: true
           files: |
             wasmcloud-docs-${{ needs.version.outputs.version }}.tar.gz

@@ -6,10 +6,21 @@ name: Tag after release-bump merge
 #
 # Version is extracted from the PR title set by update-version.yml:
 #   "docs: update wasmCloud version to 2.1.0"
+#
+# workflow_dispatch is a manual escape hatch: pass a version explicitly to
+# push a docs-v tag from main without going through the PR-bump flow. Useful
+# when update-version.yml has failed to open the PR (e.g. WASMCLOUD_BOT_PAT
+# expired) and the offline docs pipeline needs to catch up.
 
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to tag (e.g., 2.5.1). Pushes docs-v<version> from main HEAD."
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -22,10 +33,32 @@ env:
 jobs:
   tag:
     if: >-
-      github.event.pull_request.merged == true &&
-      contains(github.event.pull_request.labels.*.name, 'release-bump')
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.merged == true &&
+       contains(github.event.pull_request.labels.*.name, 'release-bump'))
     runs-on: ubuntu-latest
     steps:
+      - name: Verify bot PAT is available
+        env:
+          BOT_PAT: ${{ secrets.WASMCLOUD_BOT_PAT }}
+        run: |
+          if [[ -z "${BOT_PAT}" ]]; then
+            echo "::error::secrets.WASMCLOUD_BOT_PAT is empty or unset."
+            echo ""
+            echo "This workflow needs a bot PAT with 'repo' scope to push the docs-v tag."
+            echo "A tag pushed by the default GITHUB_TOKEN does NOT trigger downstream"
+            echo "workflows, so the PAT is required to unblock release-docs.yml."
+            echo ""
+            echo "If the PAT can't be renewed right now, workflow_dispatch on release-docs.yml"
+            echo "directly is the no-PAT escape hatch — it skips the tag push and creates the"
+            echo "GitHub Release with GITHUB_TOKEN alone."
+            echo ""
+            echo "Rotate/renew the token at:"
+            echo "    Repo → Settings → Secrets and variables → Actions → WASMCLOUD_BOT_PAT"
+            exit 1
+          fi
+
       - name: Checkout main
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -35,18 +68,23 @@ jobs:
           # by the default GITHUB_TOKEN does not fire downstream workflows.
           token: ${{ secrets.WASMCLOUD_BOT_PAT }}
 
-      - name: Extract version from PR title
+      - name: Extract version
         id: ver
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          prefix='docs: update wasmCloud version to '
-          if [[ "$PR_TITLE" != "${prefix}"* ]]; then
-            echo "::error::PR title does not match expected prefix; got '$PR_TITLE'"
-            exit 1
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            version="${INPUT_VERSION}"
+          else
+            prefix='docs: update wasmCloud version to '
+            if [[ "$PR_TITLE" != "${prefix}"* ]]; then
+              echo "::error::PR title does not match expected prefix; got '$PR_TITLE'"
+              exit 1
+            fi
+            version="${PR_TITLE#${prefix}}"
           fi
-          version="${PR_TITLE#${prefix}}"
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]]; then
             echo "::error::extracted version '$version' is not valid semver"
             exit 1
