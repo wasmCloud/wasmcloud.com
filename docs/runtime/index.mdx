@@ -31,7 +31,7 @@ platforms: [wasmCloud, Kubernetes, Wasmtime]
 
 The runtime provides easy-to-use abstractions over the low-level [Wasmtime API](https://wasmtime.dev/), as well as wasmCloud-specific APIs for managing workloads, handling NATS subscriptions, managing and utilizing host plugins, and more.
 
-For a step-by-step guide to embedding the runtime, see [Building Custom Hosts](./building-custom-hosts.mdx). To run a cluster-connected host managed by the operator, see [Cluster Hosts (Washlet)](./washlet.mdx). To extend a host with new capabilities, see [Creating Host Plugins](./creating-host-plugins.mdx).
+For a step-by-step guide to embedding the runtime, see [Building Custom Hosts](./building-custom-hosts.mdx). To run a cluster-connected host managed by the operator, see [Cluster Hosts (Washlet)](./washlet.mdx). To extend a host with new capabilities, see [Creating Host Plugins](./creating-host-plugins.mdx) for the native (Rust) authoring path or [Creating Component Host Plugins](./creating-component-host-plugins.mdx) for the WebAssembly component path.
 
 ## Architecture
 
@@ -57,9 +57,11 @@ The runtime provides WASI interface support through three distinct mechanisms:
 - `wasi:blobstore`
 - `wasi:config`
 - `wasi:logging`
+- `wasi:otel`
 - `wasmcloud:messaging`
+- `wasmcloud:postgres`
 
-Hosts can be extended with additional custom plugins at build-time.
+Hosts can be extended with additional [native (Rust) plugins](./creating-host-plugins.mdx) at build-time, or with [component host plugins](./creating-component-host-plugins.mdx) — WebAssembly components deployed into the host at runtime — under the `host-component-plugins` feature.
 
 :::info[Declaring plugins in Kubernetes]
 On Kubernetes, host plugins are *available* on the host but must be *declared per workload* under `spec.hostInterfaces` (in a `Workload`) or `spec.template.spec.hostInterfaces` (in a `WorkloadDeployment`). The runtime links interfaces declaratively from the workload spec; an undeclared import surfaces as a linker error at startup. See [Host Interfaces](../kubernetes-operator/crds.mdx#host-interfaces) for the field reference and [Troubleshooting](../troubleshooting.mdx#missing-host-interface-implementation-in-the-linker) for the specific error.
@@ -124,16 +126,20 @@ The crate supports the following `cargo` features:
 - `wasi-logging` (default): Logging interface
 - `wasi-blobstore` (default): Blob/object storage interface
 - `wasi-keyvalue` (default): Key-value storage interface
-- `wasmcloud-postgres` (default): PostgreSQL-backed implementations for keyvalue and blobstore
+- `wasi-otel` (default): OpenTelemetry traces, metrics, and logs export
+- `wasi-webgpu` (default): WebGPU interface
+- `wasmcloud-postgres` (default): PostgreSQL access via the `wasmcloud:postgres` plugin (queries and prepared statements)
 - `washlet` (default): Washlet support (depends on `oci`)
-- `wasi-webgpu`: WebGPU interface
 - `oci`: OCI registry integration for pulling components
+- `wasi-tls`: TLS termination for [`wasi:tls` components](../overview/interfaces.mdx)
+- `host-component-plugins`: Support for [component host plugins](./creating-component-host-plugins.mdx), WebAssembly components that provide host capabilities to workloads through a capability ingress
 
 ## WASI 0.3
 
 Starting in wasmCloud 2.5.0, the runtime is built on Wasmtime 46 with WASI 0.3 always on. Every build of `wash-runtime` includes P3 support alongside the P2 versions:
 
-- `wasi:http` (incoming-handler, outgoing-handler, types) at 0.3.0
+- `wasi:http` (types, handler) at 0.3.0
+- `wasi:cli` (including `run`) at 0.3.0
 - `wasi:sockets/ip-name-lookup`
 - `wasi:sockets/tcp`, `wasi:sockets/udp`
 

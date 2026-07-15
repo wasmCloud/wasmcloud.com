@@ -1,0 +1,83 @@
+---
+title: 'Trigger Services — The wasmCloud Runtime Execution Model'
+sidebar_label: 'Trigger Services'
+hide_title: true
+date: 2026-07-14T00:00:00+00:00
+icon: 'ti-target'
+description: 'The wasmCloud runtime execution model that pins a long-lived component instance and dispatches external work to it through ingresses.'
+type: 'docs'
+toc_max_heading_level: 2
+proficiency: Intermediate
+about: wasmCloud
+mentions:
+  - WebAssembly
+  - WASI
+platforms: [wasmCloud]
+---
+
+# Trigger services
+
+### The runtime model that pins a component instance and dispatches external work to it through ingresses.
+
+A **trigger service** is a wasmCloud runtime construct: one long-lived component instance is pinned under a single store, and the host delivers external invocations into that same instance through one or more **ingresses**. If the component exports `wasi:cli/run`, that runs as a background task; inbound invocations run alongside it as concurrent per-invocation tasks against the same instance, so in-memory state (e.g., pools, caches, counters, connections) is visible to every handler and to any long-running work.
+
+The trigger-service model backs two user-facing roles in wasmCloud today:
+
+- **[Services](../workloads/services.mdx)**: the stateful component in a workload's `service:` slot, providing localhost/TCP and persistent state to companion components.
+- **[Host component plugins](./plugins.mdx#component-host-plugins)**: a component that provides a host capability to other workloads, called across a store boundary.
+
+Both are driven by the same runtime construct. The differences are which ingresses they use and what role they play in the platform.
+
+## Ingresses
+
+An **ingress** is a channel the host delivers external invocations through. Each host-invoked export a trigger service declares wires up exactly one ingress; all ingress traffic lands on the same pinned instance.
+
+Three ingress kinds are available:
+
+- [HTTP](#http-ingress)
+- [Messaging](#messaging-ingress)
+- [Capability](#capability-ingress)
+
+### HTTP ingress
+
+A trigger service that exports `wasi:http/handler@0.3.0` receives inbound HTTP requests through the HTTP ingress. Responses stream back to the client incrementally as the handler produces them; `WASH_HTTP_RESPONSE_TIMEOUT_SECS` is the overall-timeout backstop.
+
+### Messaging ingress
+
+A trigger service that exports `wasmcloud:messaging/handler@0.2.0` receives inbound messages through the messaging ingress.
+
+### Capability ingress
+
+The capability ingress carries invocations from other workloads to a trigger service's exported capability interface. It is the ingress used by [host component plugins](./plugins.mdx#component-host-plugins): the plugin's capability exports (for example, a `wasmcloud:messaging/consumer` implementation) are dispatched to the same pinned plugin instance via this ingress. Because the caller and the plugin live in different stores, resource handles, streams, and futures that cross the boundary are relocated by the runtime rather than shared.
+
+## Instance lifecycle
+
+A trigger service is instantiated when its owning workload starts. The runtime instantiates the component into a dedicated store and drives that instance concurrently. From that point on:
+
+- Any `wasi:cli/run` export runs as a background task on the instance.
+- Each declared ingress is registered with the host and starts delivering invocations.
+- Every inbound invocation is spawned as a concurrent task against the pinned instance.
+
+**Supervision.** If the guest instance traps, the runtime re-instantiates it within a bounded restart budget (`max_restarts`); in-flight invocations to the failed incarnation fail promptly rather than hanging.
+
+## Cancellation and host awareness
+
+Trigger services can import [`wasmcloud:host`](../interfaces.mdx) to observe and cooperate with their environment:
+
+- **`wasmcloud:host/identity`**: the pinned instance can query the workload and component identifiers of the caller currently invoking it. Resolved per-invocation from the caller's own guest task, so the answer is exact under concurrent, interleaved calls — useful for partitioning state per caller.
+- **`wasmcloud:host/cancel`**: per-invocation cooperative cancellation. A handler can identify its current job, check whether it has been asked to stop, and observe cancellation signals for long-running work — the guest chooses when to yield.
+
+See the [authoring guide](../../runtime/creating-component-host-plugins.mdx) for details on using these interfaces in a component.
+
+## Considerations
+
+- **Single instance, not a pool.** A trigger service is one instance. Blocking work in a handler blocks the tasks scheduled on the same async runtime; use non-blocking APIs and structured concurrency.
+- **Shared state.** All ingress handlers, `wasi:cli/run`, and any inter-handler background tasks share the instance's linear memory. Guard shared mutable state accordingly.
+- **WASI target.** The HTTP ingress requires WASI P3 (`wasi:http/handler@0.3.0`); the messaging ingress uses `wasmcloud:messaging/handler@0.2.0`; the capability ingress uses the capability's own package. A trigger service that only exports `wasi:cli/run` can target P2 or P3 to match its imports.
+
+## Keep reading
+
+- [Services](../workloads/services.mdx) — the workload service role.
+- [Host component plugins](./plugins.mdx#component-host-plugins) — the plugin role.
+- [Interfaces](../interfaces.mdx) — the WIT interfaces trigger services use, including `wasmcloud:host`.
+- [Authoring a host component plugin](../../runtime/creating-component-host-plugins.mdx) — how to build a trigger service that exposes a host capability.

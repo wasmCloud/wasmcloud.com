@@ -35,6 +35,12 @@ A service is essentially the "localhost" for a workload, acting as a persistent,
 
 By isolating services at the workload level and providing them with TCP capabilities, wasmCloud enables patterns like connection pooling, protocol bridging, and cron scheduling&mdash;all while maintaining strong security boundaries.
 
+## Execution model
+
+wasmCloud drives a service through its [trigger-service execution model](../hosts/trigger-services.mdx): one long-lived component instance is pinned under a single store, and each host-invoked export the service declares becomes an **ingress**: a channel the host uses to deliver external HTTP requests, messaging deliveries, or capability calls to that same instance. Inbound invocations run as concurrent per-invocation tasks alongside any `wasi:cli/run` background loop, sharing in-memory state (pools, caches, counters, connections) across every handler and background task.
+
+See [Trigger services](../hosts/trigger-services.mdx) for the full ingress catalog and supervision behavior.
+
 ## Service as localhost
 
 Services can open TCP sockets, listen on ports for incoming connections, and act as `127.0.0.1`/`localhost` within the workload boundary. Services run continuously for the lifetime of the workload.
@@ -64,6 +70,8 @@ Services are not limited to TCP&mdash;they can use your own [custom interfaces](
 ### Export requirement
 
 A service must export `wasi:cli/run` (the standard run function) **or** exactly one [WIT interface](../interfaces.mdx). This is how the runtime identifies the service's entry point. For example, a service could export `wasi:cli/run` to act as a long-running process with a `main` function, or it could export a single custom interface.
+
+A service may additionally co-export a host-invoked interface (`wasi:http/handler@0.3` or `wasmcloud:messaging/handler@0.2.0` today) to wire up the corresponding [ingress](../hosts/trigger-services.mdx#ingresses). The co-exported handler runs on the same pinned instance as `wasi:cli/run`, so long-running work in the run loop and per-invocation handler work share state.
 
 ### Imports and host plugins
 
@@ -148,12 +156,12 @@ async fn main() -> io::Result<()> {
 When developing applications with services, it is important to consider the following:
 
 - **One service per workload**: Currently, workloads support a single service.
-- **Export constraint**: Services must export `wasi:cli/run` or exactly one WIT interface.
+- **Export constraint**: Services must export `wasi:cli/run` or exactly one WIT interface, optionally alongside a host-invoked handler that wires up an [ingress](../hosts/trigger-services.mdx#ingresses).
 - **One-way communication**: Components cannot call service exports via WIT (but can use TCP).
 - **Memory usage**: Services maintain state, so they consume memory continuously.
-- **WASI P2**: Services currently compile to WASI P2 (`wasm32-wasip2` target).
+- **WASI target**: Services that use the HTTP ingress compile against WASI P3 (`wasi:cli/run@0.3.0` + `wasi:http/handler@0.3.0`); the messaging ingress uses `wasmcloud:messaging/handler@0.2.0`. Services that don't co-export a host-invoked handler can target P2 or P3 to match their world's other imports.
 - **Async runtime**: Can use single-threaded async runtimes (e.g., Tokio with single-threaded executor).
-- **Restarts**: Services are automatically restarted if they crash.
+- **Restarts**: On a guest trap, the runtime re-instantiates the service within a bounded restart budget; see [Trigger services supervision](../hosts/trigger-services.mdx#instance-lifecycle).
 - **Isolation**: Service network operations are isolated within the workload boundary.
 
 :::note[Looking ahead]
@@ -166,6 +174,7 @@ As wasmCloud v2 moves from WASI P2 to P3 and beyond, services make it possible t
 - Learn more about services' role within a component&mdash;and how to decide when you should use components or services&mdash;in [Workloads](./index.mdx).
 - Choosing between a plugin and a service? See [Plugin or Service?](../../recipes/plugin-or-service.mdx).
 - Learn how to develop services in the [Wasm Shell Developer Guide](../../wash/developer-guide/create-services.mdx).
+- Building a service that provides a host capability to other workloads? See [Host component plugins](../hosts/plugins.mdx#component-host-plugins) and the [authoring guide](../../runtime/creating-component-host-plugins.mdx).
 
 
 
