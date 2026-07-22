@@ -1,59 +1,203 @@
 ---
 date: '2026-07-01'
-title: 'Meeting Agenda - 2026-07-01'
+title: 'wasmCloud 2.5: Wasm Component Model implements, WASI P3 Streaming, and Cancelling Long-Running Invocations'
+description: 'wasmCloud 2.5 ships the Wasm component model implements feature, demoed with Postgres, plus a WASI Preview 3 streaming Whisper demo and a cancellation design.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasmcloud 2.5
+  - component model implements
+  - wasi p3
+  - wasi preview 3
+  - epoch interruption
+  - webassembly kubernetes
+  - webassembly news
+chapters:
+  - { seconds: 21, label: "Welcome and the wasmCloud 2.5 release" }
+  - { seconds: 305, label: "Postgres implements demo: Harbor, Traefik, and per-user secrets" }
+  - { seconds: 405, label: "Performance testing and the k6 macro benchmark suite" }
+  - { seconds: 553, label: "implements on the export side and the new external-id annotation" }
+  - { seconds: 876, label: "Bharat's WASI Preview 3 demo: streaming Whisper transcription" }
+  - { seconds: 1227, label: "Cancelling long-running P3 invocations with epoch interruption" }
+  - { seconds: 1485, label: "Breaking apart stores: services, ephemeral components, and an API gateway" }
+  - { seconds: 2002, label: "Health checks, OTel, and where workload visibility belongs" }
+  - { seconds: 2318, label: "Cancellation security and how workloads scale" }
+  - { seconds: 3100, label: "More examples, sequence diagrams, and the Excalidraw MCP server" }
+  - { seconds: 3478, label: "Cancellation PRs, artifact precompile, and instance reuse" }
+image: https://i.ytimg.com/vi/xhMzyk0QX-o/maxresdefault.jpg
+duration: 3802
+showTitle: true
+slug: 2026-07-01-community-meeting
+speakers:
+  - jeremy-fleitz
+  - bailey-hayes
+  - frank-schaffa
+  - aditya-salunkhe
+  - bharat
+about: wasmCloud
+mentions:
+  - WASIPreview3
+  - Wasmtime
+  - ComponentModel
+  - Kubernetes
+  - OpenTelemetry
+  - NATS
+  - AIInference
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- implements demo with postgres @jfleitz
-- Review v2.5.0 release and blog
+<YouTube url="https://www.youtube.com/watch?v=xhMzyk0QX-o" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=xhMzyk0QX-o" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The July 1, 2026 wasmCloud community call opens on the **2.5 release**, cut the day before: Wasmtime 46, **WASI Preview 3 on by default**, async support, and the **Wasm component model `implements`** feature that lets one component multiplex several backends behind a single named interface. Jeremy Fleitz demos `implements` with Postgres — one component importing the same query interface twice as `pg-user-a` and `pg-user-b`, each bound to a different database role with different table grants — then Bharat shows cross-component streaming on WASI P3 with a Whisper model transcribing an hour-long podcast. The back half is a deep architecture discussion with Aditya Salunkhe, Bailey Hayes, and Frank Schaffa on **cancelling long-running invocations** with Wasmtime epoch interruption, where health checks belong, and how breaking apart stores turns a long-lived service into a workload's front door.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **wasmCloud 2.5 shipped with Wasmtime 46 and WASI Preview 3 on by default** — async support comes with it, along with the component model `implements` feature and Helm-chart hardening (network policies) for both the operator and the host group; the [2.5.0 release blog](/blog/wasmcloud-2-5-0-release/) went up around the call
+- **`implements` is behind a host feature flag until 2.6** — the Wasm component model `implements` flag is on by default in the canary release starting the day of the call, and becomes default-on in **2.6** a couple of weeks later, giving existing WebAssembly deployments time to shake out breakage
+- **One component, two Postgres roles, zero code duplication** — Jeremy's demo imports the same Postgres query interface twice as `pg-user-a` and `pg-user-b`, wires each to a different database user (one granted `widgets`, the other `gadgets`) with separate secrets, and deploys to a kind cluster with **Harbor** behind **Traefik** serving the OCI artifact
+- **`implements` measured zero overhead** — Bailey ran the existing micro-benchmark server against the `implements` change and saw no performance delta, because lookup is O(n) once at link time and the binding is fully **static** at bind time
+- **Macro benchmarking starts July 8** — micro benchmarks already run on a dedicated benchmark box per release build; the **k6** macro suite (response time and scalability) is scaffolded and open for contributors, with work starting in the first iteration of the new quarter
+- **`implements` works the same on exports, and a new `external-id` annotation is coming** — bindings are symmetric across imports and exports and apply to both guests and hosts; Bailey's [wasm-tools](https://github.com/bytecodealliance/wasm-tools) PR adds an `external-id` metadata annotation so a component can carry its own link configuration and be fully self-contained instead of relying on "host magic"
+- **The best WASI P3 demo yet: streaming Whisper transcription across components** — Bharat's backend runs a small Whisper GGML model over a 1-hour-13-minute Rust podcast and streams transcription segments to a frontend component, exercising back-pressure for roughly half an hour; Bailey asked for it to land in **wasmCloud Contrib** with the large audio file fetched as a separate step
+- **Cancellation is converging on Wasmtime epoch interruption** — track the store ID alongside the incoming request, hold a cancellation handle against that store, and flip it to interrupt a long-running P3 invocation; cancellation is **workload-tenanted**, so the blast radius stops at the workload boundary, and Bailey's store-separation PR (about 70–75% of the design discussed) landed as a draft that day
+
+## Chapters
+
+- [0:21 — Welcome and the wasmCloud 2.5 release](https://youtu.be/xhMzyk0QX-o?t=21)
+- [5:05 — Postgres implements demo: Harbor, Traefik, and per-user secrets](https://youtu.be/xhMzyk0QX-o?t=305)
+- [6:45 — Performance testing and the k6 macro benchmark suite](https://youtu.be/xhMzyk0QX-o?t=405)
+- [9:13 — implements on the export side and the new external-id annotation](https://youtu.be/xhMzyk0QX-o?t=553)
+- [14:36 — Bharat's WASI Preview 3 demo: streaming Whisper transcription](https://youtu.be/xhMzyk0QX-o?t=876)
+- [20:27 — Cancelling long-running P3 invocations with epoch interruption](https://youtu.be/xhMzyk0QX-o?t=1227)
+- [24:45 — Breaking apart stores: services, ephemeral components, and an API gateway](https://youtu.be/xhMzyk0QX-o?t=1485)
+- [33:22 — Health checks, OTel, and where workload visibility belongs](https://youtu.be/xhMzyk0QX-o?t=2002)
+- [38:38 — Cancellation security and how workloads scale](https://youtu.be/xhMzyk0QX-o?t=2318)
+- [51:40 — More examples, sequence diagrams, and the Excalidraw MCP server](https://youtu.be/xhMzyk0QX-o?t=3100)
+- [57:58 — Cancellation PRs, artifact precompile, and instance reuse](https://youtu.be/xhMzyk0QX-o?t=3478)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### wasmCloud 2.5: Wasmtime 46, WASI P3 by Default, and Helm Hardening
 
-### Topic 1
+Jeremy Fleitz hosted and opened on the **2.5 release**, cut the day before the call, with the [release blog](/blog/wasmcloud-2-5-0-release/) going live around the same time. The headline is the runtime: 2.5 builds on **[Wasmtime](https://wasmtime.dev/) 46** with **[WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) enabled by default**, which brings **async support** to wasmCloud workloads out of the box. Alongside it comes **`implements`**, the [component model](/docs/overview/workloads/components/) feature that lets you use several instances of the same interface type with different configurations.
 
-- Note 1
-- Note 2
+The rest of 2.5 is hardening rather than headline features. The Helm charts pick up **network policies** for both the [Kubernetes operator](/docs/kubernetes-operator/) and the host group, tightening how the platform is installed. Jeremy also flagged the rollout plan for `implements`: inside the host there is a feature flag for enabling Wasm component model `implements`, it is on by default in the **canary** release starting that day, and it flips to default-on in the **2.6** release a couple of weeks later — deliberately staged so there is time to confirm nothing breaks for existing WebAssembly deployments.
 
-### Topic 2
+### The Postgres implements Demo: One Component, Two Database Users
 
-- Note 1
-- Note 2
+Jeremy's demo makes `implements` concrete. A single WebAssembly component imports the **Postgres** query interface *twice*. The traditional import line just pulls in the Postgres interface once; with `implements`, the same interface is imported under two names — `pg-user-a` and `pg-user-b` — and the component can address each independently.
 
-## Weekly highlights
+The [workload deployment](/docs/kubernetes-operator/crds/) is where the two names get meaning. The host-interface section declares the ingress the workload serves, and the component list now names two instances of the same `wasmcloud/postgres` plugin — one bound to user A, one to user B — each with its **own secret**. Jeremy used a full connection URL per user for demo brevity (username, password, and database as separate values works equally well), and inside the cluster he created two Postgres roles with deliberately different grants: **user A can write `widgets` but not `gadgets`, and user B the reverse**. Hitting the deployed endpoint showed one component reaching two tables through two distinct, independently configured connections.
 
-### Issue of the Week
+The supporting infrastructure is worth noting for anyone reproducing it locally. Jeremy built the host with the `implements` **cargo feature** enabled, deployed to a local **kind** cluster following the [wasmCloud docs](/docs/kubernetes-operator/), and stood up **Harbor** in-cluster to host the published [OCI artifact](/docs/overview/packaging/) rather than pushing it to a public registry — with **Traefik** in front routing `*.localhost.cosmonic.sh` to the right service and `harbor.localhost.cosmonic.sh` to Harbor. Postgres itself ran in-cluster too. See the docs on [private registries](/docs/kubernetes-operator/operator-manual/private-registries/) and [secrets and configuration](/docs/kubernetes-operator/operator-manual/secrets-and-configuration/) for the production versions of those pieces.
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+### Benchmarking: Micro Benchmarks Today, k6 Macro Benchmarks Next Quarter
 
-### Documentation of the Week
+Frank Schaffa asked the question everyone wants answered about a new feature: what does it do to **response time and scalability**? Bailey Hayes gave the honest status — the **macro** benchmark work, the **k6** suite, has not started; it is assigned but was deprioritized behind other landings. A simple k6 scaffold exists and the ticket is wide open for anyone who wants to expand the benchmarking suite. The team planned to pick it up in the first iteration of the next quarter, starting **July 8**.
 
-- [title](/docs/v1/intro)
-  - summary
+What *does* exist is the micro-benchmark server, which has been running continuously and producing useful numbers. Bailey ran it against the `implements` change specifically to validate the new **multiplexed plugins** — and the result was the best possible one: **no measurable change**. The reason is architectural. The lookup for the bindings is O(n) at **link** time, and once bound, the dispatch is entirely **static**. There is no hash-map indirection on the hot path, so multiplexing several backends behind one named interface costs nothing at runtime. Validating exactly that was one of the reasons the benchmark server exists.
 
-## Community Updates
+### implements on the Export Side and the New external-id Annotation
 
-### Tune in…
+Aditya Salunkhe asked whether `implements` has an equivalent story on the **export** side — a declaration in the WIT bindings that allows a more generic implementation to be exported. Bailey's answer: it is **symmetric**. Bindings are generated the same way for imports and exports, and the same applies to both **guests and hosts** — the wasmCloud host reads the bindings generated on the host side and binds them on the linker, while guests come in with static bindings carrying the same named labels. That symmetry is why the feature is fast, and why she chose static bindings over a hash-map or indirection scheme: everything can be validated at **deployment time**. She was candid that the examples so far are all import-side; the export case is covered in the spec tests and in her [`wac`](https://github.com/bytecodealliance/wac) PR.
 
-{/* Add any upcoming events/streams/etc */}
+The more interesting news is what is coming next: a new **`external-id`** annotation that rides alongside the `implements` metadata, landing in [wasm-tools](https://github.com/bytecodealliance/wasm-tools). Today, wasmCloud ferries link configuration — the Postgres connection credentials in Jeremy's demo, for example — through platform config that lives *outside* the component model spec. `external-id` lets that key travel *inside* the component as a metadata annotation on the import or export, statically bound and passed all the way through. The payoff is a component that is **completely self-contained**: everything it needs to deploy and run travels with it, instead of the host supplying it by convention. Bailey called the current approach "host magic" and framed the annotation as another step in wasmCloud's long-term direction of pushing platform behavior into the spec itself. She had already fuzzed the change (which found a bug), expected the PR up right after the meeting, and predicted a fast review since annotated types like `@since` already exist.
 
--
+Aditya said Betty Blocks has a direct dependency on exactly this — they have been doing the "host magic" thing themselves, and guest-to-guest export binding via `implements` would land well. He offered to contribute an example or template showing an `implements` label on an export, which Bailey welcomed: she has an obvious use case for **host components** (which always have exports) but had not come up with a compelling guest-side one.
 
-### Catch up…
+### Bharat's WASI Preview 3 Demo: Streaming Whisper Transcription
 
-{/* Add any blog posts/articles that the community might find interesting */}
+Bharat demoed **cross-component communication using WASI P3 streams**, and it landed as the most impressive P3 demo the project has seen so far. The setup is two components: a **backend** running a small **Whisper GGML** model that transcribes a podcast audio file and emits **segmented streams**, and a **frontend** that receives the stream and renders the output. Running the service on port 8000 and hitting it with `curl --no-buffer`, transcription segments appeared incrementally on both the server log and the client side while the laptop fans audibly spun up on inference.
 
--
+The stress test is what makes it notable. The source file is a **Rust podcast episode running 1 hour and 13 minutes**, and Bharat ran it for roughly **half an hour** specifically to watch how **back-pressure** behaved across the component boundary. Next up for him is a UI layer so the streamed segments render for a human rather than a terminal.
 
-## Recording
+Bailey's response was to ask for it in the project: the demo should land in **wasmCloud Contrib** rather than the main repo, with the large audio file handled as a separate download step (and gitignored) so the repository does not absorb it. Jeremy liked the transcription use case in particular — a real AI inference workload that is genuinely streaming rather than request/response.
 
-{/* Automated - No need to adjust this unless automation fails */}
+### Cancelling Long-Running Invocations with Epoch Interruption
 
-<YouTube url="https://www.youtube.com/watch?v=xhMzyk0QX-o" />
+With the agenda finished, Aditya opened an Excalidraw board and raised the problem he has been chewing on. Now that P3 is in the picture, a client request into a wasmCloud workload may not return immediately — a P3 invocation can run for a long time, and while it runs there is **little to no visibility** into it and **barely any mechanism to interrupt or cancel it**.
+
+His proposal starts from where invocations actually live: the **store**. Wasmtime provides **epoch interruption**, which inserts checkpoints into the running Wasm guest at a set interval and allows **cancellation callbacks**. If you track the **store ID** alongside the incoming request and hold a cancellation handle against that store, you can stop a specific invocation by flipping its cancellation boolean and dropping the store. He also floated a complementary guest-side path — components already export resource functions, so a `cancel` function on a resource could gracefully drop it, if the host could artificially inject that kind of cancellation callback into the running guest. His second question was broader: how feasible is more **visibility** into a workload — health checks, a view of the invocations and jobs in flight — or is that just fluff?
+
+### Breaking Apart Stores: Services, Ephemeral Components, and an API Gateway
+
+Bailey had been working the same problem from the other end and took over the Excalidraw board in multiplayer to draw it. Today, all the components inside a workload sit on the **same store**, and that is how they get wired together — Aditya's recent PR uses the `run-concurrent` call to pass values around and give components **ephemeral stores** so they do not retain resources when idle.
+
+Her change adds one more box: a **long-lived service with its own store**, sitting in front of the ephemeral component stores. Using Bharat's demo as the example — a model/audio transcriber plus a responder — the service becomes the **front door**. It routes the request to the responder for the actual HTTP response while the transcriber does the CPU-intensive work concurrently, and because the CPU-heavy component is the only one that needs to be resident, everything else can stay lightweight and simply wake on `await`. Splitting the store means the service can keep accepting concurrent tasks and spin up more instances of the expensive component per request, so **one workload grows against a concurrency setting** instead of blocking.
+
+Her second sketch made the case less abstractly. Take a CRUD app with `users` and `accounts` components, both exporting the HTTP handler. Today you cannot tell which one to call — with `implements` and named labels you can, and the service in front becomes an **API gateway**. Why put the gateway there rather than outside the workload? Because *both*: `users` and `accounts` talk to each other constantly and hot, their lifetimes and request patterns scale almost linearly together, so putting them in the same workload lets them share a tenant and resources and be extremely efficient — while still letting separate teams ship each component independently behind a semantic API. And the gateway is the natural home for cross-cutting logic like a **circuit breaker** ("I'm throttling your request right now") that never needs to reach the component at all. Cancellation then percolates from the `run-concurrent` calls the service is already managing, wrapped in an epoch invocation handler.
+
+### Health Checks, OTel, and Where Workload Visibility Belongs
+
+On Aditya's visibility question, Bailey noted wasmCloud already has the *concept* of health checks — it is just not wired up or used — and the service box is exactly where the status should be reported from. The service already holds the shared logic and knows whether it is getting appropriately sized requests for its components, which is the same reasoning that makes people build sidecars, just encapsulated as components.
+
+Observability is further along. wasmCloud already does [OpenTelemetry](/blog/otel-observable/) for HTTP, and Bailey had finished the **P3 semantic conventions for streaming**, so the instrumentation added for cancellation should surface in OTel traces too. Her guidance on health checks is that you want **one resolution for the workload** — if the workload has a service exporting an HTTP handler, that is probably it — but components should be able to surface their own as well. The argument mirrors why components can import `wasi-otel` and enrich their own spans: an inference component knows the big chunk of work is going to take a minute and can say so, and a component talking to an external database knows it is down when the database is down. So health checks belong on the component side where components have something extra to say, while **cancellation should be transparent and automatic from the host**. Guests can *trigger* cancellation of their own long-running requests, but cleaning it up is the platform's job — streams and futures are supposed to handle that through the ABI and the bindings, and workload authors should not have to know or care.
+
+### Cancellation Security and How Workloads Scale
+
+Frank pushed on two things. First, **security**: since the client is effectively fire-and-forget with an ID back, only the originator should be able to cancel a request — you cannot have callers randomly killing work on what is still a shared runtime. Bailey's answer is the tenancy boundary: guests are **workload-tenanted**, so the blast radius of a cancellation is the workload box. If `accounts` cancels a long-running request, `users` will see it and the service will bubble it up if it routed there, but it cannot reach other workloads.
+
+Second, **progress**, not just cancellation: the client wants to know whether work is stuck or advancing, and where — is the database down? Bailey's recommendation for anyone serving long-running requests is the **OTel trace**, which is why she did the P3 streaming semantic conventions. Beyond that, showing progress through an API is a property of the API you are exposing — pagination or chunking are the conventional answers, and she pointed to the OCI spec as a good reference for a streaming RESTful API.
+
+Frank then worked through the **scaling** semantics, and this produced the clearest statement of the model in the call. The service is long-running, so once it is hot you keep that instance. A thousand simultaneous requests do not create a thousand services; instead you scale **workloads**, and the rule of thumb is that **one service maps one-to-one with a workload instance**, with one-to-many component instances underneath it. Jeremy confirmed the corollary: five workload instances means five services and five each of `users` and `accounts` — though you could have **zero** instances of a component running. Bailey noted the design consequence: if you adopt this architecture, keep the service **very lightweight**, much like **Envoy** on the hot path. Frank's objection — Envoy is a single point that only routes — drew the counter that Envoy also has to solve streaming for HTTP/2 and HTTP/3, which is much the same problem. And if your workload is a pure FaaS shape with nothing long-running, you simply leave the service out and still get cancellation and OTel.
+
+Aditya closed the loop with a concrete proposal: a lean **cancel type or job host plugin** that tracks the context of incoming calls, generates a unique ID per request, stores the store ID and context, holds the handle, and — on an incoming cancel for that ID — **validates the caller with a cheap guest invocation before flipping the epoch interrupt**. Bailey liked the words but wants to see code. She also noted that the store ID was effectively dead code she deliberately did not remove because the service work needs it. Frank asked whether cancellation would be synchronous; Bailey's answer is that the pieces may be on different processes, so there is no avoiding some asynchrony — which means **drains and timeouts** to prevent leaks.
+
+### More Examples, Sequence Diagrams, and What Lands Next
+
+Bailey's meta-point is that this whole discussion argues for **more examples showing different architectures**, because concrete code is far easier to reason about than a whiteboard, and flow diagrams can be generated from working examples. Frank made the case for **sequence diagrams** specifically — they show the order of operations and what information is carried from stage to stage — and volunteered PlantUML as his tool of choice. Aditya offered to produce one covering a **concurrent async request that streams and gets cancelled** and post it in the [wasmCloud Slack](https://slack.wasmcloud.com/). Bailey's tip in return: the **Excalidraw MCP server** is genuinely good — the host-components diagram she dropped on the board was generated with Claude and Excalidraw, and it is the same store-separation idea applied one level down at the host.
+
+Frank asked whether epoch interruption is part of a common runtime API. It is not — it is **Wasmtime-specific**, as is `run-concurrent` and much of the cross-store work, and the epoch lives on the store itself. That prompted a note that wasmCloud should be clearer about how much it is investing in Wasmtime, and a tangent on how far Wasmtime's target coverage now reaches: the release notes now include **s390x** (mainframes), with RISC-V and ARM32 in the mix, as Wasmtime expands into embedded, microcontroller, and legacy infrastructure. Jeremy's addendum: "just not 6502 or Z80 yet."
+
+Aditya will open a PR on wasmCloud with the cancellation implementation and discuss it at the roadmap session. Bailey's **store-separation** PR — roughly **70–75%** of what was drawn on the board — went up as a draft that day; it works end to end with a large set of test cases, and the **epoch invocation wrapper** for cancellation is a separate follow-on. He also described an earlier approach the Betty Blocks team tried: racing the real job against a second future that does a `kv.watch` on [NATS](/docs/overview/transport/) for a flipped cancel ID, early-returning and tearing down the invocation path — workable through a tiny host plugin, but too expensive on the developer side and, in his words, too gimmicky, which is what pushed them toward epoch interruption. Finally, the two "big rocks" named for the next quarter: **artifact precompile** and **instance reuse** — the latter harder given the architecture just drawn, since composing everything into one component would solve it trivially but give up the power of separate lifetimes.
+
+## WebAssembly News and Updates
+
+This call is a good snapshot of what the [Bytecode Alliance](https://bytecodealliance.org/) ecosystem looks like the week after **WASI Preview 3** stopped being a flag. [Wasmtime](https://wasmtime.dev/) 46 carries the WASI 0.3.0 APIs with P3 on by default, so async, streams, and futures are simply available; the [component model](https://component-model.bytecodealliance.org/)'s `implements` proposal turns into a shipped, statically-bound multiplexing feature in a runtime you can deploy on [Kubernetes](/docs/kubernetes-operator/); and the next annotation, `external-id`, is being fuzzed into [wasm-tools](https://github.com/bytecodealliance/wasm-tools) so components can carry their own link configuration. Meanwhile Wasmtime's target list keeps widening — s390x mainframes joined the release notes, with RISC-V and ARM32 in play — and cancellation semantics for long-running invocations are being designed in the open rather than bolted on. For ongoing **webassembly news**, follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [wasmCloud blog](/blog/).
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and deploying them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more — while the platform handles capabilities like HTTP, messaging, key-value storage, databases, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with built-in [OpenTelemetry observability](/blog/otel-observable/), long-running [services](/docs/overview/workloads/services/) alongside bursty components, and native [WASI P3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is the production substrate for **WebAssembly on Kubernetes** and the edge.
+
+## Topic Deep Dive: What the Wasm Component Model implements Feature Unlocks
+
+The **`implements`** feature is the most consequential thing in wasmCloud 2.5, and Jeremy's Postgres demo is the shortest path to understanding why it matters. In the classic [Wasm component model](/docs/overview/workloads/components/) shape, a component imports a capability [interface](/docs/overview/interfaces/) — a Postgres query interface, a key-value store — once, and the host binds that single import to a single backend. `implements` lets the same interface be imported *multiple times under distinct names*, so a single component can address `pg-user-a` and `pg-user-b` as separate, independently configured connections to the same [host plugin](/docs/overview/hosts/plugins/). In the demo those two names resolve to two Postgres roles with deliberately non-overlapping table grants, wired up through two different secrets in the [workload deployment](/docs/kubernetes-operator/crds/) — real least-privilege database access expressed in the component's own type signature rather than in glue code.
+
+Two properties make this more than syntactic sugar. First, it is **static**: the name lookup happens once at link time and the binding is fixed at bind time, which is why Bailey's benchmark run against the change showed **zero measured overhead** and why the platform can validate a deployment before it runs. Second, it is **symmetric** — the same binding machinery applies to imports and exports, and to guests and hosts alike, which is what makes host components (whose exports are the entire point) fall out of the same design. The next step Bailey previewed, an `external-id` annotation in [wasm-tools](https://github.com/bytecodealliance/wasm-tools), carries the link configuration *inside* the component alongside the `implements` metadata, so a component can arrive at the host completely self-contained instead of depending on platform-specific config the spec knows nothing about. That is the through-line for wasmCloud generally: move behavior out of "host magic" and into the [component model](https://component-model.bytecodealliance.org/) itself. `implements` is behind a host feature flag today, on by default in canary, and default-on in 2.6.
+
+## Who Should Watch This
+
+This call rewards three audiences. **Platform engineers running databases behind WebAssembly workloads** should watch the Postgres `implements` demo end to end ([0:21](https://youtu.be/xhMzyk0QX-o?t=21) through [5:05](https://youtu.be/xhMzyk0QX-o?t=305)) for a concrete pattern of per-user credentials and least-privilege grants driven from a component's own imports on [Kubernetes](/docs/kubernetes-operator/). **Developers building streaming or AI-inference workloads** will want Bharat's WASI P3 Whisper transcription demo at [14:36](https://youtu.be/xhMzyk0QX-o?t=876), which is the clearest demonstration yet of cross-component streaming with real back-pressure. And **runtime contributors and architects** should settle in for the long design discussion on cancelling long-running invocations, store separation, and health checks starting at [20:27](https://youtu.be/xhMzyk0QX-o?t=1227) — it is effectively a live design review of the next quarter's concurrency work.
+
+## Up Next
+
+The immediate calendar item is the **roadmap session on July 8**, which is also when the **k6 macro benchmark** work starts in the new quarter's first iteration. Expect Bailey's **`external-id`** PR in wasm-tools within a day of this call, followed by an export-side `implements` example or template from the Betty Blocks side; her **store-separation** draft PR to move from draft toward merge, with the **epoch invocation wrapper** for cancellation following as its own change; and Aditya's cancellation PR on the wasmCloud repo plus a sequence diagram of a concurrent async streaming request with cancellation posted to Slack. Bharat is adding a UI to the P3 transcription demo and refactoring it to land in wasmCloud Contrib. Further out, **`implements` becomes default-on in 2.6**, and **artifact precompile** and **instance reuse** are the named big rocks for the quarter.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-07-01-community-meeting-transcript/)**

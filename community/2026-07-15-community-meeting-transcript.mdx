@@ -1,0 +1,459 @@
+---
+date: '2026-07-15'
+title: 'Transcript: Host Components, Epoch Interruption, and the Q3 Roadmap for WebAssembly on Kubernetes'
+description: 'Full transcript of the July 15, 2026 wasmCloud community call covering the Q3 roadmap, host components and trigger services, epoch interruption and CPU bounds, and a static-site-to-Wasm demo.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - host components
+  - trigger services
+  - epoch interruption
+  - wasi preview 3
+  - wasmtime
+  - webassembly news
+image: https://i.ytimg.com/vi/Kwg0mEP_mJQ/maxresdefault.jpg
+showTitle: true
+slug: 2026-07-15-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - WASIPreview3
+  - Wasmtime
+  - ComponentModel
+  - Kubernetes
+  - OCIRegistry
+  - wash
+  - capabilityBasedSecurity
+  - JavaScript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-07-15-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=Kwg0mEP_mJQ" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=Kwg0mEP_mJQ" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+*wasmCloud Weekly Community Call — Wed, Jul 15, 2026 · 66 minutes*
+
+{/* Speakers: Bailey Hayes, Aditya Salunkhe, Frank Schaffa, Victor Adossi, Jeremy Fleitz, Mike Williamson, Liam Randall */}
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:02](https://youtu.be/Kwg0mEP_mJQ?t=2)
+
+Hello and welcome to our community call for wasmCloud, July 15. Today, two key things on the agenda, but we can always add more as we go. The first one is, last week we did a roadmap collaborative session, and so I've created what I think looks basically like a snapshot of that over in our GitHub. So I'm going to go through that first, and then the second thing I want to show is where we're at basically with host components, which is a large feature that we wanted to do last quarter. It's going to land now — obviously, since this quarter is beginning, so early this quarter — and some of those PRs have actually already landed. But I want to kind of show the status of that work as well.
+
+So I'm going to bring up our project view over here. I made the Q3 version now basically the default for anybody that goes here. So if you just go to wasmCloud Projects, you'll see the same view that I have here. And like I said, host components is one of those things that's already in progress. Also, last quarter we added micro benchmarks, but this quarter we want to make sure we cover k6 and macro benchmarking. Something else that got started basically as we were wrapping up last quarter, but is in progress now, is epoch interruption, basically for cancellation. But I would also like to use epoch interruption for yielding long-running work so that we can avoid the noisy neighbor problem.
+
+<img src="/img/community/2026-07-15/image001.webp" alt="The Q3 wasmCloud Roadmap project board, with Blocked, Triage, Ready for Work, In Progress, and Completed columns — host components in progress, epoch interruption for invocation cancellation, async wasmCloud Messaging, and a Kubernetes secrets plugin among the open tickets." />
+
+Now, there's a number of things here that are ready for work, and a lot of them aren't assigned. So if you're feeling motivated to try things out, please feel free to jump on the ticket. We've published wasmCloud Secrets, so it would be nice to have a plugin that is fulfilled by Kubernetes secrets themselves, and that would basically demonstrate how to fetch a secret at runtime from Kubernetes. Another one here is basically updating wasmCloud Messaging to be async. This came from a community request in Slack, but also we've already done some of this for some of our other wasmCloud interfaces. So I went and did key-value and blob store, and so those are native async now, and we have native plugin backings for each of those.
+
+We have a couple of "would be nice if" very, very small improvements that I'd love to see. Something that we did last quarter is we made sure that `wkg.toml` is something that's just natively read for any given wash project, and so you can do things like — in `wkg.toml`, you can have a local ref, and so we could share one local directory in all of our test fixtures, plus whatever would be local to that given test fixture that's unique to it, and avoid some of the weirder stuff that we were doing to corral all of this, basically copying the WIT deps around. One of the bigger motivations around that is just the technical debt of what it's like when I rev WASI or any given WIT interface. It's pretty annoying if we have the same one duplicated a thousand times because there's a million and one of those to update, and so having a shared base makes that so much easier.
+
+Another thing is just improvements to our end-to-end test suite. So right now we have statically published our test fixtures for the E2E tests, and I'd rather automate building and publishing of those, and I would like to also fully exercise the OCI registry component that we built. That will just greatly improve that whole process and hopefully encourage even more tests to be added in that realm. Although I will say the E2E tests are the slow ones, so you want to use that testing pyramid and make sure the E2E is the itty bitty part, so we don't have an inverted pyramid there. So that's sort of the smaller little things that we have.
+
+**Bailey Hayes** [4:35](https://youtu.be/Kwg0mEP_mJQ?t=275)
+
+Something that I think a lot of us are getting excited about is the idea of creating a web page that can kind of act as a dashboard that helps us explain and keep track of where all of the different languages are in the ecosystem, and also of the main ecosystem projects themselves. In the last call, we talked about how we really want more things to be added to wasmCloud Contrib — to really put some effort this quarter into revamping that so that it's got examples for your favorite Rust framework, your favorite Go framework, etc. Expand out that suite of what we have there. It's not stuff that we as maintainers want to always be maintaining in the main tree for wasmCloud. We want those dependencies to not be in wasmCloud, and that's why we want them in wasmCloud Contrib.
+
+But I think the whole WebAssembly ecosystem would really benefit from a place that they can look at and just kind of see: here are the language features that are available, here are the ones that aren't available yet. And there's a lot of axes to track across all this, and so if it's challenging for us, imagine being somebody on the outside trying to figure all of that out. So that's a much larger effort. We need to make lots of little tickets around this. So I kept this in triage because I think there's just a lot of aspects to plan and design for here. But another reason why I want to call this out now is, if you're excited about this, let's talk, because I think there's many dimensions where we can have lots of different people working on different aspects of this. So, "are we polyglot yet?" — that's that one.
+
+<img src="/img/community/2026-07-15/image002.webp" alt="The 'Are we polyglot yet?' tracking issue, proposing a page that tracks the differences between languages, their performance, and the status of component model features." />
+
+There's a few others that we need to get done. Like, we still haven't started publishing the wash runtime crate because we have dependencies that themselves aren't yet published, so we need to get those done. We also need to get some of the newer features from Wasmtime available to us, like being able to support instance pooling and reuse. A lot more complicated for us because we do dynamic linking, which is one of the killer features of why people use us. But that's also something that we need to figure out and solve. So there's some design work to be done there. So — any big gaps that we want to go ahead and address in the roadmap, and I'll go ahead and put a placeholder ticket in there for us if we want to do that. More questions? Hey, D.T.
+
+**Aditya Salunkhe** [7:13](https://youtu.be/Kwg0mEP_mJQ?t=433)
+
+First off, major kudos to Bailey and Victor for driving the whole P3 services, stores, and all the host component plugin work. It's a lot of work, and I really appreciate you guys. And I've been seeing all those different PRs just keep on going, landing and landing, and getting merged. And it's really nice to see that.
+
+I had a question about the epoch interruption for the invocation cancellation. I saw that your host component plugin also referenced some of the groundwork for this, which included the wasmCloud host cancel. So I just wanted to brush up on the new interfaces that you're going to be adding. I saw there was something that exposed the component ID as well as the workload ID. So I just needed a bit more information about those new interfaces.
+
+**Bailey Hayes** [8:17](https://youtu.be/Kwg0mEP_mJQ?t=497)
+
+Let's talk through that. Okay, so there's been a lot of changes cooking, and yeah, sorry for all the lines of code to review, Victor. But I really appreciate you. We've landed a handful of them already.
+
+The way that I would kind of break this down is, we've introduced — this first one is a good one to look at — a concept of being able to create what are essentially triggers, but these are services following our same concept of services. However, P2 services only export `wasi:cli/run`, so you basically can call them and then they spin up a loop, and they can be long-running and long-looped. A trigger service is one that actually has its own exports, and these exports themselves are P3 exports, and what that allows us to do is have basically async calls into those exports and be able to drive separate different tasks for the whole workload.
+
+And another aspect of this is that these trigger services have their own store, and that provides an isolation and different lifetime primitive than the other components that are inside the store. So now the individual workload components that run are ephemeral, and they have their own store, separate from the service, and so that way the service can act — you know, Victor and I played around with a bunch of different names. I liked his "trigger service" the best because people kind of already are familiar with the concept of a trigger in any kind of serverless computing. It's sort of the same idea here, so that's definitely the best allegory.
+
+<img src="/img/community/2026-07-15/image003.webp" alt="The trigger service pull request against wash-runtime, describing a service that keeps its own store and engine, carries the workload's ingress, and exposes P3 exports the host can call." />
+
+But essentially, because you can call in, it sort of acts potentially as your ingress, and so a lot of this is designed so that you could write something like an API gateway that then routes to all of the different individual components within your workload. So this first part is a lot of what we did when we had a whiteboarding session a couple weeks back, where we talked about the different architectures that are going to be available. And with `implements`, being able to route on basically different named labels — where multiple different components inside the workload all export HTTP handler, how do you know which one to route to? Well, now you can do named routing across that, and across paths.
+
+So that's what this introduced. A few others have landed. I just talked about the HTTP handler side; there's also the messaging handler side. That one is also landed, works about how you'd kind of expect, same as with the HTTP handler. And I think that's sort of the — okay, so that's sort of a new concept, just being able to handle a separation of store from the individual component workloads. Frank, you got a question?
+
+**Frank Schaffa** [11:18](https://youtu.be/Kwg0mEP_mJQ?t=678)
+
+Yeah. Let me see if — okay, this is working. Yeah. So first, I mean, I'm impressed with how much work you guys have been putting into this. So I do appreciate that, just want to make a comment on that. On this side of what you're talking about in terms of services, in terms of API gateway, and so forth — do we have a document that actually exposes all the use cases that you're aiming for?
+
+**Bailey Hayes** [11:54](https://youtu.be/Kwg0mEP_mJQ?t=714)
+
+Eric is working on reference architectures for all of these, and that's going to be like a big meta document for all of it. The answer is not yet, but this stuff landed yesterday, so he kind of needed that to exist to start building that out. Sorry for the interruption there.
+
+**Frank Schaffa** [12:12](https://youtu.be/Kwg0mEP_mJQ?t=732)
+
+Okay. And the other question is, actually, once you do this kind of thing, it begs also service discovery. So is this also in scope?
+
+**Bailey Hayes** [12:23](https://youtu.be/Kwg0mEP_mJQ?t=743)
+
+So we have sort of the concept already of workload identity, and within a workload you have component identity, and this is part of what D.T. was asking. But this is all actually pre-existing to wasmCloud in general — the operator sees all of that. It already has that kind of information. And so in terms of service discovery and routing, when you're in Kubernetes, you already have that natively provided. Basically the operator's creating all of those things that you might want. For example, if you're doing path-based routing, we also can help you make a virtual service. There's a ton of different features there at that layer for doing service discovery that just fits natively into the Kubernetes ecosystem, so I would kind of pause there and say that's the first big part of it.
+
+When you start talking about doing service discovery inside an individual workload — right now, the way that the outside world sees what a workload is, a workload is its own little unit. It's like the pod, right? And that's the thing that you route to. You route to essentially that workload, and the thing that you would want to be doing service discovery on is the workload itself, and not necessarily the individual components inside that workload.
+
+So the idea of the API gateway piece sitting as the trigger — what I'm really thinking, or I guess the reason why I'm kind of calling that an API gateway, is mainly that there might be shared functionality that everything has to do, like it all does the exact same middleware piece, and at that stage is where you would probably put that logic in the long-running service. Maybe you have something already doing caching, like local caching on ETag headers and that kind of thing, and maybe you're doing some kind of circuit breaker type pattern when you're doing the ingress into that workload before you reach the individual components of the workload. But I guess what I'm saying is, right now I think it's appropriate for service discovery to remain at the workload tenancy level.
+
+**Frank Schaffa** [14:35](https://youtu.be/Kwg0mEP_mJQ?t=875)
+
+Okay.
+
+**Bailey Hayes** [14:40](https://youtu.be/Kwg0mEP_mJQ?t=880)
+
+Yeah, and I welcome more questions and stuff too. I think there's probably a future world too where we can also talk about putting a wasmCloud host in an Envoy sidecar and doing xDS service discovery via Wasm, but that's probably more of a moonshot thing that might be fun to do.
+
+**Victor Adossi** [15:02](https://youtu.be/Kwg0mEP_mJQ?t=902)
+
+If you have time, would you consider writing, I don't know, a quick issue on this — just basically the kind of what you're — how you're envisioning it? I think that it's worth exploring, or at least having a sort of answer there, and/or if there is a way to make that work essentially. I think it's worth discussing, and I don't think we can give the best answer on the spot essentially in the community call here, but I think it's probably worth discussing a little longer, actually.
+
+**Frank Schaffa** [15:42](https://youtu.be/Kwg0mEP_mJQ?t=942)
+
+Okay.
+
+**Bailey Hayes** [15:47](https://youtu.be/Kwg0mEP_mJQ?t=947)
+
+Cool. All right. I'm going to keep diving in because there's more PRs that introduce even more features. All of these are in the march to support basically host components.
+
+So when you separate stores, you've got to have a way to have things be able to — you've got a service, and we're linking basically over WIT definitions of that service to your components. So because these speak over WIT, I need to be able to pass all of my P3 types that way. But they're all in separate stores. The way that WIT natively works is you basically pass around value handles in that same store — similar to the work that Aditya did before for being able to do this across components and dynamic linking. Now we also have to do this across stores, and so that's what this PR adds. This one's probably the next one to land if I'm lucky today, but we'll see.
+
+<img src="/img/community/2026-07-15/image004.webp" alt="The stack of open wash-runtime pull requests behind host components — the host plugin loader, routing inbound messages to long-lived trigger services, cross-store streams and futures, and epoch interruption for invocation cancellation." />
+
+And then, okay, so if you have this concept of a longer-lived trigger service, it provides its own exports that a host can call, or anybody could call in theory, and you have the ability to pass data around across these different stores. You now are able to facilitate separate lifetimes between this and the workloads that are running against it. Now you can also introduce something that works at the host tenant level, so that it's provided to all workloads. Some of the main use cases for that are, for example, being able to add new functionality — a new capability that people want surfaced on your host. So I want a new way to do key-value operations, let's say. Or I want to do something like call out to Kubernetes secrets and pass things around that way, right?
+
+If you are trying to do something at layer seven, you almost definitely could write a host component that can do that. When a host component plugin doesn't make sense is if you're doing something that requires a hardware-level API — maybe SPI might be an example of that. I say that for you, Jeremy, by the way. But a host component plugin here is where we start introducing some of the stuff that Aditya was asking about.
+
+Well, it depends on the file system, right? If you want to provide an in-memory file system, or you want to back a file system to S3, I think that could also still be a host component plugin. You could do layers of virtualization, which is what components are best at. So yeah, I definitely think you could do a host component for those. But WebGPU is an example of something that I don't really ever expect to be a host component plugin. There may be parts of it that make sense — like, I want a host component plugin that serializes the state of what is happening on the GPU. Maybe that one can be coupled with a native plugin that already has the GPU interface for that, and then you have your little serializer that's going to put it in linear memory for WebAssembly, and then maybe you can come up with some kind of replay, restore, all that kind of stuff. Possibilities are endless. So I do also want you to think that it's not either/or. We can kind of have these host components build on what we already have available at our surface with WASI.
+
+So, all right, this is that PR, and there's a lot there. I think the one that Aditya wanted us to talk through a little bit is actually on some of the WIT that we've added for being able to do this. Oop, that's mine — okay. I'll just start here. This is what a host plugin looks like. It's using WASI, like I said, and it's providing — the idea here is like Acme is my proprietary key-value store, right? It's not WASI's. It's doing its own thing. Does it look just like WASI's key-value store? And am I lazy?
+
+**Bailey Hayes** [20:18](https://youtu.be/Kwg0mEP_mJQ?t=1218)
+
+Yes. But I mean, the point is, this is totally a different, unique interface, and as far as the architecture is concerned, it doesn't care what the name is here. So I can say things like Acme.
+
+And the two other things that it brings in is sort of the part of identifying yourself as part of being on the host, and so this is a new capability that we're making available. So let me find it here. As you can see, the amount of WIT is actually very small, and I'm surfacing concepts that already existed in the system — but let me talk about why they need to be surfaced all the way to something that's like a host component.
+
+Part of the threat model is that when you are a guest component, you're just a random component that's inside a workload. You could be arbitrary compute. Third-party code could be LLM code, and we don't trust it. And it could do weird things. It could be trying to do something like a JIT bomb, where it just recursively tries to redo something — like a zip bomb, as the other example. But it could try to lock up the host and seize the host. And we are linking and trying to say, okay, this host component is going to service that request from the workload. Now I need a way to say, "ooh, you've gone way too long here," both for the native code that we're doing — so, as I'm maybe executing a GPU call, that is not in the purview of WebAssembly inside a WebAssembly guest, it is something that is being done as part of the host — and it could also be something that's now being done as part of the guest, as part of a host component guest, right?
+
+And so I need all of those things to be able to work in concert, so that if I am running an asynchronous request, I need to basically say, "well, this request..." I don't care how many hops we've done throughout all the different components. We might have multiple different components in a workload. We might be talking to a service in this workload. We might also be talking to a host component in this workload. I need to be able to basically signal — one component needs to be able to stop the bus, and I need to be able to propagate that across the whole thing.
+
+And the other part of this security posture is that the only thing that's trusted here is the host. And now, in a lot of ways, the host component plugins themselves are also a part of this trust surface. In that, if you're loading a host component plugin, that's privileged. That's saying, "I'm serving requests on behalf of the host," so it's part of the host service API. But within all of that, that's why we are validating the identity of who's trying to stop these things, and not basically allow somebody's guest workload to stop a request for somebody else's workload, right? So workload A should be able to have no impact on workload B's work.
+
+<img src="/img/community/2026-07-15/image005.webp" alt="The host-side identity code backing that check — resolving the component and workload identity of the caller currently invoking a host plugin, so a cancellation request can be validated before it is honored." />
+
+And this identity is consistent inside one host. So again, the surface area here is a single host, not a different one for every host — the component ID is actually unique. Yeah, exactly. Sorry, I was answering questions in chat. And then this is sort of part of this, which is: once you've triggered an async task, that's a job here, in that parlance, and that's what we would be able to cancel. And so when you create a new async task that's going to be ferried across all of these different stores, all of these different things, we would need to propagate back that cancellation. That's why we keep that ID specific to these identities, and so that is what that is. Did that answer your question, Aditya? Okay, good.
+
+**Aditya Salunkhe** [24:25](https://youtu.be/Kwg0mEP_mJQ?t=1465)
+
+Yeah, yeah. Thank you so much.
+
+**Bailey Hayes** [24:28](https://youtu.be/Kwg0mEP_mJQ?t=1468)
+
+Yeah, so I decided not to touch epoch interruption for this one, Aditya. I decided — you started capturing the epoch side of things in your work, and so what I was going to do is just focus on: okay, well, what happens from the host perspective when something needs to be canceled? Epoch interruption only yields inside Wasm, so I want to also be able to cancel when I'm not executing that Wasm.
+
+**Aditya Salunkhe** [24:52](https://youtu.be/Kwg0mEP_mJQ?t=1492)
+
+Exactly. The host part calls are not exactly cancellable by the epoch interruption because they go out of the guest scene. And you can only cancel it if it's running inside the guest code. So yeah, so we need to combine the two. I can drive that.
+
+**Bailey Hayes** [25:09](https://youtu.be/Kwg0mEP_mJQ?t=1509)
+
+Cool. Yeah, so I saw what you did. I'm like, I love it. But I had to do my half of it, and I think we can meet in the middle, and this will be really nice for other folks. And obviously it had to be part of the host component piece because I didn't want to introduce something where we hadn't already gotten the infrastructure in place for this, so that we don't cause problems by introducing new host components. Yeah, Frank.
+
+**Frank Schaffa** [25:39](https://youtu.be/Kwg0mEP_mJQ?t=1539)
+
+So I'm just thinking from the point of view of boundaries. I mean, it definitely makes sense. If I trigger a bunch of different processes and so forth, and somehow I figure out, okay, I should be timing those things out or do something about it — I can do this. But I'm just afraid that we're building, let's say, a system admin on top of this. I mean, this becomes like, okay, if you want to have a timeout process, it's on you, and so forth.
+
+And I see two different sides of this. One is actually, okay, something is not responding. The other one is actually things are taking over a lot of resources. So, for instance, how do we bound it? So there's a CPU loop or something, and it's not really making other things crash.
+
+**Bailey Hayes** [26:49](https://youtu.be/Kwg0mEP_mJQ?t=1609)
+
+Yes. Okay. So I forgot to show that the timeout layer was part of one of those past PRs that I talked through, on the cross-store side of things. So let's say you created a stream and then you talked across, and the type of attack that you were doing there — or by accident — is doing like a trickle in a stream. So, very slowly streaming things, so you're keeping it open. That is handled as part of the cross-store feature, so it's a lower layer basically than trigger services and host components. It's just part of that piece of the context for the boundary.
+
+The other aspect here is every plugin determines its own timeout, so you may have a plugin that does HTTP timeout different from how they do messaging timeout, but we have a single kind of macro that expands out all of these timeout knobs now across all of these. So that was one of the PRs that's already landed. That was introduced in the trigger service PR.
+
+And then in terms of other boundaries here, the epoch interruption that we're talking about, which we actually put on the roadmap as our issue — that's for the CPU-bound work, Frank. I want to keep hearing your thoughts on this.
+
+**Frank Schaffa** [28:34](https://youtu.be/Kwg0mEP_mJQ?t=1714)
+
+I'm just thinking from, let's say, a Kube point of view, that within your pods and containers you say, "okay, this is how much CPU I'm going to get." So if you're careful in terms of what you described in terms of limits, you don't get to become a bad neighbor, right?
+
+**Bailey Hayes** [29:09](https://youtu.be/Kwg0mEP_mJQ?t=1749)
+
+Yes.
+
+**Frank Schaffa** [29:11](https://youtu.be/Kwg0mEP_mJQ?t=1751)
+
+And I'm just thinking from the point of view of how to bring this kind of capability without being too prescriptive, because at the end there's a lot of — I mean, those things should be functions. And I'm just wondering, avoiding, let's say, deadlocks or some CPU spins and so forth — somehow I must think that it'd be difficult to add this to the framework. It can become very complex and so forth. So I'd rather provide the tools for folks to handle their own, because at the end, they own the workloads and so forth. So if they want to manage this at whatever level, that there are enough monitoring capabilities and action capabilities that you can do this — but this doesn't become, let's say, a micro Kube running in Kube.
+
+**Bailey Hayes** [30:36](https://youtu.be/Kwg0mEP_mJQ?t=1836)
+
+I totally agree from a design philosophy that we are the picks and shovels. We give people the tools, and then they figure out how to assemble it — and making sure that we expose all of these as knobs, because there's going to be so many different use cases, and it will be difficult to predict ahead of time.
+
+**Frank Schaffa** [30:58](https://youtu.be/Kwg0mEP_mJQ?t=1858)
+
+Yeah, I mean, just for instance — we use Contour as our ingress. I don't remember right now, but there are five-plus controls that you have for a timeout, and so it's not just one call, "you have this timeout." There are things: okay, you keep alive, you do this, you do that, and so forth. So anyway, I think this is useful to say, okay, whenever you're exporting this as metadata, and then you decide how you want to manage those things.
+
+**Bailey Hayes** [31:37](https://youtu.be/Kwg0mEP_mJQ?t=1897)
+
+Yeah, Victor.
+
+**Victor Adossi** [31:42](https://youtu.be/Kwg0mEP_mJQ?t=1902)
+
+Yeah. So, like a full-on CPU usage tracking slash scheduling is probably out of scope, but it sounds like the tunability that Frank is referring to sounds like we could pass through to Wasmtime's epoch interruption stuff. And as long as there's a lever from the Wasmtime side of, for example, being able to pass through sort of custom logic that we plumb through, we could get some facsimile of preventing one workload from running too long — or I should say, one component from running too long, in a workload-specific way. I mean workload in the general sense, like a sort of thing you want to do, right? Frank, does that sound reasonable? I'm not sure how familiar you are with the Wasmtime epoch feature, but the fuel is not feature-based.
+
+**Frank Schaffa** [32:46](https://youtu.be/Kwg0mEP_mJQ?t=1966)
+
+But Victor, what you just mentioned makes a lot of sense.
+
+**Victor Adossi** [32:51](https://youtu.be/Kwg0mEP_mJQ?t=1971)
+
+Yeah, so fuel was like v1 or whatever, and a lot of people in the crypto space still use it, but basically you can sort of tick down based on instructions, and that would be the closest thing to getting a real CPU time-slicing kind of thing. But I think that's really hard. That's a full sort of "write a scheduler" kind of thing, and control resources really, really tightly.
+
+So the v2 of that is epochs, and so basically just timers, right? You just get an interruption every once in a while, and the thing is, Wasmtime gives you a facility to run a function and then decide what to do. So we can just give you a function that we run in Wasmtime's function, and then it just kind of passes through there, and then wire that in to be a little bit more ergonomic or something like that. Yeah, that seems fair. That seems doable. It doesn't seem impossible.
+
+**Frank Schaffa** [33:48](https://youtu.be/Kwg0mEP_mJQ?t=2028)
+
+And so, yeah, I'm not really familiar with Wasmtime from the point of view of, let's say, scheduling. But I assume you need to have some kind of capability to say, okay, when you're running out of resources, you cannot schedule too many functions. Otherwise, you're not going to have any progress.
+
+**Bailey Hayes** [34:19](https://youtu.be/Kwg0mEP_mJQ?t=2059)
+
+Right now, Wasmtime doesn't have — scheduling is out of scope for Wasmtime, and that is wasmCloud's purview. That's where we need to figure that out and have it solved within our host. But like what Victor's saying, the epoch stuff is fully built into Wasmtime.
+
+And one other thing I wanted to add on that: a lot of folks come in thinking gas and fuel are the only solution in the space, and they're really expensive because obviously you're doing instruction counting. It's important if you're doing something like crypto and you're charging people by CPU count — sure, take the time and do the right thing. But for the most part, this type of instrumentation is going to be so much more efficient and still close enough to what you're trying to do, which is just throttle work that's happening on the CPU.
+
+**Frank Schaffa** [35:15](https://youtu.be/Kwg0mEP_mJQ?t=2115)
+
+Right. And besides, we want to run in multiple architectures, right? So you're going to have multi-threading, multi-core, multi-whatever.
+
+**Victor Adossi** [35:27](https://youtu.be/Kwg0mEP_mJQ?t=2127)
+
+Something you also mentioned, Frank, I think is actually distinct, which is running too many things. Bailey would probably know better here because she wrote the benchmarking stuff a while back, but I actually don't know what the failure mode is there. So, if you run, let's say, I don't know, four million components or whatever — just assuming that's in the range of possibility, and I think we can hit that — your question being, how do we stop that from happening?
+
+I think at that point you just run into the traditional M:N sort of threading/compute problem, where it's like, if Tokio can make progress, then we can make progress, kind of deal, as long as there's no deadlock. But yeah, I don't know exactly what Wasmtime, and then sort of as a knock-on effect what we end up doing, if you actually try and overload a system, right? Other than assuming you don't get OOMed — this is like not OOMing, but very, very heavily loaded. How do things work out?
+
+**Bailey Hayes** [36:40](https://youtu.be/Kwg0mEP_mJQ?t=2200)
+
+Yeah, I think the whole calling back to exposing these as knobs is so important. So much of it depends on how you've configured Wasmtime, and for us, by default, we configure with the pooling allocator. But a lot of people are building their own host, and it's possible to build it without the pooling allocator. You would not want to use the pooling allocator, for example, if you're choosing to run in a low-memory environment. The pooling allocator is the best one for when you're doing AOT, you're running server-side, you're going to pre-allocate a lot of memory, and you're going to use those kinds of memory pools.
+
+And this one's a really good example of just talking about some of those dimensions. There's a few others that go deep. I'm really impressed with the documentation that Wasmtime now has around this stuff. This wasn't always there, but if you want to read up and understand how the epoch side of it works, how fast execution works, that's really important here. And I guess my answer here is it depends so heavily on what your Wasmtime configures, what your Wasmtime compiler is, and then additionally for us, the other dimension again is at the scheduling level — whereas a lot of this, when you read these docs, is for this one individual workload: here's what your surface might look like.
+
+**Frank Schaffa** [38:25](https://youtu.be/Kwg0mEP_mJQ?t=2305)
+
+And I think it would be key to see, because the workload interface and so forth is wasmCloud, so then Wasmtime is abstracted. And that's why I think that there should be some knobs saying, "okay, well, sorry, I cannot run this at this time." Or, if you're running this in Kube, get another pod that I can run another instance of Wasmtime on. So those are the key things — at least I'm saying, okay, at least some guardrails. So: this is as much as I'm going to schedule, and not beyond this. Are those things in place?
+
+**Bailey Hayes** [39:20](https://youtu.be/Kwg0mEP_mJQ?t=2360)
+
+I would say it's not where I want it to be. There are some things. It's part of our metrics collection for the host — we are surfacing this, you can see it from an OTel perspective — but it's not going to stop scheduling right now. What will happen is you'll OOM, and then work will start getting scheduled on a different host, which isn't exactly what we want here. And I want to track this one, actually. This is probably a great candidate for this quarter. The obviously first next step is the epoch work, but also surfacing this for the scheduler as well, which is obviously our operator.
+
+**Frank Schaffa** [40:13](https://youtu.be/Kwg0mEP_mJQ?t=2413)
+
+I like the discussion.
+
+**Bailey Hayes** [40:21](https://youtu.be/Kwg0mEP_mJQ?t=2421)
+
+Yeah, this is great. I mean, that's really what I was hoping to facilitate, right? Like, okay, here's an initial stab at our project board. Also, be aware, lots of things changing right now.
+
+So this is that big chunk on how to load host components, right? And the boundaries around how we actually can handle cancellation, how we could start adding this type of throttling. But be clear, the epoch throttling would be a follow-on. Next, even on top of just that: how do I actually load this in a cluster? And that's what this change does.
+
+Essentially — let's see, I've got a YAML in here somewhere, I know I do. Oh, too many commits. That's the problem when you have stacked PRs. Go all the way down. So we've got basically an end-to-end task that takes a host component, that same Acme KV store, and deploys it all the way out. And we're just going to have to look at it here, making sure that we are doing it with the host component plugin.
+
+So everything I've talked about is behind a feature flag. And here's the full test. For folks that aren't familiar, we use this tool called Ginkgo for us to do our Kubernetes and assertion work. This is kind of how we do our end-to-end tests in the Go side of the world, and that's what gives us this "before all" piece. Some people are like, "no, I use pure Go test." I didn't pick this, but it was what was there and it's working great, so I've got no complaints. But anyway, this is how we kind of build up. This is for debug logging, and I'm looking for this — oh, took a long time. Okay, all right.
+
+So this is where I introduce that new host interface that this workload depends on, and up here when I staged the host, it was staged with that host plugin. Yeah, of course that's going to have a million and one hits. There — I get that plugin image, and I pass that in. Basically the host has a new field. It gets handed that plugin, host spins up, gets started. Then we schedule this workload, which is this YAML here that says, "hey, I actually depend on this specific interface that nobody else knows about, except now this host that has that host component plugin on it." And then we trigger some work, and we do that through some curl calls that that component serves, and then it tries to talk to the host component plugin. And some of the things that it also has in it that I've been adding is adding in cancellation and that kind of stuff. Usually I do `/boom` in my test for the failure bad cases, essentially. But this one isn't calling `/boom` yet — but the integration tests over on the Rust side do.
+
+<img src="/img/community/2026-07-15/image006.webp" alt="The Ginkgo end-to-end test that stages a wasmCloud host with the Acme key-value host component plugin image, then schedules a workload declaring a dependency on that plugin's interface." />
+
+So, how do I load it on a host? The answer is YAML and OCI, and it's part of your host definition.
+
+**Jeremy Fleitz** [44:01](https://youtu.be/Kwg0mEP_mJQ?t=2641)
+
+And Bailey, that's going to be when we basically cut 2.6? We can tell that we're going to be doing incremental, would you say, right?
+
+**Bailey Hayes** [44:10](https://youtu.be/Kwg0mEP_mJQ?t=2650)
+
+Well, technically, I've landed a bunch of these changes that are earlier — this is now feature quality even before we land host components. So if we wanted to get a 2.6 out now, we can. We put out a patch, basically, which was our last release, which had bug fixes in it, which were very much needed — bug fixes around P3 and a rev around `wasm-tools`.
+
+So if we want to get a 2.6 out, I would say let's give it another day or two for all of these things to kind of come together, because it's not super helpful if — like, without this PR, for example, you can only run host components in tests. You can't do it at the host level, external to the host level. So yeah, if we as maintainers decide that we're okay with doing an out-of-band feature release, because I did not make the window yesterday — basically the stuff was still landing — we can do that. And yeah, I think it would be a 2.6, although it is behind a feature flag. I would want us to give it some time to stabilize.
+
+**Jeremy Fleitz** [45:24](https://youtu.be/Kwg0mEP_mJQ?t=2724)
+
+I was about to say, I think it's okay if we get it merged. Once it gets merged into `main`, it'll be in canary, so we can use it. And that's until Tuesday — the release train pulls into the station, that turns into 2.6, maybe.
+
+**Bailey Hayes** [45:38](https://youtu.be/Kwg0mEP_mJQ?t=2738)
+
+Okay, yeah. Well, the release train is every two weeks, so —
+
+**Jeremy Fleitz** [45:45](https://youtu.be/Kwg0mEP_mJQ?t=2745)
+
+Oh yeah, you're right. You're right. Good call. Good call.
+
+**Bailey Hayes** [45:46](https://youtu.be/Kwg0mEP_mJQ?t=2746)
+
+But you know, it's push-button, so — I guess if GitHub is feeling up to it that day. Yeah. Oh, I'm just reading Victor's messages there.
+
+Well, I think let's give it another day or two. See how these come in and land. And I would like somebody other than me to have made a host component. So I love this — I really hope you say you love it and not hate it. And then we can talk about stabilizing the feature. We're not using anything underneath that's unstable, right? It's just — I think the draft PR was around 17,000 lines of code, which was all those PRs combined. And then I've since added two more PRs on top of that. So the churn of lines of code that's been edited is a lot, and I want to make sure it's rock solid. Thank you, D.T. Well, any other things we want to talk about? Got nine minutes left.
+
+**Aditya Salunkhe** [47:09](https://youtu.be/Kwg0mEP_mJQ?t=2829)
+
+Should we defer the artifact precompile to after 2.6?
+
+**Bailey Hayes** [47:15](https://youtu.be/Kwg0mEP_mJQ?t=2835)
+
+Yeah, I think this is all I can focus on right now.
+
+**Aditya Salunkhe** [47:18](https://youtu.be/Kwg0mEP_mJQ?t=2838)
+
+Yeah, that makes sense.
+
+**Bailey Hayes** [47:20](https://youtu.be/Kwg0mEP_mJQ?t=2840)
+
+I do think the `implements` stuff is also probably going to be fully part of 2.6. I got external ID plumbed through into Wasmtime — yesterday is when it landed. I think we should do the exact same thing we did for Wasmtime 46, but with Wasmtime 47, where we just add in that one commit as a patch on top of 47, so that we can go ahead and fully exercise it. And then August 4th is when WASI 0.3.1 goes out, and right now we look like we're going to have both `maps` and `implements` as part of that, considered stable as part of that release.
+
+**Aditya Salunkhe** [48:06](https://youtu.be/Kwg0mEP_mJQ?t=2886)
+
+Got it. That makes sense. What feature is getting added on top of the 47 release, the one we need a custom fork for?
+
+**Bailey Hayes** [48:15](https://youtu.be/Kwg0mEP_mJQ?t=2895)
+
+Yeah, so it's just external ID, and we probably haven't talked about that yet. It is behind the same component model feature flag as `implements`.
+
+**Aditya Salunkhe** [48:36](https://youtu.be/Kwg0mEP_mJQ?t=2916)
+
+Yeah, we did discuss about it.
+
+**Bailey Hayes** [48:40](https://youtu.be/Kwg0mEP_mJQ?t=2920)
+
+So external ID is actually part of that feature set, because the larger feature set is basically being able to have associative metadata to a given signature. So having a named alias — which is what essentially `implements` is — is part of that, and the other part is being able to actually have this kind of ride-along, not-type-checked string blob that a lot of platform operators want. That's called an annotation. It's called external ID. It's an annotation like `@since` and `@unstable`. There's also another one called version suffix, but that was actually a different feature. But the external ID annotation is something else that was just added to the latest `wasm-tools`, and now only on `main` in Wasmtime — did not land soon enough for it to be part of Wasmtime 47.
+
+But yeah — oh, Mike, you have a sick demo. Oh my gosh! Well, hi. I'm going to stop rambling if you want to take it away.
+
+**Mike Williamson** [49:50](https://youtu.be/Kwg0mEP_mJQ?t=2990)
+
+I don't know, we might be overselling it a little bit, but yeah, Liam asked if I wanted to show it, so I just thought I'd pop in saying hey and show the thing. So, okay — host has disabled participant screen sharing.
+
+**Bailey Hayes** [50:11](https://youtu.be/Kwg0mEP_mJQ?t=3011)
+
+You have the power.
+
+**Mike Williamson** [50:13](https://youtu.be/Kwg0mEP_mJQ?t=3013)
+
+I have the power. Okay, we can do this. Screen sharing on Linux is always super dicey, so cross your fingers. I still appear to be here. That is good.
+
+So this is — I'm kind of in the process of doing a bit of a brute force learning dive into wasmCloud, and that implies running it myself. So the plumbing of, hey, can I get this to run, and do I understand what's happening, and all that good stuff. Then the other part of this is, especially if I'm hoping to actually encourage other people to use this and build things on it, I should probably know a thing or two about doing that. And so this is basically what I've been doing.
+
+So one of the things I like is there's a project called rsbuild. Some of you folks have already been using this, so it's just a quick way to stand up a little kind of project skeleton. So, all the JavaScript things — we can do this, and essentially I'll make that a little bit bigger so we can see things. So all this has done is basically generated a little starter project.
+
+<img src="/img/community/2026-07-15/image007.webp" alt="A plain rsbuild starter project before any wasmCloud involvement — package.json, rsbuild.config.ts, tsconfig.json, a public folder, and src/App.css and src/index.tsx." />
+
+So this is basically what it looks like. This is sort of just normal kind of JavaScript-y things, and so this is a common starting point for myself and many other JavaScript developers. Here we are shifting the conversation from all the heavy Rust stuff into the shallow end here. So this is basically what I wanted to do: figure out how do I make this world that I'm familiar with happen in wasmCloud.
+
+So, big thing here is going to say just install dependencies. That's good. And then from there, I'm going to be able to do build. So if I do this, it's going to compile everything into a bunch of static files in the `dist` folder. This is where my problem sort of begins, because what I'm doing normally in the container world is essentially packing this into a container and then deploying a container, GitOps style, all that goodness. So I didn't really have a mental model of how to do this.
+
+So the big idea was that componentizing could come to the rescue — I could try and build that thing, and that would solve this problem for me by packing this into a module. So essentially, this is the idea. So I can say like `dist/` something like this, and this is just going to essentially compile all the stuff in that folder into something like that, and I now have a Wasm module.
+
+And then from there, it's obviously pretty easy to get this going. Basically, when I want to do this, I can do `jq` — I already just sort of got a little thing going, so I can add that script to the JSON. So if I do this, this basically gives me the script. So now this is sort of ready to go for adding that to the wash config. If I have this post-build now, I can just say `npm run build`. Build will run, compile everything into the `dist` folder, and then the post-build script will run, and I get a component. And then from there, `wash dev` magics it into wasmCloud, and life is good.
+
+<img src="/img/community/2026-07-15/image008.webp" alt="The dist folder compiled into demo.wasm via wasm-static-assets, then a jq one-liner writing the post-build script into package.json so npm run build produces the component." />
+
+So that was kind of the thing that I wanted to show. This solved a problem for me, so I'm having lots of fun with this. I'd love to get your take on the implications of this, because this basically packs obviously the files, but also a super simple web server in there that's just serving the static files. I don't fully appreciate the implications of this, other than convenience and making me happy, which is not necessarily always what you want to optimize for. So I'm assuming there are probably performance trade-offs in doing this, and probably limits in terms of file size before this approach starts breaking down and becoming a source of regret. Wonder if people have thoughts on that.
+
+**Bailey Hayes** [56:02](https://youtu.be/Kwg0mEP_mJQ?t=3362)
+
+I'm figuring Victor might want to chime in here. This is definitely stuff that's near and dear to his heart.
+
+**Victor Adossi** [56:08](https://youtu.be/Kwg0mEP_mJQ?t=3368)
+
+Yeah, no, this is great. This has been a thing that I think has been sorely needed. Like, the thing is, we actually had a version of this — I don't know, maybe two years ago or something like that — but it wasn't as easy, and there were limits on basically what you could do. For example, we'd cap the bundle to like five megabytes or whatever, and the way we did it was a little bit different.
+
+But I don't think there's much to actually think about. That's just good in general, because you just get a static file server, right? You have a component that is a static file server, and then you load in the binary for the files — or the folder of files that you want to serve — and then serve them, and then get a component out of it super quickly. I think that's extremely useful. And I think now more than ever, when people are sort of having LLMs or AI whip up single-page presentations or little websites and stuff like that, being able to bundle it — I might call it the Wasm web bundler, maybe, because it sort of bundles websites.
+
+But the thing is, it actually doesn't have to only be websites, right? There's a Wasm-as-a-packaging-medium idea that I think is actually a bit underexplored. But that's a different path. But yeah, this is amazing.
+
+**Mike Williamson** [57:46](https://youtu.be/Kwg0mEP_mJQ?t=3466)
+
+Yeah, so I hadn't really thought about that. Give me an example of the world of packaging beyond websites?
+
+**Victor Adossi** [57:55](https://youtu.be/Kwg0mEP_mJQ?t=3475)
+
+Yeah. Like, think of XLSX as a data packaging mechanism, right? Like Word docs, PDFs, everything — like CSVs, right? And generally you have to write the tool that extracts the data. You have to have the thing to read it. But just about anything, you can think of it as, "oh, I have a binary that I can now interact with to get the data I wanted." It's like if you had a Parquet file and also the Parquet engine, and they were the same thing.
+
+Now, that doesn't necessarily make sense for everything, because depending on how big the engine is, you maybe don't want the engine every single time. But it's more legible — also, if you think of the LLM implications there, right? For an LLM, figuring out how to deal with a CSV or XLSX or whatever is very specific training, but doing a function call in a binary is actually not that hard, right? Like, imagine just `get-row(2)` from `csv.wasm`, right? And row two comes out as a record. That kind of thing. There's a lot there. It's basically on nobody's radar right now, as far as I know — I've never seen anyone talk about it.
+
+But yeah, web is obviously — you've sort of done the thing where you've taken like, normally you need the `dist` folder and the web server, and now they're the same, right? So it's like a packaging mechanism for the web server — or sorry, for a web page, let's say.
+
+**Mike Williamson** [59:43](https://youtu.be/Kwg0mEP_mJQ?t=3583)
+
+Yeah. I'll leave it there. But I guess I was wondering about — if there's another option in terms of, like, I was looking a little originally at the file system option, and sort of trying to imagine how to kind of GitOps a version-bundled set of files into like a Kubernetes PVC kind of deal. So it was a failure of the imagination to kind of figure that out. So this sort of seemed like a reasonable thing, but is there another thing that is worth exploring there?
+
+**Bailey Hayes** [1:00:26](https://youtu.be/Kwg0mEP_mJQ?t=3626)
+
+Of course there's lots, but I think one of the things — in a not-small case, let's say you're making a website for something huge — in that world, you probably want to push your static assets to a CDN, and your file handler be the Wasm side of the world for now. But I think the future very much looks like Wasm is your universal package manager.
+
+Okay, all I'm going to say there is, I think you're on the right case though on looking at `.wasm` as your universal package. And in terms of serving over HTTP, obviously with the WASI HTTP handler, that's made very efficient by different host runtimes. There's probably a lot more we can do there in terms of caching static assets and all that kind of work. It's something that basically most of the CDNs now — even Azure's edge CDN now — all use Wasm, all have built-in Wasm now, mostly for the compute. They haven't quite bridged it to the CDN side, but I've definitely heard those folks talk about it. So I think that gap will also be bridged in the future.
+
+In terms of other options you had on the table, just so you know, we do support volume mounts, so you could have done a PVC volume mount if you wanted in the wasmCloud workload. It's fine, but I like what you did there better, because I'm not one to jump in and do NFS in Kubernetes, so I'm not going to recommend that to others. There's another technique that I've seen a lot of folks do, which is populating with S3 — and we support WASI blob store, so you can put your static assets in S3, and then just your logic in the `.wasm`. But in terms of the case that you and Victor were just talking about, of "I just vibed out a tiny web page" — this is perfect for that.
+
+**Mike Williamson** [1:02:43](https://youtu.be/Kwg0mEP_mJQ?t=3763)
+
+Okay. Thanks.
+
+**Liam Randall** [1:02:48](https://youtu.be/Kwg0mEP_mJQ?t=3768)
+
+The discussion has been awesome, Victor. I especially loved a lot of your points. But the only follow-up that I would add to any of that would be that of course you get all the advantages of content-addressed files, as well as their bundled methods. You can sign it, so you get a measure of immutability — the same type of immutability that you typically think of as a singleton or a Git commit. You now have that artifact, a collection of elements come together.
+
+**Bailey Hayes** [1:03:33](https://youtu.be/Kwg0mEP_mJQ?t=3813)
+
+Hey, Liam, we're losing you on your network.
+
+**Liam Randall** [1:03:36](https://youtu.be/Kwg0mEP_mJQ?t=3816)
+
+Oh, did I drop?
+
+**Bailey Hayes** [1:03:41](https://youtu.be/Kwg0mEP_mJQ?t=3821)
+
+Uh, for like half of it.
+
+**Liam Randall** [1:03:43](https://youtu.be/Kwg0mEP_mJQ?t=3823)
+
+Oh no. Oh, I'm so sorry. Did you understand my point around the immutability?
+
+**Victor Adossi** [1:03:48](https://youtu.be/Kwg0mEP_mJQ?t=3828)
+
+Like the sort of signing the artifact as well — yeah, yeah, okay.
+
+**Liam Randall** [1:03:54](https://youtu.be/Kwg0mEP_mJQ?t=3834)
+
+Yeah. So orgs that care — that want to be able to say that we ran this collection of inputs and outputs and these assets all together — you now have immutability in a single artifact. So I think that there's some just sort of second-order benefits from that.
+
+**Bailey Hayes** [1:04:10](https://youtu.be/Kwg0mEP_mJQ?t=3850)
+
+And also that same artifact — that exact same binary that you were able to validate and test both locally and in your CI, and then in every environment that you deploy to, whether it's ARM or x86 or a plane, train, or a dishwasher — it can all be the same, which is pretty powerful. Very few people can actually say that. So yeah, actually portable. It's kind of awesome.
+
+Well, we're way over, but I love this. I loved it. I love the conversation. I saved your link. Is that like your own custom GitHub, basically?
+
+**Mike Williamson** [1:04:58](https://youtu.be/Kwg0mEP_mJQ?t=3898)
+
+It's a Canadian one, sort of. Got that provider to work.
+
+**Bailey Hayes** [1:05:06](https://youtu.be/Kwg0mEP_mJQ?t=3906)
+
+Well, it's cool. All right. D.T. says that his dishwasher complained about not having P3 support. So, hey, I'm getting that complaint in a lot of places right now — but it's growing. It's spreading everywhere. So we'll get there. We'll get a patch out. All right, well — thank you, everybody.

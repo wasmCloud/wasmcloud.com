@@ -1,59 +1,220 @@
 ---
 date: '2026-07-15'
-title: 'Meeting Agenda - 2026-07-15'
+title: 'Host Components, Epoch Interruption, and the Q3 Roadmap for WebAssembly on Kubernetes'
+description: 'WebAssembly on Kubernetes: the wasmCloud Q3 roadmap, host components and trigger services, epoch interruption for CPU bounds, and a static-site-to-Wasm demo.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - host components
+  - trigger services
+  - epoch interruption
+  - wasi preview 3
+  - wasmtime
+  - webassembly news
+chapters:
+  - { seconds: 2, label: "Welcome and the Q3 roadmap board" }
+  - { seconds: 275, label: "A polyglot dashboard, wasmCloud Contrib, and instance pooling" }
+  - { seconds: 433, label: "Epoch interruption, cancellation, and the new host interfaces" }
+  - { seconds: 678, label: "Service discovery, API gateways, and reference architectures" }
+  - { seconds: 947, label: "Passing WASI Preview 3 types across separate stores" }
+  - { seconds: 1218, label: "Host component plugins and the cancellation threat model" }
+  - { seconds: 1468, label: "Combining epoch interruption with host-level cancellation" }
+  - { seconds: 1539, label: "Timeouts, CPU bounds, and avoiding noisy neighbors" }
+  - { seconds: 1902, label: "Epochs vs fuel: throttling CPU in Wasmtime" }
+  - { seconds: 2200, label: "Pooling allocator, knobs, and scheduling in the operator" }
+  - { seconds: 2421, label: "Loading host components with YAML and OCI, tested with Ginkgo" }
+  - { seconds: 2641, label: "2.6 release timing and the external ID annotation" }
+  - { seconds: 2990, label: "Demo: bundling a static site into a WebAssembly component" }
+  - { seconds: 3362, label: "Wasm as a universal packaging medium" }
+  - { seconds: 3626, label: "CDNs, volume mounts, blob store, and signed immutable artifacts" }
+image: https://i.ytimg.com/vi/Kwg0mEP_mJQ/maxresdefault.jpg
+duration: 3937
+showTitle: true
+slug: 2026-07-15-community-meeting
+speakers:
+  - bailey-hayes
+  - aditya-salunkhe
+  - frank-schaffa
+  - victor-adossi
+  - jeremy-fleitz
+  - mike-williamson
+  - liam-randall
+about: wasmCloud
+mentions:
+  - WASIPreview3
+  - Wasmtime
+  - ComponentModel
+  - Kubernetes
+  - OCIRegistry
+  - wash
+  - capabilityBasedSecurity
+  - JavaScript
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- roadmap review @ricochet
-- host component @ricochet
+<YouTube url="https://www.youtube.com/watch?v=Kwg0mEP_mJQ" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=Kwg0mEP_mJQ" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The July 15, 2026 wasmCloud community call is a long, unusually technical one. Bailey Hayes opens with the Q3 roadmap board that came out of the previous week's planning session — host components, macro benchmarking, a Kubernetes secrets plugin, async messaging, and **epoch interruption** for both cancellation and yielding long-running work — then walks the stack of PRs behind **host components**: trigger services with their own P3 exports and their own store, passing WASI Preview 3 values across stores, and host component plugins that add capabilities at host tenancy. Frank Schaffa pushes hard on resource boundaries, which turns into the best discussion of the call: how to bound CPU without writing a scheduler, why epochs beat fuel, and where throttling metrics belong when you run **WebAssembly on Kubernetes**. Mike Williamson closes with a demo that compiles an rsbuild static site straight into a `.wasm` component.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **The Q3 project board is live and is now the default view** — host components in progress, k6 and macro benchmarking layered on last quarter's micro benchmarks, **epoch interruption** for invocation cancellation *and* for yielding long-running work to dodge the noisy-neighbor problem, and a stack of unassigned "ready for work" tickets open to anyone who wants them
+- **wasmCloud Secrets is published, and a Kubernetes secrets plugin is the next demo** — a plugin fulfilled by [Kubernetes secrets](/docs/kubernetes-operator/operator-manual/secrets-and-configuration/) would show exactly how to fetch a secret at runtime; separately, wasmCloud Messaging is being made **async** off the back of a Slack community request, following key-value and blob store, which are already native async with native plugin backings
+- **Housekeeping that pays down real debt** — `wkg.toml` is now read natively for any `wash` project, so test fixtures can share one local WIT directory instead of duplicating the same interface a thousand times, and the end-to-end fixtures should be built and published automatically so the [OCI registry](/docs/overview/packaging/) component gets fully exercised — while keeping E2E the small tip of the testing pyramid
+- **Two bigger asks for the community** — an "are we polyglot yet" **web dashboard** tracking where every language and ecosystem project stands, and a real push to expand **wasmCloud Contrib** with examples for popular Rust and Go frameworks, so those dependencies stay out of the main repo
+- **Trigger services are the new front door to a workload** — unlike P2 services that only export `wasi:cli/run` and spin a loop, a trigger service has its own **P3 exports**, so the host can drive async calls into it; it gets **its own store** (a different lifetime and isolation primitive from the now-ephemeral per-component stores) and can act as an in-workload API gateway, routing to components with `implements` named routing when several export the same handler
+- **The cancellation threat model drives the new WIT** — a guest may be arbitrary third-party or LLM-generated code attempting a JIT bomb, so the host has to be able to stop work anywhere in the chain (components, services, host component plugins) while **validating the identity** of whoever requests cancellation, so workload A can never cancel workload B's job
+- **Epochs, not fuel, are the CPU lever** — Victor Adossi walked the difference: fuel counts instructions (accurate, expensive, still the right call in crypto contexts), epochs are timer-based interruptions where [Wasmtime](https://wasmtime.dev/) hands you a callback. Scheduling is explicitly out of scope for Wasmtime and squarely wasmCloud's job; today an overloaded host OOMs and work reschedules elsewhere, so surfacing these metrics to the [operator](/docs/kubernetes-operator/) is a strong Q3 candidate
+- **Host components load with plain YAML and OCI, behind a feature flag** — loading is part of the host definition, with end-to-end tests written in **Ginkgo**; the draft was roughly 17,000 lines across the stack, and Bailey wants somebody other than her to build a host component before the feature stabilizes
+- **2.6 timing and the external ID annotation** — Jeremy Fleitz asked about cutting 2.6; Bailey wants a day or two for the stack to land, and canary picks changes up on merge to `main` with a release train every two weeks. **External ID** landed in Wasmtime `main` but missed 47, so it will be patched onto 47 the same way it was patched onto 46; WASI 0.3.1 on **August 4** should carry both `maps` and `implements` as stable. Artifact precompile is deliberately deferred past 2.6
+- **A static site, compiled into a component** — Mike Williamson showed a normal rsbuild JavaScript project where `npm run build` emits `dist/` and a post-build step compiles the folder into a `.wasm` component that embeds both the assets and a tiny static file server, which [`wash dev`](/docs/wash/) then runs. Victor called it "the Wasm web bundler" and pointed at Wasm as a general packaging medium; Liam Randall added that the bundle is a single signed OCI artifact, giving you Git-commit-style immutability over the whole collection of inputs and outputs
+
+## Chapters
+
+- [0:02 — Welcome and the Q3 roadmap board](https://youtu.be/Kwg0mEP_mJQ?t=2)
+- [4:35 — A polyglot dashboard, wasmCloud Contrib, and instance pooling](https://youtu.be/Kwg0mEP_mJQ?t=275)
+- [7:13 — Epoch interruption, cancellation, and the new host interfaces](https://youtu.be/Kwg0mEP_mJQ?t=433)
+- [11:18 — Service discovery, API gateways, and reference architectures](https://youtu.be/Kwg0mEP_mJQ?t=678)
+- [15:47 — Passing WASI Preview 3 types across separate stores](https://youtu.be/Kwg0mEP_mJQ?t=947)
+- [20:18 — Host component plugins and the cancellation threat model](https://youtu.be/Kwg0mEP_mJQ?t=1218)
+- [24:28 — Combining epoch interruption with host-level cancellation](https://youtu.be/Kwg0mEP_mJQ?t=1468)
+- [25:39 — Timeouts, CPU bounds, and avoiding noisy neighbors](https://youtu.be/Kwg0mEP_mJQ?t=1539)
+- [31:42 — Epochs vs fuel: throttling CPU in Wasmtime](https://youtu.be/Kwg0mEP_mJQ?t=1902)
+- [36:40 — Pooling allocator, knobs, and scheduling in the operator](https://youtu.be/Kwg0mEP_mJQ?t=2200)
+- [40:21 — Loading host components with YAML and OCI, tested with Ginkgo](https://youtu.be/Kwg0mEP_mJQ?t=2421)
+- [44:01 — 2.6 release timing and the external ID annotation](https://youtu.be/Kwg0mEP_mJQ?t=2641)
+- [49:50 — Demo: bundling a static site into a WebAssembly component](https://youtu.be/Kwg0mEP_mJQ?t=2990)
+- [56:02 — Wasm as a universal packaging medium](https://youtu.be/Kwg0mEP_mJQ?t=3362)
+- [1:00:26 — CDNs, volume mounts, blob store, and signed immutable artifacts](https://youtu.be/Kwg0mEP_mJQ?t=3626)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### The Q3 Roadmap Board
 
-### Topic 1
+Bailey Hayes opened by pulling up the **Q3 project view**, now the default for anyone who visits the wasmCloud projects board, and described it as a snapshot of the previous week's collaborative roadmap session. [Host components](/docs/overview/hosts/plugins/) — a big feature the team wanted last quarter — are already in progress with several PRs landed. Last quarter's micro benchmarks get a macro counterpart this quarter, covering **k6** load testing. And **epoch interruption**, started as last quarter wound down, is now in progress for invocation cancellation — with Bailey adding that she wants to use it for a second purpose too: **yielding long-running work** so one component can't become a noisy neighbor.
 
-- Note 1
-- Note 2
+She was explicit that plenty of tickets are marked ready for work and unassigned, and invited anyone feeling motivated to jump on one. Two she called out by name: now that **wasmCloud Secrets** has been published, a plugin fulfilled by **Kubernetes secrets** would be a great demonstration of fetching a secret at runtime from the cluster; and **wasmCloud Messaging** should become **async**, a request that came in through the community Slack. Key-value and blob store have already made that transition and now have native plugin backings, so messaging is following a proven path.
 
-### Topic 2
+The unglamorous items matter too. Last quarter's work to read `wkg.toml` natively for any `wash` project means test fixtures can point at a single shared local WIT directory plus whatever is unique to that fixture — no more copying WIT deps around by hand. The motivating pain, in Bailey's words, is what happens when you rev [WASI](https://wasi.dev/) or any given interface and the same definition is duplicated a thousand times. On the testing side, the E2E fixtures are currently published statically; she'd rather automate building and publishing them, which would also fully exercise the **OCI registry component** the team built. Her caveat: E2E tests are the slow ones, so keep the testing pyramid the right way up and keep E2E "the itty bitty part."
 
-- Note 1
-- Note 2
+### A Polyglot Dashboard and wasmCloud Contrib
 
-## Weekly highlights
+The idea Bailey was most visibly excited about is a **web dashboard** — an "are we polyglot yet" page that tracks where each language sits in the ecosystem, along with the state of the main ecosystem projects themselves. There are a lot of axes to track, and her argument is simple: if it's hard for maintainers to hold in their heads, imagine being on the outside trying to figure it out. It's a large enough effort that she kept the ticket in triage; it needs to be broken into many small tickets, and she explicitly asked anyone interested to come talk, because there are enough dimensions for several people to work in parallel.
 
-### Issue of the Week
+The companion push is **wasmCloud Contrib**. Following on from the previous call, the team wants to spend real effort this quarter revamping it so there are examples for your favorite Rust framework, your favorite Go framework, and so on. The motivation is structural, not just editorial: maintainers don't want those framework dependencies living in the main wasmCloud tree, so Contrib is where the breadth belongs.
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+Two remaining gaps rounded out the board. The `wash` runtime crate still isn't published because it has dependencies that themselves aren't published yet. And wasmCloud still needs newer Wasmtime features — notably **instance pooling and reuse** — which is genuinely harder for wasmCloud than for most hosts, because **dynamic linking** is one of the killer features people come for. That one needs design work before it needs code.
 
-### Documentation of the Week
+### Trigger Services and Cross-Store P3 Values
 
-- [title](/docs/v1/intro)
-  - summary
+Aditya Salunkhe opened the questions with credit to Bailey and Victor Adossi for driving the P3 services and stores work and the host component plugin, then asked for a walkthrough of the new interfaces — specifically the ones exposing component ID and workload ID, and how epoch interruption fits invocation cancellation.
 
-## Community Updates
+Bailey started with **trigger services**. A P2 service only exports `wasi:cli/run`: you call it and it spins up a loop, long-running and long-looped. A **trigger service** has its own exports, and those exports are **P3 exports** — which means the host can make async calls into them and drive separate tasks for the whole workload. Just as important, a trigger service gets **its own store**, giving it a different isolation and lifetime primitive from the individual workload components, which are now ephemeral with their own stores. Bailey and Victor played with several names before settling on "trigger," because the concept is already familiar from serverless computing.
 
-### Tune in…
+Because you can call into it, a trigger service naturally acts as an **ingress** — the shape you'd use to write an API gateway that routes to the individual [components](/docs/overview/workloads/components/) in your workload. That connects directly to the whiteboarding session a few weeks earlier: with `implements`, when several components in a workload all export an HTTP handler, you can do **named routing** across them and across paths to pick the right one. The HTTP-handler side has landed; so has the messaging-handler side, which behaves the way you'd expect.
 
-{/* Add any upcoming events/streams/etc */}
+The next PR in the stack tackles a subtler problem. Services and components are linked over WIT definitions, so P3 types have to cross the boundary — but WIT handles are natively **store-local**. Passing P3 values **across stores** is the cross-store analogue of the dynamic-linking work Aditya did earlier for passing values across components, and it's what makes separate lifetimes between a trigger service and the workloads running against it actually workable.
 
--
+### Host Component Plugins and the Cancellation Threat Model
 
-### Catch up…
+On top of that sits the **host component plugin**: a component that runs at **host tenancy**, provided to all workloads on that host, as a way to add a new capability the platform operator wants surfaced. Bailey's examples were a proprietary "Acme" key-value store, a plugin that calls out to Kubernetes secrets, and a filesystem backed by memory or S3. Her rule of thumb: if you're doing something at layer 7, you can almost certainly write a host component for it; a [native host plugin](/docs/runtime/creating-host-plugins/) is the right answer when you need a hardware-level API. WebGPU was her example of something unlikely to be a host component — though even there, a host component might serialize GPU state into linear memory while a native plugin owns the device interface. It isn't either/or.
 
-{/* Add any blog posts/articles that the community might find interesting */}
+The surprising part is how **little WIT** the feature adds. What it does add — component ID, workload ID, and job/cancellation primitives — exists because of the threat model. A guest component inside a workload is arbitrary compute: third-party code, possibly LLM-generated, definitely untrusted. It might attempt a **JIT bomb**, recursively redoing work in the same spirit as a zip bomb, trying to lock up and seize the host. So the host needs a way to say "you've gone way too long here" — and it needs that to work for native code executing on behalf of the guest, for the guest itself, and for a host component guest.
 
--
+That means cancellation has to **propagate across every hop**: multiple components in a workload, a service in that workload, a host component plugin serving that workload. One participant in the chain needs to be able to stop the bus, and the signal has to travel. The only fully trusted party is the host — and host component plugins, once loaded, become part of that trust surface, because they serve requests on behalf of the host. Which is exactly why the host **validates the identity** of whoever asks for a cancellation. Workload A must have no impact on workload B's work. Identities are consistent within a single host (the surface area here is one host, not the cluster), and once you've triggered an async task — a **job**, in this parlance — that job ID is what gets cancelled and what the cancellation propagates back through.
 
-## Recording
+Bailey deliberately left **epoch interruption** out of this PR: Aditya had already started capturing the epoch side, and she focused on what happens from the host's perspective when something needs to be cancelled. As Aditya put it, host calls aren't cancellable by epoch interruption because they leave the guest — you can only interrupt code running inside the guest. The two halves need to meet in the middle, and Aditya volunteered to drive that.
 
-{/* Automated - No need to adjust this unless automation fails */}
+### Boundaries, Timeouts, and Bounding CPU
 
-<YouTube url="https://www.youtube.com/watch?v=Kwg0mEP_mJQ" />
+Frank Schaffa raised the question that shaped the rest of the call: from a boundaries point of view, isn't there a risk of building a system administrator on top of all this? He drew the distinction between two failure modes — something that isn't responding, and something that's consuming too many resources. What stops a CPU loop from making everything else crash?
+
+Bailey answered in layers. **Timeouts already landed**, as part of the cross-store PR — a lower layer than trigger services and host components — and they cover the slow-trickle stream case, where a stream is kept open by dribbling data through it. Every plugin determines its own timeout (HTTP timeouts look different from messaging timeouts), but a single macro expands the timeout knobs across all of them. For the **CPU-bound** case, epoch interruption is the lever, and it's on the roadmap as its own issue.
+
+Frank's follow-up was about philosophy as much as mechanism: in Kubernetes you set CPU limits on a pod, and if you're careful you never become a bad neighbor. How do you bring that capability across without being too prescriptive? He argued for providing tools rather than a framework — users own the workloads, and given enough monitoring and action capabilities they can manage things at whatever level suits them, without wasmCloud becoming "a micro Kube running in Kube." He pointed at Contour, their ingress, which exposes five-plus separate timeout controls, not one. Bailey agreed on design philosophy — picks and shovels, exposed as knobs, because the range of use cases is impossible to predict up front.
+
+### Epochs vs Fuel, and Where Scheduling Belongs
+
+Victor Adossi drew the technical line. Full CPU-usage tracking and scheduling is out of scope, but the **tunability** Frank wanted could be plumbed through [Wasmtime](https://wasmtime.dev/)'s **epoch interruption**. **Fuel** — the v1 approach, still widely used in the crypto space — ticks down based on instruction counts, and it's the closest thing to real CPU-time switching, but doing it properly means writing a scheduler and controlling resources very tightly. **Epochs** are the v2: timer-based interruptions where Wasmtime hands you a function to run and lets you decide what to do. wasmCloud can supply that function and wire it up ergonomically — enough to keep one component in a workload from running too long, without pretending to be a scheduler.
+
+Bailey added the framing that matters for anyone evaluating the platform: a lot of people arrive assuming gas and fuel are the only tools in the space, and they're expensive precisely because they're doing instruction counting. That cost is worth paying if you're charging customers by CPU count. For the common case — throttling work happening on the CPU — epoch-based instrumentation is far more efficient and close enough. And **scheduling is explicitly out of scope for Wasmtime**; it's wasmCloud's purview, to be solved inside the host.
+
+Victor also separated Frank's second concern: running *too many* things is a distinct problem from running one thing too long. Overload lands you in classic M:N threading territory — if [Tokio](https://tokio.rs/) can make progress, wasmCloud can make progress, absent deadlock. Bailey's honest assessment of today's behavior: it isn't where she wants it. The metrics exist — host metrics are surfaced and visible [via OTel](/blog/otel-observable/) — but nothing stops scheduling. What actually happens is the host OOMs and work gets rescheduled on a different host, which isn't the outcome anyone wants. Surfacing these signals to the scheduler — the [runtime operator](/docs/kubernetes-operator/) — is, in her words, a great candidate for this quarter.
+
+Configuration is a big part of the answer too. wasmCloud defaults to Wasmtime's **pooling allocator**, which is the right choice when you're running AOT-compiled workloads server-side and pre-allocating memory pools — and the wrong choice in a low-memory environment, where [a custom host](/docs/runtime/building-custom-hosts/) would be built without it. Bailey noted that Wasmtime's documentation on epochs and execution has gotten genuinely good and is worth reading if you want to understand the dimensions involved.
+
+### Service Discovery, Loading Host Components, and 2.6
+
+Frank also asked whether there's a document laying out the use cases for services and API gateways. Not yet — Eric Gregory is writing **reference architectures** covering all of it, and the underlying features only landed the day before, which is what he needed to start. On **service discovery**, Bailey's position is that it should stay at the **workload** level: a workload is the pod-like unit the outside world routes to, and [Kubernetes](/docs/kubernetes-operator/) already provides discovery natively — the operator creates virtual services, path-based routing, and the rest. The trigger service is the in-workload API gateway for shared middleware — caching on ETag headers, circuit-breaker patterns — that everything behind it would otherwise duplicate. She floated a moonshot to close the topic: a wasmCloud host in an **Envoy sidecar** doing xDS service discovery over Wasm. Victor asked her to write it up as an issue rather than resolve it live.
+
+Then the practical question: how do you actually load a host component on a host? The answer is **YAML and OCI**, as part of the host definition. Bailey walked an end-to-end test that stages a host with the Acme KV store plugin image, schedules a workload whose YAML declares a dependency on an interface nobody else knows about, and drives work through curl calls into the component, which then talks to the host component plugin — including the cancellation paths. Everything is behind a **feature flag**. The Go-side E2E tests use **[Ginkgo](https://onsi.github.io/ginkgo/)** for assertions and setup, which is what gives the suite its "before all" structure.
+
+Jeremy Fleitz asked whether that lands when 2.6 is cut. Bailey's answer: much of the stack is already feature-quality even before host components land, so a 2.6 could go out now — the last release was a patch with badly needed P3 bug fixes and a `wasm-tools` rev. But without the loading PR you can only run host components in tests, not at the host level, so she'd rather give it another day or two. Jeremy noted that once it merges to `main` it's in **canary** and usable regardless; Bailey confirmed the release train runs every two weeks and the release itself is push-button. Her real gate is social, not technical: she wants **somebody other than her** to have built a host component before the feature stabilizes. The draft PR was around 17,000 lines, with two more PRs stacked since, and she wants it rock solid.
+
+Aditya asked about deferring **artifact precompile** until after 2.6 — agreed, that's all anyone can focus on right now. `implements` will probably be fully part of 2.6. **External ID** got plumbed through to Wasmtime the day before but landed on `main` too late for Wasmtime 47, so the plan is the same trick used for 46: add the one commit as a patch on top of 47 so wasmCloud can exercise it fully. External ID sits behind the same [component model](/docs/overview/workloads/components/) feature flag as `implements`, because they're part of one larger feature — associative metadata attached to a signature. `implements` provides the named alias; **external ID** is the not-type-checked, ride-along string annotation (alongside `@since` and `@unstable`) that platform operators keep asking for. It's already in the latest `wasm-tools`. **August 4** is when WASI 0.3.1 goes out, and as of the call both `maps` and `implements` looked set to be considered stable in that release.
+
+### Demo: A Static Site as a WebAssembly Component
+
+Mike Williamson closed the call with a demo he described as a brute-force learning dive into wasmCloud: running it himself, understanding the plumbing, and then figuring out how to build the kind of thing he'd want to encourage others to build. He started from **[rsbuild](https://rsbuild.dev/)** — a fast way to stand up a JavaScript project skeleton — installed dependencies and ran `npm run build`, which compiles everything into a folder of static files in `dist/`.
+
+That's exactly where his problem started. In the container world, the next step is packing `dist/` into a container image and deploying it GitOps-style; he had no mental model for the equivalent here. The solution was a post-build step that compiles the whole folder into a **`.wasm` component**, wired into `package.json` as a post-build script. Now `npm run build` produces the static files, the post-build step produces a component, and [`wash dev`](/docs/wash/) runs it. The component embeds both the assets *and* a very simple static file server. Mike's question to the room was about the trade-offs: what are the performance implications, and at what bundle size does this approach become a source of regret?
+
+Victor's answer was enthusiastic. wasmCloud had a version of this roughly two years ago, but it was harder to use and capped the bundle at around five megabytes — this is much better. You get a component that is a static file server, you load in the files you want to serve, and a component comes out quickly. He argued it's more useful now than ever, with people using LLMs to whip up single-page sites and small websites, and offered a name: **the Wasm web bundler**.
+
+The more interesting thread was what comes after websites. Victor's point is that **Wasm as a packaging medium** is broadly underexplored: XLSX, Word documents, PDFs, and CSVs are all data-packaging mechanisms that require you to bring your own extraction tool. If the artifact shipped its own engine — imagine a Parquet file that is also the Parquet reader — you'd have one binary you interact with to get the data out. He drew the LLM implication explicitly: teaching a model to handle CSV or XLSX takes very specific training, but calling a typed function in a binary does not. `get-row(2)` on a `csv.wasm` returning a record is, in his words, on nobody's radar right now.
+
+Bailey rounded out the options. For a genuinely large site, push static assets to a **CDN** and keep the file handler on the Wasm side; [WASI HTTP](https://wasi.dev/) handlers are already made very efficient by host runtimes, and there's more to do around caching static assets. Most CDNs — Azure's edge CDN included — have built-in Wasm today, but mostly for compute; they haven't yet bridged it to the CDN side, though she's heard those teams talk about it. Two supported alternatives she flagged: [volume mounts](/docs/kubernetes-operator/operator-manual/filesystems-and-volumes/), so a PVC can back the assets, and WASI blob store over S3, with the logic staying in the `.wasm`. Her caveat on the first: she isn't one to jump in and run NFS on Kubernetes, so she wouldn't recommend it to others. For the case Mike and Victor were actually discussing — a small site vibed out in an afternoon — bundling is perfect.
+
+Liam Randall added the second-order benefit: because the output is a single OCI artifact, you can **sign it**, which gives you a measure of immutability over the whole collection of inputs and outputs — the same kind of immutability you'd normally associate with a Git commit, now applied to the deployed artifact. Organizations that need to attest "we ran exactly this collection of inputs and outputs" get that in one artifact. Bailey closed the loop: the same exact binary you validated and tested locally and in CI runs in every environment you deploy to, whether that's ARM or x86, and very few platforms can honestly say that.
+
+## WebAssembly News and Updates
+
+The through-line of this call is the same one running through the broader [WebAssembly](https://webassembly.org/) ecosystem right now: the [component model](https://component-model.bytecodealliance.org/) is far enough along that the interesting questions have moved from "can components talk to each other" to "how do you *govern* components that talk to each other." Epoch interruption, cross-store cancellation with identity validation, per-plugin timeouts, and host-tenancy plugins are all platform-level concerns that only become tractable once the composition story is solved. On the spec side, WASI 0.3.1 lands **August 4** with `maps` and `implements` expected stable, and the external ID annotation has already shipped in [`wasm-tools`](https://github.com/bytecodealliance/wasm-tools) with Wasmtime support on `main`. For ongoing **webassembly news**, follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [wasmCloud blog](/blog/).
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is the production substrate for **WebAssembly on Kubernetes** and at the edge.
+
+## Topic Deep Dive: Epoch Interruption and CPU Bounds for WebAssembly on Kubernetes
+
+If you run **WebAssembly on Kubernetes**, you inherit a set of expectations from the container world: a pod declares CPU limits, the kubelet enforces them, and a runaway process gets throttled rather than starving its neighbors. Wasm doesn't give you that for free. A component executing a tight loop inside a [Wasmtime](https://wasmtime.dev/) store isn't a separate OS process the kernel can deschedule — it's work on a thread inside the host. That's the gap Frank Schaffa was pointing at, and the reason **epoch interruption** appears twice on the wasmCloud Q3 roadmap: once for cancellation, once for yielding long-running work.
+
+The mechanism itself is deliberately cheap. Fuel-based metering counts instructions and gives you precise accounting — necessary if you're billing by CPU, as many crypto workloads do — at a cost you pay on every instruction. Epochs instead let the embedder bump a counter on a timer; when a store's epoch deadline passes, Wasmtime calls back into the host, which decides whether to yield, keep going, or trap. wasmCloud can plumb that callback through so a component that has run too long inside a workload gets interrupted, without anyone writing a general-purpose scheduler. What epochs cannot do is interrupt work that has left the guest — a host call, a native [plugin](/docs/runtime/creating-host-plugins/) invocation, a GPU operation — which is precisely why the host-component cancellation work exists, and why Aditya Salunkhe's epoch work and Bailey's host-side cancellation have to meet in the middle. Above both sits the layer that's still missing: today an overloaded host OOMs and the [operator](/docs/kubernetes-operator/) reschedules the work elsewhere. Surfacing throttling metrics — already visible [through OTel](/blog/otel-observable/) — to the scheduler is what turns interruption into real resource governance for **WebAssembly on Kubernetes**.
+
+## Who Should Watch This
+
+**Platform engineers and SREs** running multi-tenant workloads should watch the boundaries discussion end to end, from Frank's first question about CPU loops ([25:39](https://youtu.be/Kwg0mEP_mJQ?t=1539)) through the epochs-versus-fuel explanation ([31:42](https://youtu.be/Kwg0mEP_mJQ?t=1902)) and the pooling-allocator and scheduling segment ([36:40](https://youtu.be/Kwg0mEP_mJQ?t=2200)). **Host and plugin authors** — anyone thinking about extending a wasmCloud host with a new capability — want the host-component-plugin walkthrough and its threat model ([20:18](https://youtu.be/Kwg0mEP_mJQ?t=1218)) plus the YAML-and-OCI loading demo ([40:21](https://youtu.be/Kwg0mEP_mJQ?t=2421)). And **frontend and JavaScript developers** curious about what Wasm offers beyond the browser should jump straight to Mike Williamson's static-site-to-component demo ([49:50](https://youtu.be/Kwg0mEP_mJQ?t=2990)) and the packaging-medium conversation that follows it ([56:02](https://youtu.be/Kwg0mEP_mJQ?t=3362)).
+
+## Up Next
+
+The near-term list is concrete. The cross-store P3 PR and the host-component loading PR should land within days, at which point a **2.6** release becomes a maintainer decision rather than a blocker — and until then everything is available in **canary** on merge to `main`. Expect a patch of the external ID annotation onto Wasmtime 47, following the pattern used for 46, ahead of **WASI 0.3.1 on August 4** with `maps` and `implements` stable. Aditya Salunkhe is driving the epoch-interruption half of cancellation to meet Bailey's host-side half; artifact precompile is parked until after 2.6. Eric Gregory's **reference architectures** for services, trigger services, and host components are being written now that the features exist, and Bailey owes the community an issue on the Envoy-sidecar xDS idea. On the community side, the "are we polyglot yet" dashboard and the **wasmCloud Contrib** expansion both need volunteers.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-07-15-community-meeting-transcript/)**
