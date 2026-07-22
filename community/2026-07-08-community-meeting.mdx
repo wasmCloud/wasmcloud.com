@@ -1,0 +1,228 @@
+---
+date: '2026-07-08'
+title: 'The wasmCloud Q3 Roadmap: Build Stuff, Agentic AI, and Platform Engineering Reference Architectures'
+description: 'Platform engineering meets the wasmCloud Q3 roadmap: WASI Preview 3 shipped, agentic AI and MCP move up, plus host components and NATS queue groups.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - platform engineering
+  - internal developer platform
+  - wasmcloud roadmap
+  - agentic ai
+  - host components
+  - wasi p3
+  - nats queue groups
+  - webassembly news
+chapters:
+  - { seconds: 20, label: "Welcome and the Q2 roadmap retrospective: WASI P3, implements, SQLx" }
+  - { seconds: 288, label: "Agentic AI moves into Q3, community contributions, and the new board" }
+  - { seconds: 528, label: "Q3 themes: build stuff, agentic AI, WASI WebGPU, long-running compute" }
+  - { seconds: 793, label: "Language priorities and the case for a C++ SDK" }
+  - { seconds: 1012, label: "Async callbacks, cooperative threads, and the upstream WASI timeline" }
+  - { seconds: 1108, label: "Bharat's full-stack WASI P3 application and language choice" }
+  - { seconds: 1247, label: "The wstd P3 edition and what actually makes a component a service" }
+  - { seconds: 1545, label: "The service TCP template" }
+  - { seconds: 1584, label: "Do workloads need multiple services? Reactors and composition" }
+  - { seconds: 1902, label: "Exploded components and OCI layer deduplication" }
+  - { seconds: 2140, label: "Cryptography, wstd, and Rust ecosystem gaps" }
+  - { seconds: 2301, label: "C# runtime, wit-bindgen, and componentize-dotnet" }
+  - { seconds: 2587, label: "Are we polyglot yet? Streaming examples and wash new templates" }
+  - { seconds: 2688, label: "Host components: extending a wasmCloud host without recompiling" }
+  - { seconds: 2845, label: "NATS queue groups, autoscaling, and messaging interface design" }
+  - { seconds: 3317, label: "Reference architectures and enterprise application patterns" }
+  - { seconds: 3663, label: "Wrap-up: turning the roadmap into tickets" }
+image: https://i.ytimg.com/vi/Jxo4-4kFuTE/maxresdefault.jpg
+duration: 3782
+showTitle: true
+slug: 2026-07-08-community-meeting
+speakers:
+  - bailey-hayes
+  - colin-murphy
+  - jeremy-fleitz
+  - aditya-salunkhe
+  - yordis-prieto
+  - bharat
+  - eric-gregory
+about: wasmCloud
+mentions:
+  - WASIPreview3
+  - ComponentModel
+  - agenticAI
+  - MCP
+  - NATS
+  - Rust
+  - witBindgen
+---
+
+import YouTube from 'react-player/youtube';
+
+{/* Video hero — the whole point of this page */}
+
+<YouTube url="https://www.youtube.com/watch?v=Jxo4-4kFuTE" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=Jxo4-4kFuTE" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The July 8, 2026 wasmCloud community call is the **Q3 roadmap planning session**. Bailey Hayes opens with a Q2 retrospective — **WASI Preview 3** shipped and is enabled by default, the `implements` feature is essentially complete, and the SQLx example landed along with upstream fixes in mio, Tokio, and socket2 — then hands the board to the community. The number one theme for Q3 is simply **build stuff** on top of wasmCloud, with **agentic AI and MCP** pulled forward, **WASI WebGPU** and long-running compute alongside them, and a strong pull from **platform engineering** teams for reference architectures that explain when a concern belongs in a workload, a service, or a host component. Jeremy Fleitz, Aditya Salunkhe, Yordis Prieto, Bharat, Colin Murphy, and Eric Gregory fill in the rest: polyglot CI tracking, NATS queue groups for autoscaling, exploded components, and a hard argument against generic messaging interfaces.
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **Q2's one big rock shipped** — [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) is enabled by default in the current wasmCloud release, and the dependent work rolled out behind it: the `implements` feature plus a final `external ID` addition that Alex landed in [wasm-tools](https://github.com/bytecodealliance/wasm-tools), which lets you name a host interface so one import can have several backends — Redis and NATS both serving key-value, swappable from the workload deployment
+- **The SQLx example landed, and the Rust ecosystem moved with it** — getting a REST component onto [SQLx](https://github.com/launchbadge/sqlx) meant upstream changes in **mio**, **Tokio**, and **socket2**, so SQLx now builds as a Wasm component out of the box with no forks
+- **Benchmarking is half done** — micro benchmarks run on a dedicated box on every release build and have about six weeks of clean data behind them, which Bailey has been using for host components and services work; **k6 macro benchmarking did not get done** and carries into Q3, along with the cron work
+- **"Build stuff" is the number one Q3 theme** — products, examples, enterprise use cases, user stories, and blog posts on top of wasmCloud, with a community **wasmCloud LLM inference API**, **agentic AI and MCP** pulled forward, **WASI WebGPU** (Mendy is already on the async APIs), GPU metrics, long-running compute via epoch interruption, and host components and services with their own lifetime and store
+- **Rust is tier one, Python and Go are the most-requested, and a C++ SDK is on the list** — JavaScript and TypeScript sit in maintenance mode; the [C++](/docs/wash/developer-guide/language-support/) SDK is blocked on async bindings in `wit-bindgen-cpp` upstream and on picking a common-denominator C++ standard (coroutines or not), with a C SDK a possibility after that
+- **The upstream release train sets the pace** — WASI 0.3.1 lands **August 4** and is expected to carry `maps` and stabilize `implements` (after which wasmCloud just ungates the feature flag); fixed-length lists are essentially done; cooperative threads are rolling out with a pessimistic December 8 date; **async callbacks** matter because browsers want them, but nobody has written the code yet
+- **Host components move dependencies out of tree** — Jeremy proposed demos against [wasmCloud Secrets](/blog/wasmcloud-1.1-brings-secrets-support-and-more-enhancements-for-enterprises/), WASI SPI at the edge, and moving the Couchbase plugin to a host component; Bailey's angle is that host components take dependencies out of the wasmCloud `Cargo.toml`, which matters now that cargo-audit and aggressive dependency revving make in-tree deps churn
+- **Messaging interfaces should be specific, not generic** — Jeremy wants NATS **queue groups** so scaled-up workloads round-robin instead of fan-out-subscribing, enabling NATS-driven autoscaling to match the [KEDA](https://keda.sh/)/HTTP story; Yordis argued forcefully that a lowest-common-denominator messaging interface makes every backend pay the cost and turns wrong config semantics into production outages, and that `wasmCloud NATS` / `wasmCloud Kafka` interfaces with an optional shared second layer are the better shape — Bailey agreed, and noted host components make per-backend interfaces cheap to ship
+
+## Chapters
+
+- [0:20 — Welcome and the Q2 roadmap retrospective: WASI P3, implements, SQLx](https://youtu.be/Jxo4-4kFuTE?t=20)
+- [4:48 — Agentic AI moves into Q3, community contributions, and the new board](https://youtu.be/Jxo4-4kFuTE?t=288)
+- [8:48 — Q3 themes: build stuff, agentic AI, WASI WebGPU, long-running compute](https://youtu.be/Jxo4-4kFuTE?t=528)
+- [13:13 — Language priorities and the case for a C++ SDK](https://youtu.be/Jxo4-4kFuTE?t=793)
+- [16:52 — Async callbacks, cooperative threads, and the upstream WASI timeline](https://youtu.be/Jxo4-4kFuTE?t=1012)
+- [18:28 — Bharat's full-stack WASI P3 application and language choice](https://youtu.be/Jxo4-4kFuTE?t=1108)
+- [20:47 — The wstd P3 edition and what actually makes a component a service](https://youtu.be/Jxo4-4kFuTE?t=1247)
+- [25:45 — The service TCP template](https://youtu.be/Jxo4-4kFuTE?t=1545)
+- [26:24 — Do workloads need multiple services? Reactors and composition](https://youtu.be/Jxo4-4kFuTE?t=1584)
+- [31:42 — Exploded components and OCI layer deduplication](https://youtu.be/Jxo4-4kFuTE?t=1902)
+- [35:40 — Cryptography, wstd, and Rust ecosystem gaps](https://youtu.be/Jxo4-4kFuTE?t=2140)
+- [38:21 — C# runtime, wit-bindgen, and componentize-dotnet](https://youtu.be/Jxo4-4kFuTE?t=2301)
+- [43:07 — Are we polyglot yet? Streaming examples and wash new templates](https://youtu.be/Jxo4-4kFuTE?t=2587)
+- [44:48 — Host components: extending a wasmCloud host without recompiling](https://youtu.be/Jxo4-4kFuTE?t=2688)
+- [47:25 — NATS queue groups, autoscaling, and messaging interface design](https://youtu.be/Jxo4-4kFuTE?t=2845)
+- [55:17 — Reference architectures and enterprise application patterns](https://youtu.be/Jxo4-4kFuTE?t=3317)
+- [1:01:03 — Wrap-up: turning the roadmap into tickets](https://youtu.be/Jxo4-4kFuTE?t=3663)
+
+## Meeting Notes
+
+### Q2 in Review: WASI Preview 3, implements, and SQLx
+
+Bailey Hayes opened by framing the session: nothing had been filed as GitHub issues yet, on purpose — the point was to solicit community feedback and talk through prioritization before the board hardened. She started with the Q2 board. Q2 had exactly one big rock, **[WASI Preview 3](/blog/wasi-p3-on-wasmcloud/)**, and it shipped; P3 is enabled by default in the current wasmCloud release. The work that had been blocked behind it rolled out over the following weeks, most visibly the **`implements`** feature. One last addition to `implements` — an **external ID** — had already landed in [wasm-tools](https://github.com/bytecodealliance/wasm-tools) courtesy of Alex, and will arrive in wasmCloud with the next dependency bump, at which point Bailey considers the feature complete. The payoff is that you can **name the host interface** you want, so a single import can be backed by several different backends: Redis and NATS both serving as your key-value store, swappable and configurable from the workload deployment.
+
+The other Q2 commitment that landed was the **[SQLx](https://github.com/launchbadge/sqlx) example REST component**. Bailey pushed it all the way upstream to LaunchBadge; it did not merge there, but the more important part was never the example. Making SQLx genuinely work end to end through the ecosystem required landing changes in **mio**, **Tokio**, and **socket2** in the Rust ecosystem — so today you can take SQLx off crates.io and build a Wasm component out of the box, no dependency patching required. Given how many people depend on SQLx, that is a meaningful unlock for database-backed [components](/docs/overview/workloads/components/).
+
+Cron work did not get finished and carries over. CI hardening did — Bailey singled out Jeremy Fleitz's integration work — along with a large amount of [OpenTelemetry](/blog/otel-observable/) work. Benchmarking landed in halves: **micro benchmarks** now run on a dedicated box triggered on every release build, with about a month and a half of clean data behind them (Bailey has leaned on them heavily while landing host components and services), but the **k6** macro benchmarking never got done. Her assessment: the infrastructure is in place, so dropping k6 on top of it should now be a small T-shirt size rather than the extra-large it was last quarter.
+
+### The Number One Theme for Q3: Build Stuff
+
+With the retrospective done, Bailey opened a new board scoped to **goals by October 1** and set the tone: aggressive goals, and it is fine not to finish everything — "if you do everything on your roadmap, did you really set aggressive goals?" But if something is already implausible in July, it will not become plausible in August.
+
+Her proposed number one theme is deliberately unglamorous: **build stuff**. Products, examples, things built inside an enterprise — whatever it is, the project wants to know about it, highlight it, and turn it into user stories and blog posts. The argument follows directly from Q2: the whole quarter went into getting WASI P3 out the door, so the obvious question for Q3 is what people can now do with it. She pointed at the previous week's demos from Bharat and others as exactly the kind of thing she wants more of, and noted that **wasmCloud Contrib** is where a lot of that should live — including frameworks like actix running as component workloads, a thread she and Victor had picked up right before the call.
+
+### Agentic AI, WASI WebGPU, and Long-Running Compute
+
+Several themes fold underneath "build stuff." The first is **agentic AI and MCP**, which came up repeatedly in the last roadmap session but was not prioritized for Q2. Bailey wants it pulled forward, including community work on a **wasmCloud LLM inference API** that people can start building against.
+
+The second is **WASI WebGPU**. Mendy is already working on async APIs for WebGPU — as Bailey pointed out, WebGPU is itself an async API, so the correct name for the work is WASI WebGPU — and she added **GPU metrics** to the board alongside it. The third is **long-running compute**, where Aditya Salunkhe's epoch interruption work is the anchor. Bailey's own in-flight items — **host components** and **[services](/docs/overview/workloads/services/) with their own lifetime and store** — go on the board because they are already rolling. And k6 benchmarking, the one Q2 miss, stays near the top.
+
+She also floated a genuine open question to the community: **do workloads need multiple services?** That question dominated the middle of the call.
+
+### Language Priorities and the Case for a C++ SDK
+
+On developer experience, Bailey admitted she rarely talks about Rust for the same reason parents talk about the problem child — Rust is the well-behaved one. But it is tier one: "if we're trying to decide what example to build and we don't have an example of it in Rust, we should build Rust first." The concrete Rust items are Yash's **P3 edition of [`wstd`](https://github.com/bytecodealliance/wstd)** (a two-PR effort, with P3 following about a week behind the first PR) and a refresh pass over Rust examples and templates once the new WASI SDK lands, which she expects within the month.
+
+Beyond Rust, the order of demand she sees in Slack and elsewhere is **Python first, Go second**. JavaScript and TypeScript have a good SDK and mostly need upstream fixes to roll in, so they sit in a maintenance position. The interesting ask is a **C++ SDK** — Bailey wants one, with a C SDK possibly after it, but most of that work has to happen upstream in [wit-bindgen](https://github.com/bytecodealliance/wit-bindgen) and the [Bytecode Alliance](https://bytecodealliance.org/) first. Specifically, `wit-bindgen-cpp` needs async bindings upstreamed, and the project needs to settle a design question: what is the common-denominator C++ standard to depend on? If coroutines are on the table, the SDK can be pleasant; if not, it has to be done the old way.
+
+That thread ran into the Rust ecosystem's own gaps. Colin Murphy noted he does not actually need cryptography work — the Rust crypto crates have worked fine for a year — but that the project needs a strategy for **`reqwest`**, whose philosophy diverges sharply from WASI and the component model. Bailey's short-term answer is to keep pushing on `wstd`, and she noted with some amusement that she got **rustls** compiling as part of the SQLx demo.
+
+### The Upstream Release Train
+
+Because wasmCloud tracks upstream standards closely, Bailey walked the release train. **WASI 0.3.1 is expected August 4**, and she is hoping it carries **`maps`** so the type can be used inside WIT definitions — relevant to several of the interfaces proposed on this very roadmap. `implements` should stabilize in the same release, after which wasmCloud's job is simply to **ungate the feature flag**. **Fixed-length lists** are largely complete upstream with multiple implementations.
+
+Two items sit further out. **Cooperative threads** are rolling out well and already exist in a WASI SDK, but Bailey's slide carries a pessimistic **December 8** date, because getting two languages building with cooperative threads and fully threading it through [Wasmtime](https://wasmtime.dev/), a second reference implementation, wasm-tools, and the twenty-odd crates in the ecosystem simply takes time. **Async callbacks** — which Colin flagged as a lot of people's favorite — are not on the slide at all, for the blunt reason that nobody has written the code yet. Bailey stressed they are strategically important because callbacks are what **browsers** are asking for, and the project badly wants browsers building on the [component model](/docs/overview/workloads/components/). wasmCloud's own dependent work would ship behind a feature flag until the upstream piece exists.
+
+### A Full-Stack WASI P3 Application
+
+Bharat, who demoed a transcription component on the previous call, is building a **full-stack application on the WASI P3 stack** — a UI plus agentic capabilities where one component produces a transcription and an LLM summarizes the output. His first question was about language choice. Bailey's answer: with LLMs in the loop, language matters much less than it used to, because people care about outcomes — fastest, most efficient, safest — and by those measures Rust leads across the board. Plenty of enterprises have incumbent Go or Java codebases and genuinely need their language, but the current tide runs toward Rust.
+
+His second question was sharper and produced the most useful clarification of the call: does using the `wstd` HTTP-server macro make a component a **service**? No. The macro changes the component's exported handler to the HTTP handler export (P2 only today), and thanks to how `wstd` is written, moving to P3 should be transparent — a Cargo dependency bump swaps the P2 HTTP handler for the P3 one without touching the code. What actually makes something a service is the **[`wash`](/docs/wash/) config** for that example. Bailey walked the distributed HTTP API template to show it: one component carries the HTTP handler, two more serve over the wasmCloud messaging API, and the first acts as a router between components that share an export. Jeremy chimed in to point Bharat at the **service TCP template** in the wasmCloud repo, which Aditya had dropped in chat — it demonstrates almost exactly the HTTP-front-end-to-service shape Bharat was building.
+
+### Do Workloads Need Multiple Services?
+
+Aditya Salunkhe took up Bailey's open question and made the case for **multiple services per workload**: what if you want a service that starts automatically via `wasi:cli/run` *and* has an export, rather than choosing one or the other?
+
+Bailey's in-flight PR — the one she calls **reactors**, while acknowledging the name is a little silly because every component is a reactor — already supports the either/or shape. The workaround for the "both" case today is **composition**: take a GitHub API handler and an HTTP API gateway, compose them into one component, and you get a single service in the workload with an export on HTTP, an export on the GitHub API, and a `wasi:cli/run` export for the long-running loop. The upside of that shape is one entry point per workload, which wasmCloud can reason about. The difficulty, as Aditya pressed on, is which export you actually target when two services both declare the same one — Bailey's honest answer was that she does not know, and that this is a feature she *could* add but probably should not without a strong motivating use case. It is not possible under P2; it is possible under P3 and the concurrency work already done.
+
+### Exploded Components and OCI Layer Deduplication
+
+The last item Bailey floated herself was **exploded components** — one component per **[OCI](/docs/overview/packaging/) layer** instead of a single monolithic `.wasm`. A component is fundamentally a tree, and each node in that tree is individually addressable and individually versioned in a registry. If each one lands in its own OCI layer, the registry deduplicates them for free: you stop downloading **CPython** once per Python component across a host running a hundred of them.
+
+The motivation is language support. For Python, JavaScript, and anything else where "support" means compiling an interpreter or runtime into WebAssembly, exploded components deduplicate that runtime both in **distribution** (fewer bytes pulled from the registry) and in **what the host loads**. Today it is one box and one layer. Bailey put it on the board as a maybe — worth exploring this quarter, more likely the quarter after unless the community pushes for it.
+
+### Are We Polyglot Yet? Streaming and wash Templates
+
+Jeremy Fleitz's first set of items was about **language adoption**. With P3 landed, he expects languages — Go proper and Python especially — to mature quickly on WebAssembly compilation, and he wants the equivalent of the old "are we fast yet" trackers: an **"are we polyglot yet"** page backed by CI, verifying on every build which languages compile and work. The user-facing value is confidence: when wasmCloud 2.6-point-whatever ships, a Python developer should be able to see at a glance that their application still works.
+
+His other two items follow from the same thread. **Streaming** deserves demos and examples now that WebAssembly has real streaming capabilities, giving people a starting point for streaming applications. And **[`wash new`](/docs/wash/commands/) and `wash build`** should carry ready-to-go templates per language — a Python-style template you can scaffold and build without assembling it yourself.
+
+### Host Components: Extending a Host Without Recompiling It
+
+Jeremy's bigger item was **host components**, which Bailey expects to support very soon. Like [host plugins](/docs/overview/hosts/plugins/), they extend a wasmCloud host — but without recompiling the whole host. Jeremy wants the capability demonstrated rather than merely shipped: how it works with **wasmCloud Secrets**, how it works at the edge with **WASI SPI** (a spec recently reviewed by the W3C group), and possibly by moving the **Couchbase** plugin from a host plugin to a host component. He floated a lifecycle model worth repeating: start every extension as a host component, and promote it to a [host plugin](/docs/runtime/creating-host-plugins/) only once it matures or gets enough users.
+
+Bailey's angle on host components is about **dependency hygiene**. Q2 put a lot of work into cargo-audit and aggressive dependency revving in the wasmCloud repo, which is excellent for security and terrible for churn. Host components move those dependencies **out of tree** — out of the wasmCloud `Cargo.toml` entirely — so an integration can be grabbed, revved, and maintained independently of the host. Adding a favorite library or framework no longer means adding it to the monorepo.
+
+### NATS Queue Groups, Autoscaling, and Messaging Interface Design
+
+Jeremy's second item was the most contested. A few weeks earlier the team demonstrated autoscaling with **[KEDA](https://keda.sh/)** on incoming HTTP requests, which gives wasmCloud a solid HTTP autoscaling story. The [NATS](/docs/overview/transport/) story is weaker: wasmCloud Messaging currently issues a plain subscribe, so scaling a backend workload to ten replicas fans the same message out to all ten. That is sometimes what you want — but NATS has **[queue groups](https://docs.nats.io/nats-concepts/core-nats/queue)**, which round-robin delivery so exactly one subscriber in the group handles each message. That is the primitive you need for NATS-driven autoscaling and for transactional deployments.
+
+Bailey's worry was interface design: queue groups look very NATS-specific and might be hard to massage into something generic like wasmCloud Messaging, which deliberately landed on plain pub/sub with no queuing concept. She asked Aditya about the **NATS-native WIT definition** he had once spiked on. Yordis Prieto argued the general case hard: Kafka has consumer groups, Pulsar and RabbitMQ have their own equivalents, and while an identifier for "this group of workers should handle each message exactly once" is a plausible common denominator, the rest is not. In his framing, everything is specific until you *observe* what is common — and a generic interface makes every backend pay for the abstraction. Worse, when configuration semantics differ between backends, getting the config subtly wrong is not a compile error; it is a production outage with data loss and real liability. His recommendation was explicit per-backend interfaces — **wasmCloud NATS Messaging**, **wasmCloud Kafka** — with an optional second layer sharing whatever types genuinely overlap.
+
+Bailey said that matched her intuition, and made the connection back to the previous topic: **host components make per-backend interfaces cheap**. Because such an interface no longer has to live in the host, the project can rev it independently, explore several designs, and avoid breaking everyone while doing it.
+
+### Reference Architectures for Platform Engineering Teams
+
+Bharat asked what "reference architectures" on the board actually means, which opened the last major discussion. Bailey listed the recurring requests: "how did you all do it" walkthroughs, **how to run MCP servers**, and — the big one — a real **enterprise application architecture**, the WebAssembly answer to the pet store.
+
+His follow-up was the question every architect asks first: should a full-stack application be all components in one workload, or several workloads? Bailey's answer was that the project owes people *both* answers plus a decision framework. Components belong in the **same workload** when they scale together, deploy together, and share resources. They belong in **separate workloads** whenever you would have reached for a separate container or microservice — different lifetimes, different scaling requirements, different RBAC. At enterprise scale, she expects the shape to be hundreds of essentially serverless apps, with a **platform engineering** team (or the middleware services team, depending on the company) owning the cross-cutting concerns: authorization, authentication, logging, auditing.
+
+Those concerns raise the second decision: **service or host component?** Bailey's rule of thumb is that something should be a [service](/docs/overview/workloads/services/) when you want it **workload-tenanted**, and a host component when it must apply to everything on the host — a distinction the [plugin-or-service recipe](/docs/recipes/plugin-or-service/) already starts to map and that these reference architectures need to make concrete. Eric Gregory, who contributed most of the reference-architecture ideas on the board, confirmed the priorities: the **polyglot enterprise application** use case first, then how to run MCP servers, and generally filling a gap that has been open in the docs for a while.
+
+Bailey closed by noting that she would not run dot voting on this board, because nearly everything on it rolls up under "build stuff" — enablement work like reference documentation, examples, and templates that show people (and, increasingly, agents) what already works in WebAssembly today. Her commitment: convert the session into GitHub issues on the project board by the end of the week. Jeremy volunteered to help.
+
+## WebAssembly News and Updates
+
+The clearest **webassembly news** signal in this call is how much of wasmCloud's roadmap is now paced by the upstream release train rather than by the runtime itself. WASI 0.3.1 on August 4 is expected to carry `maps` and stabilize `implements`; fixed-length lists are effectively done across implementations; cooperative threads are moving through [Wasmtime](https://wasmtime.dev/), a second reference implementation, [wasm-tools](https://github.com/bytecodealliance/wasm-tools), and the surrounding crates with a December date pencilled in; and async callbacks — the feature browsers are asking the [Bytecode Alliance](https://bytecodealliance.org/) for — remain unwritten. Meanwhile the language story keeps moving: [componentize Go](https://github.com/bytecodealliance/go-modules) picked up a fresh walkthrough in the [component model book](https://component-model.bytecodealliance.org/), the `wstd` P3 edition is a PR away, and [componentize-dotnet](https://github.com/bytecodealliance/componentize-dotnet) plus [wit-bindgen](https://github.com/bytecodealliance/wit-bindgen) remain the gating path for C# and C++.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and deploying them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more — while the platform supplies capabilities like HTTP, messaging, key-value storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI P3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a practical substrate for **WebAssembly on Kubernetes** and at the edge, and a credible foundation for **platform engineering** teams building an internal developer platform on typed, sandboxed components instead of container images.
+
+## Topic Deep Dive: Services, Host Components, and Platform Engineering Architecture
+
+The most consequential thread on this call was not a feature at all — it was the taxonomy question that runs underneath everything on the Q3 board. When a **platform engineering** team builds an internal developer platform on wasmCloud, every cross-cutting concern (authn, authz, logging, auditing, secrets, messaging backends) has to land in one of three places: inside the application **workload**, as a **[service](/docs/overview/workloads/services/)**, or as a **host component**. The call converged on a usable rule. Put components in the same workload when they scale together, deploy together, and share resources; split them into separate workloads exactly when you would have reached for a separate container — different lifetimes, different scaling, different RBAC. Make something a **service** when it should be **workload-tenanted**: it has its own lifetime and store, it serves the components in that one workload. Make something a **host component** when it must apply to **everything on the host**, and when you want its dependencies out of the wasmCloud tree entirely.
+
+That last clause is why host components matter more than they first appear. wasmCloud spent Q2 hardening supply-chain practice — cargo-audit, aggressive dependency revving — and the cost of that discipline is churn in the monorepo. A host component keeps an integration's dependencies out of the host's `Cargo.toml`, so it can be revved and maintained on its own cadence. That mechanic is what made the messaging debate tractable: if per-backend interfaces like `wasmCloud NATS` and `wasmCloud Kafka` had to live in the host, shipping several of them would be prohibitive; as host components they are cheap enough to explore, iterate, and even get wrong without breaking everyone downstream. The [plugin-or-service recipe](/docs/recipes/plugin-or-service/) and the [host plugins](/docs/overview/hosts/plugins/) docs cover today's version of this decision; the Q3 reference architectures are meant to turn it into guidance an architect can hand to a team.
+
+## Who Should Watch This
+
+This call is for three audiences. **Platform engineers and architects** evaluating wasmCloud for an internal developer platform should watch the reference-architecture discussion on same-workload versus separate-workload and service versus host component ([55:17](https://youtu.be/Jxo4-4kFuTE?t=3317)). **Contributors and maintainers deciding where to spend Q3** should watch the theme walkthrough and the upstream release train ([8:48](https://youtu.be/Jxo4-4kFuTE?t=528) and [13:13](https://youtu.be/Jxo4-4kFuTE?t=793)) — that is where language priorities, the C++ SDK blockers, and the WASI 0.3.1 dates are laid out. And anyone **designing capability interfaces** — messaging, queuing, or otherwise — should watch the queue-group debate ([47:25](https://youtu.be/Jxo4-4kFuTE?t=2845)), which is a compact, well-argued case against lowest-common-denominator abstractions.
+
+## Up Next
+
+Bailey committed to converting this session into GitHub issues on the wasmCloud [project board](https://github.com/orgs/wasmCloud/projects) by the end of the week, with Jeremy helping — so the next calls should track a concrete Q3 board rather than a whiteboard. Expect the `implements` external ID to be threaded through and its issue closed, the `wstd` P3 edition to land and trigger a refresh of the Rust examples and templates, host components to ship along with the reactor PR built on top of them, and Bharat to report back on his full-stack P3 application once the UI and agentic summarization pieces are working. Bailey also picked up his WASI P3 async handler bug from Slack, which looked like a legitimate issue.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-07-08-community-meeting-transcript/)**
