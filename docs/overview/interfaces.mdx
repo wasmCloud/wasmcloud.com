@@ -31,7 +31,7 @@ platforms: [wasmCloud, Kubernetes]
 
 In wasmCloud, [components](./workloads/components.mdx) communicate through interfaces, which come in two kinds:
 
-* **Well-known interfaces** are common standards (such as [WebAssembly System Interface (WASI) APIs](#wasi-interfaces)) or wasmCloud interfaces (core functionalities like `wasmcloud-messaging`) supported out-of-the-box by wasmCloud hosts.
+* **Well-known interfaces** are common standards (such as [WebAssembly System Interface (WASI) APIs](#wasi-interfaces)) or wasmCloud interfaces (core functionalities like `wasmcloud:messaging`) supported out-of-the-box by wasmCloud hosts.
 * **Custom interfaces** are user-created contracts that make it possible to extend and tailor how wasmCloud components and providers interact with one another.
 
 In all cases, wasmCloud interfaces are defined using the interface description language **WebAssembly Interface Type (WIT)**.
@@ -135,6 +135,8 @@ In spite of the name, WIT isn't limited to WebAssembly: wasmCloud also uses WIT 
 
 wasmCloud supports interfaces belonging to [WebAssembly System Interface (WASI)](https://wasi.dev/) P2 (also known as WASI 0.2 / P2) in addition to a selection of interfaces proposed for inclusion in WASI, and interfaces belonging to the wasmCloud host.
 
+Starting in wasmCloud 2.5.0, the runtime also ships WASI 0.3 (P3) support alongside P2 — including `wasi:http` and `wasi:cli` at 0.3.0 and the P3 `wasi:sockets` interfaces — so components may target either P2 or P3 worlds. See [WASI 0.3 in the Runtime section](../runtime/index.mdx#wasi-03) for the current P3 surface.
+
 ### WASI interfaces
 
 [WASI P2 includes these APIs](https://github.com/WebAssembly/WASI/tree/main/preview2#wasi-preview-2-contents), all available for use with wasmCloud 2.0:
@@ -160,9 +162,14 @@ Additionally, wasmCloud supports proposed WASI APIs that are in the process of i
 | API                                           | Versions    |
 | --------------------------------------------- | ----------- |
 | https://github.com/WebAssembly/wasi-blobstore | 0.2.0-draft |
+| https://github.com/WebAssembly/wasi-config    | 0.2.0-rc.1  |
 | https://github.com/WebAssembly/wasi-keyvalue  | 0.2.0-draft |
 | https://github.com/WebAssembly/wasi-logging   | 0.1.0-draft |
+| https://github.com/WebAssembly/wasi-otel      | 0.2.0-rc.2  |
 | https://github.com/WebAssembly/wasi-tls       | 0.3.0-draft |
+| https://github.com/WebAssembly/wasi-webgpu    | 0.0.1       |
+
+`wasi:webgpu` support ships in default `wash-runtime` builds via the `wasi-webgpu` Cargo feature, with the implementation provided by the [wasi-gfx](https://github.com/wasi-gfx/wasi-gfx-runtime) project; the proposal itself is early-stage and its WIT surface may change substantially.
 
 :::info[wasi-tls]
 `wasi:tls` (added in wasmCloud 2.2) lets components terminate TLS connections themselves over `wasi:sockets` using the WASI Preview 3 `wasi:tls/client` and `wasi:tls/types` interfaces. Support is opt-in via the `wasi-tls` Cargo feature on `wash-runtime` while the upstream WIT stabilizes. Embedders can register a custom TLS provider through `EngineBuilder::with_tls_provider` — see [Building Custom Hosts](../runtime/building-custom-hosts.mdx#tls-for-wasitls-components) for details.
@@ -170,15 +177,27 @@ Additionally, wasmCloud supports proposed WASI APIs that are in the process of i
 
 ### wasmCloud interfaces
 
-Well-known interfaces include two APIs built specifically for wasmCloud:
+Well-known interfaces include six APIs built specifically for wasmCloud:
 
-| API                                                                              | Versions    |
-| -------------------------------------------------------------------------------- | ----------- |
-| [wasmcloud:bus](https://github.com/wasmCloud/wasmCloud/tree/main/wit/bus)        | 1.0.0       |
-| [wasmcloud:messaging](https://github.com/wasmCloud/messaging)                    | 1.0.0       |
+| API                                                                                        | Versions    | Interfaces |
+| ------------------------------------------------------------------------------------------ | ----------- | ---------- |
+| [wasmcloud:messaging](https://github.com/wasmCloud/wasmCloud/tree/main/wit/messaging)      | 0.2.0       | `consumer`, `handler`, `types` |
+| [wasmcloud:keyvalue](https://github.com/wasmCloud/wasmCloud/tree/main/wit/keyvalue)        | 0.1.0       | `store`, `atomics`, `batch`, `cas`, `watcher`, `types` |
+| [wasmcloud:blobstore](https://github.com/wasmCloud/wasmCloud/tree/main/wit/blobstore)      | 0.1.0       | `blobstore`, `container`, `types` |
+| [wasmcloud:postgres](https://github.com/wasmCloud/wasmCloud/tree/main/wit/postgres)        | 0.1.1-draft (sync), 0.2.0 (async) | `query`, `prepared`, `types` |
+| [wasmcloud:host](https://github.com/wasmCloud/wasmCloud/tree/main/wit/host)                | 0.1.0       | `identity`, `cancel` |
+| [wasmcloud:secrets](https://github.com/wasmCloud/wasmCloud/tree/main/wit/secrets)          | 1.0.0       | `store`, `reveal` |
 
-* **`wasmcloud:bus`** provides advanced link configuration only available in wasmCloud.
-* **`wasmcloud:messaging`** facilitates communication through message brokers.
+* **`wasmcloud:messaging`** facilitates communication through message brokers: `consumer` for publishing and request/reply, `handler` for receiving deliveries. A service that exports `wasmcloud:messaging/handler@0.2.0` receives messages through the [messaging ingress](./hosts/trigger-services.mdx#messaging-ingress).
+* **`wasmcloud:keyvalue`** is the async-shaped key-value package (see the callout below), extending `wasi:keyvalue` with TTL on `set`, compare-and-swap, batch operations, and typed errors. A `watcher` interface is defined in the package, but watch delivery is not yet implemented by the runtime plugin. Runtime support for the package is carried by `wash-runtime` builds with the `wasm_component_model_implements` Cargo feature (the canary images; not the default release build) — see [Host Interfaces](../kubernetes-operator/crds.mdx#host-interfaces) for the feature-flag details.
+* **`wasmcloud:blobstore`** is the async-shaped blob/object storage package, the streaming counterpart to `wasi:blobstore`. Runtime support carries the same `wasm_component_model_implements` feature requirement as `wasmcloud:keyvalue`.
+* **`wasmcloud:postgres`** provides direct PostgreSQL access — one-shot `query`, `prepared` statements, and shared `types` — in a sync (`0.1.1-draft`) and an async (`0.2.0`) shape, both served by the built-in Postgres [host plugin](./hosts/plugins.mdx). The async package lives in `wit/postgres`; the sync package is vendored with the runtime.
+* **`wasmcloud:host`** lets [component host plugins](./hosts/plugins.mdx#component-host-plugins) (and other components running as [trigger services](./hosts/trigger-services.mdx)) observe the calls they serve. It provides `identity` (the workload and component IDs of the current caller — for per-caller state partitioning) and `cancel` (cooperative per-invocation cancellation).
+* **`wasmcloud:secrets`** defines opaque-handle access to a secrets backend: `store` looks up a secret as a borrowable resource, and `reveal` gates access to its value so a host can permit lookup and reveal independently. Note that the wasmCloud v2 runtime does not currently implement this interface — in v2 deployments, secrets are delivered through `wasi:config` backed by Kubernetes Secrets (see [Migrating from v1](../migration.mdx)). The package remains published for hosts and tooling that implement it.
+
+You may also encounter `wasmcloud:runtime@0.1.0` in the wasmCloud source: it holds the runtime's own internal world definitions (the typed surfaces of the built-in host plugins), and is not an interface for components to import.
+
+These packages are published as [OCI artifacts](./packaging.mdx) to `ghcr.io/wasmcloud/interfaces/` and indexed in the `wasmcloud` namespace on [wasm.directory](https://wasm.directory/wasmcloud), a community-run meta-registry for WebAssembly packages.
 
 :::info[2.5.0: async `wasmcloud:keyvalue` and `wasmcloud:blobstore`]
 Starting in 2.5.0, `wasmcloud:keyvalue` and `wasmcloud:blobstore` ship async-shaped WIT packages alongside the existing sync interfaces, together with **TTL on `set`**, **CAS** (compare-and-swap), and **typed errors** for missing keys, conflicts, and backend failures. The async packages depend on the `component-model-async` proposal (implied by WASI 0.3).
