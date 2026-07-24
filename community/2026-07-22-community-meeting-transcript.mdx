@@ -1,0 +1,371 @@
+---
+date: '2026-07-22'
+title: 'Transcript: wasmCloud 2.6 Preview: Host Components, Go WebAssembly Components, and AI Inference with Candle and Qwen3'
+description: 'Full transcript of the July 22, 2026 wasmCloud community call covering the 2.6 release, Go WebAssembly components beyond TinyGo, and AI inference with Candle and Qwen3.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - go webassembly
+  - golang wasm
+  - tinygo
+  - host components
+  - wasi preview 3
+  - ai inference
+  - rust webassembly
+  - webassembly news
+image: https://i.ytimg.com/vi/SonOdAF_cco/maxresdefault.jpg
+showTitle: true
+slug: 2026-07-22-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - WASIPreview3
+  - Go
+  - TinyGo
+  - witBindgen
+  - AIInference
+  - Rust
+  - Wasmtime
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-07-22-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=SonOdAF_cco" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=SonOdAF_cco" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+*wasmCloud Weekly Community Call — Wed, Jul 22, 2026 · 59 minutes*
+
+{/* Speakers: Bailey Hayes, Colin Murphy, Liam Randall, Aditya Salunkhe, Jeremy Fleitz, Yordis Prieto, Bharat */}
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:08](https://youtu.be/SonOdAF_cco?t=8)
+
+Hello and welcome to our wasmCloud community call for July 22. We've got three different items on the agenda today. First, I'm going to talk through what we're doing for the upcoming release on Tuesday, which will be wasmCloud v2.6. There's a lot in it, and I'm going to make a call to action at the end of the call. And then we're also going to talk about one of the initiatives that we have for this quarter, which we're now calling "Are We Componentized Yet?" Jeremy's going to talk a little bit about what he started work on there, and then we also have a demo from Bharat, which we'll do right after that.
+
+So, first up: what is going to be in wasmCloud 2.6? I'll just go ahead and share my screen here. First of all, we're landing host components, which is pretty exciting. Finally. There have been a lot of things that have changed between our last release and this one. We've done a ton of work to make host components work — host components is the top-level feature that a lot of people will experience. You'll be able to opt into supplying host plugins that are actually just WebAssembly components. However, there's been a ton of groundwork that's landed as a part of this, and I want to make sure we have a really awesome release. So I'm going to cut a release candidate once I think everything that's going to be in 2.6 is all together on main, and I'll ask folks to give that a shot — make sure it works for your use cases. I think total we're probably talking 25,000 lines of code, which is a lot. So I would appreciate folks jumping in and giving us feedback on where it's at on the RC.
+
+Another thing is that we've done a huge spike just around performance. Our performance host went down for a couple weeks, and so we didn't have performance testing happening after 2.4 — so 2.5 had a performance regression. There it is, big old thing. But good news: it's back down. You can see that I'm frequently running this thing, trying it against a series of different PRs. Liam ran Claude with Fable and found a lot of good stuff, and so we've been dropping in different PRs for each one of those and running against our benchmark suite. If other folks are trying that, we can do a lot of really cool things — when I was dropping in, actually, we don't want to compare against this one because it's already on main. Let's go back a little bit: we can use my Wasmtime worktree to see kind of where we were at. This amounts to just noise, but you can see just between main and the time when I added Wasmtime 47 — so just even yesterday, but early in the day, it didn't have all the performance changes that landed. Wasmtime 47 didn't really make much of a difference, actually, but just a couple of hours on main made a huge difference. So if you ever want to play around and see some of the changes that have been happening, that's an easy way: wasmcloud.github.io, Are We Fast Yet. And obviously, we'll have a couple of runs of these against our release candidates as well.
+
+And yeah, there's more to come there. I also have another PR that'll be up once my Claude tokens reset, for basically having a couple more benchmarks that I want to expose here — because we were testing HTTP invocation throughput, cold and hot, and between P2 and P3, but we weren't testing it for services, so this will add that as well. There's a ton of different stuff that landed just as a part of that. There were several changes around just making it so that the world assumed it was WASI P3.
+
+<img src="/img/community/2026-07-22/image001.webp" alt="The Are We Fast Yet benchmark comparison dashboard showing baseline and compared runs of the wasmCloud bench history, with cold and hot invocation latencies and HTTP throughput metrics between main and a Wasmtime 47 worktree." />
+
+**Bailey Hayes** [4:46](https://youtu.be/SonOdAF_cco?t=286)
+
+So our last release was the first WASI P3 release, and we did go out without requiring a flag to be passed in, but we had a flag smattered around everywhere in comments and everything, and we had lots of things that were like "if it's P2" or "if it's P3" — and I want us to start moving towards a world where everything is just basically P3. So there's a good chunk of that. There were some really great changes coming in from outside contributors, and I understand there were a couple different hackathons against wasmCloud over the past week, so we got a bunch of good bug fixes in as well, which was really exciting and awesome. This one's a `wash dev` fix; there are a few others. This one was the performance regression and getting that back up, and then you can see there's just a ton of different PRs across — we've been beating on this thing quite a bit over the last week and a half.
+
+And oh yeah, another big thing that has landed. Mendy — let me pull this up. We've talked about this on the call before, but I'm just going to give the whole context, so if you're new, you've got it all. wasi-webgpu is a proposal in the WebAssembly WASI space. Mendy is the champion for it, and he started on basically P2, because there was no P3 at the time. He did a translation of the WebIDL definition of WebGPU for the web, and transformed that into a definition that we can use server-side for WASI. There were definitely a couple different kinds of impedance mismatches — the web one assumed there's a canvas, and you can do a bunch of JavaScripty things — so there were a lot of changes necessary to make it work in a WASI context. Well, he has now revved that and cut a release candidate of it for async WASI P3. One cool thing about this change: before, it had a pretty heavy reliance on wasi:io, because P2 — and now it actually is a totally independent world definition that doesn't pull in stuff from WASI. It doesn't need it, because all of that is now part of P3 native async. When we say that, we mean natively supported by the runtime, so it's not in the WIT definition junking it up with how you're doing all of your async concurrency work. So this will also be the first release of that API in the wasmCloud host. Yeah, Colin?
+
+<img src="/img/community/2026-07-22/image002.webp" alt="The merged wasi:webgpu 0.3.0-rc.2 pull request from Mendy Berger, updating the proposal for async WASI P3 and dropping the wgpu dependency from the examples." />
+
+**Colin Murphy** [7:41](https://youtu.be/SonOdAF_cco?t=461)
+
+I'm interested — maybe it's not the right forum, but —
+
+**Bailey Hayes** [7:46](https://youtu.be/SonOdAF_cco?t=466)
+
+It probably is. But I wish I had Mendy here.
+
+**Colin Murphy** [7:48](https://youtu.be/SonOdAF_cco?t=468)
+
+Well, I'd like to know how you got rid of wgpu — that's one. And then I'm assuming wstd will support async. Do we put that back in? And if people need help with wstd —
+
+**Bailey Hayes** [8:13](https://youtu.be/SonOdAF_cco?t=493)
+
+I actually just talked to Yosh this morning, and his first change for async landed this morning.
+
+**Colin Murphy** [8:20](https://youtu.be/SonOdAF_cco?t=500)
+
+I was gonna say — yeah.
+
+**Bailey Hayes** [8:21](https://youtu.be/SonOdAF_cco?t=501)
+
+I think it just got approved. Yeah, it's Yosh's change, this one. Basically, he's repaving the structure of wstd so that he can factor between P2 and P3, and then he's got one more PR to land right after this one for P3 support. The other cool thing about this is that, in theory, other than updating your wstd version, you won't notice any changes. The API doesn't change for you; you just keep using the same macro, so your code won't change, which is pretty cool.
+
+**Colin Murphy** [8:59](https://youtu.be/SonOdAF_cco?t=539)
+
+Yeah, that'd be great.
+
+**Bailey Hayes** [9:01](https://youtu.be/SonOdAF_cco?t=541)
+
+So — I didn't know what you were talking about initially; I didn't read this text. It's been a while since we merged it. All he meant is he removed it from the examples that he provided for WebGPU. We could do anything in our example, so he just dropped those dependencies. He actually has it in his fork of wgpu, but we don't want to depend on a fork in wasmCloud generally — except for the one that I did. But you know, if I don't do it, I don't think we want anybody else to do it.
+
+**Colin Murphy** [9:33](https://youtu.be/SonOdAF_cco?t=573)
+
+So, I mean, my impression was that wgpu was how the host calls actually worked, right?
+
+**Bailey Hayes** [9:45](https://youtu.be/SonOdAF_cco?t=585)
+
+It is. It is — no, you're right. So essentially, wgpu is how those host calls work, but actually, where that code lives is not inside wasmCloud.
+
+**Colin Murphy** [10:00](https://youtu.be/SonOdAF_cco?t=600)
+
+Right. Okay. So we got rid of it from — oh, okay. That makes more sense. We got rid of some examples. All right. Yes, makes sense. I was like, oh wow, we switched off wgpu? That's impressive. But okay, got it.
+
+**Bailey Hayes** [10:18](https://youtu.be/SonOdAF_cco?t=618)
+
+Yeah. He just revamped the example to not have a bunch of dependencies, which I'm a big fan of, because when examples have those deps, that means I'm having to churn on dependabot stuff. And then when we have interdependencies — because right now a lot of them use workspace-level sharing — then it's like, okay, well, I can't upgrade this because this is depending on the older version, and all that. So shaving off deps is very welcome in the monorepo. But yeah, wgpu is actually still used here.
+
+**Colin Murphy** [10:53](https://youtu.be/SonOdAF_cco?t=653)
+
+Okay — less of a major change than I was thinking.
+
+**Bailey Hayes** [10:58](https://youtu.be/SonOdAF_cco?t=658)
+
+Yeah, we could work on our PR comment there to kind of help. I probably shouldn't have pulled that one up just cold. So that one's huge. Let me jump all the way back to where we were. Oh — any other questions on wgpu or WebGPU before we move on?
+
+**Colin Murphy** [11:24](https://youtu.be/SonOdAF_cco?t=684)
+
+No — keep going. It's great.
+
+**Bailey Hayes** [11:30](https://youtu.be/SonOdAF_cco?t=690)
+
+Okay, yeah — I'm super excited about it. Mendy was actually on WebAssembly Unleashed yesterday. The video's not up yet, but I imagine it probably will be up in this week or early next, so that's definitely worth a watch. He goes into detail on all the changes that he's been making to make this real, how it compares to wasi-nn, and all that kind of stuff. So I think that'll be a good watch to walk through it all.
+
+Now — okay, so you can see that it's a lot of changes, because I had to go to a second page to pull up all the PRs between our last release and this upcoming one. Another big thing that I changed, that I think is a really nice DevX improvement, is that we now just read `wkg.toml` if there's one there. So you can do local file refs from `wkg.toml`, and that's really nice because a lot of times, especially when I'm making these examples, I'm making my own WIT definition. I don't want to actually push it up to an OCI registry — it's not a real thing. In my case, it was Acme Key Value that I was using for host components. Essentially, it's really easy now to have local file refs, or to be able to do a bunch of different registry definitions — you know, if some things are pushed up to my GHCR or to some other one. Now you can interact directly with wkg and override all those different settings, and `wash dev` will just pick it up.
+
+The other thing — to make better DevX improvements and ergonomics around WASI P3 — is that if out of a build comes a module, because you pass in what the component build output path is, if you're handing wash a module, we will upgrade it to a P3 component for you automatically. That's really nice, obviously, for all of our different examples that are now more P3-geared, and all of our test fixtures that are P3-geared. And the other outcome from making that change is that I was able to just get rid of a lot of the weird vendoring that I had to do across all these different fixtures — now they all use file refs, so I don't have any copies, because they all point to the real source, which is very nice. So, a bunch of ergonomic improvements there. This is the one I was just talking about — how we basically will just automatically update you. It's really easy for us to do in wash, because we can embed the adapter straight into our binary, instead of you having to have your adapter locally. If you've been doing P3 stuff, you're probably familiar with saying `wasm-tools adapt` and passing in a weird Wasm path — that's not fun. So this just does it automatically for you. And we can keep that forever, right? Some languages are going to be really slow to upgrade from P1 to P3; others are going to already have a P3 output, so this transformation won't happen. If you give us a P3 component, we're not going to do anything to it. And yeah, I'm expecting Rust to have it fairly soon.
+
+**Colin Murphy** [14:58](https://youtu.be/SonOdAF_cco?t=898)
+
+And then, are we going to have — did you already pull in LLVM 23? When is that?
+
+**Bailey Hayes** [15:05](https://youtu.be/SonOdAF_cco?t=905)
+
+We're not quite that fast.
+
+**Bailey Hayes** [15:08](https://youtu.be/SonOdAF_cco?t=908)
+
+So — we did work on that. Alex Crichton did a crapload of work here. We haven't cut the official release for that. We were testing out RC1 — Mendy did a bunch of testing with it for a bunch of different projects, I had a bunch of different projects, we hit stuff. We've got a new RC2 very recently. We need to go and do yet another battering against this, but I think this will be the one. And once we get that out, that will give everybody LLVM 23 — which, for folks who don't know, was recently released. They go on a six-month cycle, and it actually landed cooperative threading inside it, which was very exciting. We pushed really hard to get that in in time. My PR to LLVM — and I think Joel also has one. Mine is actually papered over by fixes that Alex put directly into the wasi-sdk, so I don't think we actually need to backport my change. I'm advocating not to backport it; weirdly enough, the LLVM maintainer is advocating to backport. They can do what they want there. But Joel's is still a blocker for a couple of the use cases that we need for Python. That has worked really well, and I expect us to be able to backport basic fixes for cooperative threading. Did that make sense? I dove straight into the dots there.
+
+<img src="/img/community/2026-07-22/image003.webp" alt="The WebAssembly wasi-sdk releases page showing wasi-sdk-34-rc.2, a pre-release tag preparing for LLVM 23 with cooperative threading support." />
+
+**Colin Murphy** [16:42](https://youtu.be/SonOdAF_cco?t=1002)
+
+Don't read my facial expression — it was based on something else. That sounds great. I'm so happy. I can't wait for whatever version of Rust uses LLVM 23, and we can get P3 downloadable and stable and all that. That would be great.
+
+**Bailey Hayes** [16:59](https://youtu.be/SonOdAF_cco?t=1019)
+
+Yeah. And actually, Victor — for the question you asked me this morning, here's the fix for that, by the way. That's why we've wrapped it there, and this is what eventually Rust will pull in — `wasm-component-ld` is shipped with Rust. So yeah, this thing goes to almost every language. It's rolling just a little bit slower than we hoped, but really, we just wanted to get it hammered out so that with what we cut, we can say: go try cooperative threads, give us feedback now.
+
+All right, going back. Have I talked about enough stuff yet? I don't think I've covered it all. Okay — I see the past releases in sight now. WASI P1 core modules is the last thing I just talked about. Second thing: this is some of that foundational stuff I was talking about, that we had to land to be able to even ship host components. Basically, in Wasmtime, you have a store, and that's your lifetime. It's got all your state for what your component does. And for that same reason, if you have a store and you link other components to that store, then they now have the same lifetime, and you can't get rid of it once you've linked it. There are a bunch of other caveats there, but that's essentially how we manage concurrency and faults. If you have a fault that happens in a store, it's tainted forever — you're broke, you're done. And so, for that reason, we have it now where we've separated our stores. You have all of your little components that are ephemeral, and so we always just give you an ephemeral store, spin that up — a lot of that work was done by Aditya, thank you, dude. And then the next part is services not being faultable from all of the different components: the service itself having its own store and being able to have its own lifetime — a much longer lifetime, stable for the duration of the workload — versus all of the ephemeral components that are running inside that workload. This was obviously also important for making sure that our host components are fault-tolerant and not taintable by the workloads they're servicing — making sure that we have an isolation mechanism between host components, services, and ephemeral components inside workloads.
+
+We also introduced a new concept of how we ingress into wasmCloud, and we call these trigger services. Because we're now able to provide this isolation primitive, and because we're able to build this with WASI P3, we can now have concurrent requests happening through these P3 components. And we want to make it possible so that you can — now, for the first time ever — actually have a service provide the messaging API as an export, and for the first time ever, have HTTP as a messaging export. Yeah — Liam, you had made a change to wasmcloud.com about that. We haven't released that yet, so nobody can see it, so it doesn't affect anybody. You might want to revert that.
+
+**Liam Randall** [20:22](https://youtu.be/SonOdAF_cco?t=1222)
+
+I didn't land it, Bailey — it's just queued there for discussion. Thank you.
+
+**Bailey Hayes** [20:26](https://youtu.be/SonOdAF_cco?t=1226)
+
+All right. Yeah — a lot of that was actually added for the first time here, because all of that required P3 to even make it work. And that's kind of the smattering of those three different changes right before us actually cutting the release. Questions on that, you guys?
+
+So, what remains before we cut the release candidate? Let's talk through that. All right — P3 host plugin loader. Essentially, this is the first time anybody gets the answer to the question: "But how do I use host components?" This is actually that. This is an example of how to do it from `wash dev`, where you basically — think of "dev" here as just: this is a dev host. Maybe in the future we could add other types of hosts, like my standalone host or my tiny host — we might have a tiny field or something there. But for the configuration of that host, when you say `wash dev`: load these plugins for me. Now the second one — we've got it inside our chart, where we basically pass in these values at YAML. I need a code review on this one, so this one's still coming. But I did go ahead and add a note here: because we pass host plugins straight into the deployment YAML of a host, that's why I'm not using our artifact CRD. This comment is a loose sketch of basically how I would do that in the future if we wanted to — which is introducing probably another CRD that would actually be the thing that reconciles out the actual deployment YAML. So until our operator actually is the thing that owns the deployment of a host, we're just passing and ferrying those strings straight through, and that's fine.
+
+But there are a lot of reasons why I might want to do this in the future as an enhancement. For example, when we start taking on distributed artifact caching, I want to do that via the artifact CRD — can't do it; this is not using the artifact CRD. It's probably fine, in that host components themselves only load once — when you start a whole host, versus when you're doing workload replicas, where obviously you want that cache distributed. That's going to be hit much, much more frequently than loading host components. But I thought I'd call out: hey, this is another enhancement we could probably make in the future. And I'm also interested in feedback, because one of the core design principles about us building wasmCloud v2 was that we actually wanted, as best we could, to not tell you how you had to make your hosts. We just really wanted you to give us the workload API, and that would be the contract. Now, adding our own reconciler and stuff — that changes that, right? That means every time you make a new host and you've got some more stuff you're messing with, now we've got to update our side too and own it. Because what we wanted is for lots of different hosts to exist in the ecosystem. So that will be a much longer design discussion if folks want to pursue that enhancement. So: that one needs to land so that we can actually load host components.
+
+<img src="/img/community/2026-07-22/image004.webp" alt="The P3 host plugin loader pull request, showing the wash CLI grammar for loading host plugins in wash dev, per-host-group Helm chart configuration, and the design decisions section on host-operator controlled plugin loading." />
+
+**Bailey Hayes** [24:59](https://youtu.be/SonOdAF_cco?t=1499)
+
+Next thing on top of that: this one I just threw up — I've got a little bit more work to do here, but this is the next piece for managing the lifecycle of a host component. I laid the groundwork for being able to understand what workload you're working with, what components in that workload you're working with, and how to cancel those types of jobs. But the next part is being able to have a plugin have state on different workloads. The way to do that is the exact same thing that we have in our API for host plugins — the native side of the world — just exposing that over here. The bottom one is a new interface here called lifecycle, and it's for managing the workload lifecycle of a plugin. So whenever a new workload gets scheduled, and it's bound to this plugin because it depends on it — it has one of the host interfaces — it will then be told: you got a bind; here's the information on that thing. And also on unbind. So that's cool. I would love some feedback on this one — I would say maybe today, but probably tomorrow. And for the same reason, an RC tomorrow is what I'm shooting for right now. But again, if you want to go try out everything on main, you're more than welcome to, and I would love the feedback.
+
+So, whew — that is the roundup for wasmCloud 2.6. It's a big one, and I'm excited, obviously. Any other questions on that front? Yeah, Aditya.
+
+<img src="/img/community/2026-07-22/image005.webp" alt="The draft workload lifecycle WIT interface in the wasmCloud host plugin PR, defining identity, workload-id, and component-id along with the lifecycle interface a plugin implements to receive bind and unbind events." />
+
+**Aditya Salunkhe** [25:56](https://youtu.be/SonOdAF_cco?t=1556)
+
+Great work so far. I've been seeing a lot of work done, and it's really hard to keep track of. I really do wish I could contribute, but I just pull the git state and I see that it's been revised yet again in a matter of just a few hours. But I wanted to ask about the wasmCloud host cancel interface — has that been implemented yet?
+
+**Bailey Hayes** [26:25](https://youtu.be/SonOdAF_cco?t=1585)
+
+It is implemented.
+
+**Aditya Salunkhe** [26:26](https://youtu.be/SonOdAF_cco?t=1586)
+
+Okay, so I guess the only part that remains is the guest-side code that needs the cancellation — the epoch-based interruptions. Will that be needed from my draft PR, or —
+
+**Bailey Hayes** [26:43](https://youtu.be/SonOdAF_cco?t=1603)
+
+I would say it's very complementary, right? Allowing us to make sure that guests can both yield, and us to say they've timed out — that is very important, especially for cases like noisy neighbor. We really need that in our host to solve that type of problem. But if you want a host component to be able to cancel a job, a host component can do that today on main. If you want a host native plugin to do it — it can also do it. But a service kind of initiating that — it's sort of like, you can do it if your WIT API affords it, in that you can cancel an HTTP client call, for example, and that will propagate out.
+
+The challenge with cancellation across wasmCloud is that you're talking about potentially having a long chain of calls. Okay — I'm doing a thing, and actually, oof, I can't service this async request because something's wrong in my system. Say I'm a CRUD API, and users requires accounts. Well, I'm in the accounts component, and I've realized there's no account, so generally that would be a 500 error. This is a bit of a contrived example — but let's say for whatever reason you decided just to cancel it, because you got another request for the same thing, and maybe the account exists now, so I'm going to just cancel and make the other end retry. Bear with me on the contrived example. So accounts says cancel — but users called accounts. And users also got triggered from a host interface, because it woke up because key-value had a watch trigger, and so there's a host component that actually started this whole shebang of the call. Maybe we even throw in a service in here for whatever reason. You see what I mean — there are multiple different stores. So in that scenario: three different stores, across many different boundaries, between the native side, a host component side, to a service side — which has its own isolation boundary — all the way to the component. So I would say it's not complete-complete, but that is the user journey story that we need to have rock solid to call it done.
+
+**Aditya Salunkhe** [29:32](https://youtu.be/SonOdAF_cco?t=1772)
+
+That's a lot.
+
+**Bailey Hayes** [29:33](https://youtu.be/SonOdAF_cco?t=1773)
+
+Yeah, it's a lot more complex than I think people realize, but I also think it's important. So we've got it — basically, we have a job registry, and we know about all of these things, but it all just gets cleaned up right now off of a drop. We just say, okay, this all broke, and we clean it up on a timer. So in that regard it is working — but what's not working is having an example where a guest shows this actually working all the way through. So if we're looking for more types of examples and test fixtures that we need to add to wasmCloud, that's a good candidate.
+
+**Aditya Salunkhe** [30:12](https://youtu.be/SonOdAF_cco?t=1812)
+
+Yeah — really working on that highly convoluted example fixture of all these stores being activated. I think that'd be really cool. It's something I'd like to take on.
+
+**Bailey Hayes** [30:24](https://youtu.be/SonOdAF_cco?t=1824)
+
+I know you have a very full plate right now — so if you can't get to it, you can throw it back at me.
+
+**Aditya Salunkhe** [30:31](https://youtu.be/SonOdAF_cco?t=1831)
+
+I want to challenge myself. Yeah, I can work on it.
+
+**Bailey Hayes** [30:43](https://youtu.be/SonOdAF_cco?t=1843)
+
+All right. Any other questions, folks, on some of this stuff? I know there's been a lot. Yesterday was actually my all-time record, I think, for number of PRs pushed and landed. I'm sure there are many others who have definitely beaten me in that regard — I was in the teens — but still proud. And also Jeremy, Victor: thank you for the code reviews. I'm sorry I'm spamming you.
+
+Speaking of Jeremy — we have on our roadmap one issue that really should be a bunch of different issues, but I haven't gotten around to creating them all yet. I've called it "Are We Componentized Yet?" And really, there are a lot of things that we want to make happen here. The most important goal, if I said it at a high level, is that you should be able to know: hey, can I take advantage of all the features that are in wasmCloud in my favorite language, and it just works? And if it doesn't just work, what doesn't? What are the rough edges? Maybe I don't care about those certain things. I would love it if we could have that data available to anybody just coming in and figuring out: hey, I want to work on wasmCloud — what languages should I use? Which ones shouldn't I use? Which ones are incoming? And just kind of keeping broad track of that across the whole ecosystem. And also part of this effort is just being componentized for more languages. We kept a really tight set last time, obviously, because we had a ton in our last quarter's roadmap. But this quarter, because we've had WASI P3 launch, and as that percolates across the ecosystem, we really should have much broader support now for other languages — and Go is one of those languages. Jeremy, you want to talk about it?
+
+**Jeremy Fleitz** [32:46](https://youtu.be/SonOdAF_cco?t=1966)
+
+Absolutely. Let me replace the current share. Great, awesome intro and segue there, Bailey. So, starting off with our wasmCloud documentation language support: obviously Rust is our number one, and then you see TypeScript, and then right below that is Go — and it still says TinyGo. TinyGo was chosen for WASI P1. It does have WASI P2 support, but just as everything is changing inside wasmCloud since P3 is coming out, upstream Go is getting some more support out there, and so we want to go ahead and target upstream, mainstream Go versus TinyGo. There are still a couple things that need to land upstream in Go — Joel Dice did make a PR to Go for adding a WASI idle function call. This is going to allow asynchronous goroutines to be able to be used, you know, with just using Go. But there's no reason why we can't go ahead and start removing TinyGo and go to componentize-go.
+
+<img src="/img/community/2026-07-22/image006.webp" alt="The Go (TinyGo) Language Guide for WebAssembly on wasmcloud.com, showing the v2 language support documentation that the wasmCloud Go v2 work will replace with mainstream Go guidance." />
+
+So inside wasmCloud Go, if I go to the main branch itself — this is still the old branch that's been out there for a couple of years. The latest release was 0.0.10, so it's a little bit behind. There are examples and how to do components and stuff like that, but this is also even in the old wasmCloud v1 spec as far as deployment goes, and doesn't even leverage workload deployments and Kubernetes services and things like that. So what I've started doing is working inside a branch called wasmcloud-v2, really following the same pattern that we have with our TypeScript repo, where you have examples, and then components, and then you have templates. So I did that first — you have examples and templates, and then this is still a port over from the main branch, where all the rest of the Go package is under a `/component` subfolder. And this is where there are some changes that are going to be made, even in this version.
+
+So now, what is the goal? For example, right here under component: if you're in Go and you need to import a package — say, oh, I need to do `net/http` — right now, you'd have to do `go.wasmcloud.dev/go/component/net` and then choose which one you want. Really, the goal should be kind of like what Bailey was just saying: yes, we are trying to make it so languages are adopted more inside wasmCloud, but we really shouldn't put it onto the developer to know what is P2 or what is P3. At that point, we should make it very transparent to them: you know what, I need to do an HTTP request; I really don't care what's underneath it. And if it doesn't work, or if they're about to try to use it — yes, we should have a dashboard, so to speak, inside this repo that shows exactly what is supported, as well as having benchmarking that shows the performance, so maybe there is a trade-off there.
+
+**Jeremy Fleitz** [37:09](https://youtu.be/SonOdAF_cco?t=2229)
+
+So this is wasmCloud Go — the wasmCloud Go SDK. There's `net/http` and the wasi:http 3.0 pieces. That's not really technically a wasmCloud type of library or solution that needs to be solved here — this is where we need to go a little bit more upstream, and there is a Bytecode Alliance Go package. This is pretty new, as you can tell. This issue was out there — number one, in February — and if I look at it: oh, look who's the one that did the commit. It's back to Joel Dice again, the same person that did the upstream Go fix. So this right here is going to start landing the stuff, even from this part, that really should be in the Bytecode Alliance Go package — like the wasi:http pieces. And maybe don't even have that broken out — have HTTP, and then have a stream underneath it. Totally get it: HTTP/3 makes sense because it is streams, but maybe it does keep it separate right there at that level. We really need to think of it from a Go developer's perspective on how it's going to be really used, and then deduplicate the work so that we're not doing something in wasmCloud and then someone else is doing the same type of solution inside another GitHub repo. That's when we really should start using the Bytecode Alliance to bring those common factors back together.
+
+So other than where this stays right here — in this branch, all the examples are updated to use wasmCloud 2.5.2. You can deploy to that. If I look at the template right here, you can use componentize-go. Basically, once you use componentize-go, you just add it — do a `go tool` and pass componentize-go to it — and then you're basically doing `go build` after that. So that way a typical Gopher can just use the typical Go commands. But other than that, because this is using componentize-go and wit-bindgen, you can even come in as a Wasm developer and just do `wash build`, because `wash build` is going to look at it and say: oh, this needs componentize-go, and it's going to run this exact same command for you behind the scenes.
+
+Other than that, as far as the state goes, there's one other minor change that was done, and that's just to componentize-go and the Bytecode Alliance itself. Once this gets merged, this is going to bring in the latest release of wit-bindgen-go — which I think was two releases ago, where `implements` was added. There was a bug out there on the Go side where, if you imported the same package in two different packages or modules inside Go, it would only import the first one and ignore the second one. So this adds an alias based on the package name inside Go, so there's no conflict whatsoever. So I'll pause there and ask for any questions.
+
+<img src="/img/community/2026-07-22/image007.webp" alt="The http-hello-world template in the wasmCloud Go v2 branch: a Go WebAssembly component handling HTTP requests with standard net/http types, built with the wasmCloud Go SDK, wash dev for the dev loop, and componentize-go targeting the async WASI P3 world." />
+
+**Yordis Prieto** [39:59](https://youtu.be/SonOdAF_cco?t=2399)
+
+I got lost in the signing step.
+
+**Bailey Hayes** [40:06](https://youtu.be/SonOdAF_cco?t=2406)
+
+He is such a troll. It's fair — and I think there is a bit of history here, right? At one point, we had wasm-tools-go, or another thing called go-modules, which included even a wit-bindgen-go that was just all Go. I don't know if y'all know this: Go people don't like working with anything else, and they just try to recreate the whole world in Go. That's been one of the biggest challenges that we've had there. And this is kind of a redux on all of that again. It's just so much more maintainable for us in the Bytecode Alliance to use wit-bindgen, where all the innovation is happening. If you try to do something outside of that, you're going to have a bad time — which has happened. But it does mean you either need this separate CLI — which is fine; if you're doing `go generate`, it can run a CLI that you've got installed — or you have cgo, which nobody wants. So — yep. Thank you, Jeremy.
+
+**Jeremy Fleitz** [41:29](https://youtu.be/SonOdAF_cco?t=2489)
+
+No problem.
+
+**Bailey Hayes** [41:31](https://youtu.be/SonOdAF_cco?t=2491)
+
+One other thing in that space: Dan Phillips is also getting started diving in with some of the same famous suspects — Joel and Alex, who have been doing a ton of work on componentize-py and the wasi-sdk — and working towards us being able to have first-class support for Python. Same story that Jeremy just talked through for componentize-go: making sure that we've got a really nice experience for everybody in Go, we're going to do that for Python too. And a lot of people really want it, because — I don't know if you know this — AI is kind of a hot topic these days, and a lot of folks think they need Python to do it. So yeah, all of that's flying pretty fast, I feel like.
+
+**Yordis Prieto** [42:28](https://youtu.be/SonOdAF_cco?t=2548)
+
+To that — is there any documentation around what the trade-offs per programming language to build these components are? Like, how much weight am I bringing in if I choose, I don't know, TypeScript with all the ComponentizeJS whatever, versus TinyGo, versus big Go? And how much dead code, performance, things like that — to the point that, okay, actually, most likely choose Rust or whatever other thing.
+
+**Jeremy Fleitz** [42:57](https://youtu.be/SonOdAF_cco?t=2577)
+
+Yordis, I was gonna say — that's definitely going to be part of the wasmCloud Go upstream/downstream turnaround. I love that comment, by the way, in the chat. Other than benchmarking from a Go perspective, I started doing the benchmarking from a language perspective: just a simple HTTP request to see how fast it is, and then you can also see how big the component is. Because you're right — Go itself brings in a lot of overhead compared to Rust, just because of the library that you're using. Like if you use `fmt`, it's going to bring in a lot of crap. You probably have to look at what library you're really using at that point. Sorry, Bailey.
+
+**Bailey Hayes** [43:44](https://youtu.be/SonOdAF_cco?t=2624)
+
+The other fun thing about Go is they told us that they would never use WebAssembly GC — that their GC is the best and nobody can touch it. So when you compile that to a component, you're compiling in Go's GC.
+
+**Yordis Prieto** [44:03](https://youtu.be/SonOdAF_cco?t=2643)
+
+Does the Bytecode Alliance have that documented?
+
+**Bailey Hayes** [44:06](https://youtu.be/SonOdAF_cco?t=2646)
+
+Well, I wish componentize-go had some more of that information, but my game plan is actually just to coalesce it all in wasmCloud. Obviously, in the Bytecode Alliance, we always want to hold out a friendly hand to help people improve their stuff, but in wasmCloud, I'll just be real with folks on exactly where it is. That's why in this one I specifically called that out — because I feel like a lot of people haven't quite yet wrapped their minds around the fact that you can just LLM anything, and getting started with Rust with an LLM is by far the best language for generating code with LLMs. You get something that's memory-safe, screaming fast, and it all just works. It's a really nice experience. And it's obviously also the smallest, fastest thing you can do.
+
+**Yordis Prieto** [45:04](https://youtu.be/SonOdAF_cco?t=2704)
+
+From the WebAssembly — sorry, wasmCloud — perspective, that's exactly why I ask you. Because I'd rather you be opinionated and say: hey, look, here's what's under the table, so I strongly recommend you to use X. Primarily because — yeah, AI, for me, changes things, right? I no longer care as much about the programming language, but about that inner decision-making. Somebody like you is most likely way more prepared to have strong opinions. And I personally prefer strong opinions, or strong recommendations, I guess.
+
+**Bailey Hayes** [45:38](https://youtu.be/SonOdAF_cco?t=2738)
+
+Yeah — you know, I'm always trying to bridge that. I don't want to turn anybody off from trying things out or using wasmCloud because they think, you know, "I'm going to use my favorite language here." Sure, you know? I think the other thing that is hard to capture in this matrix is also just what a lot of these things are like when multiplied, I guess. When you start thinking about scale-out, and how many instances you're running, and using something as a composition — a lot of this doesn't matter when you're just doing it as a workload and you're just like, "execute my thing." That's fine. Your Go binary today is 15 megabytes; your Go binary for .wasm is 10 megabytes. And why do you care? You got a little bit better, it's a little bit more efficient — bada bing, bada boom — your SLAs are still the same. But when you do a force multiplier on that, it's a big difference. So yeah, it's a good callout. I'm of the same brand as you, I think, Yordis, and I called it out here — obviously, I really think we should have a bunch of sub-test issues here that show this type of table that specifically captures that.
+
+**Yordis Prieto** [47:06](https://youtu.be/SonOdAF_cco?t=2826)
+
+Yeah. The reason I got into this conversation is because I'm moving now into taking a protobuf and generating all the WIT from it. So I stay now with the maps support, and the question was: okay, well, I want to give somebody a component, so that means you wrap it with your own stuff — with the codec of encoding and decoding the events from the event store. If it's going to be WebAssembly anyway — okay, should I just use Rust, or C for that matter? I really don't care, right? Whichever one is going to be the best one for me. For you to say: you know, wrap it in whatever the heck you have anyway, because it's WebAssembly — but I'm not bringing a footgun inside that. Especially for that type of wrapper — wrappable component type of situation — I feel like it's extremely important to be somewhat opinionated. Especially if they are stable, barely change, it is what it is, stop thinking about it anymore, right?
+
+**Bailey Hayes** [48:06](https://youtu.be/SonOdAF_cco?t=2886)
+
+Yeah, I agree. Well, I don't want to take too much time away — Bharat said that he would love to demo what he's been working on. Bharat, are you here? I haven't given you permission to share. Let me do that. Okay, you should have it now.
+
+**Bharat** [48:30](https://youtu.be/SonOdAF_cco?t=2910)
+
+Okay, let me share my screen first. Visible?
+
+**Bailey Hayes** [48:53](https://youtu.be/SonOdAF_cco?t=2933)
+
+Yep — I see me. I hate seeing me. Okay, cool.
+
+**Bharat** [48:59](https://youtu.be/SonOdAF_cco?t=2939)
+
+So this is basically the app UI where I'm trying to implement a kind of workflow. My last demo was generating a transcription from the audio file, and in addition to that, I'm trying to implement another component here, which is taking that transcription from that component and summarizing it into a summary text. So the workflow goes like this, and I'll try to run it. You can see the audio-transcribing component is working — like a backend part, we can say. I have set a very small audio file for that, and generated a transcription for that; here we can see that. So now it's running, and it will take some time to pass that to the next module. The next in the workflow is the text-summarizing thing. Here we are using the Qwen3 GGUF model behind the scenes in the backend, using the Candle Rust framework — and here is the model size. I chose the smaller model to get it running in the local environment.
+
+<img src="/img/community/2026-07-22/image008.webp" alt="The WASI 3.0 AI Workflow App built with wasmCloud: a web UI chaining an audio transcription step using the ggml-tiny.bin model into a summarization step using Qwen3-0.6B-Q4_K_M.gguf, with a Start the AI Workflow button." />
+
+**Bharat** [50:40](https://youtu.be/SonOdAF_cco?t=3040)
+
+So we can see in the backend — let me show the console. You can see here the logs: generating the transcription first, and then loading the model in the backend, then the system prompt for the LLM model — Qwen3 — which handles the transcription summary. So this is the system prompt for that, and now it's running the actual processing for the generation of the summarizing text.
+
+<img src="/img/community/2026-07-22/image009.webp" alt="Backend logs from the WASI P3 workflow app showing the wasmCloud host starting components, the transcription completing, the Qwen3 model loading, and the summarization system prompt streaming tokens." />
+
+**Bharat** [52:00](https://youtu.be/SonOdAF_cco?t=3120)
+
+It will take some time, so till then, I'll show the code. In the backend, I have set it up like this: you can see the web UI is the first component, and the backend components are — first, this backend component, which handles the audio file transcription, and this one handles the summarization part with the AI model. Both of these components are using different AI models. You can see here, in the general audio transcription section, we have this audio file — we are using the ggml `tiny` AI model. And for the summarization part, we have this Qwen3. Let me show the code here: we are using the Candle Rust framework by Hugging Face, and the tokenizers library. All of these are Rust-optimized, and the tokenizer is specifically built for the Wasm target. It took some time for me to evaluate these libraries, because some libraries are not supporting the WASI target right now — so I tried different libraries, and then I found this one, which works with Candle in this component. Here we can see the code where it takes this model, which is mounted in our test data directory — we mention the mount of the host and guest path for the environment resource files. And I kept it all at WASI 3.0, so all components are 3.0. In the web section also, I tried to keep it like that only — I have coded a path-based routing system here which handles our UI.
+
+Now we can see the text-processing module providing some output here, which is demonstrating our async stream WASI capability, and it's running. Basically, it takes this audio transcription and summarizes the data into a summary kind of thing, in Markdown format — which is easy to display.
+
+<img src="/img/community/2026-07-22/image010.webp" alt="The summarization step completing in the workflow UI: the Qwen3 model streams back a Markdown-formatted summary of the audio transcription, with the wasmCloud workflow steps shown beneath." />
+
+**Bharat** [55:00](https://youtu.be/SonOdAF_cco?t=3300)
+
+Or we can also take this button and copy these things to use elsewhere, or we can add more components in the workflow, which will add steps to the workflow. So currently it's running. I'd also like to take this demo and implement it in a local deployment first — I want to see how much time and what the performance of these models is in an actual deployment. So we can see here now we have the summary in Markdown format. We can copy it like this, just for demonstration, and use it anywhere. So yeah, this is it.
+
+**Bailey Hayes** [56:20](https://youtu.be/SonOdAF_cco?t=3380)
+
+This is so good. I hope you saw the chat when we saw the emoji for the first time — every single person was like, that emoji is so great, we love it. That was so good, and it's super cool. Am I understanding it right that you basically compiled Qwen, with Candle, to a WebAssembly component?
+
+**Bharat** [56:46](https://youtu.be/SonOdAF_cco?t=3406)
+
+Yes. Yes.
+
+**Bailey Hayes** [56:46](https://youtu.be/SonOdAF_cco?t=3406)
+
+Cool. I thought that's what you said — I wasn't sure. That sounds hard. Amazing. Okay, so this is really exciting. Mendy also — hopefully he'll demo this next week — he did one with llama.cpp. And I think everybody's going to want this, right? This is sort of the future. We want to be able to do multi-tenanted access. I think with Candle, I believe it's CPU right now by default — looking at your feature flags, but that went past the screen a little fast. If it did it with WebGPU, it'd be really fast.
+
+**Bharat** [57:30](https://youtu.be/SonOdAF_cco?t=3450)
+
+Fast, yeah. I'll check that also.
+
+**Bailey Hayes** [57:33](https://youtu.be/SonOdAF_cco?t=3453)
+
+Cool. Yeah — llama.cpp, after Mendy's changes, can now compile to WASI P3. I think getting Candle working — because a lot of people love that — same thing, we should make that really awesome. I can't wait to host this demo somewhere in the wasmCloud org, because people are going to love it. It's so good.
+
+**Bharat** [57:57](https://youtu.be/SonOdAF_cco?t=3477)
+
+Thanks. Thanks. So yeah, I'll keep working on that, and thanks for your inputs. It took me some time to figure out these libraries and how they gel into the WASI and wasmCloud ecosystem. So I'll keep on working, and I want to show more demos like this in the future. Thanks for your support.
+
+**Bailey Hayes** [58:26](https://youtu.be/SonOdAF_cco?t=3506)
+
+This is just awesome. Thank you. We're out of time — and that call that Liam just jumped to, I too have to jump to. But I'm super pumped. We haven't repaved wasmCloud Contrib yet — kind of like what Jeremy's doing right now for wasmCloud Go, repaving the world to be like: the only world is v2. v1, you know, that was a thing, but it's in the past. I will prioritize getting that done this week, and then if you want to create a PR with your changes there, that would be very appreciated.
+
+**Bharat** [59:05](https://youtu.be/SonOdAF_cco?t=3545)
+
+Yeah, yeah, sure thing.
+
+**Bailey Hayes** [59:06](https://youtu.be/SonOdAF_cco?t=3546)
+
+Cool. All right. Thank you, everybody. I hope you have an awesome rest of your week.
