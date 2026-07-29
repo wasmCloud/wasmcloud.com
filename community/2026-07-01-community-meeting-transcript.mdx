@@ -1,0 +1,704 @@
+---
+date: '2026-07-01'
+title: 'Transcript: wasmCloud 2.5: Wasm Component Model implements, WASI P3 Streaming, and Cancelling Long-Running Invocations'
+description: 'Full transcript of the July 1, 2026 wasmCloud community call covering the 2.5 release, the Wasm component model implements feature with Postgres, a WASI Preview 3 streaming Whisper demo, and cancelling long-running invocations.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasmcloud 2.5
+  - component model implements
+  - wasi p3
+  - wasi preview 3
+  - epoch interruption
+  - webassembly kubernetes
+  - webassembly news
+image: https://i.ytimg.com/vi/xhMzyk0QX-o/maxresdefault.jpg
+showTitle: true
+slug: 2026-07-01-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - WASIPreview3
+  - Wasmtime
+  - ComponentModel
+  - Kubernetes
+  - OpenTelemetry
+  - NATS
+  - AIInference
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-07-01-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=xhMzyk0QX-o" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=xhMzyk0QX-o" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+*wasmCloud Weekly Community Call — Wed, Jul 1, 2026 · 63 minutes*
+
+{/* Speakers: Jeremy Fleitz, Bailey Hayes, Frank Schaffa, Aditya Salunkhe, Bharat */}
+
+---
+
+{/* truncate */}
+
+## Transcript
+
+**Jeremy Fleitz** [0:21](https://youtu.be/xhMzyk0QX-o?t=21)
+
+Okay. Welcome to — I can't believe I'm saying it — the July 1 wasmCloud Wednesday of 2026. Very exciting. We've got a short little agenda, but really some good things that are coming out. You can find the agenda once again on the wasmCloud community webpage.
+
+So today we're going to be going over the 2.5 release that was cut yesterday. I'll be doing a short, quick demo on actually using one of the features, `implements`, which is multiplexing WebAssembly components underneath on a host, and then I'm going to be turning it over to Bharat at the end for him to do a demo as well on what he's been working on.
+
+So first, to start off on version 2.5: the blog will be up shortly. It might actually already be posted on the page, but it will be shortly. And 2.5 does introduce using Wasmtime 46 as well as WASI P3 by default now. So what that means is we do now have async support available, as well as using implementations — or `implements`. The nice thing about `implements` is it allows for you to use WebAssembly components of the same type with different configurations. There are some additional updates inside the 2.5 release, mainly around the Helm chart for adding network policies — just doing a little bit more hardening on the operator as far as how it's installed, as well as the host group too.
+
+So I'm going to go ahead and switch over to doing a quick demo with Postgres, and this was implemented using the 2.5 release. And one thing to call out: inside the actual host itself, there is a feature flag for enabling Wasm component model `implements`. We're going to be having this on by default inside the canary release coming out starting today, and this will be turned on by default starting in the 2.6 release in the next couple of weeks — just so we have some additional time to ensure that there's nothing that's breaking that would cause any existing WebAssembly deployment to fail.
+
+So what this example does is it creates one WebAssembly component. It uses the workload deployment, deploys to a kind cluster, and inside the component it does use the Postgres component, basically calling it PG User A and PG User B. So I'll just switch over to the WIT here, and this is what it looks like. So now on the import statement, if you look right above here, this is the traditional default way — I can just say I want to import the Postgres component. But now I can actually say I want to import the component (this is really the query component), and I'm going to call the first one PG User A and the second one PG User B.
+
+<img src="/img/community/2026-07-01/image001.webp" alt="The postgres-implements README: one component imports the same wasmCloud Postgres query interface twice, as pg-user-a and pg-user-b, and the host routes each import by its implements name to a different connection pool." />
+
+Now, what this allows me to do — if I go to my Kubernetes workload deployment here, make my screen a little bit smaller, and you can see inside the host interface. I do say, here's my ingress that it's going to be serving, and then when I look at the list of components that it's going to be using, I now can say I want to use wasmCloud Postgres 1.1 draft. I want to create one instance called PG User A, and the other one called PG User B, and then I can even have it so I have different secrets configured for each one.
+
+<img src="/img/community/2026-07-01/image002.webp" alt="workloaddeployment.yaml showing two named host interface instances — pg-user-a and pg-user-b — each on the wasmcloud:postgres 0.1.1-draft package with its own secretFrom entry supplying a separate connection URL." />
+
+So now let me bring my cluster over. So there's my workload deployment. I'll just show what this — and really, let's do the code. Yeah, and if you look at PG User A, I just have it set so it has the full entire connection string, passing username, password, as well as which database to connect to. Of course, there are many ways to do Postgres. So you could just have the username, password, database all as separate variables, but just to make it really quick for a demo, I just chose to use a URL. And then once I got that implemented, this README right here basically walks through how I built the host with the cargo feature enabled first, and then I deploy it to a local kind cluster, just following the wasmCloud documentation.
+
+**Jeremy Fleitz** [5:05](https://youtu.be/xhMzyk0QX-o?t=305)
+
+And since this is the local demo, I wanted to use Harbor to install and host the OCI artifact that's published, so that way I don't have to push it to GitHub and just have it there the whole time. In order to do that a little bit cleaner, I did put Traefik in front of all this, and so that way I can have `*.localhost.cosmonic.sh` go into Traefik, with `harbor.localhost.cosmonic.sh` going to Harbor itself. And then at the very end, in the Postgres install that's running in cluster as well, I did create a user A, user B, different passwords, and then I did give different permissions to user A and user B — user A having rights to widgets but not to gadgets, and user B vice versa.
+
+So after this was all deployed and said and done, I'll just show you once again my workload deployment here. And if I go to `pg-implements.localhost.cosmonic.sh` and bring it over — voila! So this was able to use the two components, two different configurations, and hit the two tables with two different sets of values. Any questions on this?
+
+<img src="/img/community/2026-07-01/image003.webp" alt="k9s describing the deployed postgres-implements workload, listing both named host interfaces — pg-user-a and pg-user-b — each on the wasmcloud:postgres query interface with its own secret." />
+
+**Frank Schaffa** [6:45](https://youtu.be/xhMzyk0QX-o?t=405)
+
+Actually, this is great. I'm just wondering, when are we going to use Bailey's performance testing?
+
+**Jeremy Fleitz** [6:55](https://youtu.be/xhMzyk0QX-o?t=415)
+
+Which one — on the benchmarking side? Or is that the "are we fast there yet?"
+
+**Frank Schaffa** [7:02](https://youtu.be/xhMzyk0QX-o?t=422)
+
+No, actually, on the — well, response time and also scalability.
+
+**Jeremy Fleitz** [7:11](https://youtu.be/xhMzyk0QX-o?t=431)
+
+Bailey, do you have any answer on that one?
+
+**Bailey Hayes** [7:14](https://youtu.be/xhMzyk0QX-o?t=434)
+
+Right now, we haven't started work on the macro benchmark, like the k6 suite. I put you on other things, but it's technically assigned to you right now. And it is —
+
+**Jeremy Fleitz** [7:25](https://youtu.be/xhMzyk0QX-o?t=445)
+
+Death.
+
+**Bailey Hayes** [7:28](https://youtu.be/xhMzyk0QX-o?t=448)
+
+I think we've got a couple more things that we've got to drop first, but soon. I think that'll probably be something that we'll do in our first iteration for the next quarter, which is basically now — but we're going to start ours July 8.
+
+**Frank Schaffa** [7:48](https://youtu.be/xhMzyk0QX-o?t=468)
+
+No, I think this is great. I was just being facetious in terms of looking for it. But anyway, that's something that on my side I'll be looking to try some performance testing anyway.
+
+**Jeremy Fleitz** [8:07](https://youtu.be/xhMzyk0QX-o?t=487)
+
+Awesome.
+
+**Bailey Hayes** [8:08](https://youtu.be/xhMzyk0QX-o?t=488)
+
+I made a very simple scaffold with our k6 stuff. I just didn't have time to take it all the way over the line. I think just about anybody can probably jump on that ticket and expand our benchmarking suite that we have right now with our benchmarking server, which has been running and giving us some pretty cool benchmarks.
+
+I've been looking at it, and for example, I used it against the `implements` change to validate our multiplexed plugins. And what's cool is that there was no change, because all of this happens at bind time. So the lookup here is O(n) for the bindings when it's doing the link, and then at bind time it's static — so there was no performance hit on it, which was nice. That was one of the things that it was there for.
+
+**Frank Schaffa** [8:57](https://youtu.be/xhMzyk0QX-o?t=537)
+
+Great, thank you.
+
+**Jeremy Fleitz** [8:59](https://youtu.be/xhMzyk0QX-o?t=539)
+
+Yeah. Frank, I promise I'll try to get that wrapped up as quick as possible — maybe even by next Wednesday's community call. Okay, I guess I'll hand it over to Bharat if you want to show off your demo.
+
+**Aditya Salunkhe** [9:13](https://youtu.be/xhMzyk0QX-o?t=553)
+
+Oh, before we do that, I had a question for Jeremy. I saw that we import using the `implements` keyword, but I was wondering how it looks like on the export side — if there's a specific declaration for an `implements` in the WIT binding that would specifically allow for a more generic implementation on the export side.
+
+**Jeremy Fleitz** [9:40](https://youtu.be/xhMzyk0QX-o?t=580)
+
+I'm turning this over to Bailey.
+
+**Bailey Hayes** [9:43](https://youtu.be/xhMzyk0QX-o?t=583)
+
+Okay, yeah, I was hoping so. It's symmetric. So the way that the bindings get generated for imports and exports is the same, and effectively what it means is — and I guess I should also say this also applies to both guests and hosts. So our host is actually looking at the bindings generated on the host side and is binding to that on the linker, so that the guests, who also have static bindings with these named labels, are also coming in.
+
+So that's why it's so fast, and that's why I wanted to do this work versus some kind of hash map thing or some kind of indirection. Like, oh no — it's all static, which is going to be very powerful, and it means that we can validate everything at deployment time. But to be fair, I don't think we've done any examples on the export side. I did do it in the spec test, and it's in my `wac` PR. But yeah, I obviously was very motivated on the import side.
+
+Now, I am making a change to add another annotation support called `external-id` that rides along with the `implements` metadata. And `external-id` — sort of a goofy name, but basically it's because I do a key where I say, okay, given this label and this configuration, this is a single entity, a single link entity that I'm trying to bind to. Which is fun, because it's just like wasmCloud v1. What's old is new again. But all static, right? And concurrency safe. That's the important part. That's why we're doing all the work.
+
+So basically, I was ferrying around our own config, which was outside spec, right? You pass in config information like the connection credentials for Postgres, which Jeremy showed, and then we were like, okay, that's a unique thing, that's for Team A, and this one's for Team B, and that's how I figure out the right information. Well, you can also ferry that information inside an `external-id` metadata annotation for the import or for the export, and then you can put that information there. And so that would also be statically binding and passed all the way through.
+
+And what's really nice is then I could make a component that's completely self-contained with all the information it needs to be able to deploy and run. And you wouldn't have to have — what I always call it is host magic, but that's basically what we're doing right now. We host magic in the right config, and our long-term version for basically everything that we do is that it's actually all part of the spec, it's all part of the component model. So that just pushes us more in that direction, which is good.
+
+So I'm working on getting that PR up in wasm-tools, probably right after this meeting. I'm almost done. I even got fuzzing done on it, so that's always the hardest thing — and that actually found a bug, which was great. And so I did another lap around on that. And yeah, I think that one will go through super fast because it's an annotation, and we already have annotated types. Like `@since` is another one that most people have seen.
+
+**Aditya Salunkhe** [13:02](https://youtu.be/xhMzyk0QX-o?t=782)
+
+Yeah, that's pretty awesome. That's what I was wondering. We pretty much did the host magic thing, but having guest-to-guest export magic also happening with the `implements` stuff would be pretty awesome, because we have a direct dependency on that over on the Betty Blocks side. But yeah, really interested to see this `external-id` thing come to life.
+
+**Bailey Hayes** [13:27](https://youtu.be/xhMzyk0QX-o?t=807)
+
+If you can think of an example or template that we could add where the `implements` label on an export is interesting to you — I might just not be creative enough. I didn't come up with it when I was doing it. I can definitely tell you what it'll be when we have host components, right? Like, host components always have exports. They're the thing that matters, right? But I didn't come up with it for guests.
+
+**Aditya Salunkhe** [13:54](https://youtu.be/xhMzyk0QX-o?t=834)
+
+Well, yeah, I'd be more than happy to help that out. We have a couple of things I could add on there. After this would be good, I think — just if you have a PR ready for the `external-id`. Or no rush, whenever.
+
+**Bailey Hayes** [14:14](https://youtu.be/xhMzyk0QX-o?t=854)
+
+Talk to me tomorrow. How about tomorrow? And I think it should all be up by then.
+
+**Aditya Salunkhe** [14:18](https://youtu.be/xhMzyk0QX-o?t=858)
+
+Yeah, sounds good. Sure.
+
+**Bailey Hayes** [14:22](https://youtu.be/xhMzyk0QX-o?t=862)
+
+Any more questions on `implements`, or more we want to talk about there? Okay. Bharat, we'd love to see what you built with WASI P3.
+
+**Bharat** [14:36](https://youtu.be/xhMzyk0QX-o?t=876)
+
+Yes, sure. Oh, let me share. Visible?
+
+**Jeremy Fleitz** [14:56](https://youtu.be/xhMzyk0QX-o?t=896)
+
+Not seeing it, but I just went ahead and made you co-host. Maybe try re-sharing. Okay — yes, there we go.
+
+**Bharat** [15:18](https://youtu.be/xhMzyk0QX-o?t=918)
+
+Yeah. So I actually work on some of the demos with WASI P3, and this is mainly to demonstrate the cross-component communication with WASI P3 and streams. So I created a backend with a frontend, and if we look at the backend, what we are doing is we are using a Whisper AI model — a small GGML model — and some simple podcast audio file, which we will use this Whisper library to generate a transcription for. And with that we are generating the segmented streams for that and transmitting from backend to frontend. So at the frontend side we are just receiving the stream and displaying it.
+
+So if I run it here — yeah, it's running. It's running at port 8000. Once it's running, we will ping through — yeah. So we will use curl here with `--no-buffer` so that we can see the output. Yes, so we started the service, and I can hear the laptop fans are spinning faster now, since the AI model is running and it's in play. And we can see some segments are getting logged here, and on the terminal side, at the client side, we are getting the exact outputs.
+
+So yeah, actually it's a very long, big file. This one is from a Rust podcast file. It's long enough — like one hour, 13 minutes — and I ran it for almost half an hour to see how the back-pressure and all those things were working. So the output is like this. So yeah, that's it. But next time, I'll also start planning to have a UI part, so I'm working on that, and I'll update you on that.
+
+<img src="/img/community/2026-07-01/image004.webp" alt="The backend component from Bharat's demo, iterating over Whisper transcription segments and pushing each one onto a WASI Preview 3 stream back to the frontend." />
+
+**Jeremy Fleitz** [18:50](https://youtu.be/xhMzyk0QX-o?t=1130)
+
+This is very cool. I like the idea of using it for transcription.
+
+**Bharat** [18:56](https://youtu.be/xhMzyk0QX-o?t=1136)
+
+Yeah, thanks.
+
+**Bailey Hayes** [19:01](https://youtu.be/xhMzyk0QX-o?t=1141)
+
+You've officially made the coolest P3 demo I've seen so far. Like, you're the champion right now. That's awesome.
+
+Okay, so I do want this to land in Contrib, because I think the file is probably really big, and I probably don't want that in the wasmCloud repo where we already are pretty huge. But maybe we could have that be like a separate step — like, okay, now go get this large file that we recommend and download it to run the demo, and that's something that we maybe gitignore. But yeah, it is awesome. Thank you for doing that.
+
+**Bharat** [19:46](https://youtu.be/xhMzyk0QX-o?t=1186)
+
+Thanks, thanks. And I learned a lot of things. Also thanks to Aditya and you for providing inputs on that — that worked for me. And yes, so next time I'll come up with some more interesting demo. Actually, I also talked with Liam about that. So yeah, sure thing.
+
+**Jeremy Fleitz** [20:16](https://youtu.be/xhMzyk0QX-o?t=1216)
+
+All right, awesome. Yeah, so that was the rest of our agenda, and we'll open this up to the floor if there are any other questions or topics anybody wants to discuss.
+
+**Bailey Hayes** [20:25](https://youtu.be/xhMzyk0QX-o?t=1225)
+
+I see Aditya has got one.
+
+**Aditya Salunkhe** [20:27](https://youtu.be/xhMzyk0QX-o?t=1227)
+
+Yes. Well, could I get co-host? I need to do an Excalidraw demonstration. Thank you.
+
+So the idea is that now, since we have P3 in the picture for wasmCloud, there are a lot of things that you can do with it. One of them being extended invocations. So basically, if you have a client that's making a request to your wasmCloud workload, it's not necessary that your request might be returned immediately back from the workload to your client. Sometimes, with the P3 addition in 2.5, you can have P3 requests that take a longer duration of time to complete, and during that duration there's not a lot of things you can do to the whole invocation while it's running inside your workload. There's little to no visibility — and take, for instance, if you have Wasm running, or even an invocation started, there's barely a single mechanism to interrupt that or cancel that invocation.
+
+So the idea that we were coming up with: since the store is what handles an invocation, or a request, or any sort of Wasm invocation, our idea was to use epoch interruption that Wasmtime provides, which basically runs checkpoints in your Wasm guest along a set duration, and it basically allows you to create cancellation callbacks. So take, for instance, if we trigger a cancellation by keeping track of the store ID with the incoming request, and we hold that cancellation handle with regards to the store, you could technically stop that specific invocation by dropping that store, by setting its cancellation boolean to true.
+
+But I just wanted to know if there's any other mechanism that we could probably use. For instance, resources in wasmCloud allow you to basically create guest exports that allow you to call resource functions — for instance, a `cancel` function on a resource that just allows you to gracefully drop that resource — and if there was any way we could artificially inject that type of a cancellation callback into the guest that's running the workload, so that we could have something that triggers cancellation of long-running invocations with regards to P3.
+
+And I also wanted to know what is the feasibility of having more visibility in your entire workload. For instance, having health checks about the workload, getting to know about all the different invocations that are going on, the jobs that are going on in a workload. If that's something that is promising, or if it's a bit of fluff, I'd really like to get to know your opinions.
+
+<img src="/img/community/2026-07-01/image005.webp" alt="Aditya's Excalidraw sketch: a client making a long-running request into a single wasmCloud workload box, the starting point for the cancellation discussion." />
+
+**Bailey Hayes** [24:45](https://youtu.be/xhMzyk0QX-o?t=1485)
+
+I've been working on a very similar problem. Do you want to share your Excalidraw real quick? We'll multiplayer it for a second. Here, I can make another one, but also happy to edit yours.
+
+**Aditya Salunkhe** [25:06](https://youtu.be/xhMzyk0QX-o?t=1506)
+
+Oh, live collaboration! Wait — oh, got it.
+
+**Bailey Hayes** [25:15](https://youtu.be/xhMzyk0QX-o?t=1515)
+
+Okay. So if you don't mind sharing, I want to show you one thing.
+
+**Aditya Salunkhe** [25:20](https://youtu.be/xhMzyk0QX-o?t=1520)
+
+Okay, just a minute. Yep.
+
+**Bailey Hayes** [25:25](https://youtu.be/xhMzyk0QX-o?t=1525)
+
+You know, in a workload, we break it apart into a couple of different things, right? You may have any number of components, and the thing that is actually doing the work — let's say, like in Bharat's demo. Let's name them: model audio, transcriber, responder. I'm not an artist, so we're going to do two.
+
+So basically, a couple of the problems that you run into: today, these are all on the same store, so they're all sitting on top of the same store, and that's basically how you're wiring them up together. And in your last PR, that's now available in — basically, let me move this down — `run-concurrent` is effectively the call that we make to kind of pass things around and wire these up. It's kind of weird drawing it straight off the store, but bear with me. That's basically how these things are linked together, and so this is how you're passing them along, and you're letting these have ephemeral stores so that they're not long-running, so that they're not retaining resources when they're not doing work.
+
+So I had an idea, and I'm about to put a PR up for it. We talked about it maybe a week ago or maybe two weeks ago, but here's my idea: have one for the components —
+
+<img src="/img/community/2026-07-01/image006.webp" alt="Bailey's diagram of the store split: a long-lived service in front of the workload, with model-audio and transcriber-responder components sitting on their own ephemeral stores." />
+
+**Aditya Salunkhe** [27:10](https://youtu.be/xhMzyk0QX-o?t=1630)
+
+The service having its own store.
+
+**Bailey Hayes** [27:12](https://youtu.be/xhMzyk0QX-o?t=1632)
+
+Yeah, exactly. And so if you break it up like this, you still have what you had here, right? And that's why I was like, okay, these changes are largely complementary. So you still solve it this way with ephemeral stores, but for services, when you have long-running work — which is what services are designed for — it would sit here.
+
+And what that would allow you to do is make this be — you know, you can give it a name like "front door." Effectively that's what this is. And so because now we can have multiple imports and exports on things, it lets you do some cool new architectures.
+
+So that's one architecture, right? Of like, this is how we could do long-lived. Let me talk through it. Long-running stream request. And what we really want is: okay, front door, I want you to actually route it basically to this for the actual HTTP response, while these two are doing the work concurrently, working through the audio processing and transcribing, and this one's responding back out to this long-running client.
+
+And so the challenge you have here is that this one is going to be where the CPU-intensive task is, right? And everything else is actually lightweight and doesn't actually need to be necessarily running all the time — but we need persistence, so they still have their store here. But the components themselves just need to awake on async call await. Now, if you do it this way, basically these guys will be lightweight, and if you break up the store here, now this thing can continue to process more concurrent tasks as they come in. So then you can create more instances of this for different requests. That would allow this one workload to actually grow based on whatever concurrency setting we want to set for this.
+
+**Aditya Salunkhe** [29:19](https://youtu.be/xhMzyk0QX-o?t=1759)
+
+So it would just run on a single service, right?
+
+**Bailey Hayes** [29:23](https://youtu.be/xhMzyk0QX-o?t=1763)
+
+So the service would be the long-running thing, and that's what it would use to determine the concurrency. But let me give you a different example. Let's do something a little bit more CRUD-like, something a little bit more simple. Let me just kind of keep it here, right? And then all of these basically use the `run-concurrent` API.
+
+So let's say we're doing users and accounts, and these both export HTTP handler, right? Now, if they both export HTTP handler today, you don't know which one to call. Well, not yet — but with `implements`, right? Here's your use case for why have a label. So if we have this one and same here, and then what that allows you to do is — this is actually an API gateway, spelled incorrectly, right? Like this.
+
+And so why would you want to have an API gateway like this? You might say, okay, Bailey, but I could have put it here, right? I could have done this, and I could have a gateway. And I guess what I'm telling you is: why not both? And the reason why it would be helpful when you have it here at this layer is because these two talk to each other a lot. Super hot — when you're talking to a user service, you probably want to talk about its account, right? And what org they belong to and everything else. And probably the way this workload is shaped, the lifetimes of this workload, of the components inside it, and of the requests as they come in — they're going to scale together. They scale almost linearly right next to each other.
+
+So put them in the same workload, let them have the same tenant, have them share resources, make them extremely efficient together — but also still allow you to take advantage of being able to modularize your code, so you don't have to have the team that develops users and the team that develops accounts have to ship in lockstep. They can still build a semantic API and ship independent of each other. So that's why I think this would be an interesting way to do it.
+
+Now, that's separate from: how the heck do we handle cancellation in this scenario? And I think the answer is what you said. I think we're still managing the `run-concurrent` calls here, right? And then we can wrap that in the epoch invocation handler, and that would help us percolate the cancellation.
+
+<img src="/img/community/2026-07-01/image007.webp" alt="The CRUD variant of the same architecture: a client hitting an API gateway service that routes by implements name to separate users and accounts components, each exporting an HTTP handler inside one workload." />
+
+**Aditya Salunkhe** [32:21](https://youtu.be/xhMzyk0QX-o?t=1941)
+
+Right. Yeah, but I had a question about the service. You said the workload would only have a single service, or —
+
+**Bailey Hayes** [32:32](https://youtu.be/xhMzyk0QX-o?t=1952)
+
+Right now, yes.
+
+**Aditya Salunkhe** [32:33](https://youtu.be/xhMzyk0QX-o?t=1953)
+
+Okay, right now. Okay, exactly.
+
+**Bailey Hayes** [32:35](https://youtu.be/xhMzyk0QX-o?t=1955)
+
+So right now, the way it would be is one to many: one instance here, maybe many instances of components.
+
+**Aditya Salunkhe** [32:46](https://youtu.be/xhMzyk0QX-o?t=1966)
+
+Okay, that makes sense.
+
+**Bailey Hayes** [32:47](https://youtu.be/xhMzyk0QX-o?t=1967)
+
+And that's how you would be able to handle a router guy who's long-lived and stateful, and understanding the state of the workloads that are in play, and then be able to do a lot of different things. So, like, why have an API gateway here? I didn't even say — there's so many things you can do, but specifically for the problem that you're talking about: implement a circuit breaker here. And probably everybody's familiar with, like, Claude saying "I'm throttling your request right now." That's where it would do that, and it wouldn't have to go down to the component. And so you can share all that type of logic there.
+
+**Aditya Salunkhe** [33:22](https://youtu.be/xhMzyk0QX-o?t=2002)
+
+Yeah, that makes sense. And what do you think about having more visibility about the long-running stuff that's running in your workloads? For instance, health checks — like a job, when you invoke and you forget about the request, but the long-running action is still running within the workload.
+
+**Bailey Hayes** [33:44](https://youtu.be/xhMzyk0QX-o?t=2024)
+
+So we actually already have kind of the concept of health checks. It's just not really used or wired up. But the idea was to place it exactly right here, to report that status. And that would allow you to say, okay, by default, like the service — it knows whether or not it's getting the right kind of, right-size request for its components, and so you have all that shared logic there. Just like why people build sidecars to begin with, right? Same kind of idea, just encapsulated with components. I would put them here, and there's no reason that you couldn't also put it here, right? Like, you can do both.
+
+Oh yeah, yeah, yeah. Whoever added this, Joyous Falcon — you're totally right. Okay, yes. So we already do OTel for HTTP, and I think I got all the P3 semantic conventions for streaming done. It should be working in that way, and it should surface for any of the cancellation that we do. Like, all that instrumentation that we do to make this work, we should make sure is well captured in OTel — basically with a bang, instrument it. But yes, I agree, OTel is definitely part of it.
+
+I think there's: how do I do health checks? I think you want one resolution for the workload. What's the health of the workload? I think if you have a service in it and it exports an HTTP handler, that probably should be it. But I would also be okay if we wanted to also support this, right?
+
+<img src="/img/community/2026-07-01/image008.webp" alt="The same gateway diagram annotated during the discussion with health checks at the service layer and a circuit breaker on the API gateway." />
+
+**Aditya Salunkhe** [35:45](https://youtu.be/xhMzyk0QX-o?t=2145)
+
+Yeah.
+
+**Bailey Hayes** [35:46](https://youtu.be/xhMzyk0QX-o?t=2146)
+
+This type of pattern — that could be okay too. But thoughts?
+
+**Aditya Salunkhe** [35:51](https://youtu.be/xhMzyk0QX-o?t=2151)
+
+Thoughts on defaulting it to host magic, so that it's like plug-and-play for all the workloads? And do you see this getting implemented in the host itself — the whole cancellation deal?
+
+**Bailey Hayes** [36:09](https://youtu.be/xhMzyk0QX-o?t=2169)
+
+So I think the cancellation should be transparent, on automagic by us. The part about health checks — I actually think they are literally host magic today, so yes. But just, why could components take this, right? Components can import `wasi-otel`, right?
+
+**Aditya Salunkhe** [36:35](https://youtu.be/xhMzyk0QX-o?t=2195)
+
+Yep.
+
+**Bailey Hayes** [36:36](https://youtu.be/xhMzyk0QX-o?t=2196)
+
+And the reason why they would want to do that is that they want to enrich it, for whatever reason. A better example would be: model audio knows it's going to take a minute, and maybe that work of breaking down the different parts of doing inferencing on that model is interesting, and so it's going to emit different spans and it wants control over that — to say like, "all right, we're doing the big one now," and "we just finished the big one, but give me another 30 seconds, the next answer is going to be here soon," right?
+
+So the reason why you want components to be able to have enriched OTel is the same reason why you want to be able to allow workloads to surface their own health checks if they have them, because there might be more things that they're checking, like an external service, right? Like, they might be talking to some database that's not up. And if the database is down, they're down.
+
+**Aditya Salunkhe** [37:33](https://youtu.be/xhMzyk0QX-o?t=2253)
+
+Makes sense. So health check on the component side, but cancellation is to be transparent on the host side.
+
+**Bailey Hayes** [37:45](https://youtu.be/xhMzyk0QX-o?t=2265)
+
+I think it should be. I mean, anybody should be able to — it should bubble up, right? Like, I should be able to, as a guest, cancel my long-running request in progress, right? So from that perspective, the guest can trigger this cancellation, but it's our job to transparently clean it up. We shouldn't expect, after we've done a cancellation, workload implementers to actually have to know or care how to handle that.
+
+**Aditya Salunkhe** [38:11](https://youtu.be/xhMzyk0QX-o?t=2291)
+
+Yeah, because it adds to the developer implementation complexity, I guess.
+
+**Bailey Hayes** [38:19](https://youtu.be/xhMzyk0QX-o?t=2299)
+
+Yes, exactly. And I mean, it should all just work, TM, with streams and futures like that. That is supposed to be built into the ABI and the bindings, so we're supposed to be able to transparently handle that. Frank, you've had your hand up for a while.
+
+**Frank Schaffa** [38:38](https://youtu.be/xhMzyk0QX-o?t=2318)
+
+Yes, actually, it's already dormant.
+
+**Aditya Salunkhe** [38:44](https://youtu.be/xhMzyk0QX-o?t=2324)
+
+Should I stop sharing? Sorry.
+
+**Frank Schaffa** [38:46](https://youtu.be/xhMzyk0QX-o?t=2326)
+
+No, no, this is fine. Keep sharing. This is good.
+
+So, a couple of comments here. One, it would be great to have a sequence diagram here to document those things, because this is the client — since this is asynchronous, it's probably fire-and-forget, and it's probably just gaining an ID back. And so I think it would be key from a security point of view that you can only handle, for instance — if you're going to cancel something, only things that you own. You don't want to be able to randomly go off and kill other things, because the runtime is still a shared resource.
+
+**Bailey Hayes** [39:36](https://youtu.be/xhMzyk0QX-o?t=2376)
+
+So let's talk to that one just really briefly. Guests are workload-tenanted, which means the tenancy here is this box for guests. They can't impact anything external to that box. But in theory, if accounts cancels a long-running request, users is going to obviously know that that got canceled, and then perhaps if service had routed to it, it would also bubble up to it. But it wouldn't bubble out to other workloads. So in terms of the security posture, it'd be all internal to here.
+
+**Frank Schaffa** [40:13](https://youtu.be/xhMzyk0QX-o?t=2413)
+
+Okay, cool. The other thing is actually not just being able to cancel, but it's actually to see progress. Then the client itself can say, "Okay, is stuff here stuck, or am I seeing progress? And if I'm not seeing progress, where is the point?" For instance, is the database down, and so forth, so I can take an action. So I think this would be useful to know. I mean, since we have the ID back, you can have a whole slew of things that you can do in terms of, okay, how should I react to this?
+
+**Bailey Hayes** [40:49](https://youtu.be/xhMzyk0QX-o?t=2449)
+
+Yeah, I think the OTel trace is definitely the way that I would recommend for that, for anybody that's serving some type of long-running request. In terms of dashboards, we just work — again, that's why I did the semantic conventions.
+
+**Frank Schaffa** [41:07](https://youtu.be/xhMzyk0QX-o?t=2467)
+
+Yeah, but actually, I think that the OTel would be great, and maybe OTel can actually take the role of health check. But I just — like a winner dashboard. I'm thinking mostly from the API point of view, because at the end, a dashboard is just invoking things and showing you this on a dashboard. But I'm thinking more from: what are you exposing from an API point of view?
+
+**Bailey Hayes** [41:36](https://youtu.be/xhMzyk0QX-o?t=2496)
+
+Yeah, well, I think in that domain — like, when it's what are you servicing as a FaaS or REST service — that's going to be more about your RESTful API, on whether or not you surface pagination, chunking as part of your API. Chunking is probably what most people are conventionally most familiar with, with OCI. Not a lot of people have leaned super deep into streaming yet, although it's getting a little bit better. I think the OCI spec, for example, has a really great streaming RESTful API to reference. But I guess my point there is, for being able to show progress, it's going to be specific to the API itself that you're calling.
+
+**Frank Schaffa** [42:18](https://youtu.be/xhMzyk0QX-o?t=2538)
+
+Right. Yes. So it means the implementation is to know how to do this, but I think that at least having the capability will be useful.
+
+The other thing is from a scalability point of view. So you mentioned the box, but the service is common, right? I'm not going to get an instance of a service every time I make a call. Or —
+
+**Bailey Hayes** [42:48](https://youtu.be/xhMzyk0QX-o?t=2568)
+
+The service itself is long-running. So once you make a call and it hasn't been scaled down, you have that instance hot.
+
+**Frank Schaffa** [42:59](https://youtu.be/xhMzyk0QX-o?t=2579)
+
+But if I make another call, will I create a new instance of the service, or are there — so what's — I'm wondering. So suppose that the client does 1,000 requests all of a sudden. What happens within the big square there?
+
+**Bailey Hayes** [43:23](https://youtu.be/xhMzyk0QX-o?t=2603)
+
+Okay, 1,000 requests all within a second, and let's say you don't have auto-scaling set up. Or do you want to talk through the auto-scaling scenario?
+
+**Frank Schaffa** [43:33](https://youtu.be/xhMzyk0QX-o?t=2613)
+
+No, I mean, we don't want to complicate. At this point, the auto-scaling will spawn new runtimes, right?
+
+**Bailey Hayes** [43:42](https://youtu.be/xhMzyk0QX-o?t=2622)
+
+Yeah. Okay, well — no. It also auto-scales the workloads themselves on the runtime. So it also handles how many of these workloads are placed, and so that's why workloads themselves have their own kind of concurrency model to them.
+
+**Frank Schaffa** [44:04](https://youtu.be/xhMzyk0QX-o?t=2644)
+
+Okay. So just to clarify then: if I make a single request, am I going to get this box here? If I make two requests, am I going to get two boxes? Because I mean, if I look from a service and so forth, at some point, even if it's long-running, I'm going to have something that actually keeps a state of my requests individually, right?
+
+**Bailey Hayes** [44:34](https://youtu.be/xhMzyk0QX-o?t=2674)
+
+So in the scenario where you've got one host, you don't auto-scale workloads, you don't have workload replicas set or workload instances set — in that scenario, the way that would work if you had two requests come in at the same time, you would get one of these boxes, one workload box. You'd get one service box.
+
+**Aditya Salunkhe** [45:03](https://youtu.be/xhMzyk0QX-o?t=2703)
+
+So the service will get shared between the two requests?
+
+**Bailey Hayes** [45:06](https://youtu.be/xhMzyk0QX-o?t=2706)
+
+Right.
+
+**Frank Schaffa** [45:08](https://youtu.be/xhMzyk0QX-o?t=2708)
+
+How are those decisions made? So, for instance, if I want to have one workload, let's say with a single request — what governs the scalability? You mentioned that, okay, I'm going to have a different user if I have two requests. But I'm just thinking that this can become very complex if we start having — because I mean, even users and accounts and access to the database and so forth can be all asynchronous. So the state can really explode, and I'm wondering what's the bounding box here. Okay, I'd rather have, let's say, a service taking care of one instance, and if we get another one, just replicate that. So I'm just wondering where the boundaries for those things are.
+
+**Bailey Hayes** [46:16](https://youtu.be/xhMzyk0QX-o?t=2776)
+
+Yeah, you basically just said it there. Think of a service as one-to-one with the workload instance. And so for more workloads, you would scale workloads, and that's the auto-scaling feature that we actually have now. And that's based on metrics of the workload.
+
+**Jeremy Fleitz** [46:38](https://youtu.be/xhMzyk0QX-o?t=2798)
+
+Oh, sorry. So Bailey, if you scale to say five workloads, obviously you would have five users, five accounts right there. Would you have five services?
+
+**Bailey Hayes** [46:49](https://youtu.be/xhMzyk0QX-o?t=2809)
+
+You would have five services if you had five workloads. You could, in theory, have zero instances running of users.
+
+**Jeremy Fleitz** [47:00](https://youtu.be/xhMzyk0QX-o?t=2820)
+
+Yes. Good call. Yep.
+
+**Bailey Hayes** [47:01](https://youtu.be/xhMzyk0QX-o?t=2821)
+
+Yeah. So it does influence your design, right? If you're the architect of the system, if you were adopting this architecture, you would want the service to be very lightweight. What that would look like is much like what Envoy does today, right? They know they're on the hot path. They know they're making immediate requests in and out, and then they pass them through very quickly.
+
+**Frank Schaffa** [47:27](https://youtu.be/xhMzyk0QX-o?t=2847)
+
+Yes, but with Envoy, it's a single point, right? And if we're scaling, so per request we create a different instance — then I don't know. I just think that Envoy, I mean, it's just routing stuff. It doesn't have all the logic and all the synchronous stuff that you can have in a workload.
+
+**Bailey Hayes** [48:03](https://youtu.be/xhMzyk0QX-o?t=2883)
+
+Envoy also has the challenge of having to solve for streaming, which is obviously also in a lot of cases async, and they solve it for both HTTP/2 and HTTP/3 style streaming. And so in that way it is fairly similar. And it's also why we adopted this pattern — that's why you get basically one service to one workload. If you need a thing that is the stateful thing, then it's there, and the rest of those ephemeral stores, obviously, they're meant to be stateless and bursty.
+
+**Frank Schaffa** [48:39](https://youtu.be/xhMzyk0QX-o?t=2919)
+
+Okay. And the difference between having, let's say, a service which is for long-running, or just a function call — it shouldn't be that different.
+
+**Bailey Hayes** [49:00](https://youtu.be/xhMzyk0QX-o?t=2940)
+
+Yeah, I mean — actually, Aditya, let's do another one. I'm going to take this one here, because this is also a fair shape. You could just have this: nothing long-running at all in it, if you don't need it for your workload. So if you've got a true FaaS-style workload, this would work just as fine. And being asynchronous —
+
+**Frank Schaffa** [49:38](https://youtu.be/xhMzyk0QX-o?t=2978)
+
+You can have all the information to cancel and to run OTel and so forth.
+
+**Bailey Hayes** [49:44](https://youtu.be/xhMzyk0QX-o?t=2984)
+
+Exactly. Yeah, and that's why we would want individual components to also have that same ability to expose things.
+
+**Aditya Salunkhe** [49:52](https://youtu.be/xhMzyk0QX-o?t=2992)
+
+And Frank, I think you mentioned something about having authorization, so that only the origin that invokes the workload invocation should be able to cancel that. I think what we can do is have a very lean cancel type or a job host plugin that tracks the context of those incoming calls, and implement — either on the guest side or the host side — we could just implement authorization checks right in the guest itself, so that we could just have a very lean cancellation validator. How does that sound, Bailey?
+
+**Bailey Hayes** [50:36](https://youtu.be/xhMzyk0QX-o?t=3036)
+
+I don't have a picture of it yet. I've got to see the code.
+
+**Aditya Salunkhe** [50:41](https://youtu.be/xhMzyk0QX-o?t=3041)
+
+Okay.
+
+**Bailey Hayes** [50:42](https://youtu.be/xhMzyk0QX-o?t=3042)
+
+But I think the words you said sound right. I just got to make sure it works. Yeah, and you're typing that now. Yeah, I saw the store ID. It was actually basically dead code, but I didn't push to get it removed, because I'm going to need it for the service work, and I figured there's more to add.
+
+**Bailey Hayes** [51:40](https://youtu.be/xhMzyk0QX-o?t=3100)
+
+I also just think this is a case of, we need more examples that show these different types of architectures. And once you have the concrete examples written, you know, it's way easier than these diagrams to see what we're talking about, and we can generate the flow diagrams from them, which I think is helpful. And I also — I mean, it might just show that I've been doing development for a while, but you know, I go back to print lines. Like, just give me the print lines of what this thing ran, just print those out, and then I'll look at them from there.
+
+**Frank Schaffa** [52:18](https://youtu.be/xhMzyk0QX-o?t=3138)
+
+Well, I like sequence diagrams, because then you know what's the sequence of things, and actually what information you're carrying from stage to stage.
+
+**Bailey Hayes** [52:34](https://youtu.be/xhMzyk0QX-o?t=3154)
+
+They're getting a lot easier to produce now. You know, you can get a HAR file or your OTel trace, and then we can generate sequencing from all of those.
+
+**Frank Schaffa** [52:47](https://youtu.be/xhMzyk0QX-o?t=3167)
+
+Or just ask whatever tool you're using to produce a PlantUML file.
+
+**Bailey Hayes** [52:57](https://youtu.be/xhMzyk0QX-o?t=3177)
+
+Is that what you like best, PlantUML?
+
+**Frank Schaffa** [53:00](https://youtu.be/xhMzyk0QX-o?t=3180)
+
+I mean, I use PlantUML all the time, but there are other things out there.
+
+**Bailey Hayes** [53:08](https://youtu.be/xhMzyk0QX-o?t=3188)
+
+ASCII — but that's why I'm asking, because I'll put whatever, you know. I don't have a preference.
+
+**Frank Schaffa** [53:17](https://youtu.be/xhMzyk0QX-o?t=3197)
+
+Well, does anyone else have other preferences for sequence diagrams?
+
+**Aditya Salunkhe** [53:27](https://youtu.be/xhMzyk0QX-o?t=3207)
+
+Sequence diagram — I could make that up a bit later. What process do you want the sequence diagram for?
+
+**Bailey Hayes** [53:42](https://youtu.be/xhMzyk0QX-o?t=3222)
+
+Show a concurrent async request that's doing streaming, doing cancellation.
+
+**Aditya Salunkhe** [53:49](https://youtu.be/xhMzyk0QX-o?t=3229)
+
+Okay, makes sense. Yeah, sure. I'll have that, and I'll just post that in the wasmCloud Slack, if that's fine.
+
+**Frank Schaffa** [53:59](https://youtu.be/xhMzyk0QX-o?t=3239)
+
+Yeah, that would be great.
+
+**Bailey Hayes** [54:01](https://youtu.be/xhMzyk0QX-o?t=3241)
+
+The other pro tip I have, Aditya, if you haven't used it yet — since you're using Excalidraw here, the Excalidraw MCP server is really good. Really, really good. So I dropped another diagram that was 100% Claude and Excalidraw down at the bottom, and this is what it'll look like with host components. But it's the same exact idea of what we drew for services being long-running, by breaking up the stores. It's the exact same thing, but at the host level.
+
+**Aditya Salunkhe** [54:39](https://youtu.be/xhMzyk0QX-o?t=3279)
+
+Oh, this looks really good.
+
+**Jeremy Fleitz** [54:42](https://youtu.be/xhMzyk0QX-o?t=3282)
+
+It definitely gives you a great starting point, for sure.
+
+**Bailey Hayes** [54:57](https://youtu.be/xhMzyk0QX-o?t=3297)
+
+This was awesome. We should have more discussions like this.
+
+**Aditya Salunkhe** [55:00](https://youtu.be/xhMzyk0QX-o?t=3300)
+
+Really should, yeah. Okay, I'll just quickly go through this. So what I meant was, we have a plugin that — so if you have a request that comes in from the client, we register that request. We generate a unique ID for that, and we store that store ID and the context, and we keep a handle over that store. And basically, if we get an incoming request to cancel that same ID, we first validate it through a simple guest invocation before we call the cancel. And when we do that, it basically flips the state of the internal cancel handle. And we basically have something called epoch interrupt in Wasmtime, which I'll try to see if I can find.
+
+<img src="/img/community/2026-07-01/image009.webp" alt="Aditya's cancellation-flow diagram: a plugin tracking store IDs registers each incoming long-running stream, validates a cancel request against that ID, and interrupts the CPU-intensive component while the rest of the workload runs on ephemeral stores." />
+
+**Frank Schaffa** [56:02](https://youtu.be/xhMzyk0QX-o?t=3362)
+
+And is this true for all the runtimes? Is this part of the API for the runtimes?
+
+**Bailey Hayes** [56:13](https://youtu.be/xhMzyk0QX-o?t=3373)
+
+This is definitely Wasmtime-specific. Just like our `run-concurrent` — that's largely part of the Wasmtime API surface. And a lot of what we're talking about going across stores, that's also Wasmtime-specific API. And then this epoch is on the store itself.
+
+**Frank Schaffa** [56:38](https://youtu.be/xhMzyk0QX-o?t=3398)
+
+So maybe you should highlight that we're putting more and more effort in terms of Wasmtime.
+
+**Bailey Hayes** [56:46](https://youtu.be/xhMzyk0QX-o?t=3406)
+
+Oh, I mean, the wash runtime is, you know, Wasmtime embedded. I mean, that's definitely what it is. But yeah, we certainly should and could.
+
+**Frank Schaffa** [57:03](https://youtu.be/xhMzyk0QX-o?t=3423)
+
+Is it our RISC-V architecture here?
+
+**Bailey Hayes** [57:08](https://youtu.be/xhMzyk0QX-o?t=3428)
+
+Yeah. Well, I mean, I guess that's the big thing to highlight — that Wasmtime now has lots of different modes that we could start exploring. I don't know if you all saw in the release notes, we have s390x now, because Wasmtime has s390x, which is mainframes. So yeah, you want RISC-V, you want ARM32, you want whatever — Wasmtime with a lot of its modes now is rapidly expanding and solving embedded, microcontroller, and legacy infrastructure cases.
+
+**Jeremy Fleitz** [57:48](https://youtu.be/xhMzyk0QX-o?t=3468)
+
+Just not 6502 or Z80 yet, by the way. LOL.
+
+**Aditya Salunkhe** [57:58](https://youtu.be/xhMzyk0QX-o?t=3478)
+
+Well, I got a bit carried away there, and I think I should probably have something with code, so it's much easier to understand. So we at Betty Blocks have been working on this and will be working on this. So do you think I should pull up a PR on wasmCloud?
+
+**Bailey Hayes** [58:22](https://youtu.be/xhMzyk0QX-o?t=3502)
+
+Yeah, I think yes.
+
+**Aditya Salunkhe** [58:26](https://youtu.be/xhMzyk0QX-o?t=3506)
+
+And discuss it at the roadmap session next week.
+
+**Bailey Hayes** [58:30](https://youtu.be/xhMzyk0QX-o?t=3510)
+
+I ran into wanting this right away. The break-apart of the stores I should have up later today. I was trying not to do it dirty again with a giant PR, so I was trying to break it down. I haven't been able to break it down, but it works end to end, and I've been adding a ton of different types of test cases for it. That's where I've been spending a lot of my time now. But I could go ahead and get it in a draft so you can see it, and then I think basically that's like 70-75% of what we discussed, and then the epoch invocation wrapper would be the cancellation path. So that would be its own thing.
+
+**Frank Schaffa** [59:15](https://youtu.be/xhMzyk0QX-o?t=3555)
+
+Yeah. Quick question: is the cancellation going to be synchronous?
+
+**Aditya Salunkhe** [59:21](https://youtu.be/xhMzyk0QX-o?t=3561)
+
+I think both.
+
+**Frank Schaffa** [59:24](https://youtu.be/xhMzyk0QX-o?t=3564)
+
+Well, because if it is async, we get into: okay, did it work? Did it work, or where is it stuck?
+
+**Bailey Hayes** [59:33](https://youtu.be/xhMzyk0QX-o?t=3573)
+
+Well, they would definitely potentially be happening on different processes. So there's no way to avoid cancellation not having some asyncness to it, and that's where we'll have to add drains and timeouts to prevent that from leaking.
+
+**Aditya Salunkhe** [60:00](https://youtu.be/xhMzyk0QX-o?t=3600)
+
+And by the way, we did try to do something of a cancellation thing using NATS, and basically implement cancellation listeners to race against the actual job. So you have two futures: one is the actual job, or the async suspension point that's communicating between one component to, let's say, an external call or another component. And we have the second future that basically does `kv.watch` on NATS — it's basically through a very tiny host plugin — and what happens is it watches for the cancel ID to be flipped on the KV side, and when it's flipped, it early-returns the future and it gracefully tears down the whole invocation path.
+
+But I think that's a bit expensive on the developer side, and we just wanted something way less gimmicky, to not have to figure out the suspension points or the cancellation stuff — which is why me and Maze (hi, if you're watching this) came up with the whole cancellation stuff.
+
+**Bailey Hayes** [61:19](https://youtu.be/xhMzyk0QX-o?t=3679)
+
+Cool. I haven't gotten to meet Maze yet, but yeah, we should. This is definitely on the next roadmap, but don't wait on it. I think we need it now.
+
+**Aditya Salunkhe** [61:30](https://youtu.be/xhMzyk0QX-o?t=3690)
+
+I can expedite it.
+
+**Bailey Hayes** [61:33](https://youtu.be/xhMzyk0QX-o?t=3693)
+
+Because I flagged a few of the follow-up items — basically also that if we had a capture for cancellation, I think that would have solved at least one of them, and I fixed one more, and then the separation of the stores change is one more of those. So basically —
+
+**Aditya Salunkhe** [61:52](https://youtu.be/xhMzyk0QX-o?t=3712)
+
+Seventy-five percent.
+
+**Bailey Hayes** [61:52](https://youtu.be/xhMzyk0QX-o?t=3712)
+
+— answers all of it. Yeah, exactly.
+
+**Aditya Salunkhe** [61:57](https://youtu.be/xhMzyk0QX-o?t=3717)
+
+Yeah, this is really nice. Ooh, but we also have the precompiled stuff.
+
+**Bailey Hayes** [62:04](https://youtu.be/xhMzyk0QX-o?t=3724)
+
+Oh my goodness! I don't know yet. I don't have a great answer there.
+
+**Aditya Salunkhe** [62:08](https://youtu.be/xhMzyk0QX-o?t=3728)
+
+No, no, I'm not — no force, no pressure on this.
+
+**Bailey Hayes** [62:11](https://youtu.be/xhMzyk0QX-o?t=3731)
+
+Actually, yeah, I think we should. I mean, that's definitely — that's going to be, you know, when you do quarterly planning, you plan your big rocks first, and then you do little rocks around them. And a lot of people make the mistake of doing their little rocks first, because they're fun and tiny and easy to do. Have you heard that phrasing? Anyways, that's our big rock. That's one of our big rocks. We've got to do that one early and get the design right on that.
+
+But the other one is instance reuse. We've got to start working on that too, and that one's way harder given the architecture we just drew. It's super easy if you just compose them all together — you're like, boom, bada boom, it solves the whole problem.
+
+**Aditya Salunkhe** [62:56](https://youtu.be/xhMzyk0QX-o?t=3776)
+
+Pack them together.
+
+**Bailey Hayes** [62:58](https://youtu.be/xhMzyk0QX-o?t=3778)
+
+But with what we drew, you can see there's just a lot more power there.
+
+**Aditya Salunkhe** [63:02](https://youtu.be/xhMzyk0QX-o?t=3782)
+
+Yeah. Component graphs, interdependencies — it's a lot to manage. But yeah, it's fun stuff.
+
+**Bailey Hayes** [63:12](https://youtu.be/xhMzyk0QX-o?t=3792)
+
+Yeah. All right. Well, hey, we went over, but I'm glad we did. Thanks for the awesome discussion.
+
+**Jeremy Fleitz** [63:21](https://youtu.be/xhMzyk0QX-o?t=3801)
+
+All right.
