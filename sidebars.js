@@ -45,6 +45,7 @@ const sidebars = {
           link: { type: 'doc', id: 'overview/hosts/index' },
           items: [
             'overview/hosts/plugins',
+            'overview/hosts/trigger-services',
           ],
         },
         'overview/interfaces',
@@ -69,6 +70,7 @@ const sidebars = {
       link: { type: 'doc', id: 'runtime/index' },
       items: [
         'runtime/creating-host-plugins',
+        'runtime/creating-component-host-plugins',
         'runtime/building-custom-hosts',
         'runtime/washlet',
       ],
