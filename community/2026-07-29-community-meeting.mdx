@@ -1,0 +1,194 @@
+---
+date: '2026-07-29'
+title: 'wasmCloud 2.6 Released: Host Components, AI Inference Beyond wasi-nn, and Capability-Driven Security'
+description: 'wasmCloud 2.6 ships host components, concurrency, and trigger services — plus an AI inference plan built on WebGPU and capability-driven security in the Wasm component model.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - host components
+  - trigger services
+  - ai inference
+  - wasi-nn
+  - webgpu
+  - python webassembly
+  - capability-based security
+  - wasi preview 3
+  - webassembly news
+chapters:
+  - { seconds: 12, label: "Welcome: wasmCloud 2.6 is out — try it and share feedback" }
+  - { seconds: 298, label: "New docs for trigger services and host component plugins" }
+  - { seconds: 405, label: "Frank asks: failure modes, fault tolerance, and the test suite" }
+  - { seconds: 521, label: "WASI 0.3.1: map types in WIT and the external-id discussion" }
+  - { seconds: 805, label: "Good first issues and onboarding new contributors" }
+  - { seconds: 1057, label: "Renaming contrib: the awesome-wasmcloud idea and MoonBit history" }
+  - { seconds: 1264, label: "Beyond wasi-nn: the wasmCloud inference plan on WebGPU" }
+  - { seconds: 1680, label: "Python: FastMCP, cooperative threads, and componentize-py" }
+  - { seconds: 1870, label: "Creating the awesome-wasmcloud repo live on the call" }
+  - { seconds: 2238, label: "Distributed cache brainstorm and models as artifacts" }
+  - { seconds: 2412, label: "Maps across the ecosystem: JCO, wit-bindgen, and the C++ gap" }
+  - { seconds: 2850, label: "Capability-driven security and the claims annotation proposal" }
+  - { seconds: 3008, label: "Protobuf extensions, SpiceDB, and centralized authorization" }
+  - { seconds: 3411, label: "Custom annotations in WIT: experimentation vs. standardization" }
+  - { seconds: 3735, label: "Wrap-up and next steps" }
+image: https://i.ytimg.com/vi/x6pGFQAeKQ4/maxresdefault.jpg
+duration: 3806
+showTitle: true
+slug: 2026-07-29-community-meeting
+speakers:
+  - bailey-hayes
+  - liam-randall
+  - aditya-salunkhe
+  - frank-schaffa
+  - jeremy-fleitz
+  - yordis-prieto
+about: wasmCloud
+mentions:
+  - ComponentModel
+  - WASIPreview3
+  - AIInference
+  - WebGPU
+  - Python
+  - capabilityBasedSecurity
+  - JCO
+---
+
+import YouTube from 'react-player/youtube';
+
+{/* Video hero — the whole point of this page */}
+
+<YouTube url="https://www.youtube.com/watch?v=x6pGFQAeKQ4" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=x6pGFQAeKQ4" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The July 29, 2026 wasmCloud community call is the first after the **wasmCloud 2.6** release: Bailey Hayes recaps the headline features — host components, instance pooling with concurrent subtasks, and trigger services — and asks the community to try the release and feed back on the new entity types. From there the call ranges widely: a live-on-stream creation of the new [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud) repo, a sketch of a wasmCloud **AI inference** stack that goes beyond wasi-nn by building chat APIs atop `wasi-webgpu`, the state of Python and cooperative threads, and a long design discussion with Yordis Prieto on **capability-driven security** and custom annotations in the **Wasm component model**.
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **wasmCloud 2.6 is out — and the rate of change is deliberately slowing** — the release landed the day before the call with host components, a raft of performance and isolation work, and trigger services; Bailey's ask is simple: try it, build against the new entity types, and send feedback before the next wave of changes
+- **Concurrent subtasks are a big performance win for I/O-bound workloads** — 2.6's instance pool keeps stores alive between requests, and with WASI P3 the host now threads multiple requests into the *same* pooled instance concurrently, so components that used to sit idle awaiting network responses can service other requests while they wait
+- **Trigger services put ingress and egress under fine-grained control** — you can now define exactly how requests enter and leave your workload, and the [trigger services docs](/docs/overview/hosts/trigger-services/) and [component host plugins guide](/docs/runtime/creating-component-host-plugins/) are live, with architecture diagrams and operator guidance next on Bailey's list
+- **Failure modes are documented in the test suite first** — answering Frank Schaffa's request for recovery documentation, Bailey pointed to the HTTP trigger-service integration tests as the user stories for fault tolerance: how services restart, how the host decides a workload has failed, and how crash-loop backoff kicks in
+- **WASI 0.3.1 adoption is queued for a vote** — map types in WIT are pure ergonomic sugar (no ABI change, a `wash`-side flag at most), the `implements` API has landed across the ecosystem, and the open question is what belongs in an `external-id`: Bailey's framing is Kubernetes-annotation-style metadata written by automation, not by developers
+- **awesome-wasmcloud was created live on the call** — rather than repaving [contrib](https://github.com/wasmCloud/contrib), the group voted to archive it as v1 and start [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud) for community-maintained components, host plugins, workload examples, and tools, with Bharat's AI workflow demo as the first entry and Aditya Salunkhe curating good first issues from Slack suggestions
+- **The wasmCloud inference plan does an end-run around wasi-nn** — instead of wasi-nn's machine-specific, hard-to-sandbox model serving, the sketch is a P3 chat/prompt API (stream in, stream out) served by swappable model-serving components (Candle, llama.cpp) that import a `wasi-webgpu` host component — an API that already ships P3-asyncified in 2.6; Mendy Berger has a working prototype he'll show at the WebAssembly CG
+- **Python is closing in on first-party support** — FastMCP already works under componentize-py, a wasi-sdk RC with cooperative threads is out, and the exception-handling blocker for green threads is fixed; the milestone is a CPython built on cooperative threading so prebuilt native extensions can ship as portable Wasm components instead of every user rebuilding Fortran-era native code
+- **A `claims` annotation could bring fine-grained import security** — today capability-driven security means splitting read and write APIs into separate interfaces; the proposal adds an annotated type so imports can carry claims like read/write and a component's final import set only includes what it asked for — an "extra-small t-shirt" compared to the extra-large of optional imports
+- **Yordis made the case for extensible WIT** — drawing on his Trogon IAM service (SpiceDB for enforcement, JetStream for management), he argued WIT should open protobuf-style extension points for experimentation; Bailey's plan is to prototype claims and generic attributes in the custom metadata section before pushing anything into the ABI
+
+## Chapters
+
+- [0:12 — Welcome: wasmCloud 2.6 is out — try it and share feedback](https://youtu.be/x6pGFQAeKQ4?t=12)
+- [4:58 — New docs for trigger services and host component plugins](https://youtu.be/x6pGFQAeKQ4?t=298)
+- [6:45 — Frank asks: failure modes, fault tolerance, and the test suite](https://youtu.be/x6pGFQAeKQ4?t=405)
+- [8:41 — WASI 0.3.1: map types in WIT and the external-id discussion](https://youtu.be/x6pGFQAeKQ4?t=521)
+- [13:25 — Good first issues and onboarding new contributors](https://youtu.be/x6pGFQAeKQ4?t=805)
+- [17:37 — Renaming contrib: the awesome-wasmcloud idea and MoonBit history](https://youtu.be/x6pGFQAeKQ4?t=1057)
+- [21:04 — Beyond wasi-nn: the wasmCloud inference plan on WebGPU](https://youtu.be/x6pGFQAeKQ4?t=1264)
+- [28:00 — Python: FastMCP, cooperative threads, and componentize-py](https://youtu.be/x6pGFQAeKQ4?t=1680)
+- [31:10 — Creating the awesome-wasmcloud repo live on the call](https://youtu.be/x6pGFQAeKQ4?t=1870)
+- [37:18 — Distributed cache brainstorm and models as artifacts](https://youtu.be/x6pGFQAeKQ4?t=2238)
+- [40:12 — Maps across the ecosystem: JCO, wit-bindgen, and the C++ gap](https://youtu.be/x6pGFQAeKQ4?t=2412)
+- [47:30 — Capability-driven security and the claims annotation proposal](https://youtu.be/x6pGFQAeKQ4?t=2850)
+- [50:08 — Protobuf extensions, SpiceDB, and centralized authorization](https://youtu.be/x6pGFQAeKQ4?t=3008)
+- [56:51 — Custom annotations in WIT: experimentation vs. standardization](https://youtu.be/x6pGFQAeKQ4?t=3411)
+- [1:02:15 — Wrap-up and next steps](https://youtu.be/x6pGFQAeKQ4?t=3735)
+
+## Meeting Notes
+
+### wasmCloud 2.6 Is Out: Host Components, Pooling, and Trigger Services
+
+Bailey Hayes opened the first "Wasm Wednesday" after release day: **wasmCloud 2.6** shipped the previous day, and her stated intention is to slow the rate of change so everyone has a chance to consume the release and provide feedback. Walking the quarter's project board, she recapped the big rocks that landed. **[Host components](/docs/overview/hosts/plugins/)** let you write your own WebAssembly component that provides new interfaces for other workloads to depend on inside the host, building on the `implements` capability that also ships in this release.
+
+The performance story centers on **instance pooling and concurrent subtasks**. The host now keeps an instance pool alive between requests — keeping the Wasmtime store warm, where much of the instantiation cost lives — and with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/), incoming requests are threaded into the pooled instance so one component instance can service multiple requests concurrently. That matters because typical wasmCloud workloads are I/O-bound: instead of an instance sitting idle awaiting a network response, it can pick up other requests while it waits. The API for this was defined back in the 2.0 timeframe; 2.6 finally delivers it. Rounding out the release are **[trigger services](/docs/overview/hosts/trigger-services/)** — fine-grained, user-definable control over both ingress into and egress out of a workload. With the big rocks landed, the one remaining epic on the board is the **distributed cache**; most of what's next is small, incremental changes and new host component plugins.
+
+### Documentation Next: From Happy Paths to Failure Modes
+
+A documentation pass has already refreshed wasmcloud.com with introductions to [trigger services](/docs/overview/hosts/trigger-services/) and [component host plugins](/docs/runtime/creating-component-host-plugins/), and the Kubernetes path is covered end to end. Bailey's next focus is **architecture diagrams** — how concurrency works, how pooling works, how host component plugins work, and the different axes of performance to think about across them.
+
+Frank Schaffa pushed on a gap: the docs show happy paths, but operators need **failure modes and recovery** documented. Bailey agreed, and pointed at where those answers live today — the freshly merged **integration test suite for the HTTP trigger service**, the trigger service most people will rely on. The suite exercises fault tolerance directly: how trigger services restart after a failure, how the host decides a workload has failed, and when it lands in crash-loop backoff. Her framing: the test suite holds the user stories for failure handling, and understanding "what it's like to run these things as an operator" is the next big documentation pass.
+
+### WASI 0.3.1: Maps in WIT and the External-ID Question
+
+Looking upstream, Bailey previewed the **WASI 0.3.1** adoption items she's created tickets for and will schedule a vote on. **Map types in WIT** are available behind a flag today and could be adopted the same way in wasmCloud — the feature is syntactic sugar around the component model rather than an ABI change, so the only place a flag is needed is the [`wash` CLI](/docs/wash/). The win is ergonomic: nicer WIT definitions and nicer language bindings, with nothing to change on the host. The **`implements`** API — which required real host changes — has landed across the ecosystem.
+
+The open design question is **`external-id`**, a second annotation that rode along with `implements`. What should go in an external ID on a workload deployment? Bailey's current thinking: interface configuration already has a great affordance in config values on host interfaces, so external IDs are better understood as metadata that **automated processes** attach for rollout and deployment — more like a Kubernetes *annotation* than a developer-authored *label*. She's collecting feedback on the open discussion (Victor Adossi has already weighed in) and wants a concrete answer on intended use before merging her implementation PR. Adoption moved fast on this one deliberately: she wants it to become a standard quickly, and the reference type — a string value with a name — was nearly free to thread through the ABI spec.
+
+### Good First Issues and a Friendlier Repository
+
+Aditya Salunkhe asked for more attention on **onboarding new contributors**: more good first issues, and a repository that's friendlier to newcomers. He volunteered to mine pain points and add them to the roadmap, and asked everyone to flag small, well-scoped issues as they surface. Bailey's caution from experience: the hard part is the level of detail in the issue itself — old issues around interface versioning, for example, weren't qualified well enough to hand to a first-timer. One candidate she floated: the host does configuration for environment variables by hand while the `wash` CLI uses [Figment](https://github.com/SergioBenitez/Figment), a gap that surfaced while building trigger services — possibly a good first issue, pending Aditya's judgment.
+
+The bigger onboarding lever is language SDKs. Few people write Rust in their day jobs; most arrive with Python, Go, or Java. The model is the [wasmCloud TypeScript](https://github.com/wasmCloud/typescript) repo, kept first-party and up to date over the last quarter, which mirrors the Rust examples plus ecosystem-specific ones — different builders, [Hono](https://hono.dev/), the things TypeScript developers expect. There's "a million and one" equivalents waiting for Python and Go — but step one is giving contributors a repo to contribute to.
+
+### awesome-wasmcloud, Created Live
+
+That repo materialized on stream. Prompted by Bharat's PR against [wasmCloud contrib](https://github.com/wasmCloud/contrib), Aditya asked whether to formalize a new home; Bailey told the history — contrib dates to wasmCloud v1, when a wave of community providers needed a landing zone, including the **[MoonBit](https://www.moonbitlang.com/)** contributors who wanted their WebAssembly-native language (with wit-bindgen support, it compiles straight to components and "just works") surfaced somewhere visible. With Victor voting in chat for a fresh repo, the group converged: archive contrib as v1 and create **[awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud)** — lowercase "c", after a bikeshed Bailey remembered losing years ago — described, by committee, as awesome community-maintained components, host plugins, workload examples, and tools. It will be linked from the main wasmCloud README, Aditya will turn Slack suggestions into good first issues there, and Bharat's AI workflow demo — "the most awesome demo we've seen on wasmCloud v2" — becomes its first example. The default for new contributions stays "contrib first, don't block on us," with one deliberate exception: **Python deserves a first-party repo**, with ergonomic niceties layered on componentize-py the way the Go SDK layers them on generated types.
+
+### Beyond wasi-nn: A wasmCloud Inference Stack on WebGPU
+
+Asked whether Python plus [wasi-nn](https://github.com/WebAssembly/wasi-nn) would be a good combination, Bailey offered a hot take: **"I think we can do better than wasi-nn."** Her critique: wasi-nn's model serving bakes in a machine-specific compilation of a specific model with specific serving parameters — not portable, not run-anywhere, and not easily sandboxable, which is why the proposal has struggled for traction. Often what people actually want when they ask for wasi-nn is just an inference API — a **chat API** — and that's easy to build well on P3.
+
+She sketched the Q3 idea on a whiteboard: a **prompt/chat API** defined as `wasmcloud:llm/inference` with P3's native **stream-in, stream-out** ergonomics; beneath it, a swappable **model-serving component** — a [Candle](https://github.com/huggingface/candle) version like Bharat is playing with, or a [llama.cpp](https://github.com/ggml-org/llama.cpp) version — which imports a **`wasi-webgpu` host component**. The host side already exists: wasmCloud 2.6 ships a P3-asyncified [wasi-webgpu](https://github.com/WebAssembly/wasi-webgpu) API. Any number of workload components can then import `chat` without knowing or caring what serves it — modularized, swappable AI building blocks rather than the monoliths everyone else is building. Mendy Berger has already built a working prototype (he was on vacation, sparing him a live demo) and will show it at the WebAssembly Community Group; he also went deep on the approach versus wasi-nn — including the portability superpower of WebGPU and the rough edges of porting llama.cpp, with fixes contributed upstream — on a recent WebAssembly Unleashed episode Bailey recommended.
+
+### Python: FastMCP, Cooperative Threads, and the Wheel Flywheel
+
+The Python story is accelerating. Bailey has had **FastMCP** working under [componentize-py](https://github.com/bytecodealliance/componentize-py) — the kind of thing most people don't know is possible yet. A **[wasi-sdk](https://github.com/WebAssembly/wasi-sdk) RC with cooperative threads** is available, and the biggest blocker — cooperative threading with exception handling inside Python — is already fixed. Since Python's concurrency leans on green threads, cooperative threads emulate native support cleanly; once a couple more fixes land, "most things in Python will just work." The first milestone is a **CPython built on cooperative threading**, made really nice inside componentize-py and the [Bytecode Alliance](https://bytecodealliance.org/) tooling. The flywheel Bailey wants: Python's perennial problem is that its hot paths aren't Python — they're native code in Fortran-era libraries. Package that native code as a portable WebAssembly component, push it to a registry, and downstream users pull a prebuilt component instead of fighting a native build. "Bob's your uncle."
+
+### Distributed Cache and Models as Artifacts
+
+With the 2.6 rocks landed, the **distributed cache** is the next major epic; Bailey is opening a tracking issue, and Aditya offered a brainstorm session drawing on his team's experience with edge cases, operator-side optimization, and cache cleanup. Bailey wants the design considered together with **artifact types**: the artifact abstraction was always meant to grow beyond components — precompiled `cwasm`, and potentially **models**. Not all models are OCI-referenced today, but letting people write their own operators for model artifacts — while the host guarantees the artifact resolves and hands it to hosts that know how to serve it — would give the ecosystem one base to build on. Nearly every recent wasmCloud demo is someone building agents or their own host for AI workloads, so the pull is real. She drew the line at overlapping with [KServe](https://kserve.github.io/website/), a CNCF project that stands on its own — but wants the brainstorm to cover the "what if you used KServe" path too, so the story is comprehensive either way.
+
+### Maps Land Across the Ecosystem
+
+The maps-in-WIT journey — largely Yordis Prieto's — is nearly complete. Victor Adossi just landed **maps in [JCO](https://github.com/bytecodealliance/jco)**, `implements` went through, and the [wit-bindgen](https://github.com/bytecodealliance/wit-bindgen) support matrix is, in Bailey's words, "look at all that green" — remarkable for a feature where the project usually holds the line at two languages. The stragglers are C++ (whose bindgen doesn't yet support P3 at all) and C#; Bailey reassured Yordis that neither blocks standardization, even if his brain wants every cell green before moving on. The **WASI subgroup votes** on advancing the feature, and Bailey invited Yordis to attend and collect his kudos in person. His next experiments: [Hyperlight](https://github.com/hyperlight-dev/hyperlight) and Wasm for sandboxing.
+
+### Capability-Driven Security, Claims, and Custom Annotations
+
+The deepest discussion of the call was a design conversation between Bailey and Yordis on **capability-driven security** in the component model. Today, fine-grained control means slicing a domain's API across interfaces — read operations in one, write operations in another — so an importer can be granted reads but denied writes. Yordis's counterargument: follow that logic and every mature interface converges toward one function, which fights how people actually model domains in [protobuf](https://protobuf.dev/) or OpenAPI. Bailey's proposal threads the needle: keep the domain in one interface and introduce a new **annotated type — working name `claims`** — so functions carry claims like read or write, and a component's final import resolves to only the subset it declared. In t-shirt sizes, claims is an extra-small; the other half of the story, **optional imports**, is an extra-large she'd leave to Alex.
+
+Yordis pushed further: WIT should be **extensible the way protobuf is**, with options and extension points that let practitioners experiment — his own stack generates WIT from protobuf definitions and centralizes enforcement in an authorization engine built on **[SpiceDB](https://authzed.com/spicedb)** with management on **[JetStream](https://docs.nats.io/nats-concepts/jetstream)**. Bailey, who originally proposed custom annotations and was told no, laid out the middle path: prototype claims plus a **generic attributes** table in the component's custom metadata section — "our favorite hack" — following the pattern already set by `external-id` and `@unstable`, and only push it into the ABI once real production usage proves it out. Her conclusion: with the basics now done, "I think it's time."
+
+## WebAssembly News and Updates
+
+This call carries a dense slice of **webassembly news**: [WASI 0.3.1](https://github.com/WebAssembly/WASI) adoption items are heading to a WASI subgroup vote, with map types in WIT and the `implements` annotation landed across [JCO](https://github.com/bytecodealliance/jco), [wit-bindgen](https://github.com/bytecodealliance/wit-bindgen), and friends; a [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) RC brings cooperative threads to the toolchain with Python's green threads as the driving use case; [wasi-webgpu](https://github.com/WebAssembly/wasi-webgpu) ships P3-asyncified in wasmCloud 2.6 as the substrate for portable **AI inference**; and [MoonBit](https://www.moonbitlang.com/) — the WebAssembly-native language that compiles straight to components — gets a fresh community landing zone in [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud). Follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [wasmCloud blog](/blog/) for what lands next.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a production substrate for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: Capability-Driven Security in the Wasm Component Model
+
+The **Wasm component model** is unusual among software packaging formats in that a component's imports are a complete, machine-readable statement of everything it can do — there is no ambient authority to escalate through. wasmCloud builds its [zero-trust security model](/blog/zero-trust-security/) on exactly that property: a workload declares the [interfaces](/docs/overview/interfaces/) it needs, and the platform decides what satisfies them, deny-by-default. What this call's discussion adds is granularity *within* an interface. Today, expressing "this workload may read from GitHub's API but never write" requires the interface author to have split reads and writes up front; the proposed **`claims` annotation** moves that policy to the type layer, so a faithful, whole-domain interface can still be imported piecewise — the component's resolved imports include only the functions whose claims it was granted.
+
+The implementation strategy matters as much as the design. Rather than changing the canonical ABI on day one, the plan is to carry claims and a generic attributes table in the component's **custom metadata section** — the same pattern `external-id` and `@unstable` gates already use — so wasmCloud, [wash](/docs/wash/), and downstream experimenters like Yordis's protobuf-to-WIT pipeline can validate the ergonomics against real authorization engines (SpiceDB-style policy checks included) before anything is standardized. For platform teams, the direction is significant: capability-based security stops being an architectural pattern you contort interfaces around and becomes a first-class annotation the toolchain understands. If you want the current state of the art, start with [interfaces](/docs/overview/interfaces/) and the [workload security model](/docs/kubernetes-operator/workload-security/).
+
+## Who Should Watch This
+
+**Platform engineers and operators running wasmCloud** should watch the 2.6 recap and the failure-modes exchange with Frank ([6:45](https://youtu.be/x6pGFQAeKQ4?t=405)) — the trigger-service test suite is the operator documentation until the docs pass lands. **Teams building AI infrastructure on WebAssembly** will want the inference discussion ([21:04](https://youtu.be/x6pGFQAeKQ4?t=1264)) for the wasi-nn critique and the WebGPU-based chat API sketch, plus the Python tooling update ([28:00](https://youtu.be/x6pGFQAeKQ4?t=1680)). **Security-minded architects** should jump to the capability-driven security design session ([47:30](https://youtu.be/x6pGFQAeKQ4?t=2850)). And **new contributors** get a direct invitation: the good-first-issues push and the birth of awesome-wasmcloud ([13:25](https://youtu.be/x6pGFQAeKQ4?t=805) and [31:10](https://youtu.be/x6pGFQAeKQ4?t=1870)) are the on-ramp.
+
+## Up Next
+
+Near-term follow-ups from the call: a **2.6 announcement blog post** explaining trigger services, host components, pooling, and concurrency; **architecture diagrams and operator guidance** — including failure modes and recovery — added to the docs; a tracking issue and community **brainstorm for the distributed cache** epic; the **WASI 0.3.1 vote** at the WASI subgroup, with Yordis invited; Mendy's **WebGPU inference prototype** demoed at the WebAssembly CG; and [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud) populated with Bharat's workflow demo as its first example plus good first issues sourced from Slack. Bailey also plans a fresh run at **custom annotations** on the heels of real usage.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-07-29-community-meeting-transcript/)**

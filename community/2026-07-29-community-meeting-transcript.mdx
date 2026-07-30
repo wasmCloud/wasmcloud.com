@@ -1,0 +1,521 @@
+---
+date: '2026-07-29'
+title: 'Transcript: wasmCloud 2.6 Released: Host Components, AI Inference Beyond wasi-nn, and Capability-Driven Security'
+description: 'Full transcript of the July 29, 2026 wasmCloud community call covering the 2.6 release, trigger services, AI inference on WebGPU, Python, and capability-driven security.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - host components
+  - trigger services
+  - ai inference
+  - wasi-nn
+  - webgpu
+  - python webassembly
+  - capability-based security
+  - wasi preview 3
+  - webassembly news
+image: https://i.ytimg.com/vi/x6pGFQAeKQ4/maxresdefault.jpg
+showTitle: true
+slug: 2026-07-29-community-meeting-transcript
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-07-29-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=x6pGFQAeKQ4" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=x6pGFQAeKQ4" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:12](https://youtu.be/x6pGFQAeKQ4?t=12)
+
+Hey, okay. Welcome to Wasm Wednesday for July 29. This is the Wednesday after release day, which was yesterday, and yesterday we released a big release for 2.6. Last week I went through a lot of the changes that were happening. Well, we landed most of them, which was very exciting. But we also had a ton more changes come in. So the first thing I want to talk about is: please try it out. We've released 2.6. We really want your feedback. My intention is to slow down the rate of change here and get it to where everybody has an opportunity to consume and provide feedback. And I want to actually show you our wasmCloud board where we ended up at the end of this release.
+
+<img src="/img/community/2026-07-29/image001.webp" alt="wasmCloud roadmap project board showing the Q3 2026 view with completed 2.6 items including host component plugins, benchmarking suite, and instance pooling" />
+
+So we've landed some major features. First one: host components. What that one is, is that you can create your own component, your own WebAssembly component, and provide new interfaces that other workloads can depend on in your host. It builds on some of the other features that we already have with `implements`, which is also in this release. We also have essentially a ton of different things that have landed in terms of performance and isolation in this release. Although there's another change that is close to landing here that netted us a really nice performance improvement, and this is essentially: with P3, you can do some pretty nice things like being able to spawn concurrent subtasks on components. So first, we had to implement a pool. So now we basically have an instance pool when we get in a request, and we keep that pool around because we're keeping the store alive. That's where a lot of our instantiation cost comes from. When we make a request in, if you include this change, now not only do we have this pool, but we're also threading those requests into the instance that's sitting in that pool. So what went before as a bunch of different instances — now you can actually do multiple things concurrently in that instance. And the reason why that makes a lot of sense for workloads that run on wasmCloud is that these are basically I/O bound, aka usually network bound. So for the most part, a lot of these instances are sitting idle, waiting for their await to come back from the network request. So instead of just sitting there and waiting, that component instance can actually service other requests concurrently, which is pretty nice. We had already defined this API before, all the way up as part of the 2.0 release, because we knew we wanted to do this. We just now got to it, though, so that one's going to be a pretty big boost.
+
+We also created basically the ability for people to define their own trigger services. So the way to ingress into your workload — you can now tightly and fine-grained control how that works, both ingress and egress, really, out of your service. So I think so much has changed here. We don't have a blog post on it yet. That's something I might start on soon. But I guess the biggest thing is I really want feedback on these new entity types, different types of architectures that you can build on this. And I think apart from that, these were the big rocks for our quarter. One more big rock that we haven't taken on yet is the distributed cache. Now that we've got a lot of those out of the way, I think that's probably the next big one to work on. A lot of the other things are actually not big, right? They're going to be a lot of small incremental changes, a lot of new host component plugins. I expect a lot of enhancement kind of stuff that's small. I don't expect us to have any other major epic like we had, except this one, which is probably going to be a long-running epic. Honestly, you know, we're always going to be trying to target and expand our language support. But if there's any place where other folks wanted to come in and get involved and make things better, this is probably a great one to take a look at. So that is essentially where we are right now.
+
+**Aditya Salunkhe** [4:55](https://youtu.be/x6pGFQAeKQ4?t=295)
+
+Awesome stuff, Bailey.
+
+**Bailey Hayes** [4:58](https://youtu.be/x6pGFQAeKQ4?t=298)
+
+Yeah, it's a lot of changes. I went through them one by one last week. I don't think I'm going to do that again, mainly because it might overwhelm some people. This is what it looked like. I think right now the next step is to sort of make sure that we've got great documentation around this. We've already made a pass on wasmcloud.com, so if you go here and you pull it up, we do have the introduction to what trigger services are, what host components are, but there's just more to do. But this is the first page for that, if you're interested in reading about it, and we also have some on host component plugins, but this is probably where there's a lot more to add. Like the things you need to think about when you're doing this is probably the most important thing to capture here. But in terms of adding it, you know, and taking it all the way through for Kubernetes, it's all here already. So now the most important thing is your feedback on all these things. And right now we don't have architecture diagrams for all of those. So that's kind of where I think I'm going to spend some of my time: describing how concurrency works, how pooling works, how host component plugins work, and describing the different axes of performance that you need to think about across all of these. I guess, anybody have any questions or discussion topics they want on that one? Yeah. Hey, Frank.
+
+<img src="/img/community/2026-07-29/image002.webp" alt="wasmcloud.com documentation page titled Creating Component Host Plugins for wasmCloud, describing how to build host plugins as WebAssembly components" />
+
+**Frank Schaffa** [6:45](https://youtu.be/x6pGFQAeKQ4?t=405)
+
+Yeah, I think it'd be interesting to add to this — I mean, I see a lot of, let's say, happy paths here. But whenever we put something in a document: what are the failure modes, or how to recover, and that kind of thing.
+
+**Bailey Hayes** [7:04](https://youtu.be/x6pGFQAeKQ4?t=424)
+
+Yeah, there's a lot behind that in terms of tests. Oh yeah, this one just merged, but this one's a good one to look at. So talking about these trigger services and their failure modes, there's quite a bit here on how they restart. If you go to the integration test here for the trigger service HTTP — which is probably the most common trigger service that most people are going to rely on — you'll see that we have a huge test suite now. A lot of it focused on how we handle fault tolerance, what it's like when something fails there. And another aspect here as well is how we basically decide if the workload has failed, if this gets into essentially a crash loop backoff. There's definitely a lot more to add. I think in the docs right now it is certainly much more towards the happy path, but understanding as an operator what it's like to run these things is going to be another big thing to make a pass on. My main callout here is: this test suite has kind of the user stories for all of that, so it's the best place for documentation right now. That's the one that I would recommend going and looking at.
+
+<img src="/img/community/2026-07-29/image003.webp" alt="Integration test suite source code for the HTTP trigger service showing fault-tolerance tests, including per-instance restart behavior after a failure" />
+
+**Frank Schaffa** [8:34](https://youtu.be/x6pGFQAeKQ4?t=514)
+
+Okay, great, thanks.
+
+**Bailey Hayes** [8:41](https://youtu.be/x6pGFQAeKQ4?t=521)
+
+Any other questions or discussion items? Okay, just talking about other things that are coming up. So, WASI 0.3.1 is coming in soon. I don't see Yordis on the call, but I'm going to give him a shout out because his item's about to land. So over here, I created some tickets for essentially saying what we need to adopt within WASI for this next upcoming release, and I'm going to schedule the vote for this. Basically, in WIT, you'll be able to use map types. You can do this actually today behind a flag, and it's something that we could also add behind a flag in wasmCloud if we want to go ahead and add it. It's pretty darn straightforward. And the only place to actually add the flag is on the wash CLI itself, because this is like sugar, really, around the component model, and not an ABI-level change. So this one will have a nice ergonomic lift for people who are defining WIT APIs, and you'll have a nice lift on the language bindings that you get — like what people actually author. But in terms of what we actually have to change on the host, I think it's nothing. So I like those kinds of changes.
+
+<img src="/img/community/2026-07-29/image004.webp" alt="GitHub issue Adopt Component Model implements annotations for the next WASI 0.3.x release, showing stability notes and per-toolchain implementation status" />
+
+What's not nothing is this one, for what we had to change on the host — and we had a lot of changes that came in for a lot of this. But I think we've successfully gotten it landed across the ecosystem. There was one more big thing for this one — so this is the `implements` API, but there's a second aspect to it, which is external ID. So let me show you this one. There's some discussion to be had here on what you should put in an external ID when you're doing a workload deployment. Over here in wasmCloud, we've got a discussion item around this that I welcome folks to read and give feedback on. I already got good thoughts from Victor down here, because it's a little open-ended on what you could be passing in on an external ID, and I think how we interpret that, or what we would do about that, is interesting. If this is configuration for the interface, that's one way to think about it — and not configuration for the plugin or the backing implementation. Or if it is something for the backend implementation, you could use that to key off all kinds of things. My current thinking right now is largely that we already have a great affordance for this with actual config values that you can pass in on host interfaces. So use that. And you could use this, but probably not as a developer. I don't really anticipate developers writing their own external IDs. I expect automated processes, potentially, to add this type of information for the rollout and for the deployment. Think of it more like a Kubernetes annotation-style thing, versus a Kubernetes label that maybe developers do on their own.
+
+<img src="/img/community/2026-07-29/image005.webp" alt="GitHub issue Surfacing external-id in wasmCloud with discussion about what the external ID field should mean for workload deployments" />
+
+Oh, lost Colin. Okay, well, he said that's fast adoption on external ID, and yes — mainly because I want this to become a standard quickly. So I wanted to thread it all the way through. But also, this type of reference is really easy to add to the ABI: a spec string value with the name. We basically already had it, so it's not quite as easy as maps, where no canonical ABI changes were required, but it was almost that. It was the next smallest level from that. So this one, I definitely would appreciate feedback on. And then I had more scope in my PR, but I whittled it down a little bit, and this kind of implements it through. But I think we definitely want to have a good concrete answer to what we expect people to use this for before merging. That's all from me. Yeah, Aditya.
+
+**Aditya Salunkhe** [13:25](https://youtu.be/x6pGFQAeKQ4?t=805)
+
+I had a request for a bit more attention towards onboarding new contributors and making our repository a bit more friendly to them, by adding a bit more good first issues. So obviously, I'm going to take on the effort to maybe look for some pain points that could be classified as good first issues and add them to our roadmap. But if any of you guys come across any small issues that could be good for first-time contributors, that'd be pretty lovely.
+
+**Bailey Hayes** [14:10](https://youtu.be/x6pGFQAeKQ4?t=850)
+
+The hardest thing about those is making sure you have the right level of detail in the issue itself, right? We had some old issues that just weren't well qualified — I feel like specifically the ones around the versioning on interfaces, for example. That one isn't a great good first issue. But there's another one that I just closed... maybe, oh boy, this one. One thing that I didn't take on that might be a good first issue, if somebody wanted to take a look at it — but I'm not even sure if it's a good idea, so that's the first part — is: we use Figment in the wash CLI, but we don't use Figment in the host, where I'm doing a bunch of configuration for environment variables. And that's one thing that came up building out trigger services. So that might be a good first issue. Might not be. Might need you to look at it, Aditya, and see if that's a good issue, period. And so I think that's a great one.
+
+I think when I think about people coming in and having a hard time getting started, the number one thing is just their language. Oh, thanks, Frank — I was not sharing that. Let me go back. I'm just going to drop the issue in chat, actually, just so you can see. So, pull this back up: I called out that I opted not to include that in my list of follow-ups from review feedback, mainly because I think I want to see it be used a little bit more. I had conflicts with my PR with the concurrency one, so I didn't really want to land it right away. But I also think that could potentially be a good, self-contained change later.
+
+And then, in terms of — back to our project board — I think there's a plethora here of what we can add under this as sub-issues, right? So we should have one for the work we're doing in Go and have that tagged out. We should have one for Python. When I think about somebody coming in: few people know Rust in their day jobs. For the most part, folks are writing in Python, Go, or Java. I'm not proposing that we take on Java right now, but we have a happy path for other languages. And so I think there's plenty there, because essentially what I would want to see is — if you go over, for example, to wasmCloud TypeScript, which is the main SDK that we've wrapped and kept up to date for our last quarter — what we did is we made sure that we mirrored over the examples that we have in Rust, plus some that we think are important to the TypeScript ecosystem. Folks are definitely going to want to know how to use two different kinds of builders. They want to know how to use Hono. That's kind of what they expect in the TypeScript space. As you can imagine, there's a million and one of those kinds of things, probably, for Python and for Go. So getting some of the high-value targets there would be super nice. Obviously, step one, though, is we need to give them a repo to contribute to.
+
+<img src="/img/community/2026-07-29/image006.webp" alt="wasmCloud TypeScript repository templates directory listing example templates such as http-api-with-distributed-workloads, http-blobstore-handler-hono, and http-kv-handler-hono" />
+
+**Aditya Salunkhe** [17:37](https://youtu.be/x6pGFQAeKQ4?t=1057)
+
+Yeah, I was just going to talk about that. I saw Bharat's PR about awesome wasmCloud, and I was just wondering, should we just formalize a repo, like the contrib?
+
+**Bailey Hayes** [17:50](https://youtu.be/x6pGFQAeKQ4?t=1070)
+
+I think contrib is probably the best one, but you know, I'm also game to rename it, if that's not a very findable thing.
+
+**Aditya Salunkhe** [18:01](https://youtu.be/x6pGFQAeKQ4?t=1081)
+
+Awesome wasmCloud, yeah.
+
+**Bailey Hayes** [18:03](https://youtu.be/x6pGFQAeKQ4?t=1083)
+
+Right, exactly. I'm good with that. We thought about that name. I have no idea why we didn't pick it, though.
+
+**Liam Randall** [18:09](https://youtu.be/x6pGFQAeKQ4?t=1089)
+
+Which name is that?
+
+**Bailey Hayes** [18:13](https://youtu.be/x6pGFQAeKQ4?t=1093)
+
+This one. So, in wasmCloud v1 days, there were a ton of different providers that people wanted, and there were different ways of, kind of, what people wanted to play around with, and we needed a landing zone. Also because the MoonBit contributors wanted to get MoonBit on our radar. For folks who don't know MoonBit: it is a WebAssembly-native language that can compile straight to components. It's really nice, and it has support in wit-bindgen, and it just works out of the box for us — we have to do nothing. But folks like that want to be surfaced as high up as they can be in our docs and everything, and so they wanted an "awesome wasmCloud" place to be like: we work over here too, and if you're over here, you might care to do some MoonBit stuff. So, I think probably what I would recommend we do is delete everything that's in contrib right now, or move it to a v1 branch, and then make main just be v2, and put Bharat's contribution over there as our first. This is basically the most awesome demo we've seen on wasmCloud v2, so it being the first makes a lot of sense.
+
+**Aditya Salunkhe** [19:31](https://youtu.be/x6pGFQAeKQ4?t=1171)
+
+And then we could probably even have Go bits and stuff added in there for the v2 stuff.
+
+**Bailey Hayes** [19:38](https://youtu.be/x6pGFQAeKQ4?t=1178)
+
+Okay, so — when should we make our own Python repo versus not, right? When should we make a MoonBit one versus not? I think the default should be: add it to contrib first, so you're not blocked on us. So I think that is the right instinct. The only reason why I actually kind of really want a Python repo is that I think there's a handful of ergonomic things that we can do on top of componentize-py that make adoption easier — similar to why we have a Go SDK, which is kind of like: look, a lot of these types are generated; here are some not-generated types that are very nice and easy to consume that you would want. The same thing goes for Python. So it's kind of the difference between first-party support and not. And if we're willing to invest in first-party support — which I think we should be for Python, since that seems to be sometimes number one, sometimes number two; it depends, it seems, on the week, on whether or not people are most hustling for Go or most hustling for Python. But Python is definitely something that's coming up a lot with the AI world. So it definitely feels like one where, if we've got the resources to do it, we should do first-party support. But until we do, contrib is the way.
+
+**Aditya Salunkhe** [21:04](https://youtu.be/x6pGFQAeKQ4?t=1264)
+
+Indeed. And do you think Python with wasi-nn could be a good shout?
+
+**Bailey Hayes** [21:12](https://youtu.be/x6pGFQAeKQ4?t=1272)
+
+Well, what if I told you: I think we can do better than wasi-nn? Hot take. So wasi-nn has its own way of doing, essentially, model serving, and it's goofy. Essentially it's: here is a thing that is compiled specifically for this machine, with exactly this model, with exactly these parameters for how to serve it. It's not portable. It doesn't just run anywhere. And so it depends on what people are asking for when they ask for wasi-nn — sometimes they're asking actually just for the inference API, aka "I just want a chat API," which is super easy to create, right? And so when we actually did our brainstorming — I don't think I went into this in detail — I think we should do it. So here's our Q3 thing.
+
+**Aditya Salunkhe** [22:08](https://youtu.be/x6pGFQAeKQ4?t=1328)
+
+wasmCloud inference, or wasmCloud LM?
+
+**Bailey Hayes** [22:13](https://youtu.be/x6pGFQAeKQ4?t=1333)
+
+Yeah, exactly. And not only that — because we can do something really nice here. The reason why I want to shout this out is that wasi-nn hasn't yet arrived at WASI P3. But what if you had — and it doesn't have to be "inference"; it could be "chat," right? — what you can do is a stream in and a stream out with P3, and so you can have a really nice ergonomic interface around that. And if we put this here, what we can do is wrap it. We can add another component around this that's kind of in the background — probably a host component that implements wasi-webgpu. And so, similar to what Bharat already showed with Candle, we could do a Candle version of this, or we could do a llama.cpp version of this, or etcetera. And so basically you could have a component depend on this component, right? And then what you can do is have a workload like this: I'm a workload, and it'll have component A and component B, and both of them can import `chat`, basically. I'm calling it chat to simplify it — sometimes when you say "inferencing," people start thinking model serving and more complex things. So I guess what I'm saying is: the model-serving challenge would be here; the actual, sort of, prompt API is here; and then this can obviously just sit atop all of that. And that's how you get modularized components being able to do LLM stuff, which I think is ultimately what everybody wants. And by us coming up with what we want at the wasmCloud layer, there are a lot of benefits, right? We can move really fast. We can do a lot of interesting things here.
+
+<img src="/img/community/2026-07-29/image007.webp" alt="Excalidraw sketch of the wasmCloud inference architecture: a workload with components importing a chat stream API, a wasmcloud:llm/inference prompt API, model serving via candle-rs on wasi:webgpu, and a host with built-in WebGPU" />
+
+So I'm going to change this to Candle, since this is what Bharat's playing with. And this is sitting on top of the host, right? So we already have this capability for everybody to use — it's already been P3-asyncified as part of 2.6. So inside 2.6 you get a P3 WebGPU API that's real nice, and then you can build on top of it with things that would import this to be able to do very efficient model serving. And then you could build a prompt API on top of that, and then you can have any number of workloads run on it, multi-tenanted, which would be kind of cool.
+
+**Aditya Salunkhe** [25:05](https://youtu.be/x6pGFQAeKQ4?t=1505)
+
+This is so cool. It's like a whole ecosystem being built on top of the whole chain.
+
+**Bailey Hayes** [25:13](https://youtu.be/x6pGFQAeKQ4?t=1513)
+
+And every one of those components can be swapped around. That's the crazy cool part. And with all of this changing so fast, that's the only thing we can do reasonably right now, right? Instead of building these monoliths, which everybody else is building, we're building pluggable architectures.
+
+**Bailey Hayes** [25:31](https://youtu.be/x6pGFQAeKQ4?t=1531)
+
+So I actually asked Mendy to go ahead and make this, and he did. And it works. He is on vacation today; otherwise, I would have put him on the spot. But he's basically going to be showing this off at the WebAssembly CG in a week. And probably we need a place for this — and it probably should be awesome-wasmcloud instead of wasmCloud contrib.
+
+**Liam Randall** [26:04](https://youtu.be/x6pGFQAeKQ4?t=1564)
+
+Bailey, I thought it was totally my job to put people on the spot and call out technology that's being developed.
+
+**Bailey Hayes** [26:11](https://youtu.be/x6pGFQAeKQ4?t=1571)
+
+Yeah. Well, let me do it one better. He actually talked about this and the differences between his approach and wasi-nn. I totally recommend everybody checking that out. He was on WebAssembly Unleashed and went into more detail about why this approach versus this other approach, and that was a really good chat. I totally recommend folks watching that — kind of the superpower that we get with WebGPU, which is obviously portability, but also a lot of other things that he talks about. And he talked a little bit about some of the rough edges he ran into with porting llama.cpp, but he's been contributing his fixes back up all the way upstream, so it's pretty sweet. Keep going, Aditya. That was fun.
+
+**Aditya Salunkhe** [27:09](https://youtu.be/x6pGFQAeKQ4?t=1629)
+
+Oh yeah, it's like we talk about stuff, and it's already done. What can I say?
+
+**Bailey Hayes** [27:15](https://youtu.be/x6pGFQAeKQ4?t=1635)
+
+Well, I mean, I totally welcome stuff coming in for wasi-nn. I guess it's just that the proposal — there's not a lot of traction on that. I think folks have found that they want something that's a smaller surface, that's more purpose-built for that use case, that's sandboxable, basically. Because wasi-nn's not easily sandboxable.
+
+**Aditya Salunkhe** [27:38](https://youtu.be/x6pGFQAeKQ4?t=1658)
+
+Yeah. So once this has been pushed out, maybe we could take a gander at it — for the Candle artists, or even for something that's running in Python. That would be cool, because you mentioned there's a lot of growing attraction from the whole Python crowd that's coming in.
+
+**Bailey Hayes** [28:00](https://youtu.be/x6pGFQAeKQ4?t=1680)
+
+I was able to get FastMCP, for example, working with componentize-py. So there's just — and that's what I mean, people don't even know it's possible. And that's why it would be nice to have either an awesome-wasmcloud entry or a Python SDK. I kind of want to go that route, because I want it to be really, really nice, but there are just so many different things that we can do now.
+
+I guess, an update on that: we got a wasi-sdk RC available with cooperative threads in it. There are bugs, as there always are, but one of the bugs is already fixed, which was the biggest blocker for us being able to do cooperative threading with exception handling inside Python — which was the big driving force for a lot of this. It was basically being able to support Python fully, where they use green threads, and cooperative threads obviously are a great way to emulate native support for green threading. The progress on that's moving really fast. Once a couple of those bug fixes land, most things, I think, in Python will just work, which will be pretty sweet. The first milestone there is getting a CPython with this built, and making it really nice inside componentize-py and the Bytecode Alliance, for other people to take that tooling and make their own WASI components from it. We want that flywheel to start first, because basically, once we have those components being produced, then people can push them up as Python wheels, and other people can build with them. Because, you know, the perennial problem of Python is it's not Python — it's some other language, like Fortran or some ancient stuff sometimes, especially when it's really mathy. So if you can take the native code, package that up in a portable WebAssembly component, shove that up into their registry, then when you're building, you can just pull down an already pre-built component. You don't have to figure out how to build that native thing and just link to it. Bob's your uncle — that's what my old CTO used to say. So yeah, I would say that's where we'd be at.
+
+**Aditya Salunkhe** [30:19](https://youtu.be/x6pGFQAeKQ4?t=1819)
+
+Yeah. So for the good first issues — to kind of meld into the whole equation about getting more usage examples — would it make sense, maybe after we rename contrib to something like awesome wasmCloud, we could probably take some Slack suggestions from the community members, throwing in suggestions based on the usage examples that they want to see, and probably have them up as good first issues in the awesome wasmCloud page?
+
+**Bailey Hayes** [30:55](https://youtu.be/x6pGFQAeKQ4?t=1855)
+
+And it will be linked to awesome wasmCloud straight from the README on wasmCloud/wasmCloud, too. It seems like most people look at that first.
+
+**Aditya Salunkhe** [31:02](https://youtu.be/x6pGFQAeKQ4?t=1862)
+
+Yep, and just link them to the docs. That would be a really good way to increase adoption.
+
+**Bailey Hayes** [31:10](https://youtu.be/x6pGFQAeKQ4?t=1870)
+
+I love that idea, and so much so — what do we want, guys? Should it be like this? Also, Victor, hello. I need your approval too. But between you, Aditya, Jeremy, we have a quorum. So let's do it.
+
+**Aditya Salunkhe** [31:42](https://youtu.be/x6pGFQAeKQ4?t=1902)
+
+I prefer it with a small c, just because.
+
+**Bailey Hayes** [31:51](https://youtu.be/x6pGFQAeKQ4?t=1911)
+
+I think that's actually why we didn't do it — paging that big M from years ago. I think it was like: oh, that's weird and confusing, and we hate it; we'll call it contrib.
+
+**Aditya Salunkhe** [32:04](https://youtu.be/x6pGFQAeKQ4?t=1924)
+
+There's also these decisions.
+
+**Bailey Hayes** [32:07](https://youtu.be/x6pGFQAeKQ4?t=1927)
+
+There's also that. Checking the chat real quick. Oh, you would make a new repo, Victor. Okay, I'll do that.
+
+**Liam Randall** [32:31](https://youtu.be/x6pGFQAeKQ4?t=1951)
+
+So if we create a new repo, that means that the current contrib one would just stay v1.
+
+**Bailey Hayes** [32:36](https://youtu.be/x6pGFQAeKQ4?t=1956)
+
+Yeah, we could archive it.
+
+**Bailey Hayes** [33:12](https://youtu.be/x6pGFQAeKQ4?t=1992)
+
+Should I just, in the description, put text and emojis here? Or what would you put in the description, y'all? Awesome. Awesome.
+
+<img src="/img/community/2026-07-29/image008.webp" alt="GitHub create-a-new-repository form filled in live on the call with owner wasmCloud and repository name awesome-wasmcloud" />
+
+**Aditya Salunkhe** [33:26](https://youtu.be/x6pGFQAeKQ4?t=2006)
+
+Workload examples.
+
+**Jeremy Fleitz** [33:31](https://youtu.be/x6pGFQAeKQ4?t=2011)
+
+Yeah, and maybe tools.
+
+**Liam Randall** [33:35](https://youtu.be/x6pGFQAeKQ4?t=2015)
+
+That's good. Yeah, with "for use on wasmCloud."
+
+**Jeremy Fleitz** [33:41](https://youtu.be/x6pGFQAeKQ4?t=2021)
+
+Yeah, we should probably put wasmCloud in there, at least once. Maybe towards the beginning, somewhere.
+
+**Aditya Salunkhe** [34:02](https://youtu.be/x6pGFQAeKQ4?t=2042)
+
+With the "awesome," it gives us amazing SEO advantages as well. So that's good.
+
+**Bailey Hayes** [34:08](https://youtu.be/x6pGFQAeKQ4?t=2048)
+
+Yes.
+
+**Frank Schaffa** [34:21](https://youtu.be/x6pGFQAeKQ4?t=2061)
+
+Yeah, I like that.
+
+**Bailey Hayes** [34:25](https://youtu.be/x6pGFQAeKQ4?t=2065)
+
+Yeah, see, Frank. Good job, good job, team. I feel like I created a template for us before, but it's okay. We won't have one. Go ahead, make that.
+
+**Aditya Salunkhe** [34:45](https://youtu.be/x6pGFQAeKQ4?t=2085)
+
+If you guys take a look at chat, you'd probably give out a few giggles.
+
+**Bailey Hayes** [34:56](https://youtu.be/x6pGFQAeKQ4?t=2096)
+
+Should I read that out for the stream, Yordis? All right, go team. So, Aditya, if you want to create issues and stuff, go ham. And Bharat, if you don't mind taking your PR and also actually putting it here — I really do want it to be our first awesome example, because it is awesome.
+
+**Aditya Salunkhe** [35:23](https://youtu.be/x6pGFQAeKQ4?t=2123)
+
+Thanks. I should probably structure it a bit, and you should be good to go.
+
+**Bailey Hayes** [35:31](https://youtu.be/x6pGFQAeKQ4?t=2131)
+
+Just a quick link for folks. Awesome. Are there other triage items we need to do? Maybe I should go ahead and tag that out, that you're doing that.
+
+<img src="/img/community/2026-07-29/image009.webp" alt="The freshly created awesome-wasmcloud GitHub repository README describing a wasmCloud community maintained repo for awesome components, host plugins, workload examples, and tools" />
+
+**Bailey Hayes** [35:48](https://youtu.be/x6pGFQAeKQ4?t=2148)
+
+I think this is kind of like a subtask here, which is not something I know how to do. I'll struggle through that later. Let me see — I think if I do this, it'll link to it. Nah, no such luck. All right.
+
+**Bailey Hayes** [37:04](https://youtu.be/x6pGFQAeKQ4?t=2224)
+
+And that way we could check in on it next week, see where we are. I need to create a big issue for the distributed cache. I'm writing that down for myself to follow up on.
+
+**Aditya Salunkhe** [37:18](https://youtu.be/x6pGFQAeKQ4?t=2238)
+
+We could even have a brainstorm session, because we ran into quite a few edge cases, and we optimized a lot of the operator side, as well as the whole cleanup of the whole distributed cache. So I've got to give my two opinions on that.
+
+**Bailey Hayes** [37:35](https://youtu.be/x6pGFQAeKQ4?t=2255)
+
+That would be really helpful. I also think we want to kind of think about it in concert with the idea of bringing other types of artifacts in. Part of the reason why we have the artifact abstraction — and I think I mentioned this to Mendy when they started — is that we wanted to also have the idea of being able to support cwasm, essentially, as one part. Other things that could be on the table that we could discuss: should artifacts have models? Should we be thinking about how to distribute those, and pre-cache and pre-compile those? Right now, not all models are OCI-reffed, right? They have kind of their own path. But it would let people write their own operators to support those types in an artifact, and still have basically our host guarantee that that artifact can be resolved, and then have it passed to the hosts that know how to implement it. Obviously, the benefit there is we would be all building towards the same base for how to serve these types of models — and every wasmCloud demo I've seen recently, of people building on wasmCloud, is in that vein of building your own agents, building your own kind of host for those types of things. So I think there's a lot there. Now, I don't want to do too much overlap with things like KServe, for example. I think that's another awesome CNCF project that can stand on its own. But there might be a real opportunity there to explore, at least from a brainstorming perspective. It's like: okay, if we're not going to do it the artifact way, what would that look like if you were using KServe? And just make sure that we have a comprehensive story for all of it.
+
+And be honest, Yordis — I just now learned that you could put images there, and now I expect more frog memes from you from here on out. It's funny how you know everybody's favorite emojis. Well, any other items we should go through before we adjourn?
+
+**Yordis Prieto** [40:12](https://youtu.be/x6pGFQAeKQ4?t=2412)
+
+I have one with you, but it's not on wasmCloud. Just haunting you here.
+
+**Bailey Hayes** [40:16](https://youtu.be/x6pGFQAeKQ4?t=2416)
+
+I know. I'm sorry. I've been ignoring you. I need to get in there, into wit-bindgen, and do that code review. I honestly was kind of holding out hope that I could convince somebody else to go and take that over.
+
+**Yordis Prieto** [40:29](https://youtu.be/x6pGFQAeKQ4?t=2429)
+
+Alex already said he doesn't know about C++ stuff, so...
+
+**Bailey Hayes** [40:37](https://youtu.be/x6pGFQAeKQ4?t=2437)
+
+I know. And I've seen Isai's been on vacation. Yeah, I know. Like, "oh, Alex doesn't know about C++ stuff" — that's false. But that's okay, I understand. The C++ bindgen, by the way, Yordis — you don't have to have that. None of us — we, it should be "we," right? Because I'm your blocker there. We don't have to have that over the line to move maps to standardized.
+
+**Yordis Prieto** [41:11](https://youtu.be/x6pGFQAeKQ4?t=2471)
+
+I know, but I like to see things complete, complete. So even C++, C# — I want everything to be green, you know? Just personally, so my brain can move on.
+
+**Bailey Hayes** [41:23](https://youtu.be/x6pGFQAeKQ4?t=2483)
+
+Well, I don't know if you know, but our C++ support doesn't yet support P3, so there's a lot there that that bindgen does not do. Oh yeah — did you see that Victor got maps into JCO?
+
+**Yordis Prieto** [41:41](https://youtu.be/x6pGFQAeKQ4?t=2501)
+
+No. Wait, that's cool. Where is that pull request? I need to find it and learn from it. Okay, what the heck is JCO, and why is that not in the bindgen repo? Oh, that's the JavaScript one.
+
+**Bailey Hayes** [41:54](https://youtu.be/x6pGFQAeKQ4?t=2514)
+
+Yes — but also, it's what we do.
+
+**Yordis Prieto** [42:02](https://youtu.be/x6pGFQAeKQ4?t=2522)
+
+You need to help me to create this map. I swear, God — I keep like, JCO who? No clue. Oh my god. Okay.
+
+**Bailey Hayes** [42:10](https://youtu.be/x6pGFQAeKQ4?t=2530)
+
+Yeah. Well, Victor's kind of right that we could have more in the bindgen repo for this one. But the other side of it is that Rustaceans don't really want to see JavaScript — so that's the other side of that problem. I think the reality is that this mapping of all the things that this rolls out to — I'm not sure it's Turing complete. I think that we see — at least I see — even circular references in how some of these things roll out, depending on the language. Like, they depend on it being in the wasi-sdk, but then they had their own implementation, and then they jumped forward two steps, back sideways, and then it landed. So I don't know. I think you've done better than everybody else on seeing it all the way through to the end. Yeah — Victor just dropped the JCO side of it, and then we also got `implements` through. And I did put links for all that, by the way.
+
+**Yordis Prieto** [43:24](https://youtu.be/x6pGFQAeKQ4?t=2604)
+
+Nice. Okay, okay. Well, I'm going to move on from the feature then, I guess. If you're telling me it's good enough, I'm moving on.
+
+**Bailey Hayes** [43:33](https://youtu.be/x6pGFQAeKQ4?t=2613)
+
+Then you've done it. Yeah. So for everybody else — what we're talking about here is: look at all that green. I mean, that's crazy for something where we only usually hold the line for two languages. So you've already met it. This is what Yordis is giving me a hard time for.
+
+<img src="/img/community/2026-07-29/image010.webp" alt="GitHub issue Adopt Component Model map type for the next WASI 0.3.x release showing merged map-type PRs and a mostly green per-language support matrix in wit-bindgen" />
+
+**Yordis Prieto** [43:54](https://youtu.be/x6pGFQAeKQ4?t=2634)
+
+No, it's not that one. It's the C++ one. Well — you know, I need to talk to Liam. You need to talk to your boss here. Like, is this so outdated? Finally.
+
+**Liam Randall** [44:11](https://youtu.be/x6pGFQAeKQ4?t=2651)
+
+I do not tell Bailey what to do. Bailey and I align on business objectives, and then Bailey does what Bailey needs to do.
+
+**Yordis Prieto** [44:19](https://youtu.be/x6pGFQAeKQ4?t=2659)
+
+That is why I stick here with you. You are an amazing leader.
+
+**Liam Randall** [44:24](https://youtu.be/x6pGFQAeKQ4?t=2664)
+
+I'm not sure that Bailey would agree with you every day, but maybe someday she might agree. You know, I'm very lucky. I've got a lot of trust in her instinct and her ability just to accomplish and solve a ton of technical bandwidth all along the way. So I'm always very grateful about that, and sometimes I step on her toes a little bit when I try to help, but she's patient with me. And I try to go out and just raise the awareness and bring all the business boys to the yard, so we get more developers working on this.
+
+**Yordis Prieto** [45:03](https://youtu.be/x6pGFQAeKQ4?t=2703)
+
+Hell yeah.
+
+**Liam Randall** [45:04](https://youtu.be/x6pGFQAeKQ4?t=2704)
+
+Yeah, hell yeah. So that's your fight: you make it important to her, and then she'll give you a...
+
+**Yordis Prieto** [45:12](https://youtu.be/x6pGFQAeKQ4?t=2712)
+
+Yeah, we're good. We're good. Okay, okay. I've got to move on then, mentally, from this thing. It's out of my hands then.
+
+**Bailey Hayes** [45:18](https://youtu.be/x6pGFQAeKQ4?t=2718)
+
+Yeah — just mentally say it's on me now. You've given me everything I need to standardize it. And, I mean, if you'd like — have you ever attended a WASI meeting?
+
+**Yordis Prieto** [45:31](https://youtu.be/x6pGFQAeKQ4?t=2731)
+
+I think I do, but I always get kind of sleepy in it. It was biweekly, or no?
+
+**Bailey Hayes** [45:40](https://youtu.be/x6pGFQAeKQ4?t=2740)
+
+Another one — the WASI subgroup.
+
+**Yordis Prieto** [45:43](https://youtu.be/x6pGFQAeKQ4?t=2743)
+
+Oh no, I don't know what version is that one.
+
+**Bailey Hayes** [45:46](https://youtu.be/x6pGFQAeKQ4?t=2746)
+
+Well, it's the boring version of all these other things. It's the non-implementation side of it.
+
+**Yordis Prieto** [45:53](https://youtu.be/x6pGFQAeKQ4?t=2753)
+
+I mean, the last time, biweekly — I felt stupid, like I fell asleep, because I don't know what is happening. Too many smart people talking.
+
+**Bailey Hayes** [46:05](https://youtu.be/x6pGFQAeKQ4?t=2765)
+
+They're in the guts. Well, the WASI subgroup is where we vote to advance it, and so it might be nice to have you there for when we standardize on this feature, just to give you the kudos you deserve. I gave you kudos last week, just knowing that eventually it might get back to you. But to really close the gap — that you've done it all — you might want to be there next week.
+
+**Yordis Prieto** [46:34](https://youtu.be/x6pGFQAeKQ4?t=2794)
+
+Yeah. Okay. Yeah, send the invite. Now I just need to pick the next thing to do. I'm messing around with Hyperlight and the Wasm stuff for sandboxing.
+
+**Bailey Hayes** [46:47](https://youtu.be/x6pGFQAeKQ4?t=2807)
+
+Well, I mean, I can give you a wish list any time, but it would be good to know what you're cooking on. Maybe I can give you something that you'll actually be able to use on your side — because I know you needed maps; you wanted it for your use case.
+
+**Yordis Prieto** [47:04](https://youtu.be/x6pGFQAeKQ4?t=2824)
+
+Yeah, the last mile there is just the lazy stuff that Alex said no to. I'm going to do it, so I didn't do anything there. After that, it's just the ergonomics between the protobuf and the WIT. I still don't know who's supposed to point to who, and why, and if I'm even able to do it.
+
+**Bailey Hayes** [47:30](https://youtu.be/x6pGFQAeKQ4?t=2850)
+
+So, well, yeah. There's one new one that I've been working on designing that folks here might be interested in. So today, how do you do capability-driven security? Well, you do that based on the imports of the interfaces that you import. So if you are faithfully porting, let's say, the API to talk to GitHub, then one way you could do that and still have capability-driven security is by all of the read APIs being on their own interface, and all the write APIs being on another interface. And so you might be willing to grant somebody a read on that import, but you probably aren't willing to grant somebody a write. So you would deny them being able to have an import on the write APIs. Does that make sense so far? I mean, I know this is interesting to you — that's why I'm throwing it out there. So wouldn't it be nice if, instead, you were able to come up with the unionized set of that — which I think is maybe what you've asked for before, but maybe we're actually ready to do it now. So instead of saying "I've got to split all of these APIs apart" — and the reason why you might not want to do that is that you're basically taking the domain and then slicing and dicing it. When you think about things with OpenAPI or with protobuf, which is probably how you've run into this, you would generally say what you want this thing to do right there on top of it, and you would want it all in the same interface, because it's part of the same domain. But it's on the import side, when you're actually bringing that in, that you want to be able to fine-grained control what actually gets imported. One way to do this — the proposal here — would be that we introduce yet another annotated type, like what we just did with external ID, and have it be called something like `claims`. And that way you can say: is this a read one? Is this a write one? And then when you do the import into your — you're going to hate me because I'm going to say the word "world" — but when you do the import into your final component, it gets only the set that you're saying you're importing on. So you only could get the read APIs, if that's all you wanted.
+
+**Yordis Prieto** [50:08](https://youtu.be/x6pGFQAeKQ4?t=3008)
+
+Okay, let me share something — and this is where I hope that WIT is ahead of the problem. So first of all, let me go back. Notice that you said, "Oh, what if we split the write interfaces from the read interfaces," right? I forgot whoever was around back then, but it was like: oh, are you getting to segregation? Interesting. Should every single interface be only one function, Bailey? Because it's not about reads and writes at that point. You could even segregate even further.
+
+**Bailey Hayes** [50:42](https://youtu.be/x6pGFQAeKQ4?t=3042)
+
+Sure. Yeah.
+
+**Yordis Prieto** [50:43](https://youtu.be/x6pGFQAeKQ4?t=3043)
+
+Right. And now we go back to the ultimate design of an actual interface: it's a function, it's not an object.
+
+**Bailey Hayes** [50:53](https://youtu.be/x6pGFQAeKQ4?t=3053)
+
+But it's an interface.
+
+**Yordis Prieto** [50:53](https://youtu.be/x6pGFQAeKQ4?t=3053)
+
+Right, but the interface is a function. It's one operation. It's not n numbers of operations. Because at some point, with the exact same mindset that you go — either for security reasons or scalability reasons — you're going to get to the point that says: oh, I wish this interface was fewer functions.
+
+**Bailey Hayes** [51:10](https://youtu.be/x6pGFQAeKQ4?t=3070)
+
+Well, the import of an interface will give you the set of functions.
+
+**Yordis Prieto** [51:14](https://youtu.be/x6pGFQAeKQ4?t=3074)
+
+No, that's my point — that if people design it like that, eventually you're going to find out that you want only one function in that set of interfaces you're talking about. It's just the get, or the put. It's not get and put, or whatever combination.
+
+**Bailey Hayes** [51:27](https://youtu.be/x6pGFQAeKQ4?t=3087)
+
+Yes, but you want the ergonomics of being able to describe unionized sets.
+
+**Yordis Prieto** [51:34](https://youtu.be/x6pGFQAeKQ4?t=3094)
+
+Yeah, that's fine. But my point is: any mature-enough interface that's trying to meet most of the requirements would end up being just one function inside. So here's my fourth attempt at what you're saying. This is how I'm trying to think of how to leverage protobuf — and the reason why I stick to protobuf: yes, the protobuf is there for all the marshaling, right? But this is what I like from protobuf — you can always extend the specification. So what I do with this is just: I give this spec, and there's a centralized service that takes all that type of information and sends it to an authorization engine, where you could actually do the policy checks. So is this somewhat what you're saying? And here — let me see. Sorry, okay, this is a hot mess. Don't look at it. This is just vibe coding. YOLO life.
+
+**Bailey Hayes** [52:37](https://youtu.be/x6pGFQAeKQ4?t=3157)
+
+You're using SpiceDB, huh? Okay.
+
+**Yordis Prieto** [52:39](https://youtu.be/x6pGFQAeKQ4?t=3159)
+
+Yes. Yes. So this is the ergonomics you're talking about — why you want it. And the reason I say "hey, I hope WIT is ahead of time" is: you need to define this sooner rather than later. And the reason is because the spec should be friendly for people like me to experiment around, test it, and see what sticks. Or even better — WIT itself is really limited, right? For example, protobuf, in a sense, is just that, right? Service and message — so it's really limited. But they open it for you to do all this stuff. The faster WIT does this type of thing, the better everybody around is going to win. Because this is where I'm actually concerned: when I say, hey, should I go from WIT to proto, or from proto to WIT? If I go from proto to WIT — which I want to do — then I'm going to be limited with this type of thing. So I need to do generation around it, like generating other things. Or, for example, to make a point: let's say there is an option here that is for, like — okay, so this is a repeated, and I want to do a unique list or whatever, like a type unique, for whatever stupid reason, right? It doesn't really matter. This is something I don't know if WIT has, but it's something that I definitely recommend to have, because at this point you open the door — and yes, this is normally what you can do — and then you just map this to the WIT, or vice versa. WIT could do something like this, and then that goes into the centralized service, which I have here, which is normally like a catalog. I'm trying to find where the heck I put it — oh, in the readme. Okay, yeah. So eventually, the protobuf is just a way to do it, but you could also have stuff like this — this could also become a Kubernetes CRD if you want to. So effectively, all this configuration goes into that centralized authorization engine — that you most likely want from wasmCloud, by the way — and then in there you say: hey, here's the operation I'm trying to do, yada yada, and you do all the bindings and the stuff, which is what I also coded here.
+
+<img src="/img/community/2026-07-29/image011.webp" alt="Yordis Prieto's screen share of a protobuf IAM service definition with permission annotations on each RPC, alongside a README describing services, permissions, and roles" />
+
+**Bailey Hayes** [54:42](https://youtu.be/x6pGFQAeKQ4?t=3282)
+
+So I think, to faithfully, fully do what you're talking about, you need two things. You need what I'm talking about right now, which is just adding a concept of an annotated type that is user-defined — so you can define "this is read," "write," all that kind of stuff. And right now, the name we're using is `claims`, but it could be anything. The shed is paintable in this moment. And then the second part there is optional imports — and you've probably heard us talk about that. There are so many different affordances that we could do if we had that. But I'll be honest, I don't think you should mess with that one. In terms of t-shirt sizes, between claims and optional imports: claims would be like a tiny, extra-small t-shirt, and optional imports extra-large. And I'm afraid that's an Alex one.
+
+**Yordis Prieto** [55:44](https://youtu.be/x6pGFQAeKQ4?t=3344)
+
+I definitely need this one. So if you think this is somewhat in the pipeline, I 100% need it. Because, for example, let's assume that WIT doesn't have a specific type that is friendlier — to make a point — in the codegen, right? I can use this type of annotation to say: hey, transform this type — that I know that the WIT is going to do a specific way — into something that is friendlier. Like, instead of, I don't know, the hash tree or whatever — for us, I want to use the map, to make a point. You could use this annotation to drive a little bit of the compilation of them. So, like I said, this thing — whatever version of it — I think is granted, especially so that you can experiment around this annotation, right? For all the stuff you introduce slowly, to see how it sticks, and see: oh, okay, I experimented, I see it's valuable — now let's bring it up to actually the specification. Or no — it can just stay as an extension. Nobody needs to actually build it from the WIT perspective.
+
+**Bailey Hayes** [56:51](https://youtu.be/x6pGFQAeKQ4?t=3411)
+
+Oh yeah — we have another idea here, which is about the idea of just being able to have custom annotations, which we're anti right now. Largely because we're afraid, if you introduce that as a concept — you know, have you ever heard the phrase "to a hammer, everything looks like a nail"? We're afraid that things that could have been solved in a better way, ergonomically, would be baked in forever with these custom types with no path. But I think we've gotten to the point now where we mostly have the affordances we needed, so that's no longer as big of a deal.
+
+**Yordis Prieto** [57:33](https://youtu.be/x6pGFQAeKQ4?t=3453)
+
+Let me push back on something — and please correct me, disagree with me. One: I think the WebAssembly community is used to "well, here's a new world," right? Like, look at preview 1, 2, 3. The community is not scared of that. Okay, let's agree on that one, I think. And second: I hear you, but what makes you believe that you are not missing out on those experimentations, and observing actually-production software with the real trade-offs, to then bring it up? I'm in that realm of encouraging experimentation, with a strong community that is speaking, from the get-go, "hey, better together" and stuff like that, Bailey. If you take care of the culture aspect of it, then you get the benefits of the experimentation and autonomy, in my opinion.
+
+**Bailey Hayes** [58:26](https://youtu.be/x6pGFQAeKQ4?t=3506)
+
+To be fair, I was the one that proposed custom annotations to begin with. I was the one that was told no. But the feedback I got was that I could build it in my own bindgen, basically behind a flag, and then I can do all that experimentation myself without baking it into the standard. Which I'm sympathetic to, because, you know, with what we're doing in the web side of the world: you define something, it lives forever, and there are no take-backs there.
+
+**Yordis Prieto** [59:02](https://youtu.be/x6pGFQAeKQ4?t=3542)
+
+More reason for you to externalize the experiments until they're actually proven in production. The only thing that you're taking is: this specification is flexible enough for you to do the experiments. And you already have a precise way to see those experiments, right? Because if I fork and I make it my own and stuff like that — great. Now I need to figure out how you customized your thing in order for me to understand it, in order to then have a conversation to say: oh, now I see it, we could bring it in.
+
+**Bailey Hayes** [59:35](https://youtu.be/x6pGFQAeKQ4?t=3575)
+
+But I don't know — you saw how hard it is when you change one thing, how many places you have to touch. Now imagine if you changed the ABI. Because you didn't even change the ABI.
+
+**Yordis Prieto** [59:48](https://youtu.be/x6pGFQAeKQ4?t=3588)
+
+Yeah. Well, some of these annotations — the good thing is, most likely, what most people would care about is codegen-ing these things. It's barely the ABI itself, right? For example, working on the maps type today: we put a lot of these customizations inside the flags, right? Like, in the maps, we got to the point where, oh, I may want two types of map codegen. That's what you would do with this type of annotation — like, okay, give me this flavor or that other flavor, or ignore it, right? So the customization already exists.
+
+**Bailey Hayes** [1:00:23](https://youtu.be/x6pGFQAeKQ4?t=3623)
+
+Well, sort of — because you don't have it. It only round-trips for your stuff right now because it's in the custom metadata section, which is our favorite hack for a lot of things. But to avoid doing it in the ABI — I would say that we can come up with a new annotation that we want people to use, called `claims`, and we could design this in a way to have generic attributes, which would be like the holding place for any number of other types of annotations we may want to feature-add, if that makes sense. So external ID is an example. `@unstable` is another example. We obviously have a pattern here, and we could create a table that's just of that. But I want it, ultimately, in the ABI, inline, as I'm parsing the component — because I eventually need this in the ABI. But I guess what I'm saying is: we can start without it. We can do this trick in custom metadata, basically, to do all of this in a way to allow lots of experimentation without having to eat the whole world. So yeah, I think we can do it. I think it's time. And I also get why I got a lot of pushback for doing that too early — because we didn't have the basics done yet.
+
+**Yordis Prieto** [1:01:46](https://youtu.be/x6pGFQAeKQ4?t=3706)
+
+Yep. And for the IAM stuff, just let me know. This is my bread and butter, and the second thing that I weirdly decided is important in my life — I don't know why. So I have a lot of experience and scars. Also, this service is on top of SpiceDB — that's the authorization, the one who enforces it — which, in my opinion, is the best one out there right now. But the whole management is on top of JetStream, so it's familiar tooling for you.
+
+**Bailey Hayes** [1:02:15](https://youtu.be/x6pGFQAeKQ4?t=3735)
+
+Yeah. Well, I also like the guy that created SpiceDB, so I've been wanting to play with it just for that. So, all right — thank you, Yordis. Thanks for hanging on. Anybody else? If you listened to this part — well, now you get to know what it's like in the guts. It's a fun place too. A lot of debates. But yeah, I think that will be a good candidate for you, Yordis. I have a million and one wish list items, but it's more important to give people something they need.
+
+**Yordis Prieto** [1:02:54](https://youtu.be/x6pGFQAeKQ4?t=3774)
+
+Yeah, I like it. Let's follow up on the Slack to figure out what you did before, and see a path forward here, then.
+
+**Bailey Hayes** [1:03:01](https://youtu.be/x6pGFQAeKQ4?t=3781)
+
+Yeah, you can. It's still component model, still just chilling. Custom annotations — we want to go forward, but I'm going to do it fresh again, on the heels of people actually using this stuff and realizing they need it. So — Aditya just asked you a question in chat. I don't want to close it out. I'm going to go ahead and stop the recording now.
