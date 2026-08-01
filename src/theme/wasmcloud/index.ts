@@ -2,6 +2,10 @@ declare module '@theme/wasmcloud/components/video-modal' {
   export * from '@site/src/theme/wasmcloud/components/video-modal';
 }
 
+declare module '@theme/wasmcloud/components/copy-page-dropdown' {
+  export * from '@site/src/theme/wasmcloud/components/copy-page-dropdown';
+}
+
 declare module '@theme/wasmcloud/hooks/use-body-scroll-lock' {
   export * from '@site/src/theme/wasmcloud/hooks/use-body-scroll-lock';
 }
