@@ -29,7 +29,7 @@ wasmCloud workload security operates in two complementary layers:
 - **The WebAssembly sandbox** — enforced by the [Wasmtime](https://wasmtime.dev/) runtime, which provides strong isolation guarantees for every component by default
 - **Kubernetes controls** — NetworkPolicy for host pods, and RBAC for the operator and gateway ServiceAccounts
 
-This page covers the sandbox model, `allowedHosts`, `allowIpNameLookup`, and NetworkPolicy. For RBAC configuration, see [Roles and Role Bindings](./operator-manual/roles-and-rolebindings.mdx).
+This page covers the sandbox model, `allowedHosts`, `allowedIpNameLookups`, and NetworkPolicy. For RBAC configuration, see [Roles and Role Bindings](./operator-manual/roles-and-rolebindings.mdx).
 
 ## The WebAssembly sandbox
 
@@ -68,27 +68,27 @@ If `allowedHosts` is empty or the field is omitted, all outbound HTTP requests a
 `allowedHosts` controls outbound HTTP calls made via `wasi:http/outgoing-handler`. It does not restrict network access that may be available through other host interfaces that are explicitly bound to the component.
 :::
 
-## Allowing DNS name lookups with `allowIpNameLookup`
+## Allowing DNS name lookups with `allowedIpNameLookups`
 
-DNS name resolution via `wasi:sockets` is denied by default: a component with no `allowIpNameLookup` list (or an empty one) cannot resolve any hostname and must connect by IP address. Starting in wasmCloud 2.6.0, a component can opt in with a per-component allowlist:
+DNS name resolution via `wasi:sockets` is denied by default: a component with no `allowedIpNameLookups` list (or an empty one) cannot resolve any hostname and must connect by IP address. Starting in wasmCloud 2.6.1, a component can opt in with a per-component allowlist:
 
 ```yaml
 components:
   - name: http-component
     image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
     localResources:
-      allowIpNameLookup:
+      allowedIpNameLookups:
         - api.example.com
         - "*.internal.example.com"
 ```
 
-Entries may be exact hostnames, `*.suffix` wildcards, `*` (any name), or literal IPs. Unlike `allowedHosts`, which fails open when omitted, `allowIpNameLookup` fails closed: resolution is denied unless a matching entry is present. The restriction is enforced by the wasmCloud host for both WASI 0.2 and 0.3 resolvers, independently of any Kubernetes NetworkPolicy.
+Entries may be exact hostnames, `*.suffix` wildcards, `*` (any name), or literal IPs. Unlike `allowedHosts`, which fails open when omitted, `allowedIpNameLookups` fails closed: resolution is denied unless a matching entry is present. The restriction is enforced by the wasmCloud host for both WASI 0.2 and 0.3 resolvers, independently of any Kubernetes NetworkPolicy.
 
 :::note[Check your installed CRDs]
-The CRDs bundled with the 2.6.0 Helm chart predate this field. If your installed `Workload`/`WorkloadDeployment` CRDs don't include `allowIpNameLookup` under `localResources`, the Kubernetes API server silently prunes it from applied manifests. Update your CRDs from the runtime-operator's current definitions before relying on the field.
+The capability shipped in wasmCloud 2.6.0 under the name `allowIpNameLookup` and was renamed to `allowedIpNameLookups` in 2.6.1 — on a 2.6.0 host, use the old name. The CRDs bundled with the 2.6.x Helm charts predate the field entirely: if your installed `Workload`/`WorkloadDeployment` CRDs don't include `allowedIpNameLookups` under `localResources`, the Kubernetes API server silently prunes it from applied manifests. Update your CRDs from the runtime-operator's current definitions before relying on the field.
 :::
 
-Note that `allowIpNameLookup` governs the `wasi:sockets` name-lookup interface (i.e., resolving hostnames for raw TCP/UDP connections). Outbound HTTP through `wasi:http/outgoing-handler` is resolved by the host's own HTTP client and governed by `allowedHosts`, so HTTP-only components don't need entries here.
+Note that `allowedIpNameLookups` governs the `wasi:sockets` name-lookup interface (i.e., resolving hostnames for raw TCP/UDP connections). Outbound HTTP through `wasi:http/outgoing-handler` is resolved by the host's own HTTP client and governed by `allowedHosts`, so HTTP-only components don't need entries here.
 
 ## Kubernetes NetworkPolicy for host pods
 
