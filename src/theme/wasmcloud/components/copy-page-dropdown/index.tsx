@@ -1,6 +1,5 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import { useDoc } from '@docusaurus/plugin-content-docs/client';
 import { useClickOutside } from '@theme/wasmcloud/hooks/use-click-outside';
 import { useKeypress } from '@theme/wasmcloud/hooks/use-keypress';
@@ -28,7 +27,6 @@ async function fetchPageMarkdown(rawUrl: string): Promise<string> {
 }
 
 function CopyPageDropdown(): React.JSX.Element {
-  const { siteConfig } = useDocusaurusContext();
   const { metadata } = useDoc();
   const [isOpen, setIsOpen] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
@@ -38,8 +36,8 @@ function CopyPageDropdown(): React.JSX.Element {
   const close = useCallback(() => setIsOpen(false), []);
   useClickOutside(containerRef, close);
   useKeypress('Escape', close);
+  useEffect(() => () => window.clearTimeout(copyResetTimeout.current), []);
 
-  const pageUrl = `${siteConfig.url}${metadata.permalink}`;
   const rawUrl = metadata.editUrl ? editUrlToRawUrl(metadata.editUrl) : undefined;
 
   const copyPage = useCallback(async () => {
@@ -58,12 +56,17 @@ function CopyPageDropdown(): React.JSX.Element {
     setIsOpen(false);
   }, [rawUrl]);
 
-  const chatGptUrl = `https://chatgpt.com/?q=${encodeURIComponent(
-    `Read ${pageUrl} so I can ask questions about it.`,
-  )}`;
-  const claudeUrl = `https://claude.ai/new?q=${encodeURIComponent(
-    `Read ${pageUrl} so I can ask questions about it.`,
-  )}`;
+  const viewAsMarkdown = useCallback(async () => {
+    if (!rawUrl) return;
+    try {
+      const markdown = await fetchPageMarkdown(rawUrl);
+      const blobUrl = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown' }));
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Failed to open page as Markdown', error);
+    }
+    setIsOpen(false);
+  }, [rawUrl]);
 
   const copyLabel =
     copyState === 'copied'
@@ -101,13 +104,11 @@ function CopyPageDropdown(): React.JSX.Element {
             </div>
           </button>
           {rawUrl && (
-            <a
+            <button
+              type="button"
               role="menuitem"
               className={styles.menuItem}
-              href={rawUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={close}
+              onClick={viewAsMarkdown}
             >
               <div className={styles.menuItemText}>
                 <span className={styles.menuItemLabel}>
@@ -115,39 +116,8 @@ function CopyPageDropdown(): React.JSX.Element {
                 </span>
                 <span className={styles.menuItemDescription}>View this page as plain text</span>
               </div>
-            </a>
+            </button>
           )}
-          <div className={styles.menuDivider} />
-          <a
-            role="menuitem"
-            className={styles.menuItem}
-            href={chatGptUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={close}
-          >
-            <div className={styles.menuItemText}>
-              <span className={styles.menuItemLabel}>
-                Open in ChatGPT <ExternalLinkIcon className={styles.externalIcon} />
-              </span>
-              <span className={styles.menuItemDescription}>Ask ChatGPT about this page</span>
-            </div>
-          </a>
-          <a
-            role="menuitem"
-            className={styles.menuItem}
-            href={claudeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={close}
-          >
-            <div className={styles.menuItemText}>
-              <span className={styles.menuItemLabel}>
-                Open in Claude <ExternalLinkIcon className={styles.externalIcon} />
-              </span>
-              <span className={styles.menuItemDescription}>Ask Claude about this page</span>
-            </div>
-          </a>
         </div>
       )}
     </div>
