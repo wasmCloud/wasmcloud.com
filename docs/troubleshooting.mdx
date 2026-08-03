@@ -69,7 +69,7 @@ hostInterfaces:
     interfaces: [blobstore]
   - namespace: wasmcloud
     package: messaging
-    interfaces: [consumer, producer]
+    interfaces: [consumer, handler]
 ```
 
 **See also:** [Host Interfaces](./kubernetes-operator/crds.mdx#host-interfaces) for the full field reference (including the `name` field for multi-backend binding) and the [`HostInterface` API reference](./kubernetes-operator/api-reference.md#hostinterface). If you're hitting this error in `wash dev` rather than on Kubernetes, see [Debugging Components: Unknown import errors](./wash/developer-guide/debugging-components.mdx#unknown-import-errors).
@@ -78,7 +78,7 @@ hostInterfaces:
 
 A component that imports `wasi:http/outgoing-handler` and is bound to the corresponding host interface still cannot reach an external URL — the call fails or returns an error to the component, even though the network path appears clear.
 
-**Cause:** The host enforces a per-component allowlist of outbound destinations via `localResources.allowedHosts`. When the list is non-empty, any outbound HTTP request whose host doesn't match an entry is blocked at the wasmCloud layer before the request leaves the process — independently of any Kubernetes `NetworkPolicy`. If `allowedHosts` is set but does not include the host the component is trying to reach, the call is rejected.
+**Cause:** The host enforces a per-component allowlist of outbound destinations via `localResources.allowedHosts`, and the policy fails closed: any outbound HTTP request whose host doesn't match an entry is blocked at the wasmCloud layer before the request leaves the process — independently of any Kubernetes `NetworkPolicy`. A component with no `allowedHosts` list at all is denied every outbound call, so this is the expected first-run symptom for any component that makes outbound HTTP, not just a sign of a misconfigured list.
 
 **Fix:** Add the host to `allowedHosts` for the component:
 
@@ -95,7 +95,7 @@ components:
 
 Entries are matched against the request's host (no scheme, no path) using case-insensitive comparison. A leading wildcard like `*.example.com` matches any subdomain but **not** the bare `example.com` — list both if you need both.
 
-If `allowedHosts` is empty (or the field is omitted), **all outbound HTTP requests are allowed** — the allowlist only takes effect when at least one entry is present.
+If `allowedHosts` is empty or the field is omitted, **all outbound HTTP requests are denied** — the policy fails closed. To allow unrestricted egress, set `allowedHosts: ["*"]` explicitly. (In local development, `wash dev` substitutes the allow-all policy when the field is omitted from `.wash/config.yaml`, which is why a component can work in the dev loop and then fail on Kubernetes.)
 
 **See also:** [Workload Security — Restricting outbound HTTP with `allowedHosts`](./kubernetes-operator/workload-security.mdx#restricting-outbound-http-with-allowedhosts). If outbound HTTP is blocked at the cluster level rather than the wasmCloud level, see the same page for [NetworkPolicy](./kubernetes-operator/workload-security.mdx#kubernetes-networkpolicy-for-host-pods) guidance.
 

@@ -218,6 +218,30 @@ Naming rules:
 - Names must be unique within a workload's `hostInterfaces` for the same `namespace`+`package`.
 - Names must match `[a-z0-9][a-z0-9-]*` (DNS label style).
 
+### Messaging subscriptions and consumer groups
+
+The built-in NATS `wasmcloud:messaging` plugin reads two config keys, each from the component's `localResources.config` first, falling back to the `config` on the workload's `wasmcloud:messaging` `hostInterfaces` entry (so workers in one workload can override the workload-scoped values):
+
+- **`subscriptions`**: A comma-separated list of NATS subjects the component's `wasmcloud:messaging/handler` export subscribes to.
+- **`consumer_group`**: Controls delivery when a component runs with multiple replicas (as of wasmCloud 2.6.0). When omitted, replicas join a consumer group derived from the workload namespace, workload name, and component name, so exactly one replica handles each message. Set it to the special value `broadcast` to deliver every message to every replica (the pre-2.6.0 behavior — e.g., for cache invalidation), or to any other NATS-safe name (no whitespace, `*`, or `>`) to place subscribers in an explicitly named group (e.g., to share one group across components).
+
+```yaml
+spec:
+  template:
+    spec:
+      components:
+        - name: order-processor
+          image: ghcr.io/example/order-processor:0.1.0
+          localResources:
+            config:
+              subscriptions: 'orders.received'
+              consumer_group: broadcast
+      hostInterfaces:
+        - namespace: wasmcloud
+          package: messaging
+          interfaces: [consumer, handler]
+```
+
 ### Runtime Configuration
 
 Runtime configuration values (such as environment variables) may be supplied via the optional `localResources` subfield of the `component` field. 
@@ -248,7 +272,7 @@ The `poolSize`, `maxInvocations`, `allowedHosts`, and `allowedIpNameLookups` fie
 
 - **`poolSize`**: Enables warm-instance pooling (functional as of wasmCloud 2.6.0). After an invocation completes cleanly, the host parks the instance (up to `poolSize` instances) and reuses parked instances for subsequent invocations instead of instantiating fresh. A burst beyond `poolSize` still gets fresh instances rather than queueing, so pooling reduces per-invocation latency without capping concurrency. When omitted, `0`, or negative, every invocation instantiates fresh. Note that when linked components share a store, pooling applies only if every component in that unit has `poolSize` set: one opted-out component disables pooling for the shared store.
 - **`maxInvocations`**: Caps how many invocations a pooled instance serves before the host retires it and instantiates a replacement (a recycling bound for long-lived pooled instances). When `0`, negative, or omitted, pooled instances are reused without limit. This is not a concurrency limit: it bounds instance reuse, not in-flight requests.
-- **`allowedHosts`**: A list of hostnames this component is permitted to make outbound HTTP calls to (e.g., `api.example.com`, `*.s3.amazonaws.com`). Entries are matched case-insensitively against the request's host. When the list is non-empty, calls to hosts not on the list are blocked, enforcing a least-privilege network policy for the component. An empty list (or omitted field) allows all outbound HTTP. See [Workload Security](./workload-security.mdx#restricting-outbound-http-with-allowedhosts) for details and usage guidance.
+- **`allowedHosts`**: A list of hosts this component is permitted to make outbound HTTP calls to (e.g., `api.example.com`, `*.s3.amazonaws.com`, or `*` for any host). Entries are matched case-insensitively against the request's host. Calls to hosts not on the list are blocked, enforcing a least-privilege network policy for the component. The policy fails closed: an empty or omitted list denies all outbound HTTP, so a component that makes outbound calls needs either specific entries or an explicit `allowedHosts: ["*"]` for unrestricted egress. See [Workload Security](./workload-security.mdx#restricting-outbound-http-with-allowedhosts) for details and usage guidance.
 - **`allowedIpNameLookups`**: A list of names this component is permitted to resolve via `wasi:sockets` name lookup (added in wasmCloud 2.6.0 as `allowIpNameLookup`; renamed to its current form in 2.6.1). Entries may be exact hostnames, `*.suffix` wildcards, `*` (any name), or literal IPs. DNS resolution is denied by default — an omitted or empty list denies every lookup, so components without this field must connect by IP address. See [Workload Security](./workload-security.mdx#allowing-dns-name-lookups-with-allowedipnamelookups) for usage and a note on CRD versions.
 
 ## WorkloadReplicaSet
