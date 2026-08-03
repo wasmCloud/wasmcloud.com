@@ -163,15 +163,15 @@ Use `HostBuilder` to construct a host with your desired configuration. All capab
 use std::sync::Arc;
 use wash_runtime::{
     engine::Engine,
-    host::{HostBuilder, HostApi, http::{HttpServer, DevRouter}},
+    host::{HostBuilder, HostApi, http::{Ingress, DevRouter}},
     plugin::wasi_config::DynamicConfig,
 };
 
 let engine = Engine::builder().build()?;
 
 // Configure HTTP handler and plugins
-let http_handler = HttpServer::new(DevRouter::default(), "127.0.0.1:8080".parse()?).await?;
-// For HTTPS, use HttpServer::new_with_tls() with cert, key, and optional CA paths
+let http_handler = Ingress::new(DevRouter::default(), "127.0.0.1:8080".parse()?).await?;
+// For HTTPS, use Ingress::new_with_tls() with a TlsConfig
 let config_plugin = DynamicConfig::new(false);
 
 // Build the host
@@ -197,17 +197,17 @@ let host = host.start().await?;
 | `with_hostname(str)` | Set the system hostname (defaults to OS hostname) |
 | `with_friendly_name(str)` | Set a human-readable name (auto-generated if not set) |
 | `with_label(key, value)` | Add metadata labels for identification |
-| `with_http_handler(Arc<dyn HostHandler>)` | Register the HTTP handler (`HttpServer` implements `HostHandler`, not `HostPlugin`) |
+| `with_http_handler(Arc<dyn HostHandler>)` | Register the HTTP handler (`Ingress` implements `HostHandler`, not `HostPlugin`) |
 | `with_plugin(Arc<dyn HostPlugin>)` | Register a plugin (can be called multiple times; IDs must be unique) |
 
 ### Customizing outgoing HTTP requests
 
 By default, every outbound HTTP request from a component flows through `wasmtime-wasi-http`'s `default_send_request`. For most embedders that's the right behavior — but if you need to thread custom TLS configuration through outgoing calls, swap in an alternative transport (an internal RPC system, for example), or insert middleware-style policy at the egress boundary, `wash-runtime` 2.2 introduced the `OutgoingHandler` trait as a pluggable extension point on the HTTP server.
 
-Implement `OutgoingHandler` on your own type, then supply it to `HttpServerBuilder::outgoing_handler` when constructing the HTTP server:
+Implement `OutgoingHandler` on your own type, then supply it to `IngressBuilder::outgoing_handler` when constructing the ingress:
 
 ```rust
-use wash_runtime::host::http::{HttpServer, DevRouter, OutgoingHandler};
+use wash_runtime::host::http::{Ingress, DevRouter, OutgoingHandler};
 
 struct MyEgressHandler { /* ... */ }
 
@@ -215,9 +215,7 @@ impl OutgoingHandler for MyEgressHandler {
     // ...
 }
 
-let http_handler = HttpServer::builder()
-    .router(DevRouter::default())
-    .bind_address("127.0.0.1:8080".parse()?)
+let http_handler = Ingress::builder(DevRouter::default(), "127.0.0.1:8080".parse()?)
     .outgoing_handler(MyEgressHandler { /* ... */ })
     .build()
     .await?;
@@ -329,7 +327,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use wash_runtime::{
     engine::Engine,
-    host::{HostBuilder, HostApi, http::{HttpServer, DevRouter}},
+    host::{HostBuilder, HostApi, http::{Ingress, DevRouter}},
     plugin::wasi_config::DynamicConfig,
     types::{Workload, WorkloadStartRequest, Component, LocalResources},
 };
@@ -345,7 +343,7 @@ async fn main() -> anyhow::Result<()> {
         .build()?;
 
     // Configure HTTP handler and plugins
-    let http_handler = HttpServer::new(DevRouter::default(), "0.0.0.0:8080".parse()?).await?;
+    let http_handler = Ingress::new(DevRouter::default(), "0.0.0.0:8080".parse()?).await?;
     let config_plugin = DynamicConfig::new(false);
 
     // Build and start the host
