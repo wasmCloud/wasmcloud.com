@@ -1,6 +1,6 @@
 ---
-title: 'Creating Component Host Plugins for wasmCloud'
-sidebar_label: 'Creating Component Host Plugins'
+title: 'Creating Host Component Plugins for wasmCloud'
+sidebar_label: 'Creating Host Component Plugins'
 sidebar_position: 3
 toc_max_heading_level: 2
 description: 'Build wasmCloud host plugins as WebAssembly components — implement WASI or wasmCloud capabilities in Wasm and deploy them alongside your workloads.'
@@ -25,23 +25,23 @@ platforms: [wasmCloud, Wasmtime]
 
 ### Build host plugins as WebAssembly components instead of native Rust code.
 
-A **component host plugin** is a WebAssembly component that provides a host capability to other workloads. Instead of implementing the [`HostPlugin` trait](./creating-host-plugins.mdx) in Rust and linking it into the host binary, you build the capability as a Wasm component and deploy it into a wasmCloud host at runtime.
+A **host component plugin** is a WebAssembly component that provides a host capability to other workloads. Instead of implementing the [`HostPlugin` trait](./creating-host-plugins.mdx) in Rust and linking it into the host binary, you build the capability as a Wasm component and deploy it into a wasmCloud host at runtime.
 
-Component host plugins are one of two options for extending a host with new capabilities. See [Host plugins](../overview/hosts/plugins.mdx) for the overview of both native and component plugins, and [Plugin or Service?](../recipes/plugin-or-service.mdx) for the decision guide.
+Host component plugins are one of two options for extending a host with new capabilities. See [Host plugins](../overview/hosts/plugins.mdx) for the overview of both native and component plugins, and [Plugin or Service?](../recipes/plugin-or-service.mdx) for the decision guide.
 
 ## How it works
 
-At runtime, a component host plugin is a [trigger service](../overview/hosts/trigger-services.mdx) with a **capability ingress**. The host pins one long-lived instance of the plugin, and capability calls from other workloads (for example, a `wasmcloud:messaging/consumer.publish` invocation from a business component in another workload) are dispatched to that pinned instance across a store boundary. See [Trigger services](../overview/hosts/trigger-services.mdx#capability-ingress) for the cross-store dispatch model.
+At runtime, a host component plugin is a [trigger service](../overview/hosts/trigger-services.mdx) with a **capability ingress**. The host pins one long-lived instance of the plugin, and capability calls from other workloads (for example, a `wasmcloud:messaging/consumer.publish` invocation from a business component in another workload) are dispatched to that pinned instance across a store boundary. See [Trigger services](../overview/hosts/trigger-services.mdx#capability-ingress) for the cross-store dispatch model.
 
 From the caller's perspective this is transparent: a workload does not know whether the capability it imports is implemented as a native plugin or as a component plugin.
 
 :::info[Opt-in feature]
-Component host plugins shipped in wasmCloud 2.6.0, opt-in via the `host-component-plugins` Cargo feature on `wash-runtime`. Release images are built with default features only, so running component host plugins requires a host image built with the feature enabled. Check the [wash-runtime source](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-runtime) for the current shape.
+Host component plugins shipped in wasmCloud 2.6.0, opt-in via the `host-component-plugins` Cargo feature on `wash-runtime`. Release images are built with default features only, so running host component plugins requires a host image built with the feature enabled. Check the [wash-runtime source](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-runtime) for the current shape.
 :::
 
 ## Plugin world
 
-A component host plugin exports the capability it implements and optionally imports [`wasmcloud:host`](../overview/interfaces.mdx) to observe and cooperate with its runtime environment. A minimal WIT world for a plugin that implements the `wasmcloud:messaging/consumer` interface (the outbound publish/request side of `wasmcloud:messaging`) looks like:
+A host component plugin exports the capability it implements and optionally imports [`wasmcloud:host`](../overview/interfaces.mdx) to observe and cooperate with its runtime environment. A minimal WIT world for a plugin that implements the `wasmcloud:messaging/consumer` interface (the outbound publish/request side of `wasmcloud:messaging`) looks like:
 
 ```wit
 package example:messaging-plugin;
@@ -108,13 +108,13 @@ A plugin that doesn't export the interface is unaffected. Note that inside a lif
 
 ## Building the plugin
 
-Component host plugins are built the same way as any other wasmCloud component. Use `wash` to scaffold a component project, target `wasm32-wasip2` (or `wasm32-wasip3` if using WASI P3 interfaces such as `wasi:http/handler@0.3`), and compile.
+Host component plugins are built the same way as any other wasmCloud component. Use `wash` to scaffold a component project, target `wasm32-wasip2` (or `wasm32-wasip3` if using WASI P3 interfaces such as `wasi:http/handler@0.3`), and compile.
 
 The output is a standard component binary. Sign and publish it to an OCI registry the same way you distribute any other wasmCloud component.
 
 ## Deploying the plugin
 
-Component host plugins are declared in **host configuration**, not in a workload's manifest. A plugin serves every workload on the host that imports its interface, so it's a privileged install the host operator controls. Plugins are loaded once at host start; there is no dynamic reload today.
+Host component plugins are declared in **host configuration**, not in a workload's manifest. A plugin serves every workload on the host that imports its interface, so it's a privileged install the host operator controls. Plugins are loaded once at host start; there is no dynamic reload today.
 
 Every declaration carries a host-unique **id** (a duplicate ID is a hard error at host startup) and a **source** (OCI image reference or file path). Optional fields include a digest pin (for supply-chain verification, OCI sources only) and a per-plugin `max-restarts` override.
 
@@ -193,7 +193,7 @@ These are set on the host process (via container `env`, Helm `runtime.env`, etc.
 
 ## Considerations
 
-- **Wasm-only capabilities.** Component host plugins run inside the sandbox. They cannot open raw sockets, access arbitrary filesystem paths, or reach the host's hardware directly. If your capability needs those, build a [native host plugin](./creating-host-plugins.mdx) instead.
+- **Wasm-only capabilities.** Host component plugins run inside the sandbox. They cannot open raw sockets, access arbitrary filesystem paths, or reach the host's hardware directly. If your capability needs those, build a [native host plugin](./creating-host-plugins.mdx) instead.
 - **Design your WIT for cross-store traffic.** Resource handles, streams, and futures that cross the store boundary are relocated by the runtime rather than shared. Prefer WIT shapes that minimize resource churn across the boundary — for example, favor value-returning calls over long-lived resource handles when the choice is reasonable.
 - **Cooperative cancellation.** Long-running handlers should poll `wasmcloud:host/cancel.is-cancelled` at safe points; otherwise a workload teardown must wait for the natural completion of any in-flight invocation.
 - **Runtime execution model.** See [Trigger services considerations](../overview/hosts/trigger-services.mdx#considerations) for single-instance concurrency, shared state, and restart-budget notes that apply to every trigger service, including plugins.

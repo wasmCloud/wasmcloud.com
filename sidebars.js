@@ -70,7 +70,7 @@ const sidebars = {
       link: { type: 'doc', id: 'runtime/index' },
       items: [
         'runtime/creating-host-plugins',
-        'runtime/creating-component-host-plugins',
+        'runtime/creating-host-component-plugins',
         'runtime/building-custom-hosts',
         'runtime/washlet',
       ],
