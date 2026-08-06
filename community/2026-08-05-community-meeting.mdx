@@ -1,60 +1,180 @@
 ---
 date: '2026-08-05'
-title: 'Meeting Agenda - 2026-08-05'
+title: 'wash wizard Demo, a 13.6x HTTP Throughput Improvement, and Async wasmcloud:messaging on WASI P3'
+description: 'Aditya Salunkhe demos the wash wizard scaffolding tool, Bailey Hayes explains the 13.6x HTTP throughput win from Wasmtime instance pooling, plus async messaging on WASI P3.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasmtime webassembly runtime
+  - instance pooling
+  - wasi preview 3
+  - async messaging
+  - trigger services
+  - host components
+  - webassembly performance
+  - wash wizard
+  - webassembly news
+chapters:
+  - { seconds: 13, label: "Welcome and agenda" }
+  - { seconds: 68, label: "Demo: wash wizard — scaffold custom Wasm workloads in the terminal" }
+  - { seconds: 544, label: "Brainstorm: language defaults, workload manifests, and custom capabilities" }
+  - { seconds: 912, label: "Frank asks: how do components get into the wizard catalog?" }
+  - { seconds: 1075, label: "OCI metadata, portable topology, and corporate catalogs" }
+  - { seconds: 1409, label: "Liam's benchmark: 60K requests per second on a MacBook with P3 and pooling" }
+  - { seconds: 1444, label: "How 2.6 got a 13.6x HTTP throughput improvement: separate stores and trigger services" }
+  - { seconds: 1711, label: "Instance pooling and concurrent instances explained" }
+  - { seconds: 1857, label: "Frank asks: why not P3-only? P2's decade-long tail" }
+  - { seconds: 2193, label: "Where the state lives: Wasmtime stores and the cross-store bridge" }
+  - { seconds: 2475, label: "Host component plugins and a SQLx connection-pool service" }
+  - { seconds: 3096, label: "Jeremy: core instance limits, noisy neighbors, and heartbeat metrics" }
+  - { seconds: 3396, label: "PR walkthrough: async wasmcloud:messaging 0.3.0" }
+  - { seconds: 3700, label: "Bharat asks: WASI WebGPU and AI inference with Candle" }
+  - { seconds: 3972, label: "Wrap-up" }
+image: https://i.ytimg.com/vi/zyYVTNW0M7k/maxresdefault.jpg
+duration: 4009
+showTitle: true
+slug: 2026-08-05-community-meeting
+speakers:
+  - bailey-hayes
+  - liam-randall
+  - aditya-salunkhe
+  - frank-schaffa
+  - jeremy-fleitz
+  - victor-adossi
+  - bharat
+about: wasmCloud
+mentions:
+  - WASIPreview3
+  - ComponentModel
+  - Wasmtime
+  - wash
+  - NATS
+  - WebGPU
+  - AIInference
+  - SQLx
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- [DEMO] wash wizard @Aditya1404Sal
-- async wasmcloud:messaging @Aditya1404Sal
-- host component plugins now may depend on native plugins
+<YouTube url="https://www.youtube.com/watch?v=zyYVTNW0M7k" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=zyYVTNW0M7k" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The August 5, 2026 wasmCloud community call opens with Aditya Salunkhe demoing **wash wizard**, a terminal UI that scaffolds custom Wasm workload architectures — ingress triggers, component chains, fan-out, capability selection — into a buildable project. From there Bailey Hayes goes deep on how [wasmCloud 2.6](/blog/wasmcloud-2-6-release/)'s separate **Wasmtime** stores, trigger services, and concurrent **instance pooling** produced a **13.6x HTTP throughput improvement**, Jeremy Fleitz previews core-instance metrics for the host heartbeat, and Aditya returns with the PR that makes `wasmcloud:messaging` natively async on **WASI Preview 3**.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **wash wizard turns a blank terminal into a buildable Wasm workload** — Aditya Salunkhe's new `wash` command offers the repo's existing examples and templates as a catalog, plus a build-your-own mode: pick HTTP, messaging, or service triggers, chain or fan out components to arbitrary depth, select capabilities like `wasi:config` and HTTP egress per step, and it generates a `my-workload` package with WIT worlds pre-wired so `wash build` compiles a working boilerplate immediately
+- **A 13.6x HTTP throughput improvement is in review** — the change builds an instance pool of P3 components and threads requests into pooled instances *concurrently*, instead of today's one-request-per-instance round-robin; reviewers are working through it now
+- **Separate stores are the enabler for everything else** — wasmCloud 2.6 runs [trigger services](/docs/overview/hosts/trigger-services/) on their own Wasmtime store, apart from the workload store, so lifetimes and concurrency are managed independently; the **cross-store bridge** built for that also unlocked [host component plugins](/docs/runtime/creating-host-component-plugins/), with isolation overhead measured around 10%
+- **Trigger service exports must be P3** — Victor Adossi flagged in review that the current implementation accepts both; Bailey expects the P2 path deadlocks, and the action item is to enforce P3-only with a unit test to catch it, since P2 cannot handle reentrancy
+- **P2 isn't going away — plan for a decade** — Rust's `wasm32-wasip3` target is expected upstream within weeks, after which cfg-style P2/P3 switches can percolate through socket2, Tokio, and SQLx the way P2 sockets did; until toolchains catch up, components that import `wasi:io` get treated as P2 and miss the new speedups
+- **Community numbers back the story** — Liam Randall hit 60,000 requests per second on a MacBook with a P3 web component and the new `poolSize` option, and separately measured 3x over an equivalent P2 component with the host daemon at 6% CPU
+- **Core instances need to be treated as a first-class resource** — Jeremy Fleitz showed why Wasmtime's default 1,000-core-instance limit surprises Go users (componentized Go can consume 4–5 core instances per component versus Rust's 1–3), and is adding available/used core-instance counts to the host heartbeat plus a configurable limit so the runtime operator can schedule and warn before exhaustion
+- **`wasmcloud:messaging` 0.3.0 makes messaging natively async** — Aditya's PR asyncifies request and reply so a component can keep many operations outstanding, replies can be awaited from inside a handler, and the 0.2.0 interface stays untouched side by side; his verdict on the P2-to-P3 migration: "quite straightforward"
+
+## Chapters
+
+- [0:13 — Welcome and agenda](https://youtu.be/zyYVTNW0M7k?t=13)
+- [1:08 — Demo: wash wizard — scaffold custom Wasm workloads in the terminal](https://youtu.be/zyYVTNW0M7k?t=68)
+- [9:04 — Brainstorm: language defaults, workload manifests, and custom capabilities](https://youtu.be/zyYVTNW0M7k?t=544)
+- [15:12 — Frank asks: how do components get into the wizard catalog?](https://youtu.be/zyYVTNW0M7k?t=912)
+- [17:55 — OCI metadata, portable topology, and corporate catalogs](https://youtu.be/zyYVTNW0M7k?t=1075)
+- [23:29 — Liam's benchmark: 60K requests per second on a MacBook with P3 and pooling](https://youtu.be/zyYVTNW0M7k?t=1409)
+- [24:04 — How 2.6 got a 13.6x HTTP throughput improvement: separate stores and trigger services](https://youtu.be/zyYVTNW0M7k?t=1444)
+- [28:31 — Instance pooling and concurrent instances explained](https://youtu.be/zyYVTNW0M7k?t=1711)
+- [30:57 — Frank asks: why not P3-only? P2's decade-long tail](https://youtu.be/zyYVTNW0M7k?t=1857)
+- [36:33 — Where the state lives: Wasmtime stores and the cross-store bridge](https://youtu.be/zyYVTNW0M7k?t=2193)
+- [41:15 — Host component plugins and a SQLx connection-pool service](https://youtu.be/zyYVTNW0M7k?t=2475)
+- [51:36 — Jeremy: core instance limits, noisy neighbors, and heartbeat metrics](https://youtu.be/zyYVTNW0M7k?t=3096)
+- [56:36 — PR walkthrough: async wasmcloud:messaging 0.3.0](https://youtu.be/zyYVTNW0M7k?t=3396)
+- [1:01:40 — Bharat asks: WASI WebGPU and AI inference with Candle](https://youtu.be/zyYVTNW0M7k?t=3700)
+- [1:06:12 — Wrap-up](https://youtu.be/zyYVTNW0M7k?t=3972)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### wash wizard: Scaffolding Custom Wasm Workloads
 
-### Topic 1
+Aditya Salunkhe opened with the problem: a beginner exploring wasmCloud has the docs, but building a first **WebAssembly component** from scratch still means learning WIT, worlds, and workload wiring all at once. The wasmCloud repository already carries examples and templates — so why not surface them as a [`wash`](/docs/wash/) command? His answer is **wash wizard**, a terminal UI with two modes. The catalog mode lists the existing templates — the HTTP API with distributed workloads, the service TCP example, and the rest of the examples tree — and clones the selected subdirectory using the `wash new` mechanism for pulling any component directory with a `.wash/config.yaml`. It's also wired to load community components from the new [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud) repository into the same picker.
 
-- Note 1
-- Note 2
+The custom mode is the headline. Pick a trigger — HTTP, messaging, or service — then design the workload's shape: chained steps or fan-out branching with configurable branch counts and depths, with a live topology preview rendering in the terminal as you go. Capabilities are selected per step — `wasi:config` on the ingress, HTTP egress (the `wasi:http` outgoing handler) on a downstream step — and the wizard generates a `my-workload` package where every component's WIT world is pre-wired and the selected capabilities are pre-registered into a simple invoke function. Running `wash build` on the output compiles immediately, so a newcomer goes from nothing to a running custom architecture under [`wash dev`](/docs/wash/) without hand-authoring WIT. Aditya built the wizard with Claude; under the hood it emits a `config.yaml` plus a `topology.yaml` capturing the workload graph that drives the preview.
 
-### Topic 2
+### From Catalog to OCI Metadata: Making Workloads Machine-Readable
 
-- Note 1
-- Note 2
+The brainstorm that followed ranged over what the wizard should become. On languages, Aditya kept the demo Rust-only but designed for Python, TypeScript, and others; Bailey Hayes suggested a default-language setting in `wash` — most developers live in one language, so let them set it once. On capabilities, Bailey pointed at the growing [host component plugin](/docs/runtime/creating-host-component-plugins/) space: the interesting choices aren't just *which* capability but *which flavor* — awesome-wasmcloud already has two Couchbase connectors, one speaking the database's socket API and one using its HTTP data API, both serving the same interface. Aditya's counterpoint held firm: beginners need something that compiles and works as a minimal first step — get people from zero to one before zero to one hundred.
 
-## Weekly highlights
+Frank Schaffa asked how a component someone builds actually becomes available in the catalog. Aditya's pipeline walks a contributed component's WIT world (accounting for cases like [wstd](https://github.com/yoshuawuyts/wstd), which binds the `wasi:http` incoming handler internally where it isn't visible in the world) and generates the topology metadata via CI — contributors just build a component that compiles to `.wasm`. Bailey pushed it further: eliminate the sidecar file and put topology metadata *inside* the Wasm OCI artifact, using OCI labels and annotations for registry lookup. Her design goal: "if you give me a `.wasm`, I can basically tell you how to deploy it" — secrets, configuration, and capabilities all discoverable, down to synthesizing the Kubernetes custom resource for the [runtime operator](/docs/kubernetes-operator/). That framing also makes the wizard pluggable for companies that want their own component catalogs first — and, in a world where "the zero to 100 is: can the LLM do it," keeps the whole thing machine-readable.
 
-### Issue of the Week
+### How wasmCloud Got a 13.6x HTTP Throughput Improvement
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+Prompted by Liam Randall's anecdote — 60,000 requests per second from a P3 web component with the new `poolSize` option on a MacBook — Bailey walked through the performance arc that started with [wasmCloud 2.6](/blog/wasmcloud-2-6-release/) and continues in a PR now in review that delivers a **13.6x improvement in HTTP throughput**. The foundation is store separation. A wasmCloud host provides host-native plugins (`wasi:http`, key-value, blob store) to workloads; with 2.6, a **[trigger service](/docs/overview/hosts/trigger-services/)** — a service whose exports make it triggerable, which requires [WASI P3](/blog/wasi-p3-on-wasmcloud/), since P2 re-entrancy deadlocks — runs on its *own* Wasmtime store, separate from the workload store. Separate stores mean separate lifetimes and separately managed concurrency: a trigger into the service store spawns a task that can spawn work on a different store, so the service keeps accepting requests — routing to a users handler here, a products handler there — while operations are in flight. One shape that enables: a trigger service acting as an API gateway.
 
-### Documentation of the Week
+Getting that layer in required a **cross-store bridge**, and once the bridge existed it also unlocked **[host component plugins](/docs/overview/hosts/plugins/)** — host-tenanted components with their own stores, built on the same fundamentals. The throughput win comes on top: because service state now lives apart from stateless compute, the host holds an **instance pool**, and because pooled components are P3, requests are threaded into instances *concurrently*. Today a request picks one of the pool's instances one at a time; with concurrent pooled instances, every available instance is reused as requests arrive — that's the 13.6x, and it especially helps languages that pay a runtime-instantiation cost on startup. Bailey was careful to scope the claim: this is concurrency (async tasks awaiting), not parallelism — that's a shared-everything-threads conversation for another day.
 
-- [title](/docs/v1/intro)
-  - summary
+### Why P2 Isn't Going Away
 
-## Community Updates
+Frank's "why don't we just move to P3 and that's it?" got a two-hat answer. Wearing the wasmCloud maintainer hat: 2.6 already enforces P3 for host components, and trigger-service exports are headed the same way. Wearing the WASI co-chair hat: **P2 will be supported for a decade or more**, because toolchains adopt slowly. Bailey's worked example was sockets: she landed P2 `wasi:sockets` support in socket2, the crate beneath Tokio's networking, which is how [SQLx](https://github.com/launchbadge/sqlx) compiles to a Wasm component today with no changes on its side — but that same path means a fresh build imports P2 sockets, and a component that imports `wasi:io` gets treated as P2 by everything downstream, missing the new speedups. The unblocker is Rust shipping a **`wasm32-wasip3` target** (expected upstream within weeks); then cfg-style switches — build for P2, do this; build for P3, do that — can percolate through socket2, Tokio, and the library ecosystem the way P2 sockets did, for Rust and eventually every language toolchain.
 
-### Tune in…
+### Where the State Lives: Stores, the Cross-Store Bridge, and Host Components
 
-{/* Add any upcoming events/streams/etc */}
+Frank's deeper questions — where does state live, and can flows share external resources across components — took the call into [Wasmtime](https://wasmtime.dev/) internals. The async bindings, task spawning, and stream plumbing for the WASI APIs all hang off the **Wasmtime store**; that's why stores are wasmCloud's unit of isolation and lifetime. (Bailey trailed a future component-model concept, *blast zones*, that would provide isolation units within stores.) When a stream crosses stores — a host component servicing HTTP and passing work to a downstream component — each store holds its own representation of the stream and the bridge pumps a handle through, copying the stream's structure but not its bytes. Measured overhead for that isolation: about **10%** versus native. WIT's resource semantics carry over faithfully — owned versus borrowed handles are tracked across the bridge as part of lifetime management, and P3's streams and futures bring their Rust-like lifetime definitions with them, along with the component model's built-in cancellation and error propagation. On eBPF-style zero-copy via ring buffers: sharing memory would weaken WebAssembly's sandboxing, so it's off the table for now — though Bailey noted the [eunomia-bpf](https://github.com/eunomia-bpf) work fondly, and pointed out that anyone can build an eBPF-flavored or Envoy-sidecar host just by implementing the wasmCloud workload API.
 
--
+The payoff section was host components in practice: a **SQLx service component** that makes real outbound database connections — think PgBouncer-shaped connection pooling — deployable as a workload service *or* as a host component tenanted per-workload or per-host, mixing and matching from one codebase. Bailey's ask for the coming weeks: a wave of new [host component plugins](/docs/runtime/creating-host-component-plugins/) that add capabilities cheaply — they look like any other component unless they need workload identity, which arrives via a host interface import. Roughly 40,000 lines of work went into trigger services, the cross-store bridge, and host component plugins — "nobody else can do this."
 
-### Catch up…
+### Protecting the Host: Core Instance Limits and Heartbeat Metrics
 
-{/* Add any blog posts/articles that the community might find interesting */}
+Jeremy Fleitz brought a tech spec on a sharp operational edge: a compiled component consumes more than one Wasmtime **core instance**, and Wasmtime defaults to a **1,000 core-instance maximum** per host. Rust components typically cost 1–3 core instances; componentized Go adds shims and can cost 4–5. The failure mode is real — a scaling test that ran clean with KEDA autoscaling on Rust workloads hit `maximum concurrent core instances limit of 1000 reached` when the same logic was rewritten in Go — and the error speaks Wasmtime's vocabulary, not the platform's, with no warning beforehand. The plan: make the limit configurable, and add **available and used core-instance counts to the host heartbeat** (alongside CPU, memory, and workload counts) so the [runtime operator](/docs/kubernetes-operator/) can warn at ~80%, error near 95%, and order hosts in a host group by available core instances when scheduling. Core instances, in other words, become a first-class resource. Aditya asked whether long-lived service invocations were covered in testing yet — on the list.
 
--
+### Async wasmcloud:messaging Lands on WASI P3
 
-## Recording
+The call closed on [PR #5413](https://github.com/wasmCloud/wasmCloud/pull/5413), Aditya's asyncification of the `wasmcloud:messaging` interface. Under 0.2.0, `request` blocks the entire component instance until a reply or timeout, and replying from inside a handler is a nested blocking call. Under **0.3.0**, both are natively async on P3: a component keeps many operations outstanding while each awaits, and a reply can be awaited from inside the handler itself. The 0.2.0 interface ships untouched alongside, so existing components keep working. Victor Adossi's review note — the implementation currently accepts both P2 and P3 for trigger services — became an action item after Bailey predicted the P2 path deadlocks: enforce P3-only, with a unit test to prove it. Asked what the migration felt like, Aditya called it "quite straightforward"; Bailey's experience matches — adding async is the work, bidirectional streams mostly mean *deleting* incoming/outgoing plumbing, and P3 is purely additive over P2 thanks to wasm-tools stashing async type information in the component's custom metadata section. The faithful port lands first; a NATS-specific interface is the next step. The one gotcha to watch: accidentally *being* P2 by importing `wasi:io`.
 
-{/* Automated - No need to adjust this unless automation fails */}
+### WASI WebGPU and AI Inference with Candle
 
-<YouTube url="https://youtube.com/live/zyYVTNW0M7k" />
+Bharat, building his WASI P3 AI inference application, asked whether to target [Candle](https://github.com/huggingface/candle) with a `wasi-webgpu` backend or write standalone WebGPU code. Bailey's answer: upstream is the way. Mendy Berger has already done the integration for [llama.cpp](https://github.com/ggml-org/llama.cpp) — platforms that support WebGPU need relatively little work to add [wasi-webgpu](https://github.com/WebAssembly/wasi-webgpu), mostly rebinding the browser-only APIs — and demoed it at the WebAssembly Community Group the day before. Candle is the natural next target, and yes: a Candle wasi-webgpu backend you can build against would be "amazing." The honest caveat is that the work currently lives in branches-of-branches (much of it pending upstream in [Dawn](https://dawn.googlesource.com/dawn) and friends, plus a code review Bailey owes Mendy) — or as Bailey put it, right now you have to *hold your mouth right* to make it all work, and the goal is that you won't.
+
+## WebAssembly News and Updates
+
+This week's **webassembly news** clusters around performance and portability: Rust's `wasm32-wasip3` target is expected to land upstream within weeks, opening the path for socket2, [Tokio](https://tokio.rs/), and [SQLx](https://github.com/launchbadge/sqlx) to grow P2/P3 switches; [Wasmtime](https://wasmtime.dev/)'s store and pooling machinery is the substrate for wasmCloud's concurrent instance pooling; [wasi-webgpu](https://github.com/WebAssembly/wasi-webgpu) integration work is being upstreamed into [llama.cpp](https://github.com/ggml-org/llama.cpp) with [Candle](https://github.com/huggingface/candle) in sight; and the WebAssembly Community Group met this same week — Bailey was double-booked with it during the call. Community components are gathering in [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud), now feeding directly into wash wizard's catalog. Follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [wasmCloud blog](/blog/) for what lands next.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a production substrate for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: Instance Pooling on the Wasmtime WebAssembly Runtime
+
+Most of this call's performance story reduces to one question about the **Wasmtime WebAssembly runtime**: where does a component's state live? Wasmtime scopes instances, async tasks, streams, and resource lifetimes to a **store**, so whoever controls store boundaries controls isolation, lifetime, and concurrency. wasmCloud 2.6 redrew those boundaries — [trigger services](/docs/overview/hosts/trigger-services/) and [host component plugins](/docs/overview/hosts/plugins/) each get their own store, joined by a cross-store bridge that tracks owned and borrowed handles across the gap for roughly 10% overhead. With service state isolated from stateless compute, the host can keep a warm **instance pool** (the `poolSize` control that shipped in [2.6](/blog/wasmcloud-2-6-release/)) and — because pooled components are [WASI P3](/blog/wasi-p3-on-wasmcloud/) and natively async — thread many in-flight requests into the *same* pooled instances concurrently rather than checking instances out one request at a time. That last step is the 13.6x HTTP throughput improvement now in review, and it compounds exactly where WebAssembly needs it most: I/O-bound workloads and languages that pay heavy runtime instantiation costs. For the operational counterweight, see Jeremy's core-instance work above — pooling more instances makes [treating core instances as a first-class, schedulable resource](/docs/kubernetes-operator/) the natural next move.
+
+## Who Should Watch This
+
+**New wasmCloud developers and DevRel-minded contributors** should watch Aditya's wash wizard demo ([1:08](https://youtu.be/zyYVTNW0M7k?t=68)) — it's the shortest path from empty terminal to custom Wasm workload, and the catalog discussion shows where community components plug in. **Platform and performance engineers** will want the throughput deep dive ([24:04](https://youtu.be/zyYVTNW0M7k?t=1444)) and the Wasmtime store internals ([36:33](https://youtu.be/zyYVTNW0M7k?t=2193)) for a rare from-first-principles walkthrough of stores, bridges, and pooling. **Operators running wasmCloud on Kubernetes** should catch Jeremy's core-instance limits segment ([51:36](https://youtu.be/zyYVTNW0M7k?t=3096)) before a Go workload finds the 1,000-instance ceiling for them. And **AI-on-Wasm builders** get the current state of wasi-webgpu at [1:01:40](https://youtu.be/zyYVTNW0M7k?t=3700).
+
+## Up Next
+
+Follow-ups queued by this call: enforce **P3-only trigger services** in Aditya's messaging PR with a deadlock-catching unit test; land **core-instance availability and usage in the host heartbeat** with a configurable maximum; continue review on the **13.6x concurrent pooling PR**; evolve wash wizard toward **language defaults, host-component flavors, and OCI-embedded topology metadata**; and Liam teased a demo of the new pooling features for an upcoming call. Expect more host component plugins — and more Wasm Wednesday numbers — as 2.6 adoption spreads.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-08-05-community-meeting-transcript/)**

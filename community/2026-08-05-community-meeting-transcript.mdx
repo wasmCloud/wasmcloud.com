@@ -1,0 +1,417 @@
+---
+date: '2026-08-05'
+title: 'Transcript: wash wizard Demo, a 13.6x HTTP Throughput Improvement, and Async wasmcloud:messaging on WASI P3'
+description: 'Full transcript of the August 5, 2026 wasmCloud community call covering the wash wizard demo, instance pooling and Wasmtime stores, core instance limits, and async wasmcloud:messaging.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasmtime webassembly runtime
+  - instance pooling
+  - wasi preview 3
+  - async messaging
+  - trigger services
+  - host components
+  - webassembly performance
+  - wash wizard
+  - webassembly news
+image: https://i.ytimg.com/vi/zyYVTNW0M7k/maxresdefault.jpg
+showTitle: true
+slug: 2026-08-05-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - WASIPreview3
+  - ComponentModel
+  - Wasmtime
+  - wash
+  - NATS
+  - WebGPU
+  - AIInference
+  - SQLx
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-08-05-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=zyYVTNW0M7k" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=zyYVTNW0M7k" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:13](https://youtu.be/zyYVTNW0M7k?t=13)
+
+Hello and welcome to our wasmCloud community call for August 5. Today we've got a couple things to talk through for what we've landed after 2.6.1, but also I just want to start with potentially a demo. Aditya, are you on and able to share your screen? Oh, you're not able to share your screen — but I'm going to fix that right now. Okay, how about now?
+
+**Aditya Salunkhe** [0:37](https://youtu.be/zyYVTNW0M7k?t=37)
+
+Yep, just give me a second. I hope you can see this.
+
+**Bailey Hayes** [0:55](https://youtu.be/zyYVTNW0M7k?t=55)
+
+Hmm, I'm not seeing anything yet. Has anybody else seen stuff? It's just me?
+
+**Liam Randall** [1:00](https://youtu.be/zyYVTNW0M7k?t=60)
+
+I see VS Code, yeah.
+
+**Bailey Hayes** [1:06](https://youtu.be/zyYVTNW0M7k?t=66)
+
+Oh, okay. All right, it's up now.
+
+**Aditya Salunkhe** [1:08](https://youtu.be/zyYVTNW0M7k?t=68)
+
+Okay, so I hope this is visible. So basically, there is a tiny problem that comes to people when they try to experiment with wasmCloud and start new wasmCloud components. Let's say you're a beginner and you're just trying to explore wasmCloud — you're not necessarily going to know anything about how to start your own Wasm component, except for the docs, which are really great. But someone who's entirely new to the whole ecosystem might be really confused. And with the examples and templates that exist in the wasmCloud repository, it made me think: why not just expose that to people that want to try them out in the form of a wash command? And at the same time, why not let people create their own custom workload architectures? So I came up with a command called wash wizard, which sounds a bit mystical, but hear me out. If you hit enter, it creates this whole selection screen for people that are trying to design new components. The first option is a custom architecture, which I'll show in a bit. But the other options are taken directly from the template source, such as the HTTP API with distributed workloads, the service TCP, and all the different components that exist in our examples and templates folder. And when people enter any of these, it just does a very simple git clone. Just to lay some pretext: there's the subcommand for wash new that allows you to directly git clone a subdirectory within a given repository, allowing you to directly copy, clone, and run any Wasm component in a given directory that has a .wash config YAML. What this does is take away that whole "ooh, where is this component in this examples directory?" I have the file system view on the left here, and if I just hit enter here, it should do a git clone and return the entire subdirectory. And similarly, if we have community contributions in the awesome-wasmcloud repository, which was just spun up by Bailey — if I hit enter and wait — oh, that broke a bit. But what's theoretically going to happen is the awesome-wasmcloud components that exist in that repository are also going to get loaded up into this wizard, so that people can choose from that pre-existing directory, and the wizard is just going to be a simple catalog for people to view things really simply.
+
+<img src="/img/community/2026-08-05/image001.webp" alt="wash wizard terminal UI showing the architecture and template selection screen with an HTTP key-value handler in Rust" />
+
+**Aditya Salunkhe** [4:30](https://youtu.be/zyYVTNW0M7k?t=270)
+
+And the most important thing is having your own custom architecture — being able to understand what your entire workload is going to be like. So if you do this, it goes into a cool wizard setup where there are three kinds of triggers as of now: HTTP, messaging, and service. Let's say I choose an HTTP ingress, and I want it to be P2. The P3 one keeps bugging out on my local machine, I don't know why, so for this demo I'll keep it strictly to P2. And the linking part is — let's say I have two or more components that I want to include in my entire workload directory. I can choose the number of steps, and on the right side here, it shows you a really clean view of how your components are going to be interlinked. Let's say three, four — I mean, the whole terminal view is a bit wonky, but you get what I mean. And if I choose fan out, it gives you a whole bunch of branching operations, with being able to choose the number of branches as well as the branch depth for each individual branch. So let's say you have an ingress pointing to different branches, and those branches in themselves have different component chains — you can bootstrap them directly using this wizard. For the sake of this demonstration, I'll keep it to a chain, and I'll keep it to one step. And capabilities: let's say I want to be able to do wasi:config on the ingress. I can choose that, as well as on step one.
+
+<img src="/img/community/2026-08-05/image002.webp" alt="wash wizard custom workload builder showing trigger, linking, and capability selection with a live topology preview of ingress and steps" />
+
+**Aditya Salunkhe** [7:03](https://youtu.be/zyYVTNW0M7k?t=423)
+
+I can keep doing that for all these capabilities, such as HTTP egress, which is the wasi:http outgoing handler, and I choose that for step two. And once I hit enter, it generates this whole package called my-workload. You can obviously specify this using a flag. And the interesting part about this is, if you cd into my-workload and you do wash build, it does the whole build process, and it gives you a workable boilerplate template for your application. If you remember correctly, step one had the egress, which is the outgoing request, and also the wasi:config, which it pre-registers into a simple invoke function which people can just edit. And the WIT is also readily generated — the simple ingress and the step one component — so this way, people don't have to manually create their own custom WIT interfaces without doing a very serious deep dive into what Wasm is and what WIT is. It just allows them to have a really good experience with building Wasm components and being able to run them with wash dev directly. I just think that having this could really boost the user experience that we have when it comes to beginners trying wasmCloud. And that was it for my demo.
+
+<img src="/img/community/2026-08-05/image003.webp" alt="Generated my-workload package building successfully with wash build in VS Code, showing the wit world and compiled components" />
+
+**Bailey Hayes** [8:57](https://youtu.be/zyYVTNW0M7k?t=537)
+
+This is really cool.
+
+**Aditya Salunkhe** [8:59](https://youtu.be/zyYVTNW0M7k?t=539)
+
+Yeah, I'm glad to hear that.
+
+**Bailey Hayes** [9:04](https://youtu.be/zyYVTNW0M7k?t=544)
+
+Are you up for some brainstorming? Do you mind if we do a little — my first thought was, what do you think about exposing language here? Or are we living in a Rust-only world at all times?
+
+**Aditya Salunkhe** [9:21](https://youtu.be/zyYVTNW0M7k?t=561)
+
+No, no, that was what I was going to discuss. We could totally extend this to having Python, TypeScript, or any other language that we want. Just for the sake of the demo, I kept it Rust-only. But yeah, that is totally up for grabs.
+
+**Bailey Hayes** [9:36](https://youtu.be/zyYVTNW0M7k?t=576)
+
+To implement that, there are some interesting ways you could do it. And I wonder also, with what you output — did you output a workload manifest as well?
+
+**Aditya Salunkhe** [9:51](https://youtu.be/zyYVTNW0M7k?t=591)
+
+With the wash config.
+
+**Bailey Hayes** [9:55](https://youtu.be/zyYVTNW0M7k?t=595)
+
+Yeah, I guess wash config basically is a workload manifest, so we could probably synthesize it. We could have another command that essentially synthesizes that into a workload YAML.
+
+**Aditya Salunkhe** [10:06](https://youtu.be/zyYVTNW0M7k?t=606)
+
+Yeah — I did use Claude to build this, but it does create a config.yaml and a special thing called topology.yaml, which basically just creates a whole topological map of your entire workload — the node points, the graph — and it basically helps show that preview in the wizard, like "hey, this component links to that, this does this." Anything else?
+
+**Bailey Hayes** [10:40](https://youtu.be/zyYVTNW0M7k?t=640)
+
+I think the build-your-own-workload is obviously my favorite thing. I do want to think through how you would surface even custom capabilities with it. For example, right now we haven't really added too much yet in the host component plugin space, right? We just got the ability to create host components, and I started in on a Couchbase one — we've got one that I started with as a host component, then opted to make it native. But I'm expecting very soon we will have a lot of different host components that people could add, and those would expose their own interfaces. And I noticed you say that you can trigger with service — obviously with service, that would be exposing its own custom interfaces there as well. So just thinking through, effectively, user stories: in awesome-wasmcloud, we have two different ways to connect to Couchbase. One is the database API, which is over sockets. The other one actually connects over HTTP and uses their data API, which a lot of databases now have — it's great for serverless functions — but not every cluster enables that, right? So people are going to want to be able to choose which one they want to use. Even in the scenario of "I want this capability," you may want to pick what flavor of that capability you want that's using the exact same interface.
+
+**Aditya Salunkhe** [12:26](https://youtu.be/zyYVTNW0M7k?t=746)
+
+Indeed, indeed. But do you think it's more relevant to have something that just stubs the whole implementation rather than builds the whole application itself? Because what I think people need as beginners is something that just compiles and just works as a minimal first step, which they can iterate on, which they can link as an additive step on top of. So let's say people are trying to build zero to 100. You'd first want them to actually build the zero to one, instead of doing the whole zero to 100. Having this first base of something that is P2-compliant, that just compiles and helps them implement their own business logic — I think that would be really meaningful. But I do agree that choosing the right flavor of the interface also makes sense, because you might not want to just slap a single interface on and call it a day.
+
+**Bailey Hayes** [13:27](https://youtu.be/zyYVTNW0M7k?t=807)
+
+Well, I guess that's my thought: right now our dev host just gives you basically in-memory implementations for most of these interfaces, right? And I think the goal is to get something that is talking to basically real workloads. And real workloads — they all connect to a database of some kind, right? That's what's an interesting app: it's an app that's interesting because it has interesting data. So from that perspective, I would think that we would actually have a lot of different host components to choose from that are all going to be in awesome-wasmcloud. They're not going to be just straight off-the-shelf WASI. And in that scenario, I think they'll want to pick it, and then inside the config YAML that you generate, where you generate the dev config, you would fill in the host component plugin list and just plop it right there. So hopefully that's not too much. And I think I'm of two minds about the Rust versus other languages thing — that's why I was curious what you thought. If it's "I want to get you working right now," odds are you're gonna have the best time with Rust. So I'm almost tempted to have a default language setting for this thing, like a wash setting, where it's just like: look, I only see the world in black and white, everything is Go or everything is Rust — and most of the people that I meet, they're exactly like that. So let them pick their basic one, and then we just always derive from that.
+
+**Aditya Salunkhe** [15:07](https://youtu.be/zyYVTNW0M7k?t=907)
+
+I would agree.
+
+**Bailey Hayes** [15:10](https://youtu.be/zyYVTNW0M7k?t=910)
+
+Frank, you got a question?
+
+**Frank Schaffa** [15:12](https://youtu.be/zyYVTNW0M7k?t=912)
+
+Yeah, one thing. For starting, this would be wonderful. And I'm wondering if you can use this to build a component that's going to be part of something where you want to continue the integration. So this is a tool that you can use — and then how do you register this? How does it become available in your repo, so that you can see it and then you can use it?
+
+**Aditya Salunkhe** [15:50](https://youtu.be/zyYVTNW0M7k?t=950)
+
+Right. So basically, what I've implemented is a mechanism which walks through — let's say you want a new component to be added into this catalog. The workflow is that we walk through the WIT interface, the world.wit, and — I believe it's the Cargo.toml — if it contains wstd, because wstd does the internal binding for the wasi:http incoming handler, that's not necessarily visible in the world WIT. So the ideal way is that when you have components that get added to the awesome-wasmcloud repository, you would have a build step that would create the Wasm binary artifacts, and then you'd use wasm-tools or something similar to walk through its component WIT, and through that you would build its own topology map using a graphical walker. That would in itself create a topology YAML, which wash wizard would read, and it gets added to the catalog. I'm not sure if this answers your question — does it answer your question, Frank?
+
+**Frank Schaffa** [17:16](https://youtu.be/zyYVTNW0M7k?t=1036)
+
+It does, but it shows that this, especially for a beginner, can be very complicated.
+
+**Aditya Salunkhe** [17:27](https://youtu.be/zyYVTNW0M7k?t=1047)
+
+Yeah, no — the thing is, you don't need to do anything other than just build your component and make sure it compiles to .wasm. If you just upload it to awesome-wasmcloud, I think we should have a CI step there that does the whole catalog-updating stuff for wash wizard, and there's nothing that the beginner — who's already a lot confused — needs to do other than just build the component itself.
+
+**Bailey Hayes** [17:55](https://youtu.be/zyYVTNW0M7k?t=1075)
+
+One thing I'm thinking about is if we can eliminate the topology YAML and put that metadata inside the Wasm OCI artifact itself, and also the Wasm artifact. One of my design goals — we're not 100% there yet — is: if you give me a .wasm, I can basically tell you how to deploy it, right? Like, I know what secrets it needs now with the wasmCloud secrets change, I know what configuration you need, I know what capabilities you need. So you could basically give me a .wasm, and I can produce essentially the custom resource definition in Kubernetes for what it would need — the basics. If you give me the top-level config YAML for your whole app, like what you generated, for the most part that also could say "I build this thing and this thing and this thing, and they all get this configuration," right? Your top-level config YAML, for the most part, gives you the topology. Except — did I just leave?
+
+**Jeremy Fleitz** [19:16](https://youtu.be/zyYVTNW0M7k?t=1156)
+
+It was like mid-sentence, and then it looked like you dropped and then came right back.
+
+**Bailey Hayes** [19:21](https://youtu.be/zyYVTNW0M7k?t=1161)
+
+Yeah, I think Zoom crashed. Neat. That's because I've been in two Zooms all day, and I guess it couldn't handle it. The WebAssembly CG is happening right now, in case you didn't know. So, sorry about that. Well, what I was thinking through is that it just seems like there are some attributes about the component and the overall workload, and I want to be able to package it all kind of universally, so that I could just take that one thing and put it anywhere. So I want to look at what you've made and see what those metadata types are, and maybe that's something that we need to expose in config YAML, or on the component itself as part of its build, so that it shows up in the custom metadata section of that component. A lot of different ideas there, but that's where my head's at. I really love the idea of exposing the architecture, right? Like, this is designed for fan-out, and this is the type of thing that you would want to do with this — and service chaining as a top-level construct is something else that you had there. I love all that. And so now I'm like, okay, well, how would I generically give people this so that they could figure out how to run it in other systems as well? Obviously, I prefer you to run it in wasmCloud — our wasmCloud host and awesome-wasmcloud — but one of my high-level goals is that you can build portable, standard components. And also, if you put it on the OCI, it solves the registry metadata problem, because you can just use OCI labels and annotations to do the lookup for everything.
+
+**Bailey Hayes** [21:14](https://youtu.be/zyYVTNW0M7k?t=1274)
+
+And then you can cheat and make it really easy to add other people's stuff, right? So it wouldn't just have to be awesome-wasmcloud. And I bet a lot of people are going to want to add to this. Now, again, I'm greedy here, and I want them to add it to our awesome-wasmcloud, but I'm also practical, in that people love to get their own branding on things.
+
+**Aditya Salunkhe** [21:34](https://youtu.be/zyYVTNW0M7k?t=1294)
+
+That is true. I didn't think of it from that perspective, actually. This is a lot.
+
+**Bailey Hayes** [21:41](https://youtu.be/zyYVTNW0M7k?t=1301)
+
+Yeah, there are so many places you could take it. I guess the other thing that I felt like I got out of Frank's question was: it's almost like I want this to be a plugin. I almost want to be able to customize this to how my company works, or at least pre-populate this information with what I care about, right? Yeah, there's that community wasmCloud thing, but I'm corporate — you know, McDuff — and I want the McDuff components here, and that's what I want you to see first.
+
+**Aditya Salunkhe** [22:20](https://youtu.be/zyYVTNW0M7k?t=1340)
+
+Yeah, indeed. So like a custom way to just overwrite the awesome-wasmcloud repo space — except, of course, we should just keep it as a default there.
+
+**Bailey Hayes** [22:41](https://youtu.be/zyYVTNW0M7k?t=1361)
+
+I don't know if that was — I was thinking of Scrooge McDuck, but then I just morphed it into something.
+
+**Liam Randall** [22:49](https://youtu.be/zyYVTNW0M7k?t=1369)
+
+Duff's — the beer, just the beer on The Simpsons.
+
+**Bailey Hayes** [22:52](https://youtu.be/zyYVTNW0M7k?t=1372)
+
+Kind of random — now it's both. Okay, so my made-up corporation is a brewer? That's good, that works for me. I like beer. Any other thoughts or questions for Aditya? I think this is a great idea, and I love the effort on getting more people using this stuff. I want to make sure it's all machine readable, because in today's world, the zero to 100 is: can the LLM do it? And so that's going to be a big key part of it.
+
+**Liam Randall** [23:29](https://youtu.be/zyYVTNW0M7k?t=1409)
+
+Bailey, I've got a demo that I'm working on with some of the new stuff, but maybe we save it till next week. It's with all the new pool size stuff you've been landing. I'm blown away — wasmCloud goes so, so, so fast, and I think you even have a few new things on the roadmap. I just did a test with the P3 web component and the pool size on my local MacBook — so totally not representative, entirely anecdotal — and I hit 60,000 requests per second. I'm impressed.
+
+**Bailey Hayes** [24:04](https://youtu.be/zyYVTNW0M7k?t=1444)
+
+Well, I have a version that maybe we should just talk through the design of, since I'm now asking for another round of review. Thank you, reviewers — I'm sorry I've been spamming you a lot. It's building right now, and it looks like I've got something to fix, but I think it's probably worth taking the community through what this change will be, which is a 13.6x improvement for the HTTP throughput case. I think most people will want that. But first, I guess it's worth talking through how we got here. A couple weeks ago, we talked about separating stores, and I needed the separation of stores for a couple different reasons. A lot of this comes from the new types of architectures we can build on top of P3 — the reason why we've been getting faster and improving is largely because of P3, but so much had to change underneath to expose that. When we talk about what we provide today: we have the host, and we built a bunch of host-native plugins — that's wasi:http, for example, that everybody's using. And then we also have built-ins for wasmCloud, and a few others that are popular, like key-value and blob store. And Aditya — I should actually hand you the mic after this deep dive — Aditya has a PR up for adding async messaging with P3, and we're also intending for that one to be a built-in plugin as well. With wasmCloud v2, we had an entity type that is a service, and a service is triggerable over a wasi:cli/run, and it's written this way — the reason why it has a single entry point and everything is because in P2, I can't really do reentrancy — it'll all deadlock. With the service architecture, this is how it had to be. But when you talk about what you're able to actually do with WASI P3, we can do all kinds of new architectures, like making your service itself be triggerable. So with wasmCloud 2.6, we introduced the concept of trigger services — and obviously I just kind of renamed our existing built-in version of this, which is wasi:http, but it specifically has to be P3 to be triggerable. What we do is we've now put this piece on its own store, separate from what is running in the wasmCloud workload store. And because we have separate stores now, we can have separate lifetimes and manage concurrency separately from each other. So I can do a trigger into the service store, which will create a task, and then that task can spawn another task that's actually running on a totally different store — and the service isn't blocking while that operation is happening. It can service other requests that are coming in — maybe it's sending to the users handler, then it's sending to the products handler — and it's awaiting, if you wanted it to await, to have egress back. So you could create basically a trigger service that actually acts as an API gateway — that's just one very specific type of thing that you could now build. We're trying to give you all the right building blocks. But the main thing I wanted to highlight here is that now you've got a store here and you've got a store here, and getting that layer in is what let me build host components: essentially, I had to figure out how to have a cross-store bridge. And once I had a cross-store bridge, I could have services, but I could also introduce this other concept of host component plugins, and they also have their own store. For the most part, they're more like a host-tenanted version of these same trigger services I was talking about earlier — underneath, they use basically a lot of the same fundamentals.
+
+<img src="/img/community/2026-08-05/image004.webp" alt="Excalidraw WASI P3 board showing the wasmcloud:llm/inference chat stream sketch with model serving via candle-rs importing wasi:webgpu" />
+
+<img src="/img/community/2026-08-05/image005.webp" alt="Excalidraw diagram comparing host native plugins with services on WASI 0.2.0, including when-to-use guidance" />
+
+<img src="/img/community/2026-08-05/image006.webp" alt="Excalidraw diagram of Service on WASI 0.3.0 asking to compose or not to compose, with a CRUD API of per-resource components" />
+
+**Bailey Hayes** [28:31](https://youtu.be/zyYVTNW0M7k?t=1711)
+
+Now, because we've basically wired up that we can have these separate stores, we can have this cross bridge, we can have separate lifetimes — now I can do some really cool stuff. I can hold on to separate instances of things, because now I've said, okay, my service state is actually totally separate from my stateless compute. So the stateless compute in the workload can service requests and potentially spin back down, but be written however you want it to be written. And so now I'm able to have an instance pool. The instance pooling was awesome — that was a really great improvement, especially for languages that have a slow startup time, because they have to instantiate a whole runtime to be able to work. This is something that is possible because we're requiring these things to be P3 — if they are P3, I can concurrently run on these instances. Now, this doesn't mean that it's parallel: concurrently running means I'm spawning different tasks, and each of them is asynchronous, async-awaiting — they're not necessarily executing at the exact same time. Concurrency is what I'm solving here. Parallelism — big different topic, one that I really am excited about with shared-everything threads, but we're not there yet in core Wasm, so we're not gonna approach it there. So, by being able to have an instance pool of things that are servicing HTTP requests, for example — right now, today, it looks like this: I've got four instances sitting in my pool, a request comes in, it picks one of them, and it just goes one at a time. By doing a concurrent pooled instance, I'm able to basically reuse each one that's available as requests are coming in — and that's why that's such a huge throughput improvement. So that's one of the things that is on its way in. Frank, I see your hand's up.
+
+<img src="/img/community/2026-08-05/image007.webp" alt="Excalidraw diagram of trigger services and host components on WASI 0.3.0 with when-to-use guidance for HTTP client SDKs and SQL drivers" />
+
+**Frank Schaffa** [30:57](https://youtu.be/zyYVTNW0M7k?t=1857)
+
+Yeah — this is very cool. Let me ask you something on the bridge, because you just talked about it. What kind of state are you maintaining? Is the pool itself going to live there? If you want to do retries and so forth, is that also going to live there? Because I think you have the front end, then you have the bridge that will be the smart part, expanding in terms of the virtual dimension, allowing for greater concurrency, and then you have the service itself, or the function itself, right?
+
+**Bailey Hayes** [31:44](https://youtu.be/zyYVTNW0M7k?t=1904)
+
+Yeah — I wish I had more detail in my diagram here. There's a lot I would like to talk through. I don't know if I can do it totally ad hoc.
+
+**Frank Schaffa** [31:52](https://youtu.be/zyYVTNW0M7k?t=1912)
+
+Actually — just a parenthesis here. I mean, why don't we just move to P3, and that's it?
+
+**Bailey Hayes** [32:02](https://youtu.be/zyYVTNW0M7k?t=1922)
+
+Yeah — well, kind of. I'm doing that. I like your thinking. So, you can only have a P3 host component, and you can only have a P3 service trigger. If you want an export on your service, you must be P3 — otherwise you're gonna have a bad time. It'll fail.
+
+**Frank Schaffa** [32:25](https://youtu.be/zyYVTNW0M7k?t=1945)
+
+Oh — Aditya, I guess you have to update your demo for P3.
+
+**Bailey Hayes** [32:30](https://youtu.be/zyYVTNW0M7k?t=1950)
+
+I'm sorry, Aditya. Well, the reason why I can't just get rid of P2 is a few different reasons. One is that it's gonna take a while for P3 to make it through into all the different language toolchains. For example, three months ago, I landed the ability to do P2 wasi:sockets — the crate's called socket2, and it's the crate through which Tokio's net, and the whole Rust ecosystem, communicates over sockets. And because it's exposed in Tokio's net, now I can compile things off the shelf, like SQLx, without making any changes — and interestingly enough, without SQLx having to make any changes. They just pulled in Tokio's net, which pulled in socket2, and all of a sudden they're able to do WASI P2 sockets. However, if I'm just trying to build a component today and I say, yeah, import that SQLx thing — SQLx is like, cool, I'm gonna do TCP net; underneath, it's gonna do socket2 and be like, yo, you need a WASI P2 socket. So what comes out when you do that compilation is something that is importing WASI P2, and not WASI P3. And to fix that — well, there's the hack option, which I often reach for when making stunt hack demos, which is: oh, I'll just patch in all my own dependencies for the whole thing. But the real fix is getting WASI P3 as a target. It's going to be a tier-two target in, I think, two weeks — don't quote me on that, I can go pull up the roadmap, but soon, I'm pretty sure less than a month — you will have the ability to say `--target wasm32-wasip3` for Rust. That's the prerequisite for me to be able to then add config flags — effectively, basically a macro in the Rust ecosystem to say: okay, if you're building for Windows, do this; if you're building for Linux, do that. We also have the equivalent for P2 versus P3, and so we'll add that in once I'm able to actually say, if you are P3, go do this thing. If you want to see how to sun-hack it through, you can see my wstd fork where I've done that before P3 is a known OS target. But essentially, to get it to actually percolate through the whole system, you need it in the standard library, and then all of these library projects build on top. For the most part, they don't even have to change — socket2 is not in std for Rust, because Rust has a very light, thin std, but it's std-adjacent, and that project will get it first, and then everybody else will kind of build on top of that, and it'll percolate through the system. And that will be the case for essentially all of these different languages. So P2 is going to be around for a while. And honestly, swapping off my wasmCloud maintainer hat and putting on my WASI co-chair hat: it's gonna be around for a decade or more, and that's how long I'm gonna have to provide support for it. So just know that P2 is not going away — but you build for P2, you get P2 capabilities. And I'm really glad that I'm building things inside wasmCloud that are going to encourage people to get off of P2 and start giving us feedback on the thing that we're actually trying to standardize now, on our road to 1.0 for the component model. Those were great questions. Do you have more?
+
+**Frank Schaffa** [36:25](https://youtu.be/zyYVTNW0M7k?t=2185)
+
+And sorry — you were now gonna get to your bridge.
+
+**Bailey Hayes** [36:33](https://youtu.be/zyYVTNW0M7k?t=2193)
+
+Okay, okay — your question was: where's the state at? So, in Wasmtime — which, really, for a wasmCloud host, our answer is always "what does Wasmtime do" for most of this — the state for these WASI APIs, for where the async bindings live and how all that's driven through from the runtime talking to the component: the component says, "hey, I'm doing async stuff," and now basically the component model runtime, aka Wasmtime, is saying, okay, I know to await here, or I know that this is an async call — I'm going to help you spawn these tasks in these different places and wire it up to all these different components while you're doing the async calls. Where all of that actually happens in Wasmtime is the store. This is the stateful bit, and that's also why we separate our stores between units of isolation and units of different lifetimes. I can go on a totally different side quest here to talk about other things we have planned in the component model, called blast zones, that would allow me to basically have these within stores — I'd have a blast zone per isolated unit. That doesn't exist yet, but it's an idea that we really care about, and now you can kind of see why I would care about it, when you realize that to build communication across different stores, if you want that level of isolation, you have to create a thing like a cross-store bridge. So — where's the state at? Let's say I'm doing a stream from a service — actually, here, I've got the host component pulled up, so let's talk about that. I have a host component that is servicing something with HTTP, and it's going to pass that to another downstream component that called it. So my host component created a stream and is going to pass that on through the system. The way that essentially looks is that we have this run-concurrent call — if you saw over here, we have these async hook calls; it's essentially how it's getting plumbed down underneath. There are some layers of abstraction, so I'm doing a little bit of a hand wave to jump over the gaps, but that's effectively how it works. As I'm sending those async tasks, those are the things that I'm spawning — we create these little func-new-concurrent — and basically the one store knows about these async requests and those async calls, and they get into an await state, or they're in a stream state, and they're saying, "are there bytes to be read, or are there bytes to write? Let me do it." And on the other side is effectively the same thing. In a world where we're passing one stream but I have two stores, I have two different things representing that stream, and they basically have a handle that I'm essentially pumping through. When I measure this, it's the cost of a copy going out of the stream, but you're doing it effectively in the same process, so it's still really fast. And when I measured the overhead of doing this natively versus doing this with a component that's providing isolation, it's about 10% overhead today. Where that overhead is, is literally just copies for this part — but it's not a huge copy, because it's the struct of the stream, not necessarily all the bytes of the stream. I can build a better diagram for this.
+
+<img src="/img/community/2026-08-05/image008.webp" alt="Wasmtime Store documentation shown during the walkthrough of where async state lives in the runtime" />
+
+**Bailey Hayes** [40:33](https://youtu.be/zyYVTNW0M7k?t=2433)
+
+It's kind of hard to describe, but that's fundamentally how it's set up now with streams and all of these async calls. Something else that's built into the component model that's important to know about is that it also has built-in cancellation — and effectively, in a lot of ways, error handling. So when we make a cancellation, from maybe a call that's happening in the host component, or on the other side from the workload, I need that to propagate all the way out and sort of clean up the state for all of these different things. That was probably a lot. Did that answer your question?
+
+<img src="/img/community/2026-08-05/image009.webp" alt="Excalidraw host component plugin architecture diagram showing workload stores, the cross-store bridge, and the host component plugin store" />
+
+**Frank Schaffa** [41:11](https://youtu.be/zyYVTNW0M7k?t=2471)
+
+Yeah — it's starting to.
+
+**Bailey Hayes** [41:15](https://youtu.be/zyYVTNW0M7k?t=2475)
+
+Yeah, there's a lot more there. I guess the part that I'm most excited about is that nobody else can do this, and it was a lot of freaking work — I mean, we're talking at this point maybe 40,000 lines to be able to do trigger services as components, this cross-store bridge work, but also having a really nice isolated unit of host component plugins. What I really want to see in the next couple of weeks is us introducing a ton of different new host component plugins that give whole new capabilities to the system really cheaply — really simply, too. The components that you write for that just look like any other component, unless you need information about the workload, and then you just import our host interface that tells you what the workload identity looks like and what properties were passed in on the workload when it was defined. That combination of things means not only this architecture, but another one that we can do really super well now: instead of just having to do this TCP loopback — which is cool and fine — we can actually just straight up do SQLx coming all the way through, and have a service component that actually has real connections. You can imagine it could be PgBouncer, but for me, I built one that has SQLx, because it's obviously my favorite. That one's able to call out, so I'm able to scale different connection pools, tenanted by the workload, or tenanted by the whole host as a host component. And I can actually use that exact same component that I built for this service as the host component, so people can essentially mix and match between all of these. Okay, I'm gonna take a breath.
+
+**Frank Schaffa** [43:02](https://youtu.be/zyYVTNW0M7k?t=2582)
+
+I guess we're in discussion time now, right? Do we have a mechanism — I know that for a lot of things in Wasm, we're using linear memory and so forth — but is there a place where I can have, let's say, an external resource that I'm managing between my different components, as my flow moves from one component to another component?
+
+**Bailey Hayes** [43:47](https://youtu.be/zyYVTNW0M7k?t=2627)
+
+Yeah, you know, I think it wouldn't be impossible to do a demo of exactly this, to explain the architecture to people — if I did a wasi-otel component, doing WASI OTel for WASI OTel's sake. If I had a wasi-otel host component plugin, and I had a workload that also used wasi-otel, I could attach an ID to the span that I'm creating and propagate it all the way through, and I could probably create a flow chart of exactly when everybody along this chain touched it. I think that would help. If I had an LLM go and make me essentially a flow diagram — it might be a little intense right now, because of the tracking that we do of these tasks, but that might work out too. I think either of those approaches would be a nice way to explain how all of this works. I mentioned it last week: that's my big to-do. First I had to make it work, and now that it does work, now I need to create all these materials to explain the power that's here — that you basically can't do with anything else.
+
+**Frank Schaffa** [45:07](https://youtu.be/zyYVTNW0M7k?t=2707)
+
+Yeah. Actually, I was just thinking in terms of whether this could be extended using ring buffers, in eBPF style, because then you're not really copying any stuff — you're just sending pointers, and you're just managing how you're doing this.
+
+**Bailey Hayes** [45:28](https://youtu.be/zyYVTNW0M7k?t=2728)
+
+I think there have been some really incredible — there are two different projects that I thought were awesome. I'm pretty sure Liam's jumping in to talk about the Cisco one; that was cool. But I'm a fan of — oh, thank you — eunomia, where somebody had basically modified eBPF to allow you to write user-space-style programs in the kernel, which is essentially how eBPF works. So, yes. Also, you know, it's super easy to write a wasmCloud host, right? To have a wasmCloud host scheduled to places, all you have to do is provide the workload API. Right now we send that in over NATS with gRPC protobuf, but we could easily build a host that just instantiates from a manifest file, right? And that would be a great use case for an eBPF-style host. Also, I think we could have a host that just runs as your way to do sidecars in Envoy. I've got plenty of ideas — and the wasmCloud workload scheduling API is way more ergonomic than the xDS one. So, millions of different options there. The way to eliminate the copies — it's essentially fundamental to how Wasmtime stores work. We could explore other options, like trust-me-bro-type store work — I've seen plenty of people disable bounds checks, for example, for Wasmtime hosts, and find different ways to just share memory — but we're not going that route right now, because that basically weakens the whole isolation and sandboxing perspective of WebAssembly. That's another option that could be on the table.
+
+**Frank Schaffa** [47:57](https://youtu.be/zyYVTNW0M7k?t=2877)
+
+Yeah. I'm just wondering how much of the Rust concepts we can bring to this, in terms of ownership, passing things along, and so forth.
+
+**Bailey Hayes** [48:08](https://youtu.be/zyYVTNW0M7k?t=2888)
+
+Oh, we actually do bring a lot over — I catch a lot of grief for it, actually. In WIT, you have a concept of a resource type, and you basically have both owned and borrowed handles. We have that fully represented in that cross-store bridge, where we basically know who owns and who borrows, and that's a key part of the lifetime. And then obviously — or maybe not obviously — the streams, futures, these new canonical ABI types that are introduced as part of WASI P3: all of those have very Rust-like definitions of their lifetimes, and that's also faithfully brought over in our cross-store bridge.
+
+**Frank Schaffa** [48:57](https://youtu.be/zyYVTNW0M7k?t=2937)
+
+Yeah, that makes a lot of sense.
+
+**Bailey Hayes** [49:02](https://youtu.be/zyYVTNW0M7k?t=2942)
+
+And that's kind of what I was talking about: there is a copy, but it's the copy of the structure — like, you've got a stream now — and then the bytes themselves are essentially pumped through. That's sort of a superpower of a lot of these approaches. I think there's plenty here to improve on the performance side — obviously, I've been doing a performance spike, but, you know, step one: make it work; then crawl, walk, run. Going all the way back to how I ended up here — why can I do concurrent requests, why can I do this performance thing? Initially I brought to y'all: how about I compose it all together, and then I can just reuse everything, because now it's all on the same store. But because we figured out how to do that without having to do the composition, now we get all of the benefits — our dynamic linking, basically being able to build out all these things at runtime, without me having to do that composition hack. It was a lot of work to get there, but I think it ended up better. And, you know, folks from Betty Blocks were like, "Bailey, don't do that" — and I'm glad you did, because we ended up with something even better.
+
+**Liam Randall** [50:24](https://youtu.be/zyYVTNW0M7k?t=3024)
+
+Bailey, you know, just as side-of-desk anecdotal evidence: playing with the new features today, and just trying to wrap my brain around them, I put together a simple demo of a P2 component, then a P3 component, and then a P3 component with the new pool size option — so only playing with one of the new variables. Not only am I getting a 3x performance improvement compared to the standard P2 component, but looking at my local system metrics, just running htop here, the daemon is using 6% of the CPU. I think there's a ton of room here to continue to roll out all these new features, and I can't wait to play with all the new stuff. I'm really excited to see wasmCloud finally get to the point with P3, and all the native async and everything, where the sky's the limit here. I think we're just getting started on performance.
+
+**Bailey Hayes** [51:29](https://youtu.be/zyYVTNW0M7k?t=3089)
+
+Definitely, definitely — just getting started.
+
+**Frank Schaffa** [51:30](https://youtu.be/zyYVTNW0M7k?t=3090)
+
+I should just add to this: performance, and monitoring.
+
+**Bailey Hayes** [51:36](https://youtu.be/zyYVTNW0M7k?t=3096)
+
+Actually — I don't think, Jeremy, I'm not gonna put you on the spot for this. I'm only gonna pseudo put you on the spot. Jeremy's working on something for us: surfacing basically these metrics on our heartbeat, including additional information that we weren't surfacing before. It's part of the monitoring story, but there's a plethora of things to do there.
+
+**Jeremy Fleitz** [52:01](https://youtu.be/zyYVTNW0M7k?t=3121)
+
+I'm ready to share real quick.
+
+**Bailey Hayes** [52:01](https://youtu.be/zyYVTNW0M7k?t=3121)
+
+Oh — go for it!
+
+**Jeremy Fleitz** [52:03](https://youtu.be/zyYVTNW0M7k?t=3123)
+
+I had it — I'm ready to go. All right. So this is just a quick write-up inside Notion — this is a private Notion. As you all probably know — well, I just learned recently — when you compile WebAssembly components, it takes up more than one core instance space, and Wasmtime has, by default, a max of 1,000 core instances. In Rust — Rust is way better with the way it uses core instances; it could be like one to three on average. But when you use Go, especially componentized Go, when it adds various shims in place in front of it to make it work, it can add four to five per component. So if I take a typical WebAssembly host, and I have one Go component that I compiled, and I thought, oh, it can run 1,000, and I go ahead and put 500 on there — it could use all of the core instances at once, and now you're going to get this error that says "maximum concurrent core instances limit of 1000 reached." So basically, we need to protect the host. This is a time where you could have a noisy neighbor — it can exhaust all the host resources. Now, I'm not exactly sure how 1,000 came up — I don't know the history behind Wasmtime — and also, based upon: is it x86, is it 32-bit or 64-bit, all that — this number could, probably should, be configurable. So that's one thing that's on the roadmap: making some of these dials exposable. But the other thing we need to expose is having this inside the host heartbeat that comes back. Right now, we currently send the type of architecture, the CPU usage, the memory, the component count, workload count. So now we're going to go ahead and add in there, to the host heartbeat, how many of these core instances are available — if it is configurable — but also how many are currently being used. What that'll do is allow us to have it so that the runtime operator is smarter. We can have different thresholds out there, so that if a host gets over a certain percentage, say like 80%, the host can start warning, saying, hey, I'm about to get close to my max amount of core instances that are allowed — and then maybe even start throwing an error, say around 95%. Since we do have host groups, that means the operator can simply order the hosts on which it schedules components based upon which one has the most number of instances available. So it's just a better way to push out the work so that it's more distributed, so that we're not using up all our core instances — because we really need to start treating that as a first-class resource type of property. Any questions? Honestly, this really came up with one of the people that uses wasmCloud — they did a scaling type of test. I did a scaling test using KEDA autoscaling, and it was on Rust, and never had any type of issue. But then they wrote the same type of thing in Go, and Go had the issue. And that was just kind of like — why would there be a difference in language? And it really just went back down to: certain languages compile differently. It kind of goes back full circle, Aditya, to you and Bailey talking about your wash wizard, and do we really need to know about languages or not — I feel like this kind of fits in with that story.
+
+<img src="/img/community/2026-08-05/image010.webp" alt="Jeremy Fleitz's Core Instance Use Visibility tech spec in Notion explaining how 300 workloads can exhaust 1,000 Wasmtime core instances" />
+
+**Aditya Salunkhe** [56:16](https://youtu.be/zyYVTNW0M7k?t=3376)
+
+Yeah — Jeremy, did you test it with long-lived service invocations?
+
+**Jeremy Fleitz** [56:25](https://youtu.be/zyYVTNW0M7k?t=3385)
+
+I have not yet. This is definitely on the list, yes — to keep on working on.
+
+**Bailey Hayes** [56:36](https://youtu.be/zyYVTNW0M7k?t=3396)
+
+Great discussion today. I think I'll just bring up the PR that Aditya has up. I see Victor — I asked Victor if he would be able to review, since I've been in the WebAssembly CG all day, and yesterday. Dropping a link to it, if you want to just give it a quick shout, Aditya.
+
+<img src="/img/community/2026-08-05/image011.webp" alt="GitHub pull request 5413, feat(messaging): async wasmcloud:messaging@0.3.0, with Victor Adossi as requested reviewer" />
+
+**Aditya Salunkhe** [57:06](https://youtu.be/zyYVTNW0M7k?t=3426)
+
+Oh, you're sharing it already. Okay.
+
+**Victor Adossi** [57:08](https://youtu.be/zyYVTNW0M7k?t=3428)
+
+Yeah — maybe one thing about that review, though. I left a comment, but basically, review aside: the mention that the trigger services should only be on P3 — I think we'll change the implementation a bit more, because I think Aditya's got support for both in there.
+
+**Bailey Hayes** [57:27](https://youtu.be/zyYVTNW0M7k?t=3447)
+
+I bet it'll deadlock. I bet if we create a unit test for it, you can see that it'll deadlock.
+
+**Victor Adossi** [57:35](https://youtu.be/zyYVTNW0M7k?t=3455)
+
+Okay.
+
+**Bailey Hayes** [57:38](https://youtu.be/zyYVTNW0M7k?t=3458)
+
+Okay — but, well, hey, that's why we do code review. Aditya, do you want to describe what this does?
+
+**Aditya Salunkhe** [57:48](https://youtu.be/zyYVTNW0M7k?t=3468)
+
+Yeah. Basically, this just asyncifies the wasmcloud:messaging interface. Under the 0.2.0 interface, the request was just a plain function: when the guest called it, the entire component instance was blocked until the reply arrives or the timeout fires, and nothing else in that component could run. With 0.3.0, we basically asyncify it with native async, with P3 stuff, so that the component can have many operations outstanding and keep serving other work while each awaits. And the other one was that earlier, in 0.2.0, the reply for a publish was a blocking call, which was nested inside a blocking handler. Now you can just await that from inside itself, which is really cool.
+
+**Bailey Hayes** [58:53](https://youtu.be/zyYVTNW0M7k?t=3533)
+
+That's really nice. And for folks who are curious what it's like to create a P3 API — do you feel like you had to do a lot of extra work to go from P2 to P3?
+
+**Aditya Salunkhe** [59:06](https://youtu.be/zyYVTNW0M7k?t=3546)
+
+No, not really. It was quite straightforward.
+
+**Bailey Hayes** [59:13](https://youtu.be/zyYVTNW0M7k?t=3553)
+
+It's good to hear. You, me, and Mendy, I think, are in the special list of people who have gone and done it. Now, the migration — for the most part, adding async is the main thing, and because you get bidirectional streams, usually you're just deleting lines. That's been my experience, because before, you had to have incoming and outgoing, and think through who's handling what and where, and now that kind of goes away. So it's been pretty good so far. On what's the biggest gotcha in migration: I think one of the reasons why there isn't a huge amount of gotcha is that P3 is purely additive. It was a non-breaking change, so you can compile for P2 and add in types that are the native async types. And because of our tooling — basically, what we developed without having to require Rust and other things to know about P3 inside wasm-tools — you do component embed: we take that WIT information about it being async, stuff it into the custom metadata section, and then slurp it back out when we're making you the component. That's how a P2 component can almost basically be P3 — but the difference is, if you have wasi:io, everybody's going to treat you like you are P2, which you probably don't want, because then you don't get my speedups. So I think the biggest gotcha would be accidentally being P2.
+
+**Victor Adossi** [1:01:09](https://youtu.be/zyYVTNW0M7k?t=3669)
+
+Is this new interface about the NATS stuff we talked about last time? So all the specification here is related to NATS only?
+
+**Bailey Hayes** [1:01:18](https://youtu.be/zyYVTNW0M7k?t=3678)
+
+We did the easy thing first, which is just faithfully porting what we have, so that's what people are currently using. We'll have that, but we also really want to do the NATS-specific one, which I think is also the right thing to use.
+
+**Victor Adossi** [1:01:35](https://youtu.be/zyYVTNW0M7k?t=3695)
+
+Okay, nice. Like it.
+
+**Bailey Hayes** [1:01:40](https://youtu.be/zyYVTNW0M7k?t=3700)
+
+Hey, Bharat.
+
+**Bharat** [1:01:43](https://youtu.be/zyYVTNW0M7k?t=3703)
+
+Hey, hi. So, I was working with my WASI AI app — AI inference — and I checked Mendy's work on the WebGPU, wasi-webgpu. I was trying to get that into our demo, but before that, I checked Mendy's work, Sean's work, and the WebAssembly Unleashed podcast — all those things — and the git repo code for that. So I'd like to know your input on, like: if we want to have that AI inference thing with wasi-webgpu, is it beneficial to add that back into a Candle framework, or would we like to have our own code for wasi-webgpu? What are your thoughts?
+
+**Bailey Hayes** [1:02:53](https://youtu.be/zyYVTNW0M7k?t=3773)
+
+Well, what Mendy's been working on is upstreaming his work to places like Candle — but not Candle yet; he's done it for llama.cpp. Essentially, there are a lot of platforms already out there today that support WebGPU, and the support to add wasi-webgpu is not too much work: essentially, if they already have WebGPU, it's fairly straightforward to do what we need to run server-side. The main tricks are just that some of the web APIs we don't have access to, so we have a slightly different interface binding — but a lot of that can be automated. Long-winded way of saying yes: I think it would be amazing if Candle had a wasi-webgpu backend that you were able to build with. And Mendy's a good person to reach out to on Slack. There's sort of a mix of things right now — I just shared an example that he demoed at the WebAssembly CG yesterday. There are caveats: basically, a lot of this is brand new, so I'm blocking him, actually, on not doing this code review yet — I owe him that one — for landing that in the header space. There's some work to be done upstream: Dawn is essentially what a ton of people build with, and what llama needed in this case. And for other things to get working, he's kind of brought a lot of things together, so there are branches of branches, which can be hard to work with. But the ultimate goal is everything lands upstream and on main, and you don't have to know the right tricks. In the South, we have a saying for this: it's called "hold your mouth right." Whenever you're doing something — if you've ever seen someone put on mascara, for example, they make the silliest faces you've ever seen, to be able to do it, and it shouldn't impact anything, but for some reason, you've got to kind of hold your mouth right to make it all work together. So anyways — right now it's in that kind of hard way of putting it together, but I think it's definitely a worthy goal of getting all of this upstreamed, because then everybody is just going to be able to build all kinds of different interesting components and run anywhere.
+
+**Liam Randall** [1:05:22](https://youtu.be/zyYVTNW0M7k?t=3922)
+
+Bailey, that was a Liam-level idiom, you know — that was outstandingly obscure and completely sideways. I think Aditya's eyes were about to pop out of his head.
+
+**Bailey Hayes** [1:05:35](https://youtu.be/zyYVTNW0M7k?t=3935)
+
+Well, I try not to let my accent come through too strong here — but yeah, if I talk to my mom on the phone or something, and then I get on a wasmCloud community call, you guys are gonna think that I'm speaking a different language. We have the craziest sayings here, so I do my very best to keep those on the DL. But for here, it's like — it's so perfect, because it's so hard to make that work. The rest of the ones that came to mind, I can't say on camera, so we stuck with the clean ones.
+
+**Jeremy Fleitz** [1:06:07](https://youtu.be/zyYVTNW0M7k?t=3967)
+
+I saw Yordis pop in — I was waiting for Yordis to say something about this one.
+
+**Bailey Hayes** [1:06:12](https://youtu.be/zyYVTNW0M7k?t=3972)
+
+Okay. Well, hey, we've already gone 12 minutes over. Let's not make this a contest. So I'm gonna stop the recording now — but thank you, everybody, for joining. And maybe somebody else will give a demo after the recording isn't happening anymore. It says I'm live streaming — I don't know how to stop it, guys.
+
+**Liam Randall** [1:06:45](https://youtu.be/zyYVTNW0M7k?t=4005)
+
+I think you dropped it.
