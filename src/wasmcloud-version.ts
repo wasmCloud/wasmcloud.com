@@ -1,1 +1,1 @@
-export const WASMCLOUD_VERSION = '2.6.1';
+export const WASMCLOUD_VERSION = '2.7.0';
