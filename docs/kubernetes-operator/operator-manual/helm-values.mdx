@@ -350,7 +350,7 @@ runtime:
         - gc
 ```
 
-Recognized values are `component-model-async`, `gc`, `exception-handling`, `wide-arithmetic`, `threads`, and `tail-call`. WASI 0.3 always brings the `component-model-async` proposal along with it, so hosts running the 2.5.0-and-later runtime always have the async proposal available whether or not it's listed explicitly.
+Recognized values are `component-model-async`, `component-model-map` (added in 2.7.0), `gc`, `exception-handling`, `wide-arithmetic`, `threads`, and `tail-call`. WASI 0.3 always brings the `component-model-async` proposal along with it, and as of wasmCloud 2.7.0 the engine also enables the Component Model `map` type proposal unconditionally — so neither needs to be listed explicitly on 2.7.0-and-later hosts.
 
 ### `runtime.hostGroups[].http.port`
 
@@ -359,6 +359,26 @@ Starting in 2.0.3, this value is honored by the host (it was previously hardcode
 ### `runtime.hostGroups[].webgpu.enabled`
 
 Enables the WebGPU plugin on hosts in the group. Requires a host image built with the `wasi-webgpu` feature.
+
+### `runtime.ociCaPaths` and `runtime.hostGroups[].ociCaPaths`
+
+Introduced in 2.7.0. PEM bundles of additional CA certificates the host trusts when pulling from OCI registries — workload components, host component plugins, and washlet artifacts alike. `runtime.ociCaPaths` applies chart-wide; the per-host-group form is additive. The chart renders entries as `--oci-ca-path` arguments (the paths must be mounted into the pod via `volumes`/`volumeMounts`).
+
+For an in-cluster registry signed by the chart's own CA (with `global.tls.enabled`), the CA bundle is already mounted:
+
+```yaml
+runtime:
+  ociCaPaths:
+    - /runtime-cert/ca.crt
+```
+
+Prefer this over `--allow-insecure-registries`, which switches every registry to plain HTTP — credentials travel in the clear and no certificate is checked at all.
+
+For trusting private CAs on components' *outbound HTTPS* (a separate mechanism from OCI pulls), pass `--http-client-ca-path`/`--http-client-trust-roots` via [`runtime.hostGroups[].extraArgs`](#runtimehostgroupsenv-envfrom-and-extraargs) with the bundle mounted the same way.
+
+### `runtime.hostGroups[].http.tls.certificate.generate.ipAddresses`
+
+Introduced in 2.7.0. Additional IP SANs for the host group's generated TLS certificate — needed when clients reach the host group by IP rather than name. Note that the chart reuses an existing `hostgroup-<name>-http-tls` Secret if one exists, so adding `ipAddresses` to a live release takes effect only after that Secret is deleted and the certificate regenerated.
 
 ### `runtime.image.tag`
 

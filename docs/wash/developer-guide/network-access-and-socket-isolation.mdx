@@ -30,13 +30,14 @@ The wasmCloud host applies socket policy to all workloads. The policy is impleme
 
 ### Allowed by default
 
-- **Outbound TCP connections** — components and services can connect to non-loopback addresses. This enables components to make outbound HTTP requests, connect to databases, or use any TCP-based protocol.
-- **TCP bind on loopback for services** — services can bind and listen on `127.0.0.1` (or the unspecified address `0.0.0.0`). This is how a service becomes the "localhost" for its workload.
+- **Outbound TCP connections** — components and services can connect to non-loopback addresses. This enables components to make outbound HTTP requests, connect to databases, or use any TCP-based protocol. As of wasmCloud 2.7.0, raw-socket connections count against a per-workload quota (default 256; over-quota connects are refused immediately) and are evaluated against the workload's `allowedHosts` list plus an address policy screening special ranges — in **count** mode by default, so nothing is newly blocked on upgrade; operators opt into `enforce` after reviewing the counters.
+- **Bind on loopback for services** — services can bind and listen on `127.0.0.1` (or the unspecified address `0.0.0.0`). This is how a service becomes the "localhost" for its workload. Binds are loopback-confined for both TCP and UDP: a `0.0.0.0` bind is rewritten to the workload's virtual loopback and never reaches the machine's real interfaces. (wasmCloud 2.7.0 closed an escape where UDP binds to `0.0.0.0` got a real socket on every interface.)
 
 ### Denied by default
 
 - **DNS / name resolution** — `ip-name-lookup` is denied by default. Components and services must use IP addresses directly rather than hostnames unless resolution is explicitly allowed. Since wasmCloud 2.6.0, a component can opt in with the per-component `allowedIpNameLookups` allowlist in its workload configuration (named `allowIpNameLookup` before 2.6.1); entries may be exact hostnames, `*.suffix` wildcards, `*` (any name), or literal IPs.
 - **TCP bind for regular components** — only services can bind TCP ports and act as listeners. A regular component that attempts to bind a TCP port will be denied by the host.
+- **The machine's loopback** — `127.0.0.1` always means the workload's own virtual loopback, never the host machine's. As of wasmCloud 2.7.0 there is one sanctioned path to the machine's loopback: the reserved name `host.wasmcloud.internal`, gated by the per-component `allowedHostLoopbackPorts` list *and* a host-level `--allow-host-loopback` flag (off by default). See [Workload Security](../../kubernetes-operator/workload-security.mdx#raw-socket-egress-policy-and-connection-quotas).
 
 :::info[Policy is enforced at the host level]
 These restrictions are enforced by the wasmCloud runtime, not by the component itself. A component does not need to implement its own socket restrictions&mdash;the host ensures policy is applied regardless of what the component code attempts.

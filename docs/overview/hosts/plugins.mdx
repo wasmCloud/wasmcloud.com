@@ -37,7 +37,7 @@ wasmCloud supports two kinds of host plugin:
 - **[Native host plugins](#native-host-plugins)** — Rust code linked into the host binary that implements the `HostPlugin` trait. Native host plugins are appropriate for capabilities that need direct host resources (filesystem, network, hardware) or must run with the host's privileges.
 - **[Host component plugins](#host-component-plugins)** — WebAssembly components deployed alongside workloads, running as [trigger services](./trigger-services.mdx) with a capability ingress. Host component plugins are useful when a capability can be implemented in Wasm and you want to ship, version, and sandbox it like any other component.
 
-Both kinds of plugin provide interfaces to workloads, and a workload does not know whether a given capability is implemented natively or as a component.
+Both kinds of plugin provide interfaces to workloads, and a workload does not know whether a given capability is implemented natively or as a component. As of wasmCloud 2.7.0, host component plugins can also *consume* interfaces that workloads export — see below.
 
 ## Native host plugins
 
@@ -102,6 +102,8 @@ A **host component plugin** is a WebAssembly component that provides a host capa
 
 Host component plugins run as [trigger services](./trigger-services.mdx) with a **capability ingress**: a single long-lived plugin instance is pinned in the host, and other workloads' capability calls (for example, a `wasmcloud:messaging/consumer.publish` invocation) are dispatched to that pinned instance across a store boundary. See [Trigger services](./trigger-services.mdx#capability-ingress) for the cross-store dispatch model.
 
+As of wasmCloud 2.7.0, calls can also flow the other way: a plugin can import interfaces that workloads export and invoke them through `wasmcloud:host/workload-call` — dispatching scheduled or broker-driven work into application components. A plugin can even export no capability at all and act purely as a **trigger** driving workload exports from its background task. Plugins can also import the host's built-in native capabilities (`wasi:config`, `wasi:keyvalue`, `wasmcloud:secrets`, and more) for their own use, with their own configuration and secrets and allowlist-gated network egress.
+
 ### When to use host component plugins
 
 Host component plugins are suitable when:
@@ -114,16 +116,18 @@ Native host plugins remain the right choice when the capability needs direct hos
 
 ### The `wasmcloud:host` interface
 
-Host component plugins can import [`wasmcloud:host@0.1.0`](../interfaces.mdx) to observe and cooperate with their runtime environment:
+Host component plugins can import [`wasmcloud:host`](../interfaces.mdx) (0.1.3 as of wasmCloud 2.7.0) to observe and cooperate with their runtime environment:
 
 - **`wasmcloud:host/identity`**: query the workload and component identifiers of the caller currently invoking this plugin. This allows a plugin to partition state for each caller (e.g., keep one connection or session per workload without callers seeing each other's state).
 - **`wasmcloud:host/cancel`**: cooperative per-invocation cancellation. A handler can identify its current job, check whether it has been asked to stop, and observe cancellation signals for long-running work.
+- **`wasmcloud:host/workload-call`** (added in 2.7.0): invoke interfaces that workloads export, targeting either the current caller or an explicitly opened workload. Failures come back as error values — a failing workload can never fault the plugin.
+- **`wasmcloud:host/workload-lifecycle`** (an interface the plugin *exports* rather than imports): observe workloads binding and unbinding, to set up and tear down per-workload state.
 
 For details on authoring, packaging, and deploying a host component plugin, see [Creating host component plugins](../../runtime/creating-host-component-plugins.mdx).
 
 ### Feature-gated
 
-Host component plugins shipped in wasmCloud 2.6.0. Support is opt-in: release images are built with default features, so enable the `host-component-plugins` Cargo feature when building a host. If you embed `wash-runtime`, enable the feature on a Git dependency (the crate on crates.io is a stale early snapshot that predates the current API):
+Host component plugins shipped in wasmCloud 2.6.0 and remain opt-in as of 2.7.0: release images are built with default features only, which do not include the plugin support, so enable the `host-component-plugins` Cargo feature when building a host. If you embed `wash-runtime`, enable the feature on a Git dependency (the crate on crates.io is a stale early snapshot that predates the current API):
 
 ```toml
 [dependencies]

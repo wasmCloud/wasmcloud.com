@@ -52,6 +52,8 @@ A trigger service that exports `wasmcloud:messaging/handler@0.2.0` receives inbo
 
 The capability ingress carries invocations from other workloads to a trigger service's exported capability interface. It is the ingress used by [host component plugins](./plugins.mdx#host-component-plugins): the plugin's capability exports (for example, a `wasmcloud:messaging/consumer` implementation) are dispatched to the same pinned plugin instance via this ingress. Because the caller and the plugin live in different stores, resource handles, streams, and futures that cross the boundary are relocated by the runtime rather than shared.
 
+As of wasmCloud 2.7.0, a host component plugin can also call in the *opposite* direction — invoking interfaces that workloads export, via `wasmcloud:host/workload-call`. Those calls do not involve an ingress or any pinned instance: each runs on one of the callee workload's warm pooled instances (or a fresh store), and resource handles cannot cross in that direction at all (refused at plugin load or workload deploy). See [the authoring guide](../../runtime/creating-host-component-plugins.mdx#wasmcloudhostworkload-call) for the full contract.
+
 ## Instance lifecycle
 
 A trigger service is instantiated when its owning workload starts. The runtime instantiates the component into a dedicated store and drives that instance concurrently. From that point on:
@@ -60,7 +62,7 @@ A trigger service is instantiated when its owning workload starts. The runtime i
 - Each declared ingress is registered with the host and starts delivering invocations.
 - Every inbound invocation is spawned as a concurrent task against the pinned instance.
 
-**Supervision.** If the guest instance traps, the runtime re-instantiates it within a bounded restart budget; in-flight invocations to the failed incarnation fail promptly rather than hanging.
+**Supervision.** If the guest instance traps, the runtime re-instantiates it within a bounded restart budget; in-flight invocations to the failed incarnation fail promptly rather than hanging. The budget is spent only on the trigger service's *own* faults — as of wasmCloud 2.7.0, a failure in a workload that a plugin calls via `workload-call` is reported to the plugin as an error value and never traps the pinned instance or consumes its restart budget.
 
 ## Cancellation and host awareness
 
@@ -68,6 +70,7 @@ Trigger services can import [`wasmcloud:host`](../interfaces.mdx) to observe and
 
 - **`wasmcloud:host/identity`**: the pinned instance can query the workload and component identifiers of the caller currently invoking it. Resolved per-invocation from the caller's own guest task, so the answer is exact under concurrent, interleaved calls — useful for partitioning state per caller.
 - **`wasmcloud:host/cancel`**: per-invocation cooperative cancellation. A handler can identify its current job, check whether it has been asked to stop, and observe cancellation signals for long-running work — the guest chooses when to yield.
+- **`wasmcloud:host/workload-call`** (added in wasmCloud 2.7.0, host component plugins): invoke interfaces that workloads export, targeting the current caller implicitly or an explicitly opened workload.
 
 See the [authoring guide](../../runtime/creating-host-component-plugins.mdx) for details on using these interfaces in a component.
 
