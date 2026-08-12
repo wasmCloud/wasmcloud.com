@@ -1,0 +1,147 @@
+---
+title: 'wasmCloud 2.7: Bidirectional host component plugins, concurrent pooling, and multi-backend binding by default'
+authors: [ericgregory]
+date: '2026-08-12'
+description: 'wasmCloud 2.7 makes host component plugins bidirectional (plugins can call workload exports), multiplies warm-instance capacity with maxConcurrency, enables multi-backend binding by default, and hardens workload networking with quotas and private CA trust.'
+slug: wasmcloud-2-7-release
+about: wasmCloud
+image: './images/2.7-blog-header.webp'
+mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS]
+---
+
+![wasmCloud 2.7 release banner](./images/2.7-blog-header.webp)
+
+[wasmCloud 2.7.0](https://github.com/wasmCloud/wasmCloud/releases/tag/v2.7.0) is now available! This release is a deep one for the runtime:
+
+- **Host component plugins become bidirectional**: A plugin can now import the host's built-in capabilities for its own use *and* call interfaces that workloads export, with per-plugin configuration, secrets, and explicitly granted network access (still opt-in via feature flag)
+- **Concurrent pooled instances**: The new `maxConcurrency` control lets one warm instance overlap calls while it awaits I/O, multiplying warm capacity to `poolSize × maxConcurrency`
+- **Multi-backend binding by default**: The Component Model's `implements` clause is enabled in stock release images, so multi-backend binding is no longer locked behind custom host builds
+
+2.7 also pools outbound HTTP connections per workload (removing a hard throughput ceiling), brings raw sockets under per-workload quotas and an opt-in egress policy, adds configurable CA trust for private registries and internal HTTPS, and ships up-to-date CRDs in the Helm chart.
+
+{/* truncate */}
+
+## At a glance
+
+| Area | 2.6.x | 2.7.0 |
+|---|---|---|
+| Host component plugins | serve capability calls to workloads | also import host capabilities and call workload exports, with per-plugin config, secrets, and network grants |
+| Warm instance concurrency | one call at a time per instance | `poolSize × maxConcurrency` concurrent calls |
+| Multi-backend binding (`implements`) | custom host build required | on by default |
+| Outbound HTTP transport | connection per request | per-workload keep-alive pools |
+| Private CA trust | not configurable | `--http-client-ca-path` / `--oci-ca-path` and chart values |
+| Chart-bundled CRDs | stale (new fields silently pruned) | current, with a CI drift check |
+
+## Host component plugins, now bidirectional
+
+wasmCloud 2.6 introduced [host component plugins](/docs/overview/hosts/plugins/#host-component-plugins): WebAssembly components that provide host capabilities to workloads, running as trigger services with a capability ingress. In 2.6, calls flowed one way (from workloads into the plugin). wasmCloud 2.7 delivers the other side of the equation.
+
+**Plugins can import host capabilities.** A plugin's imports now resolve against the host's native plugin registry, so a plugin can use `wasi:config`, `wasi:keyvalue`, `wasmcloud:secrets`, and the other built-ins for its own purposes. Each plugin declaration carries its own configuration and secrets and its own network posture: outbound HTTP and DNS are **deny-all** unless the operator grants per-plugin allowlists. Secrets can be imported per label, and a missing one fails plugin construction up front rather than at runtime.
+
+**Plugins can call workload exports.** The new `wasmcloud:host/workload-call` interface lets a plugin invoke interfaces that workloads export: the reverse of the capability ingress. A plugin serving a capability call can call back into its current caller implicitly, or open an explicit handle to any workload serving a given interface and dispatch from its own background loop. Those calls run on the callee workload's own instances, and the contract is strict and checked at load or deploy time rather than failing mid-call. A plugin can also export **no capability at all** and act as a pure trigger (think cron- or broker-driven dispatch into application components across every workload on the host).
+
+**Workload failures can't take the plugin down.** Because one pinned plugin instance serves every workload on the host, blast radius matters. However a callee fails (a trap, a redeploy, or a timeout) it comes back to the plugin as an **error value** in the call's result: it never traps the plugin's instance and never consumes its restart budget.
+
+The through-line of all of this: every bit of a plugin's reach beyond the sandbox (its configuration, its secrets, its network egress) is an explicit, auditable operator grant.
+
+:::info[Feature flag required for now]
+Host component plugin support remains opt-in in 2.7: the `host-component-plugins` Cargo feature is not in the default `wash-runtime` feature set, so stock release images don't enable it out of the box. To use it today, build a custom host image with the feature enabled (the source [Dockerfile](https://github.com/wasmCloud/wasmCloud/blob/main/Dockerfile) takes `CARGO_FEATURES=host-component-plugins` as a build arg) and point the Helm chart at your image via the `runtime.image` values.
+:::
+
+The [authoring guide](/docs/runtime/creating-host-component-plugins/) covers the full contract, including the [workload-call semantics](/docs/runtime/creating-host-component-plugins/#wasmcloudhostworkload-call), config sourcing, and deployment paths.
+
+## Concurrent pooled instances
+
+2.6.0's warm-instance pooling kept instantiation cost off the request path; 2.7.0 multiplies what each warm instance can do. The new **`maxConcurrency`** control (a sibling of `poolSize` on the component entry) sets how many calls one warm instance may serve at the same time. Unset means one: the same behavior as 2.6.0, so existing manifests run unchanged.
+
+Raising it lets an instance overlap calls while it awaits I/O, so warm capacity becomes `poolSize × maxConcurrency` in-flight calls. Warm instances now serve component-to-component calls as well as inbound HTTP, and a burst beyond warm capacity is still served from a fresh one-shot store rather than queueing; pooling never adds latency it didn't save. Upstream benchmarks measured roughly a 13.6× improvement in concurrent throughput.
+
+Concurrency is only safe for a guest that yields rather than blocks, and pooling has sharper edges worth knowing: a trap faults every call in flight on that instance, and background tasks a guest spawns now survive across calls. See [Component resource controls](/docs/kubernetes-operator/crds/#component-resource-controls) for the full semantics.
+
+## Multi-backend binding by default
+
+The WASI subgroup voted to depend on the stabilized Component Model `implements` and `map` features, and as of 2.7.0, so does wasmCloud, by default. **Multi-backend binding now works on stock release images**: a component can import the same interface twice under distinct labels (`import cache: wasi:keyvalue/store@0.2.0-draft; import sessions: wasi:keyvalue/store@0.2.0-draft;`) and route each to its own backend via named `hostInterfaces` entries. A custom host build is no longer required.
+
+Component Model `map` types are enabled unconditionally in the engine as well, so components whose WIT uses `map<k, v>` now validate and instantiate on stock hosts.
+
+See [multi-backend binding](/docs/kubernetes-operator/crds/#host-interfaces) in the CRD documentation for the routing model and manifest shape.
+
+## Networking: pooled egress, quotas, and least-privilege sockets
+
+A cluster of changes makes workload networking faster and more explicitly governed:
+
+- **Outbound HTTP connection pooling.** The runtime replaces per-request connections with keep-alive pools keyed per workload; workloads never share a TCP connection. This removes a hard throughput ceiling (previously around 1,000 req/s) where port exhaustion surfaced as spurious DNS errors under concurrent outbound load.
+- **Connection quotas.** Each workload now has a connection quota across outbound HTTP, raw sockets, and inbound connections, under a host-wide ceiling. Defaults are generous; see the upgrade notes below.
+- **Raw-socket egress policy.** Raw `wasi:sockets` connections are now evaluated against the workload's `allowedHosts` and an address policy screening special ranges (including cloud metadata endpoints). Enforcement is deliberately **opt-in**: the default `--socket-egress count` mode only records would-deny counters, so nothing breaks on upgrade. Review the counters, then switch to `enforce`.
+- **UDP binds are loopback-confined**, closing an escape where a `0.0.0.0` UDP bind reached the machine's real interfaces.
+- **Sanctioned host-loopback access.** The reserved name `host.wasmcloud.internal` plus matching per-component and host-level grants form a two-key path to services on the machine's loopback: `127.0.0.1` still always means the workload's own virtual loopback.
+
+Details in [Workload security](/docs/kubernetes-operator/workload-security/) and the [network access guide](/docs/wash/developer-guide/network-access-and-socket-isolation/).
+
+## Private CAs for HTTPS and OCI
+
+Two related but distinct trust surfaces become configurable:
+
+- **Outbound HTTPS from components**: `--http-client-ca-path` layers extra PEM bundles onto the compiled-in roots, and a companion flag selects the base trust model, up to pinning exactly your own bundles. Defaults are unchanged, and the trust applies to all outbound HTTPS, including gRPC.
+- **OCI pulls**: `--oci-ca-path` (or the [`runtime.ociCaPaths` chart values](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeocicapaths-and-runtimehostgroupsocicapaths)) adds CAs trusted for every pull the host makes. Prefer this over `--allow-insecure-registries`, which downgrades every registry to plain HTTP.
+
+In-cluster registries signed by the chart's own CA need a single chart value: see the [Helm values reference](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeocicapaths-and-runtimehostgroupsocicapaths).
+
+## Chart and operator
+
+- **The chart's bundled CRDs are current again** (and CI now checks them against the operator's definitions), so fields like `allowedIpNameLookups` are no longer silently pruned by the API server on chart installs. One caveat: Helm only installs the `crds/` directory on `helm install`. Upgrades from a 2.6.x chart still need a manual `kubectl apply` of the updated CRDs.
+- **Host-plugin config rotation**: Host pods now roll exactly when plugin config changes, and Stakater Reloader annotations are emitted so clusters running Reloader restart hosts when referenced ConfigMaps/Secrets rotate.
+- **Gateway cleanup**: Deleting or replacing a runtime-gateway no longer leaves Hosts and Workloads stuck terminating on stale finalizers; existing clusters recover on upgrade.
+
+## Other notable changes
+
+- **[Wasmtime 47.0.3](https://github.com/wasmCloud/wasmCloud/pull/5415)**, via routine dependency and security bumps.
+- **[The `oci-registry` example shipped 0.2.0](https://github.com/wasmCloud/wasmCloud/pull/5434)**, publishing an artifact that includes the registry's mandatory Basic auth (credentials via `wasmcloud:secrets`).
+- **[The egress idle-connection cap is sized from declared concurrency](https://github.com/wasmCloud/wasmCloud/pull/5432)**, so a component that declares `poolSize`/`maxConcurrency` gets an idle-connection allowance to match.
+- **[CRD kind descriptions were corrected](https://github.com/wasmCloud/wasmCloud/pull/5427)** in the operator's API reference.
+- **[The `wasm-component-ld` prerequisite for building test fixtures is documented](https://github.com/wasmCloud/wasmCloud/pull/5445)**: Thanks to contributor [@jtakakura](https://github.com/jtakakura)!
+
+## What to check before you upgrade
+
+- **Hostname routing now ignores ports**: HTTP routing matches the `Host` header without its port, so a workload registered as `example.com` answers `example.com:8080` and vice versa. Two workloads registered as `example.com` and `example.com:8080` now collide where they previously did not.
+- **Pooled components**: If a pooled guest spawns background work and relies on it being torn down with the call, don't pool it; background tasks survive across calls on a warm instance as of 2.7.0.
+- **CRDs on Helm upgrades**: Upgrading the chart from 2.6.x does not update installed CRDs; apply the 2.7.0 CRDs manually to use the new fields.
+- **Raw-socket egress** stays in `count` mode by default. Nothing is newly blocked, but plan the move to `enforce` and review the counters first.
+- **Connection quotas now bound previously unbounded workloads**: 128 pooled outbound HTTP connections (brief wait when over), 256 raw-socket connections (refused when over), and 256 inbound per workload. The defaults are generous, but a workload that held thousands of connections will now feel the ceiling. The per-surface flags raise it.
+
+## What's coming
+
+Host component plugin work continues: port publishing for plugins (and workloads) is in flight upstream, so watch for that in a future release. As always, the [roadmap](https://github.com/orgs/wasmCloud/projects/7) has what's in progress, and [wasmCloud Wednesday](/community/) is the place to weigh in.
+
+## Get started with wasmCloud 2.7
+
+Install or upgrade `wash`.
+
+On macOS or Linux via install script:
+
+```bash
+curl -fsSL https://wasmcloud.com/sh | bash
+```
+
+With Homebrew:
+
+```bash
+brew install wasmcloud/wasmcloud/wash
+```
+
+On Windows with [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+
+```shell
+winget install wasmCloud.wash
+```
+
+For new users, the [quickstart](/docs/quickstart/) gets you from installation to a running component on Kubernetes in a few minutes.
+
+Full changelog: [v2.6.1...v2.7.0](https://github.com/wasmCloud/wasmCloud/compare/v2.6.1...v2.7.0)
+
+## Join the community
+
+- [wasmCloud Slack](https://slack.wasmcloud.com/): Questions, announcements, and #wasmcloud-dev
+- [wasmCloud Wednesday](/community/): Weekly community call, Wednesdays at 1PM ET
+- [wasmCloud Roadmap](https://github.com/orgs/wasmCloud/projects/7): What's in progress and what's ready for contributors to pick up
+- Good first issues: [github.com/wasmCloud/wasmCloud/issues](https://github.com/wasmCloud/wasmCloud/issues?q=label%3A%22good+first+issue%22+is%3Aopen)
