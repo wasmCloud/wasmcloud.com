@@ -35,8 +35,10 @@ At runtime, a host component plugin is a [trigger service](../overview/hosts/tri
 
 From the caller's perspective this is transparent: a workload does not know whether the capability it imports is implemented as a native plugin or as a component plugin.
 
+As of wasmCloud 2.7.0, calls can also flow in the other direction: a plugin can import an interface that a workload exports and invoke it via [`wasmcloud:host/workload-call`](#wasmcloudhostworkload-call) — for example, to dispatch scheduled or broker-driven work into application components. A plugin can even export no capability at all and act as a **pure trigger** that only drives workload exports from its background task.
+
 :::info[Opt-in feature]
-Host component plugins shipped in wasmCloud 2.6.0, opt-in via the `host-component-plugins` Cargo feature on `wash-runtime`. Release images are built with default features only, so running host component plugins requires a host image built with the feature enabled. Check the [wash-runtime source](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-runtime) for the current shape.
+Host component plugins shipped in wasmCloud 2.6.0, opt-in via the `host-component-plugins` Cargo feature on `wash-runtime` (still the case as of 2.7.0). Release images are built with default features only, so running host component plugins requires a host image built with the feature enabled. Check the [wash-runtime source](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-runtime) for the current shape.
 :::
 
 ## Plugin world
@@ -48,8 +50,8 @@ package example:messaging-plugin;
 
 world plugin {
   // Import the host awareness interfaces (optional but recommended)
-  import wasmcloud:host/identity@0.1.0;
-  import wasmcloud:host/cancel@0.1.0;
+  import wasmcloud:host/identity@0.1.3;
+  import wasmcloud:host/cancel@0.1.3;
 
   // Export the capability this plugin provides
   export wasmcloud:messaging/consumer@0.2.0;
@@ -57,11 +59,15 @@ world plugin {
 }
 ```
 
-The plugin can additionally export `wasi:cli/run@0.3.0` to have a background task that runs alongside inbound invocations — useful when the plugin needs to maintain a long-lived connection, run a scheduler, or process background work. `wasi:cli/run` is optional; a pure capability plugin can omit it and export only its capability interface. Note that the plugin's world must export at least one capability function; a world that exports only a `types` interface fails at plugin construction.
+(The `wasmcloud:host` package is at 0.1.3 as of wasmCloud 2.7.0; the host matches its reserved interfaces by name and resolves versions semver-compatibly, so a plugin built against an earlier 0.1.x continues to load.)
+
+The plugin can additionally export `wasi:cli/run@0.3.0` to have a background task that runs alongside inbound invocations — useful when the plugin needs to maintain a long-lived connection, run a scheduler, or process background work. `wasi:cli/run` is optional; a pure capability plugin can omit it and export only its capability interface.
+
+A plugin's world must either **export at least one capability function** or (as of wasmCloud 2.7.0) **import a workload-facing interface** to call via [`wasmcloud:host/workload-call`](#wasmcloudhostworkload-call). A world that does neither — for example, one that exports only a `types` interface — fails at plugin construction.
 
 ## The `wasmcloud:host` interface
 
-The `wasmcloud:host@0.1.0` WIT package provides two subinterfaces plugins can import (`identity` and `cancel`) and one a plugin can optionally export (`workload-lifecycle`).
+The `wasmcloud:host` WIT package (0.1.3 as of wasmCloud 2.7.0) provides four subinterfaces plugins can import — `identity`, `cancel`, `workload-call`, and the shared `types` (which carries `workload-id`, `component-id`, and the `call-error` variant) — and one a plugin can optionally export (`workload-lifecycle`).
 
 ### `wasmcloud:host/identity`
 
@@ -97,6 +103,30 @@ loop {
 }
 ```
 
+### `wasmcloud:host/workload-call`
+
+Added in wasmCloud 2.7.0, `workload-call` lets a plugin invoke interfaces that **workloads export** — the reverse of the capability ingress. A plugin that imports `workload-call` opts in to **workload-facing imports**: any interface the plugin imports that no host built-in provides is routed to a workload that both declares the interface under `hostInterfaces` *and* exports it. (A plugin that doesn't import `workload-call` is held to a closed import surface — an unsatisfiable import fails at plugin load.)
+
+Calls in this direction do **not** run on the plugin's pinned instance or on any long-lived callee instance. Each call runs on one of the callee's warm pooled instances (or a fresh store), with arguments and results relocated across the boundary — the same path workload-to-workload calls use.
+
+**Targeting.** There are two ways to name the callee:
+
+- **Implicit**: with no handle held, a call routes back to the workload whose capability call the plugin is currently serving (resolved the same way as `identity`). A plugin calling back into its own caller needs no handle.
+- **Explicit**: `open(workload-id, interface)` returns an `option<target>` handle — `none` unless that workload actually serves that interface, so a live handle is proof the call routes. The handle's lifetime is the routing scope (the innermost live handle for a given interface wins), which lets a plugin's `wasi:cli/run` background loop dispatch with no inbound call to inherit. A handle pins *which component* serves the interface but not liveness: it records a deployment generation that is rechecked per call, so a handle held across a stop or redeploy answers `not-running` rather than reviving. `callable()` returns a `map<workload-id, list<interface>>` of everything currently callable.
+
+**Constraints** (checked at plugin load or workload deploy, not at call time):
+
+- Every function of a workload-facing interface must be an **`async func`**; a sync function is refused at plugin load.
+- Every function must **return a `result`** the host can write an error into. Three shapes are accepted, best first: the `wasmcloud:host/types.call-error` variant (recommended — the only shape that distinguishes host-reported failures from workload-meant errors; matched structurally, so your WIT may restate it); `result<_, string>` (the shape `wasmcloud:messaging/handler` uses); or the interface's own error type, if some case carries nothing, a `string`, or an `option<string>`. For the latter two shapes, host-reported detail arrives prefixed with `wasmcloud:host: ` where the chosen error case has room for text (a payload-less case drops the detail).
+- `resource` and `error-context` handles cannot cross in this direction — refused at plugin load or workload deploy. (This means `wasi:http/handler` cannot be a workload-facing import: requests and responses are resources.)
+- A workload's long-lived **service** is not callable this way even if it exports the interface — reported at deploy time and omitted from `callable()`.
+- Lifecycle hooks cannot call the workload they are about (it is still deploying at bind and torn down at unbind).
+- If two components in a workload export the same interface, the tie-break is by component **name** (stable across deploys).
+
+**Error semantics.** A workload-call failure can never fault the plugin. Every failure — no target, workload stopped or redeployed, interface not exported, callee trapped, call ran past the host's ceiling — is written into the function's `result` as an error value; the plugin is never trapped for it, and failures in called workloads never consume the plugin's restart budget. `call-error`'s variants are `no-target`, `not-running`, `not-exported`, `failed`, and `other` (each carrying an `option<string>` of detail) — treat the set as open and match `other`.
+
+Because a plugin can now *drive* workloads rather than only serve them, a plugin may export **no capability at all**: a **pure trigger** whose `wasi:cli/run` loop dispatches scheduled or broker-driven work into workload exports, host-scoped, with no inbound ingress involved.
+
 ### `wasmcloud:host/workload-lifecycle`
 
 Where `identity` and `cancel` are imports, `workload-lifecycle` (added in wasmCloud 2.6.0) is an interface a plugin may optionally **export** to observe the workloads binding to it:
@@ -104,7 +134,7 @@ Where `identity` and `cancel` are imports, `workload-lifecycle` (added in wasmCl
 - **`on-workload-bind`**: invoked before the workload's first capability call reaches the plugin. It receives a `workload-info` record carrying the workload's ID, name, and namespace, its service and component IDs, and each matched interface instance with its version and manifest-supplied config. Returning an error **fails the workload's deployment** — use this to reject workloads with invalid configuration, or to provision per-workload state (connections, sessions, credentials) before traffic arrives.
 - **`on-workload-unbind`**: a best-effort cleanup notification when the workload stops.
 
-A plugin that doesn't export the interface is unaffected. Note that inside a lifecycle hook, `get-workload-id` reports the binding workload's ID but `get-component-id` returns an empty string (there is no in-flight component call) — prefer reading IDs from the `workload-info` record.
+A plugin that doesn't export the interface is unaffected. Note that inside a lifecycle hook, `get-workload-id` reports the binding workload's ID but `get-component-id`'s value is **not meaningful** and must not be relied on (as of `wasmcloud:host` 0.1.3 this is explicit in the WIT) — read IDs from the `workload-info` record instead. Two more rules for hook bodies: a hook must not invoke the plugin's own exported capabilities (this times out during post-restart replay), and it cannot [call the binding workload's exports](#wasmcloudhostworkload-call) (the workload is still deploying at bind and torn down at unbind).
 
 ## Building the plugin
 
@@ -112,15 +142,27 @@ Host component plugins are built the same way as any other wasmCloud component. 
 
 The output is a standard component binary. Sign and publish it to an OCI registry the same way you distribute any other wasmCloud component.
 
+### Plugin imports
+
+As of wasmCloud 2.7.0, a plugin's imports resolve against the host's **native plugin registry** — a plugin can import `wasi:config`, `wasi:keyvalue`, `wasmcloud:secrets`, and the other built-in capabilities, and the host links them at plugin construction. Imports never resolve against another component plugin (this rules out plugin-to-plugin dependency cycles by construction). An interface the plugin both imports and exports routes back to the plugin itself.
+
+Two import surfaces deserve special mention:
+
+- **Labeled secrets.** The `wasmcloud:secrets@2.1.0` package gained a `secret` interface with a single nullary `get` — a plugin imports one labeled instance per secret (`import db-password: wasmcloud:secrets/secret;`). The host resolves each label against the plugin's bind-time config **before instantiation**, so a missing label fails plugin construction with an error naming the label, instead of surfacing as a runtime `not-found` deep in a handler. The dynamic `store.get` path remains available for names not known at build time.
+- **Network egress.** A plugin's own outbound HTTP (`wasi:http/outgoing-handler`) and DNS (`wasi:sockets/ip-name-lookup`) are **deny-all by default** and gated by per-plugin `allowedHosts` and `allowedIpNameLookups` lists in the plugin's declaration. Unlike a workload, a plugin gets no ergonomic allow-all default anywhere — it is operator-controlled and more privileged than a workload, so its egress is always an explicit grant.
+
 ## Deploying the plugin
 
 Host component plugins are declared in **host configuration**, not in a workload's manifest. A plugin serves every workload on the host that imports its interface, so it's a privileged install the host operator controls. Plugins are loaded once at host start; there is no dynamic reload today.
 
-Every declaration carries a host-unique **id** (a duplicate ID is a hard error at host startup) and a **source** (OCI image reference or file path). Optional fields include a digest pin (for supply-chain verification, OCI sources only) and a per-plugin `max-restarts` override.
+Every declaration carries a host-unique **id** (a duplicate ID is a hard error at host startup) and a **source** (OCI image reference or file path). Optional fields include a digest pin (for supply-chain verification, OCI sources only) and a per-plugin `max-restarts` override. As of wasmCloud 2.7.0, a declaration can also carry:
+
+- **`config` / `configFrom` / `secretFrom`** — the plugin's own bind-time configuration, resolved against top-level `configs:`/`secrets:` catalogs and delivered to every native capability the plugin imports (e.g., `wasmcloud:secrets`) the way a workload's config is — values stay in memory and are never written to a file the plugin reads. Sources merge in order (inline `config`, then `configFrom`, then `secretFrom` — last wins). Catalog entries can be sourced from a directory of files (`dir:`, the Kubernetes ConfigMap/Secret volume-mount shape, filename = key), a single file (`file:`), inline values (`inline:`), or the environment (`fromEnv:`). Single-file (`file:`) secret sources must be permission-restricted (`0600`/`0400`); directory sources are exempt because Kubernetes-projected volumes are symlink farms.
+- **`allowedHosts` / `allowedIpNameLookups`** — the plugin's own egress allowlists (see [Plugin imports](#plugin-imports)); omitted means deny-all.
 
 The `host-component-plugins` Cargo feature must be enabled on the target host; a host built without it rejects a plugin declaration at startup with a clear error rather than silently dropping it.
 
-Three loading paths are supported.
+Four loading paths are supported.
 
 ### `wash host`
 
@@ -144,6 +186,31 @@ Required keys: `id`, and exactly one of `image` or `file`. Optional keys (image 
 
 For image sources in an authenticated registry, pass credentials through the environment — `WASH_HOST_PLUGIN_REGISTRY_USER` and `WASH_HOST_PLUGIN_REGISTRY_PASSWORD` (or the `--host-plugin-registry-user` / `--host-plugin-registry-password` flags). Credentials are deliberately kept out of the `--host-plugin` spec string so they never appear in process listings or shell history; both must be set together.
 
+Note that the `--host-plugin` flag grammar covers only the basic fields (`id`, source, `pull`, `digest`, `max-restarts`). The 2.7.0 fields — `config`/`configFrom`/`secretFrom` and the egress allowlists — can only be expressed in a config file (below) or chart values.
+
+### `wash host` config file
+
+`wash host` reads the same layered configuration as `wash dev`: the global user config (overridable with the global `--user-config <file>` flag) merged with the project-local `.wash/config.yaml`. The config file's `host.hostPlugins` entries carry the **full** plugin spec, including the fields the flag grammar can't express:
+
+```yaml
+secrets:
+  acme-kv-credentials:
+    dir: /etc/acme-kv-secret
+host:
+  hostPlugins:
+    - id: acme-kv
+      image: ghcr.io/acme/kv-host:1.0.0
+      pullPolicy: ifNotPresent
+      config:
+        bucket: acme-cache
+      secretFrom:
+        - acme-kv-credentials
+      allowedHosts:
+        - kv.acme.internal
+```
+
+The top-level `configs:` and `secrets:` catalogs map names to sources (`dir:`, `file:`, `inline:`, or `fromEnv:`); `configFrom`/`secretFrom` reference catalog entries by name.
+
 ### `wash dev`
 
 Add entries under `dev.host_plugins` in `.wash/config.yaml`. Fields are camelCased (`pullPolicy`, `maxRestarts`, `expectedDigest`) rather than kebab-cased:
@@ -162,7 +229,7 @@ dev:
 
 ### Helm chart
 
-Declare per host-group under `runtime.hostGroups[].hostPlugins`; the chart renders these into `--host-plugin` args on the host Deployment:
+Declare per host-group under `runtime.hostGroups[].hostPlugins`:
 
 ```yaml
 runtime:
@@ -176,6 +243,13 @@ runtime:
 ```
 
 The Helm YAML uses `digest` (matching the CLI grammar), not `expectedDigest` — that camelCased form is only for `wash dev`'s local config file.
+
+As of the 2.7.0 chart, `hostPlugins` entries also accept `config`/`configFrom`/`secretFrom` and `allowedHosts`/`allowedIpNameLookups`. How the chart renders an entry depends on its fields: an entry with **none** of those fields still renders as a `--host-plugin` CLI arg, while an entry with **any** of them renders the whole entry into a mounted `wash host` config file — deliberately, so secret values never appear on the command line or in `kubectl describe` output.
+
+Two operational notes on config delivery:
+
+- Editing chart values rolls the host pod (the pod carries a checksum annotation over the rendered plugin config).
+- The *contents* of a referenced ConfigMap or Secret are resolved **once at host startup**. Rotating them does not affect a running host — plan a pod roll, or run [Stakater Reloader](https://github.com/stakater/Reloader), for which the chart emits annotations naming the referenced sources.
 
 ### After loading
 
@@ -193,10 +267,11 @@ These are set on the host process (via container `env`, Helm `runtime.env`, etc.
 
 ## Considerations
 
-- **Wasm-only capabilities.** Host component plugins run inside the sandbox. They cannot open raw sockets, access arbitrary filesystem paths, or reach the host's hardware directly. If your capability needs those, build a [native host plugin](./creating-host-plugins.mdx) instead.
+- **Wasm-only capabilities.** Host component plugins run inside the sandbox. They cannot open listening ports, access arbitrary filesystem paths, or reach the host's hardware directly, and their outbound network reach is an explicit grant: HTTP and DNS are deny-all without per-plugin allowlists. If your capability needs direct host resources beyond that, build a [native host plugin](./creating-host-plugins.mdx) instead.
 - **Design your WIT for cross-store traffic.** Resource handles, streams, and futures that cross the store boundary are relocated by the runtime rather than shared. Prefer WIT shapes that minimize resource churn across the boundary — for example, favor value-returning calls over long-lived resource handles when the choice is reasonable.
 - **Cooperative cancellation.** Long-running handlers should poll `wasmcloud:host/cancel.is-cancelled` at safe points; otherwise a workload teardown must wait for the natural completion of any in-flight invocation.
 - **Runtime execution model.** See [Trigger services considerations](../overview/hosts/trigger-services.mdx#considerations) for single-instance concurrency, shared state, and restart-budget notes that apply to every trigger service, including plugins.
+- **Workload failures don't fault the plugin.** Failures in workloads the plugin calls via `workload-call` are delivered as error values in the call's `result` — they never trap the plugin's pinned instance and never consume its restart budget. The budget below is spent only on the plugin's *own* faults.
 - **Restart-budget exhaustion is terminal.** If the plugin's supervisor exhausts its restart budget, the plugin stays down for the remainder of the host process's lifetime. Every subsequent capability call routed to it fails; workloads that depend on it lose their capability until the host is restarted. Monitor the plugin's health surface and plan a host-level response (drain and roll the host pod, page an operator) for restart-budget exhaustion — the runtime does not attempt further recovery.
 
 ## Keep reading
