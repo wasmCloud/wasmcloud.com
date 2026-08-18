@@ -56,6 +56,20 @@ function CopyPageDropdown(): React.JSX.Element {
     setIsOpen(false);
   }, [rawUrl]);
 
+  const copyLlmsTxtLink = useCallback(async () => {
+    window.clearTimeout(copyResetTimeout.current);
+    setCopyState('copying');
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/llms.txt`);
+      setCopyState('copied');
+    } catch (error) {
+      console.error('Failed to copy llms.txt link', error);
+      setCopyState('error');
+    }
+    copyResetTimeout.current = window.setTimeout(() => setCopyState('idle'), 2000);
+    setIsOpen(false);
+  }, []);
+
   const viewAsMarkdown = useCallback(async () => {
     if (!rawUrl) return;
     // Open the tab synchronously so the user gesture isn't lost across the
@@ -128,6 +142,19 @@ function CopyPageDropdown(): React.JSX.Element {
               </div>
             </button>
           )}
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            onClick={copyLlmsTxtLink}
+          >
+            <div className={styles.menuItemText}>
+              <span className={styles.menuItemLabel}>Copy llms.txt link</span>
+              <span className={styles.menuItemDescription}>
+                Copy a link to this site&apos;s llms.txt for AI tools
+              </span>
+            </div>
+          </button>
         </div>
       )}
     </div>
