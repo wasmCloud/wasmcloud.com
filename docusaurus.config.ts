@@ -375,6 +375,8 @@ const config = (async (): Promise<Config> => {
         {
           generateLlmsTxt: true,
           generateLlmsFullTxt: true,
+          // Emit a Markdown file per page so the .md links in llms.txt resolve.
+          generateMarkdownFiles: true,
           docsPluginIds: ['default'],
           blogPluginIds: ['default'],
         },
