@@ -88,6 +88,7 @@ const sidebars = {
             'kubernetes-operator/operator-manual/helm-values',
             'kubernetes-operator/operator-manual/cicd',
             'kubernetes-operator/operator-manual/autoscaling',
+            'kubernetes-operator/operator-manual/concurrency-and-connections',
             'kubernetes-operator/operator-manual/roles-and-rolebindings',
             'kubernetes-operator/operator-manual/secrets-and-configuration',
             'kubernetes-operator/operator-manual/private-registries',
