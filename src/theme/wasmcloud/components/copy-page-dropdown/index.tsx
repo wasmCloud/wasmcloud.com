@@ -70,27 +70,10 @@ function CopyPageDropdown(): React.JSX.Element {
     setIsOpen(false);
   }, []);
 
-  const viewAsMarkdown = useCallback(async () => {
-    if (!rawUrl) return;
-    // Open the tab synchronously so the user gesture isn't lost across the
-    // await — popup blockers (Safari especially) block window.open otherwise.
-    // No `noopener`: it would make window.open return null, and the tab only
-    // ever hosts an inert text blob we create ourselves.
-    const tab = window.open('about:blank', '_blank');
-    try {
-      const markdown = await fetchPageMarkdown(rawUrl);
-      // text/plain renders inline; text/markdown triggers a download in Chrome.
-      const blobUrl = URL.createObjectURL(
-        new Blob([markdown], { type: 'text/plain;charset=utf-8' }),
-      );
-      if (tab) tab.location.href = blobUrl;
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-    } catch (error) {
-      tab?.close();
-      console.error('Failed to open page as Markdown', error);
-    }
-    setIsOpen(false);
-  }, [rawUrl]);
+  // The llms-plugin generates a Markdown twin of every page at its own
+  // permalink + `.md`, so this can be a plain link instead of a client-side
+  // fetch/Blob — no popup-blocker or MIME-type workarounds needed.
+  const markdownUrl = `${metadata.permalink.replace(/\/$/, '')}.md`;
 
   const copyLabel =
     copyState === 'copied'
@@ -127,21 +110,21 @@ function CopyPageDropdown(): React.JSX.Element {
               <span className={styles.menuItemDescription}>Copy page as Markdown for LLMs</span>
             </div>
           </button>
-          {rawUrl && (
-            <button
-              type="button"
-              role="menuitem"
-              className={styles.menuItem}
-              onClick={viewAsMarkdown}
-            >
-              <div className={styles.menuItemText}>
-                <span className={styles.menuItemLabel}>
-                  View as Markdown <ExternalLinkIcon className={styles.externalIcon} />
-                </span>
-                <span className={styles.menuItemDescription}>View this page as plain text</span>
-              </div>
-            </button>
-          )}
+          <a
+            role="menuitem"
+            className={styles.menuItem}
+            href={markdownUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsOpen(false)}
+          >
+            <div className={styles.menuItemText}>
+              <span className={styles.menuItemLabel}>
+                View as Markdown <ExternalLinkIcon className={styles.externalIcon} />
+              </span>
+              <span className={styles.menuItemDescription}>View this page as plain text</span>
+            </div>
+          </a>
           <button
             type="button"
             role="menuitem"
