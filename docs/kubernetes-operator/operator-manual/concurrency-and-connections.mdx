@@ -2,7 +2,7 @@
 title: 'Concurrency and connections'
 sidebar_label: 'Concurrency and connections'
 sidebar_position: 4
-description: 'Tune how many calls a wasmCloud component serves at once and how many connections a workload may hold, and size the two together so instance concurrency never outruns its connection budget.'
+description: 'Size per-instance concurrency and per-workload connection quotas together so a wasmCloud component never outruns its connection budget.'
 proficiency: Intermediate
 # `about` (single primary topic) and `mentions` (secondary topics) reference
 # entity slugs in src/data/entities.json. At build time these expand into
@@ -17,22 +17,22 @@ platforms: [wasmCloud, Kubernetes]
 
 wasmCloud gives you two families of knobs that decide how much work a component does at once and how much of the network it may hold open while doing it:
 
-- **Instance limits** set how many calls a single warm component instance serves concurrently, and how many warm instances the host keeps. They live on the component, in the `Workload` (or `WorkloadDeployment`) custom resource.
+- **Instance limits** set how many calls a single warm instance (a component the host keeps ready between calls) serves concurrently, and how many warm instances the host keeps. They live on the component, in the `Workload` (or `WorkloadDeployment`) custom resource.
 - **Connection quotas** set how many outbound and inbound connections a workload may hold. They live on the host, set through Helm values or host flags, and apply to every workload the host runs.
 
 The two families multiply. Raising instance concurrency raises how many connections the workload needs, so they are worth tuning as a pair. This page explains how they fit together and how to size them. For the full field reference, see [component runtime fields](/docs/kubernetes-operator/crds) and [workload security](/docs/kubernetes-operator/workload-security).
 
 ## The mental model
 
-Three settings decide a component's total in-flight work, at three levels:
+Three settings decide a component's total in-flight work, each at a different scope:
 
-| Level | Knob | Sets |
+| Scope | Knob | What it sets |
 | --- | --- | --- |
 | Instance | `maxConcurrency` | calls one warm instance serves at the same time |
 | Component | `poolSize` | warm instances the host keeps for the component |
 | Deployment | `replicas` | copies of the workload across the host group |
 
-A single component's warm capacity is `poolSize × maxConcurrency` in-flight calls. Multiply by `replicas` for the deployment's total. Each of those calls can open its own outbound requests, so the connection a workload needs grows with the same product. That is the interaction to keep in mind: **instance concurrency sets the demand, connection quotas set the ceiling.**
+`maxConcurrency` and `poolSize` are set on the component entry; `replicas` is set on the `WorkloadDeployment`. A single component's warm capacity is `poolSize × maxConcurrency` in-flight calls. Multiply by `replicas` for the deployment's total. Each of those calls can open its own outbound connections, so the connections a workload needs grow with the same product. That is the interaction to keep in mind: **instance concurrency sets the demand, connection quotas set the ceiling.**
 
 ## Instance limits (per component)
 
@@ -56,7 +56,7 @@ spec:
           maxInvocations: 1000
 ```
 
-`maxConcurrency` above `1` lets one instance overlap calls while it waits on I/O, which is what makes pooling pay off for network-bound work. It is only safe for a guest that yields while it waits rather than blocking the thread. `maxInvocations` bounds how long a warm instance lives, which is useful when a component accumulates state you would rather reset periodically. Both are only meaningful alongside `poolSize`, since an unpooled component starts fresh on every call. The [component runtime fields reference](/docs/kubernetes-operator/crds) covers the pooling semantics in full, including how linked components share a store and what a guest trap does to calls in flight.
+`maxConcurrency` above `1` lets one instance overlap calls while it waits on I/O, which is what makes pooling pay off for network-bound work. It is only safe for a guest (the component's own code) that yields while it waits rather than blocking the thread. `maxInvocations` bounds how long a warm instance lives, which is useful when a component accumulates state you would rather reset periodically. Both are only meaningful alongside `poolSize`, since an unpooled component starts fresh on every call. The [component runtime fields reference](/docs/kubernetes-operator/crds) covers the pooling semantics in full, including how linked components share a store and what a guest trap does to calls in flight.
 
 ## Connection quotas (per workload)
 
@@ -78,9 +78,14 @@ All three roll up into the host-wide `maxConnections` ceiling. The [workload sec
 
 ## Sizing them together
 
-Take the component above: `poolSize: 10` and `maxConcurrency: 8` is up to 80 calls in flight on one replica. If each call makes one outbound HTTP request, the workload wants up to 80 pooled outbound connections at peak, comfortably under the default `128`. Raise `maxConcurrency` to `16`, or have each call fan out to several backends, and the demand crosses the default. Past that point, outbound requests wait on `--http-connection-wait` and then fail, which shows up as latency spikes and timeouts under load rather than an obvious error.
+Take the component above: `poolSize: 10` and `maxConcurrency: 8` is up to 80 calls in flight on one replica. If each call makes one outbound HTTP request, the workload wants up to 80 outbound connections at peak, comfortably under the default `128`. Raise `maxConcurrency` to `16`, or have each call fan out to several backends, and the demand crosses the default. Past that point, outbound requests wait on `--http-connection-wait` and then fail, which shows up as latency spikes and timeouts under load rather than an obvious error.
 
-You do not size the outbound pool directly. The host derives it from what the component declared, `poolSize × maxConcurrency`, so a component that raises its concurrency gets a proportionally larger pool without a second setting to keep in sync. `maxOutboundHttpConnectionsPerWorkload` is the ceiling on that derived size. So the tuning workflow is:
+Two separate things are at work here, and only one of them is a knob you set:
+
+- **Keep-alive pool sizing is automatic.** For reuse, the host keeps some idle connections warm to each destination, and it sizes that from the component's declared `poolSize × maxConcurrency`, so raising concurrency keeps proportionally more connections ready without a second setting to keep in sync. Idle connections above real demand close on their own after a timeout. You do not tune this.
+- **The connection ceiling is the knob.** `maxOutboundHttpConnectionsPerWorkload` (default `128`) caps how many outbound HTTP connections the workload may hold at once, across every destination. This is the limit a request waits behind, and it is what you raise when peak demand outgrows the default.
+
+So the tuning workflow is:
 
 1. Set `poolSize` and `maxConcurrency` for the throughput you want.
 2. Estimate peak outbound connections as `poolSize × maxConcurrency ×` (outbound requests per call).
@@ -92,12 +97,12 @@ These quotas are per host process. A workload scaled to several `replicas` gets 
 
 ## Replicas
 
-`replicas` is the third scaling axis: copies of the whole workload spread across the host group. It scales throughput past what one host's instance pool can serve, and it is the axis a `HorizontalPodAutoscaler` or KEDA drives through the `/scale` subresource. See [Autoscaling](/docs/kubernetes-operator/operator-manual/autoscaling) for how to scale `replicas` automatically, and why the host group is a precondition for it.
+`replicas` is the third scaling axis: copies of the whole workload spread across the host group (the pool of hosts the operator manages). It scales throughput past what one host's instance pool can serve, and it is the axis a `HorizontalPodAutoscaler` or KEDA drives through the `/scale` subresource. See [Autoscaling](/docs/kubernetes-operator/operator-manual/autoscaling) for how to scale `replicas` automatically, and why the host group is a precondition for it.
 
 ## Takeaways
 
 - A component's warm capacity is `poolSize × maxConcurrency` calls in flight; `replicas` multiplies that across hosts.
 - Instance concurrency sets connection demand; the per-workload quota sets the ceiling. Size them as a pair.
-- The outbound HTTP pool is derived from declared concurrency, so you tune concurrency and the quota, not the pool directly.
+- The keep-alive pool is sized automatically from declared concurrency, so you tune concurrency and the quota, not the pool directly.
 - Outbound HTTP over quota waits up to `--http-connection-wait` (default `5s`) then fails; raw sockets and inbound connections are refused immediately.
 - The connection quota applies once per replica, so scaling out multiplies the total connection budget.
