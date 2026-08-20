@@ -70,10 +70,12 @@ function CopyPageDropdown(): React.JSX.Element {
     setIsOpen(false);
   }, []);
 
-  // The llms-plugin generates a Markdown twin of every page at its own
-  // permalink + `.md`, so this can be a plain link instead of a client-side
-  // fetch/Blob — no popup-blocker or MIME-type workarounds needed.
-  const markdownUrl = `${metadata.permalink.replace(/\/$/, '')}.md`;
+  // docusaurus-plugin-llms generates each page's Markdown file from its
+  // source path (metadata.id), not its permalink — the two diverge for
+  // index pages, where the permalink drops "index" (id "overview/index" ->
+  // permalink "/docs/overview/") but the generated file keeps it
+  // (".../overview/index.md").
+  const markdownUrl = `/docs/${metadata.id}.md`;
 
   const copyLabel =
     copyState === 'copied'
