@@ -1,60 +1,177 @@
 ---
 date: '2026-08-12'
-title: 'Meeting Agenda - 2026-08-12'
+title: 'wasmCloud 2.7 Ships 13.6x Concurrency, WIT Annotations Take Shape, and an OCI Registry Made of Components'
+description: 'wasmCloud 2.7 lands max concurrency and maps in the Wasm component model, Yordis Prieto pitches WIT annotations, and a Wasm-built OCI registry passes conformance.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wit annotations
+  - wit
+  - protobuf
+  - oci registry
+  - epoch interruption
+  - instance pooling
+  - wasi
+  - component registry
+  - webassembly news
+chapters:
+  - { seconds: 11, label: "Welcome and wasmCloud 2.7 release highlights" }
+  - { seconds: 280, label: "WASI 0.3.1: maps and implements enabled by default" }
+  - { seconds: 531, label: "Hardening: pooling limits and protecting host component plugins" }
+  - { seconds: 665, label: "Epoch interruption: stopping runaway guest code (PR 5451)" }
+  - { seconds: 883, label: "Async wasmcloud:messaging and NATS JetStream plans" }
+  - { seconds: 950, label: "awesome-wasmcloud: a catalog of reusable components" }
+  - { seconds: 1135, label: "Publishing ports and wasmcloud.internal routing proposals" }
+  - { seconds: 1318, label: "Live roadmap triage: what shipped in 2.7" }
+  - { seconds: 1433, label: "Distributed cache design targeted for 2.9 or 3.0" }
+  - { seconds: 1581, label: "Typed map keys and the case for WIT aliases" }
+  - { seconds: 1927, label: "WIT annotations: read and write views of one interface" }
+  - { seconds: 2191, label: "WIT as a superset of Protobuf" }
+  - { seconds: 2360, label: "WASI 0.3.2 outlook: cooperative threads" }
+  - { seconds: 2665, label: "An OCI registry built from Wasm components" }
+  - { seconds: 2996, label: "wasm.directory and the component registry ecosystem" }
+  - { seconds: 3249, label: "Wrap-up" }
+image: https://i.ytimg.com/vi/5x35I8fk5pE/maxresdefault.jpg
+duration: 3265
+showTitle: true
+slug: 2026-08-12-community-meeting
+speakers:
+  - bailey-hayes
+  - aditya-salunkhe
+  - yordis-prieto
+  - liam-randall
+about: wasmCloud
+mentions:
+  - ComponentModel
+  - WASI
+  - OCIRegistry
+  - Wasmtime
+  - NATS
+  - wasmTools
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
--
--
--
+<YouTube url="https://www.youtube.com/watch?v=5x35I8fk5pE" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=5x35I8fk5pE" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The August 12, 2026 wasmCloud community call opens with Bailey Hayes unpacking [wasmCloud 2.7](/blog/wasmcloud-2-7-release/) — max concurrency on instance pools (13.6x in her best-case benchmark), a hardened OCI registry component, and maps and `implements` enabled by default in the **Wasm component model** after a W3C WASI subgroup vote. Aditya Salunkhe walks through his epoch-interruption work for canceling runaway guest code, and Yordis Prieto lays out the plan for **WIT annotations** — a change that would let WIT express read/write capability views, Protobuf-style validation, and more, making WIT effectively a superset of Protobuf.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **wasmCloud 2.7 is out, and max concurrency is the headline** — set a `poolSize` to keep instances warm, add `maxConcurrency`, and the host threads requests into pooled instances concurrently instead of effectively serially; Bailey's admittedly cheesed I/O-bound benchmark showed a **13.6x improvement**, with the caveat that compute-bound workloads won't see anything like it
+- **Maps and `implements` are enabled by default** — the W3C WASI subgroup voted to let WASI proposals depend on these two stabilized component model features; wasmCloud reads `implements` as a request to multiplex across multiple named backends, and the host's own WIT now uses a `map` keyed by workload ID for nicer bindings than the list-of-tuples ABI form
+- **WASI 0.3.1 shipped the day before the call** — the first release on top of WASI 0.3.0; phase-2 proposals like wasi-blobstore and wasi-keyvalue are expected to start adopting maps and `implements` now that they're allowed to
+- **Epoch interruption is how wasmCloud will cancel runaway code** — Aditya's [PR #5451](https://github.com/wasmCloud/wasmCloud/pull/5451) uses Wasmtime's epoch feature to bake ~10ms checks into guest code loops (roughly a nanosecond of overhead), so a pathological regex or spin lock gets torn down instead of eating CPU for months
+- **The OCI registry component got serious** — it now authenticates via wasmCloud Secrets, runs TLS end-to-end inside wasmCloud's own test suite, passes the official OCI distribution-spec conformance suite, and can be backed by any blob store from local filesystem to S3; private-registry users can also thread CA roots through the operator to the host
+- **WIT annotations are coming** — Yordis Prieto's proposal (with Luke Wagner's blessing) uses WAVE syntax to attach structured, typed annotations to WIT, so one big CRUD interface can be filtered into read-only or write-only views instead of hand-splitting interfaces; Bailey wants aliases as map keys landed alongside it
+- **WIT to Protobuf is safe; Protobuf to WIT has sharp edges** — because components are bytecode, an enum change that Protobuf calls a non-breaking minor bump is a breaking change in WIT, so use WIT as the source of truth; Bailey plans to convert wasmCloud's YAML-defined NATS workload-scheduling interface as soon as annotations land
+- **Cooperative threads may make WASI 0.3.2 in October** — CPython now builds with cooperative threads and passes its unit tests, with C, C++, Rust, and Python exercising the feature; the distributed cache moves to a dedicated design session, targeted at a 2.9 or 3.0 release
+
+## Chapters
+
+- [0:11 — Welcome and wasmCloud 2.7 release highlights](https://youtu.be/5x35I8fk5pE?t=11)
+- [4:40 — WASI 0.3.1: maps and implements enabled by default](https://youtu.be/5x35I8fk5pE?t=280)
+- [8:51 — Hardening: pooling limits and protecting host component plugins](https://youtu.be/5x35I8fk5pE?t=531)
+- [11:05 — Epoch interruption: stopping runaway guest code (PR 5451)](https://youtu.be/5x35I8fk5pE?t=665)
+- [14:43 — Async wasmcloud:messaging and NATS JetStream plans](https://youtu.be/5x35I8fk5pE?t=883)
+- [15:50 — awesome-wasmcloud: a catalog of reusable components](https://youtu.be/5x35I8fk5pE?t=950)
+- [18:55 — Publishing ports and wasmcloud.internal routing proposals](https://youtu.be/5x35I8fk5pE?t=1135)
+- [21:58 — Live roadmap triage: what shipped in 2.7](https://youtu.be/5x35I8fk5pE?t=1318)
+- [23:53 — Distributed cache design targeted for 2.9 or 3.0](https://youtu.be/5x35I8fk5pE?t=1433)
+- [26:21 — Typed map keys and the case for WIT aliases](https://youtu.be/5x35I8fk5pE?t=1581)
+- [32:07 — WIT annotations: read and write views of one interface](https://youtu.be/5x35I8fk5pE?t=1927)
+- [36:31 — WIT as a superset of Protobuf](https://youtu.be/5x35I8fk5pE?t=2191)
+- [39:20 — WASI 0.3.2 outlook: cooperative threads](https://youtu.be/5x35I8fk5pE?t=2360)
+- [44:25 — An OCI registry built from Wasm components](https://youtu.be/5x35I8fk5pE?t=2665)
+- [49:56 — wasm.directory and the component registry ecosystem](https://youtu.be/5x35I8fk5pE?t=2996)
+- [54:09 — Wrap-up](https://youtu.be/5x35I8fk5pE?t=3249)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### wasmCloud 2.7: Max Concurrency and a Hardened Registry
 
-### Topic 1
+Bailey Hayes opened with the release cut the day before: [wasmCloud 2.7](/blog/wasmcloud-2-7-release/), a hardening pass on the foundation 2.6 laid down. The biggest single item is **max concurrency on instance pools**. Setting a `poolSize` keeps a set of warm instances ready ("keep these toasty for me"); adding `maxConcurrency` lets the host call into every instance in that pool concurrently, up to the configured ceiling. Instead of handling HTTP requests effectively serially — and cold every time — requests thread into warm instances as they arrive. In Bailey's own best-case benchmark (a sleep in the workload, cheerfully self-described as cheesed), that's a **13.6x improvement**. The honest scoping: the win comes from I/O-bound workloads that spend time awaiting databases and downstream HTTP calls. Compute-heavy workloads that never yield won't see a dramatic change — but for the typical wasmCloud workload shape, the boost is significant.
 
-- Note 1
-- Note 2
+The **OCI registry component** also leveled up: it now reads credentials from wasmCloud Secrets for basic auth and runs with TLS encryption end-to-end inside wasmCloud's own end-to-end tests — a "yo dawg, I heard you like components" arrangement in which the project's test fixtures are pushed to and pulled from a registry that is itself a Wasm component. Private-registry users got a matching quality-of-life fix: **CA roots can now be passed to the [runtime operator](/docs/kubernetes-operator/)** and threaded all the way through to the host, which matters the moment you secure a registry with your own TLS rather than relying on public GHCR. Rounding out the hardening theme, Bailey and Jeremy Fleitz added **connection quotas** — HTTP incoming and outgoing, sockets inbound and outbound — and the next knob in the queue is the Wasmtime pooling allocator's hard-coded 1,000-instance ceiling, which will be raised and made configurable, possibly in a patch release.
 
-### Topic 2
+### Maps, Implements, and WASI 0.3.1
 
-- Note 1
-- Note 2
+The other headline in 2.7 is that **maps and `implements` are enabled by default**. The context: the week before, Bailey held a vote in the W3C WASI subgroup, and the group agreed WASI can now depend on two stabilized [component model](https://github.com/WebAssembly/component-model) features. `implements` lets a component say "I want to use these two different stores," which wasmCloud interprets as a request to **multiplex across multiple named backends** — two, five, however many you name uniquely. Maps give WIT a first-class `map` type: the ABI representation is still a list of tuples, but if your language supports it, bindings on both host and guest sides surface a real map instead of something you iterate through. Bailey immediately put it to use in the wasmCloud host's own WIT definition, keying interface targets by workload ID.
 
-## Weekly highlights
+The day before the call, Bailey also cut **[WASI 0.3.1](https://wasi.dev/)** — the first release on top of WASI 0.3.0, and a hefty one. No existing WASI proposal depends on maps or `implements` yet, but the phase-2 proposals — wasi-blobstore, wasi-keyvalue, and friends — have been eager for exactly these features and are expected to start adopting them now that they're allowed as dependencies.
 
-### Issue of the Week
+### Epoch Interruption: Protecting the Host from Runaway Code
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+The hardening story continues in flight. Host component plugins gained protection so that a trapping invocation no longer traps the plugin itself, and work is underway to let a host component act as a **trigger** that invokes workloads — think a Kafka or NATS JetStream bring-your-own-trigger plugin — which is harder at host scope than at workload scope because it means calling across workloads safely.
 
-### Documentation of the Week
+The deepest cut is **epoch interruption**, Aditya Salunkhe's work in [PR #5451](https://github.com/wasmCloud/wasmCloud/pull/5451). The problem: if guest code is stuck in something like a catastrophically backtracking regex — O(n³) or worse — the host never gets a callback; there's no poll to return, no natural cancellation point. Wasmtime's epoch feature bakes incremental checks into every loop of the compiled guest code — roughly every 10 milliseconds, at about a nanosecond of overhead per check. If a timeout fires, a flag flips, the check trips, and a cancellation teardown begins. Today the mechanism tracks the entire Wasmtime store; a pending Wasmtime pull request for per-task cancellation inside `run-concurrent` task loops should eventually allow finer-grained teardown, and Bailey wants that one badly too. Aditya's other PR, the **async `wasmcloud:messaging` host plugin** ([PR #5413](https://github.com/wasmCloud/wasmCloud/pull/5413)), is nearly through review after iterations with Victor Adossi — expect it in 2.8 or a 2.7 patch — and NATS JetStream support is next on his list. He also gave a shout-out to new contributor **Junji Takakura**, contributing from Japan across a formidable time-zone gap.
 
-- [title](/docs/v1/intro)
-  - summary
+### The Roadmap, Live: Triage, Distributed Cache, and Internal Addressing
 
-## Community Updates
+Bailey ran the quarter's roadmap triage live on the call, moving cards as she went: epoch interruption, instance pooling, and instance reuse — done in the latest release; the wasmCloud Secrets plugin — built into the host; several more items with draft PRs ready to cross the line. A frequently requested ticket, **publishing the wash CLI to crates.io**, has an outside contributor ready to jump on it. The one big rock left standing is the **distributed cache**, which the group agreed deserves a dedicated design and iteration sprint — likely a whiteboarding call — and realistically targets a 2.9 or 3.0 release. Aditya offered notes from Betty Blocks' production experience with a similar precompiled-cache format as input to that design.
 
-### Tune in…
+Two new drafts landed for feedback in the addressing space. Users have asked to **publish ports** — expose a service or host component to callers outside the host — and, on the flip side, to target such ports from other workloads without leaving the machine. Bailey's drafts (including [PR #5440](https://github.com/wasmCloud/wasmCloud/pull/5440)) follow the Docker playbook: an internal DNS name — `service.wasmcloud.internal` or `host.wasmcloud.internal` — resolves as a virtual loopback, extending the TCP loopback wasmCloud already implements for sandboxing to the host as a whole. That enables patterns like a single platform function every workload on a host can call. Also settled: **WasmCon** won't run as a formal co-located event this KubeCon season — CNCF is giving smaller events a theater and a time slot instead, where Bailey plans to talk wasmCloud with anyone willing to listen.
 
-{/* Add any upcoming events/streams/etc */}
+### WIT Annotations: Domain-Driven Design for Interfaces
 
--
+Yordis Prieto arrived to a greeting of "you missed me talking about maps" and picked up two threads he's driving in the component model. The first is **typed map keys**: today a WIT map key must be a native type, so Bailey's workload-ID map is keyed by bare `string` with a doc comment explaining what it means. Yordis had deliberately left custom key types out of the initial maps work — some languages allow absurd key types, and he wanted a conservative core — but both he and Luke Wagner agree an **alias that resolves to an allowed native type** should be legal as a key. Bailey has already been playing with the spec grammar (with an assist from Claude) and will put the PR up for Yordis to review.
 
-### Catch up…
+The second thread is the big one: **annotations in WIT** ([component-model #695](https://github.com/WebAssembly/component-model/issues/695)). The design has two sides — a declaration, where a top-level type is marked as an annotation type, and a usage, where `@annotate` applies it with arguments written in **WAVE** (the WebAssembly Value Encoding, the JSON-ish syntax already used by CLIs in [wasm-tools](https://github.com/bytecodealliance/wasm-tools)) — structured text interpreted as WIT types. Bailey spelled out why this matters for capability-driven design: WASI's key tenet is that an interface import is a capability grant, but nobody wants to hand-split a big, natural API — GitHub's, say — into a dozen tiny interfaces just to separate reads from writes. With annotations, the CRUD operations stay together and an alias can request "just the read-only ones," resolving to a filtered world. That's **domain-driven design for WIT**, and it has been requested since the early days — Yash, who presented the structured-annotations idea to the subgroup and whose auto-stamp project generated CRUD APIs for a pile of common SaaS services (browsable on [wasm.directory](https://wasm.directory/)), would be one of the first consumers. Yordis also wants to fold in AI use cases and, longer-term, generate things like HTTP proxy routing straight from the annotations.
 
-{/* Add any blog posts/articles that the community might find interesting */}
+### WIT ⊃ Protobuf
 
--
+Yordis' endgame is blunt: annotations plus lazy types make WIT **effectively a superset of Protobuf**. He demoed the motivation with [Protovalidate](https://github.com/bufbuild/protovalidate) — the annotation package the entire Protobuf ecosystem uses to declare "this field is a UUID," "this is an email," retry metadata, and so on. If WIT can express the same annotations, the backend and the frontend can consume literally the **same component** — no marshaling shim generated in a different stack, no "hopefully what you use matches what I use." Bailey flagged the one impedance mismatch to respect: Protobuf versions enums as non-breaking minor changes, but a component is bytecode with exact representations, so the same change is breaking in WIT. Going WIT → Protobuf → wire → WIT is safe; blindly importing Protobuf definitions into WIT is not. Her commitment: the moment annotations land, wasmCloud's **NATS workload-scheduling interface** — currently defined in Protobuf via Buf, with an awkward YAML-to-bindings pipeline for Kubernetes ergonomics — gets converted, unlocking tricks like mock-testing workload scheduling with components. "I'm a WebAssembly person. I want to fully embrace WebAssembly components." On the standards calendar: **WASI 0.3.2 lands in October**, and **cooperative threads** — which a month ago looked crazy to attempt — may make it, now that CPython builds with cooperative threads and passes its unit tests, with C, C++, Rust, and Python all exercising the ABI.
 
-## Recording
+### An OCI Registry Built from Wasm Components
 
-{/* Automated - No need to adjust this unless automation fails */}
+Aditya asked the question that turned into the best demo of the call: could the OCI registry component actually behave like a real registry — list images, serve manifests, stand up WebAssembly infrastructure for WebAssembly? Bailey's answer: it already does. The component **passes the official OCI distribution-spec conformance suite** across pull, push, content discovery, and content management (skipping only optional cross-mounting cases that don't apply), and because it fronts [wasmCloud's blobstore interface](/docs/overview/hosts/plugins/), the same registry can be backed by a local filesystem via the filesystem plugin or by S3 for scale. Cataloging an entire registry isn't part of the OCI spec — Victor Adossi confirmed from the chat that `_catalog` is non-standard, one reason Harbor is nearly alone in supporting it — but per-repo tag listing works, and the [CNCF Wasm OCI Artifact layout](https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/) gives every `.wasm` a `mediaType` that makes components discoverable and searchable in any compliant registry. Bailey's ask: kick the tires and send feedback — and expect this component, alongside her perennial favorite **Blobby**, to get a prominent home in [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud), the community catalog Aditya proposed and is now stocking with good first issues.
 
-<YouTube url="https://youtube.com/live/5x35I8fk5pE" />
+### wasm.directory and the Coming Component Marketplace
+
+The registry thread widened into the ecosystem view. Bailey showed **[wasm.directory](https://wasm.directory/)**, Yash's meta-registry for WebAssembly — search for GitHub and you'll find a published component and WIT definition, click through to record types and package contents, browse what depends on wasmCloud Secrets. Aditya added **buildeverything.ai**, a component catalog from Dr. Brian Boynton, a familiar face from earlier community calls. By Bailey's count that makes something like the fifth registry for WebAssembly components, and she wants more — including a curated my-favorite-things list of her own. Her thesis for where this goes: code is basically free now — anybody can vibe a GitHub component into existence in five minutes — so components will compete on **size footprint, speed, and API quality**, and the cream rises as everyone builds on the best implementations. (Her one editorial: "if you picked anything other than Rust, you probably picked wrong.") Aditya's summary landed the theme of the call: component distribution is starting to feel like "the second coming of Docker."
+
+## WebAssembly News and Updates
+
+This week's **webassembly news** is dense: [WASI 0.3.1](https://wasi.dev/) shipped as the first release on WASI 0.3.0, with maps and `implements` now fair game for proposals like wasi-blobstore and wasi-keyvalue; **cooperative threads** are tracking toward WASI 0.3.2 in October, validated by CPython passing its unit tests; [WIT annotations](https://github.com/WebAssembly/component-model/issues/695) are being specified with WAVE syntax in the [component model](https://github.com/WebAssembly/component-model); the [CNCF Wasm OCI Artifact spec](https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/) is doing quiet, load-bearing work in making components distributable through any OCI registry; and component catalogs are multiplying, from [wasm.directory](https://wasm.directory/) to [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud). Follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [wasmCloud blog](/blog/) for what lands next.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a production substrate for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: The Wasm Component Model Grows Maps, Implements, and Annotations
+
+Every thread of this call pulls on the same rope: the **Wasm component model** is accumulating the type-system features that make interfaces a platform's source of truth. Maps give WIT ergonomic bindings for keyed data; `implements` turns "I recognize those interfaces" into declarative **multi-backend binding**, which [wasmCloud 2.7](/blog/wasmcloud-2-7-release/) now enables by default; typed map keys via aliases keep domain meaning (a workload ID is not just a `string`) attached to the type; and [annotations](https://github.com/WebAssembly/component-model/issues/695) let one interface carry many capability views — read-only, write-only, validated, retry-annotated — resolved at consumption time rather than hand-maintained as parallel WIT files. Stack those up and WIT stops being merely an IDL for [WebAssembly components](/docs/overview/workloads/components/) and starts subsuming the jobs Protobuf, OpenAPI specs, and validation-annotation packages do today — with one crucial difference Bailey highlighted on the call: components are bytecode, so WIT is honest about what's actually a breaking change. For how wasmCloud consumes these features at runtime — multiplexed backends, capability grants as imports, [host plugins](/docs/overview/hosts/plugins/) providing the implementations — start with the [platform overview](/docs/overview/) and the [interfaces documentation](/docs/overview/interfaces/).
+
+## Who Should Watch This
+
+**Platform engineers running wasmCloud in production** should start with the 2.7 highlights ([0:11](https://youtu.be/5x35I8fk5pE?t=11)) — max concurrency, connection quotas, and CA roots for private registries are all operational knobs you can turn today — and stay for epoch interruption ([11:05](https://youtu.be/5x35I8fk5pE?t=665)) to see how runaway guest code gets contained. **API and interface designers** will get the most from Yordis' annotations discussion ([32:07](https://youtu.be/5x35I8fk5pE?t=1927)) and the WIT-versus-Protobuf comparison ([36:31](https://youtu.be/5x35I8fk5pE?t=2191)) — it's the clearest articulation yet of WIT as a general interface language. **Registry and supply-chain folks** should watch the OCI registry segment ([44:25](https://youtu.be/5x35I8fk5pE?t=2665)) for a fully conformant registry built out of Wasm components and backed by any blob store.
+
+## Up Next
+
+Watch for a design and iteration sprint (or dedicated whiteboarding call) on the **distributed cache**; Bailey's spec PR for **aliases as map keys** with Yordis reviewing; the first issues filed for **annotations** in the component model; the async **`wasmcloud:messaging`** PR merging once a template flake clears, with **NATS JetStream** support behind it; **wash on crates.io** with an outside contributor driving; and good first issues landing in [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud) over the weekend. The very next call picks up several of these threads — the [August 19 meeting](/community/2026-08-19-community-meeting/) covers the rewritten Go language guide, the WASI SDK GitHub Action, and top-level WIT types landing as the annotations prerequisite.
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-08-12-community-meeting-transcript/)**
