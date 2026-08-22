@@ -1,0 +1,448 @@
+---
+date: '2026-08-19'
+title: 'Transcript: Go WebAssembly Toolchains Compared, a WASI SDK GitHub Action, and Top-Level WIT Types'
+description: 'Full transcript of the August 19, 2026 wasmCloud community call covering the Go language guide, the WASI SDK GitHub Action, routing proposals, and top-level WIT types.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - go webassembly
+  - go wasm
+  - tinygo
+  - wasm component model
+  - wasi sdk
+  - componentize-go
+  - github actions
+  - wit
+  - wasi
+  - webassembly news
+image: https://i.ytimg.com/vi/7-CWNEDqYyQ/maxresdefault.jpg
+showTitle: true
+slug: 2026-08-19-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - Go
+  - TinyGo
+  - componentize-go
+  - WASI
+  - ComponentModel
+  - JCO
+  - Wasmtime
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-08-19-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=7-CWNEDqYyQ" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=7-CWNEDqYyQ" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:08](https://youtu.be/7-CWNEDqYyQ?t=8)
+
+Hello and welcome to wasmCloud's community call for August 19th. Today we're going to talk about our Doc of the Week — some great doc enhancements that Eric's been making, and new contributors in the docs happening right now. We're going to talk about the PRs that we have in flight. If you're interested in the epoch work that we've been doing, we'll dive in a little bit deeper on that and some of the options that exist in the WebAssembly ecosystem. And also — at the end, and I didn't add it to the agenda because it just happened — we're going to talk about the WASI SDK GitHub Action that Victor got released. So, up first: Eric, do you mind showing us the Doc of the Week?
+
+**Eric Gregory** [0:53](https://youtu.be/7-CWNEDqYyQ?t=53)
+
+Not at all, thank you. So, this is all about Go. Traditionally, our ecosystem has leaned into the TinyGo approach to building WebAssembly components from Go, especially back in v1 and early v2. But that's been a little bit to the neglect of the componentized Go approach. And rather than pushing docs readers down a single path for a single approach for building components with Go, we wanted to reflect the wider ecosystem out there — especially as, in our project, we start to look a little more towards componentized Go for some pieces. So the Go language guide has been totally rewritten to break down both options, to go through the differences, and to help users make a decision — really clearly breaking down the trade-offs for using each approach, and the situations where you might want to go with one toolchain or the other. Now, this is a pretty extensive update, so I won't walk through all of it. But if you're interested in building with Go, it's definitely well worth checking this updated page out. There's another update here, though, from a new contributor, Shreya, who I want to shout out here. We now have, for each page, a copy-page function that can copy the page's Markdown for LLMs, view the page's Markdown, or copy the llms.txt link. This was implemented across two PRs and is super, super appreciated. Thank you, Shreya. Any questions about either of these pieces?
+
+<img src="/img/community/2026-08-19/image001.webp" alt="The rewritten Go Language Guide for WebAssembly on wasmcloud.com, showing the two-toolchains comparison of TinyGo and Standard Go with componentize-go" />
+
+<img src="/img/community/2026-08-19/image002.webp" alt="Shreya's merged pull request adding the copy-as-markdown and open-in-LLM dropdown to every v2 docs page" />
+
+**Bailey Hayes** [2:34](https://youtu.be/7-CWNEDqYyQ?t=154)
+
+I have a hot take. Anybody have actual questions? Okay — my hot take. One: love this page, I really appreciate it. My goal is to make it so that there's no question here — you're like, "I'm definitely using the componentized Go toolchain." That is where I want the puck to move, and I want us all to skate towards where the puck is heading — sorry for the sports analogy. Basically, when we get goroutines natively using cooperative threading within WASI, it's going to be so screaming fast and nice that any other option is just going to be kind of weird and off the beaten path. So I want it to be, today: just pick this. Just pick componentize-go, and it'll give you the fastest, easiest version to make it work. The other cool thing — I'm not ready to demo it yet, but just so you know that it's happening — I was able to componentize componentize-go. What I mean by that is: the steps that componentize-go does — it has bindings generation inside it, so it's got a couple of different steps; it's got the adapter step to adapt it to WASI P3 — all of that can actually be bundled into a component. That's the version I have right now, but I actually want a componentized version of really just wit-bindgen, because that's actually the interesting step that will work for any language. And if you have that componentized, then people can embed that into their system, into their plugins. What I got working is: I embedded that inside Helm. In Helm, I use — I don't know how I want to say it — wazero, not to be confused with actual WASI. That runtime is all written in Go, no CGo. And because I have that runtime embedded inside Helm, I can have Helm run componentize-go as a component, with adaption, and it can generate plugins that are also components, from a component, to be loaded inside the Helm runtime. Right now they have it where you can run processes as Helm plugins — that's obviously not super secure. And the goal there is also to prevent you from having to go download these other binaries. Like: oh, you want to do Wasm? Well, now you need wasm-tools, now you need componentize-go, now you need this adapter thingy, and it's going to download and mix all these things. No — just have the Helm binary, and we can bundle the rest. And then you can just use Helm to generate Helm plugins. That's a very specific example for Helm, but you can imagine any project that wants plugins, and wants to use components with it, can do the exact same thing. So yeah, that stuff's evolving really fast. If you haven't tried out componentized Go and you're doing Go, you should. Any other questions on Doc of the Week or that Go stuff? And actually, Eric, do you mind bringing up the other blog post that you created, about 2.7?
+
+**Eric Gregory** [6:11](https://youtu.be/7-CWNEDqYyQ?t=371)
+
+Absolutely. One moment. So here's our 2.7 release blog post, walking through our features at a glance.
+
+**Bailey Hayes** [6:39](https://youtu.be/7-CWNEDqYyQ?t=399)
+
+We went through this in detail on a call — what was coming in and everything — but I think this is a much easier thing to talk through. I just wanted to highlight that if you want to take advantage of the concurrency change that's called out here, you do have a step you have to take: you have to set max concurrency and the pool size, and that's well called out here. There's also a bunch more of the changes that are hard to run through on a call when it's coming off the top of my head from PRs, so I really appreciate having something more verbose than just release notes. I don't think anybody's looking at the release notes I'm creating when I cut the release for wasmCloud, because there are too many things in them — it is not for mere mortals to parse. So this has been helpful, at least for me, to talk about. I'm curious if other people are reading these, and if there's any feedback you have — anything we should add or change here to make it better for you, do let us know. All right. Well, as you can see in this bottom part here, where we've been adding pooling quotas and all kinds of different types of policy controls around capabilities — that's been a major effort of the last sprint, and it's going to continue in this one. So I figured I could talk through one of the PRs that we have up right now, which Aditya has been working on, and which I'm expecting to get into the next release. It's going to be a really great way to prevent spin locks — having a greedy, busy, noisy neighbor running on a host, and it not impacting other workloads and taking other people down. The approach that Aditya landed on is using the built-in epochs that Wasmtime provides. You can just think of it as a timer — timer-based, rather than doing instruction counting, which is what fuel-based metering does inside Wasmtime. Instruction counting is obviously deterministic, which is a good thing if you're charging money for those instructions, but a bad thing if all you're looking for is "don't let it go too long" — then you don't want to spend the cycles counting. You want to just cut it off once it's been too long, and that's where we've landed with the epoch work. One thing we were talking about before we started the call: Aditya was asking me, should we layer fuel metering on top of this? We do have it as a feature in the host right now — you can enable it on your Wasmtime engine config, and we surface a little bit of OTel metrics around it — but otherwise we don't have a ton of wasmCloud features built around fuel metering, largely because, like I said, it's very much for a very specific use case: I'm charging people for the instructions that I'm running, so it needs to be absolutely accurate and perfect, and I don't care that it's a little bit slower to get that. For us, for the most part, that's not why we're trying to do it — mostly we're just trying to prevent spin locks and people holding on to work, and work ceilings. I think right now it's about ready to land — Aditya said he's got a couple more changes to make, but then we'll get that one in. I've got two PRs that are up that are also in the policy, capability-based space — I think one we should talk through really fast. Here, I'll pull up my screen. This is Aditya's change — it's 5451. It's a fairly large, significant, large-T-shirt-size change. So if folks want to try this out and give us feedback, it would be very much appreciated before we cut the release on Tuesday. And if you don't — we're cutting the release anyways.
+
+<img src="/img/community/2026-08-19/image003.webp" alt="The wasmCloud pull request queue with the PRs in flight, including PR 5451: timeout hardening for guest code that spins CPU forever" />
+
+**Bailey Hayes** [11:24](https://youtu.be/7-CWNEDqYyQ?t=684)
+
+But I think we'd appreciate the extra help and usage to make sure at least the values make sense to you. I kind of am mad at myself. On the release I cut two weeks back: max invocations made a ton of sense to me, because I wrote it. But once other people started trying to use it, they assumed max invocations was the max number of concurrent invocations that are allowed to be in flight. And when you say that out loud, you're like — yeah, that makes sense. Oh crap! Because what I actually meant max invocations to mean is the max amount of invocations I do on an instance until I kill the instance. It should have been a refresh — I'm thinking "instance refresh limit" or something like that. The idea being: when you intend to run an ephemeral workload — I'm running a component, and I'm basically expecting to scale it down to zero, but I really want to take advantage of the max concurrent instances, so I want to have a pool of these things, have them be warm, have them quickly service these requests, and be able to concurrently service requests — there's a solid chance that state is going to accumulate or leak through this thing that was intended to be stateless. And not just that being a problem: in some components, like TinyGo, a lot of people choose to disable the garbage collector in TinyGo — that's sort of the default mode that people use, and it gets them a way smaller component. But guess what? You no longer have a garbage collector. So if you're assuming that it's running in a fire-and-then-tear-down mode, you're going to have a bad time, because it's going to continue growing memory over time. This gives you a knob to say: all right, at this point, just kill it, start over fresh, and then I won't have that state. So that's an example of — now, when we're doing these things, I want some more people to try it out and make sure all these new knobs are making a lot of sense, because this sprint and the last one are very much about introducing a bunch of policy configuration knobs. And on that point, we've got one more thing that I want folks to think about and give us feedback on — actually, two things. They're somewhat related, but way less related than they sound. This first one is one that Jeremy's working on. For the most part, what I've seen end users do is: they take wasmCloud, they deploy a host, and if they're in a service-mesh-like situation with either Linkerd or with Istio and Envoy, they have a sidecar container sit right next to the host. They're really happy with that, because that's still in the same local network of the pod when it's a sidecar container — really fast, really nice. But there are other cases where people have deployed, say, more of a load balancer or reverse proxy sitting in front of maybe multiple hosts. When they've done that, they really don't want to exit the local networking stack, because it's not a sidecar container for them, and in their case they don't have a network policy or a service mesh that has to sit in between this work. So in that scenario, you could flip on your own flag to say: okay, I know what I'm doing, one and two — I'm going to turn on local routing and have the host basically self-route on itself and not bounce all the way out. I'm interested in feedback on this one: if it makes sense to folks, if they really don't want us to add something like this, or if there are better alternatives. So this one is up right now.
+
+<img src="/img/community/2026-08-19/image004.webp" alt="PR 5399: Component local routing / same-host support — Jeremy Fleitz's proposal for hosts behind load balancers to self-route" />
+
+**Bailey Hayes** [15:46](https://youtu.be/7-CWNEDqYyQ?t=946)
+
+And then a second one that is kind of related: I want individual workloads to basically be able to self-route. This is really inspired by the same kind of feature that Docker has — docker internal. Right now, if you say localhost and you're in a workload and you're doing some kind of socket connection, you're going to get TCP loopback built in, and you're going to hit your service. That's the default, and the default is the most secure option that we can come up with — that's always going to be our answer here in wasmCloud. But you may choose to allow a virtual loopback and be able to say: no, no — I want to talk to my service, and I'm also going to do some other HTTP requests. Don't try to be too smart; I will make sure I'm using hostname routing. And the same thing on: actually, I'm going to talk HTTP, but on the same host — maybe there are some other services floating about on my host that I want to hit. So that is something else that we can add. This way, again, it lets people be very clear that they're not expecting to egress from the host, and they want to have that routing there. I'm not going to promise having this done by Tuesday, but it was something that I wanted to get drafted up to get early feedback on. And if people can give me use cases, so that I make sure that I'm hitting what your needs are, that would be really helpful for this one. So those are some of the PRs that are in flight, and I think that was the main stuff I wanted to cover. Any questions on any of that? Alrighty. Hey, Victor — would you be game to talk about the GitHub Action that you've gotten released today?
+
+<img src="/img/community/2026-08-19/image005.webp" alt="PR 5440: reserved internal DNS zone and host-published ports — service.wasmcloud.internal and host.wasmcloud.internal virtual loopback" />
+
+**Victor Adossi** [17:49](https://youtu.be/7-CWNEDqYyQ?t=1069)
+
+Yeah, sure. Let me share my screen real quick.
+
+**Bailey Hayes** [18:03](https://youtu.be/7-CWNEDqYyQ?t=1083)
+
+You can now.
+
+**Victor Adossi** [18:06](https://youtu.be/7-CWNEDqYyQ?t=1086)
+
+Okay, great. So hopefully y'all can see my screen now. So this is sort of a little-known project, I guess. Some people use it inside the BA — I know a bunch of the Bytecode Alliance projects use it, and in our projects we use it as well. WASI SDK is basically a toolchain that packages Clang — or "C-lang," depending on how you like to pronounce it — and the WASI sysroot. You can think of that as libc, but WASI-fied. It's what lets you easily build any languages that basically use Clang — let's say C and C++ — build those codebases into WebAssembly components. Setting up toolchains for C and C++ projects — there are lots of ways to do it, right? There's Ninja, there's Meson, there's CMake, there are all these other options. But basically, what all of those need to do is get a copy of essentially WASI SDK and wasi-libc. So this action and this repo help you get a released version of WASI SDK much more easily than you could otherwise — because otherwise, you have to find the right release, download the right release, unpack it, et cetera, et cetera, and install things. Ideally, using this action, that becomes basically two steps: you use the WASI SDK action — right now, the version we've actually got released today is 0.1.0; there will be a v1 very soon, but for now we're testing it out and making sure the release is good before putting out the v1 tag — and basically, you set this up, and at this point Clang is set up, and you should be able to compile C straight to WebAssembly. It should be as easy as this. Now, this has existed for a while. Everyone up until now has been using it basically via commit hashes, because you can do that if you have a repo that represents a GitHub Action. But we now have a proper version out. A lot of changes have gone in here — a whole bunch of stuff that's been landed over the years. I think this thing might have existed since last year, or at least earlier this year. But one of the interesting things worth highlighting — and this wasn't there before — is that you can actually use an experimental version, or basically a release-candidate version, of WASI SDK. There's a lot of work going on in WASI SDK and wasi-libc right now, especially with the threading stuff for P3, so being able to be on the cutting edge of WASI SDK is pretty useful. Right now, the latest version, I think, is 34.0-rc.2. So now you can actually set that up and then build C and C++ components really, really easily. We actually use this in JCO to test a P3 component that is built in C. Mendy, who works with us, submitted an issue to JCO using this newer toolchain — essentially a newer version of WASI SDK that is made so that you can run Clang with a target that is actually wasm32-wasip3. For us to run that from CI in JCO, and be able to build the component and run the component to use it as a fixture, we needed to make this change to the WASI SDK action — because we already used the WASI SDK action, but we could only pull a published version, and it's been a while since they published a full version; they've been going through RCs for a bit now.
+
+<img src="/img/community/2026-08-19/image006.webp" alt="The setup-wasi-sdk-action repository on GitHub, a Bytecode Alliance project, with the v0.1.0 release tagged" />
+
+**Victor Adossi** [22:37](https://youtu.be/7-CWNEDqYyQ?t=1357)
+
+So this thing is now on the marketplace. You can actually go out and just use it, and this should make workflows a whole lot easier. Again, right now the tag is actually 0.1.0. I'm going to test this really quickly myself to make sure it works just fine, and then we'll bump this to v1 — and hopefully we won't need any breaking changes or anything crazy anytime soon. But yeah, in general, this is out there. You can use it now. If you're building C and C++ projects in CI with WASI SDK, this should make your life a whole lot easier.
+
+**Bailey Hayes** [23:17](https://youtu.be/7-CWNEDqYyQ?t=1397)
+
+Thank you, Victor. You can also see on Victor's screen: Brett Cannon, who works on CPython, is using this as well. That's the main shout about being able to use the new RC — that's where we've got an implementation of cooperative threading in the ABI. And as Victor said, you can also directly target WASI P3: LLVM's next release will have wasm32-wasip3 as a known target, but you can use it today if you use this tool. So that's the main thing to call out there. Any questions on this one? All right, sweet. Hey, we have a new person on the call today — I just wanted to say hi and welcome. Adam, do you mind introducing yourself?
+
+**Adam de Delva** [24:16](https://youtu.be/7-CWNEDqYyQ?t=1456)
+
+Hello, wasmCloud community. Yeah, I'll be brief. I've been following the project — my former CTO, about four, three years ago, told me about this thing called Wasm. I'm like, okay. And then I tuned in about two years ago — I stopped Liam and I said hi. I said, my CTO told me to pay attention to you guys. And fast-forward two years later: now I have a group of engineers working on implementing Wasm with our architecture. I'm a former Microsoft digital app innovation specialist — my role at Microsoft was helping commercialize IP and put it into enterprise platforms and products. And my co-founder is an author of Docker — he wrote 92% of the original Docker source code. So now we're building using Wasm. I can officially say we're building effectively a portal that allows for compute to be heterogeneously scheduled — from data centers that may be owned by, let's say, a neo-cloud, to a developer portal that instantiates a Linux environment in Wasm, which then allows development to occur in-browser without needing to log into AWS for compute resources. So I paid attention to my CTO three years ago, and it got me back here. We are using quite a few Wasm components. The team includes members from Cisco, members from Google, members from AWS and Azure — I could go on and on about the team, but it's really about making sure that as Wasm scales, we have supported resources that are shared across development across our teams. The company is called BTR, by the way. We have a bunch of engineers; we want to start contributing to the upstream and basically supporting the project as we see it. So we've quietly been working and researching and stalking Liam, and now we're here.
+
+**Bailey Hayes** [26:17](https://youtu.be/7-CWNEDqYyQ?t=1577)
+
+That's awesome! Thank you, thank you, thank you. It's always really cool to hear how many people have been watching and waiting in the wings for us to get to a place where people can really start building and being really effective at what they're doing with Wasm. Awesome that you've got a real solid use case for it. Obviously, we've got lots of different people that do wasmCloud work, but also Bytecode Alliance and standards work, so it's definitely a good community to be connected to and ask questions. We can definitely route you to the right people if we don't already know the answer. If you're doing browser stuff, Victor is the guy to talk to — he's your maintainer for JCO, making it really easy for you to have bindings to JavaScript, and also being able to take JavaScript and turn it into a WebAssembly component. Yordis has an update — so yeah, thank you, Adam. And if you ever have a demo or anything you want to share — shout out to the community, just let us know, and we'll toss you on the agenda. We meet every Wednesday. Every Wednesday is a wasmCloud Wednesday.
+
+**Adam de Delva** [27:27](https://youtu.be/7-CWNEDqYyQ?t=1647)
+
+Saw that. Yeah, thank you. I'll send over my LinkedIn. We actually have a bunch of demos, and my favorite one right now is something called Hollow Spaces. We could talk through, especially from the developer side, how we're using Wasm in that exact use case. We basically underpinned the Wasm instance with our novel mathematics — and that is a whole rabbit hole — but the novel mathematics allows for simulated quantum effects on standard silicon, which then provides that as a browser type. So it's really going to be an interesting 2026 into 2027.
+
+**Bailey Hayes** [28:07](https://youtu.be/7-CWNEDqYyQ?t=1687)
+
+It sounds awesome. It sounds sci-fi. Can't wait to see it. Thank you. Yeah — Yordis, you got stuff you want to share?
+
+**Yordis Prieto** [28:29](https://youtu.be/7-CWNEDqYyQ?t=1709)
+
+Yeah, just a small update. I cannot share — Bailey, Bailey, are you doing your job over there as a host?
+
+**Bailey Hayes** [28:44](https://youtu.be/7-CWNEDqYyQ?t=1724)
+
+Nope, I fell asleep.
+
+**Liam Randall** [28:46](https://youtu.be/7-CWNEDqYyQ?t=1726)
+
+Hey, it's not me.
+
+**Yordis Prieto** [28:49](https://youtu.be/7-CWNEDqYyQ?t=1729)
+
+All right — so, incoming component model changes. I have this pull request here, 699. Effectively adding — allowing — top-level types. That's it. So you should be able to do now something like that, where your records, enums, resources are not there for no strong reason. Just simple steps right now, for what I actually need right away. But this one should allow you to have the top-level types if everything is merged. I already made it work in wasm-tools and bindgen.
+
+<img src="/img/community/2026-08-19/image007.webp" alt="Yordis Prieto's screen share of component-model PR 699 — Allow type declarations at package scope — showing the WIT.md design and encoding notes" />
+
+**Bailey Hayes** [29:36](https://youtu.be/7-CWNEDqYyQ?t=1776)
+
+I would expect this to be a big change. Well — previously, all types were associated with an interface. And if you already have it working, it must not have been as hard as I thought it should be.
+
+**Yordis Prieto** [29:55](https://youtu.be/7-CWNEDqYyQ?t=1795)
+
+No — primarily because there are two situations, right? I learned, by the way, that everything is self-contained in the WAT file. By the way, it drives me nuts, this WAT file. Oh my god. Don't tell Luke, but — whoever decided to use Lisp: I love you and I hate you at the same time.
+
+**Bailey Hayes** [30:14](https://youtu.be/7-CWNEDqYyQ?t=1814)
+
+Well, that was WebAssembly — but also Luke.
+
+**Yordis Prieto** [30:16](https://youtu.be/7-CWNEDqYyQ?t=1816)
+
+I do like data. Anyway — no, it was not that much work, primarily because it just behaved the same as before. Anyway, you would import all the types and give each an identity inside the WAT, right? So it's self-contained. Resolving the identity is what may be a tricky bit, but you already have a namespace — the package — so it acts as normal namespacing: okay, this belongs to the package directly. So it's not that problematic. You're just dropping one layer: instead of package-slash-API, everything will be just the package, and then right there you use it. There are a few weird things that I don't like — like the way you use it sometimes. For example, like this: that's now a type, which I kind of don't like, because I'd rather just do a dot here and point. But I'm kicking that can down the road and waiting for Luke.
+
+**Bailey Hayes** [31:21](https://youtu.be/7-CWNEDqYyQ?t=1881)
+
+In that example, I'd want your use definition inside the interface, so it's scoped there — or expanded so that you have a second interface, so that you can show that it's globally referenced between both.
+
+**Yordis Prieto** [31:32](https://youtu.be/7-CWNEDqYyQ?t=1892)
+
+I think you can do both — at least in the unit tests that I'm trying to put here. Half of these files are a lot of these things.
+
+**Bailey Hayes** [31:46](https://youtu.be/7-CWNEDqYyQ?t=1906)
+
+239? Did I just see that?
+
+**Yordis Prieto** [31:49](https://youtu.be/7-CWNEDqYyQ?t=1909)
+
+I mean, like I say, half of them is me being paranoid, until I run out of combinations and permutations — and the AI telling me, "yeah, dude, buddy, just stop." Okay, fine. I don't want to break anything, okay? So I'm permutating this; half of this is just unit-test artifacts and stuff like that. Anyway, in here there's already the combination of putting this over here, and putting this over here and over here, and failing if they conflict with each other.
+
+**Bailey Hayes** [32:25](https://youtu.be/7-CWNEDqYyQ?t=1945)
+
+Does it work with implements or external-id? Will you add a unit test for that?
+
+**Yordis Prieto** [32:32](https://youtu.be/7-CWNEDqYyQ?t=1952)
+
+Okay. Okay, Bailey. Thank you for giving me work. You see — I come here for like two things, and I leave with more work. Wait, let me take a note. It should —
+
+**Bailey Hayes** [32:46](https://youtu.be/7-CWNEDqYyQ?t=1966)
+
+But the problem is that I did implements. Implements is, by definition, an instance type on a world item. But if you can define types at a top level, and you can import them without having to import them through an interface — I'm not sure how that would show up in a world definition that had implements.
+
+**Yordis Prieto** [33:08](https://youtu.be/7-CWNEDqYyQ?t=1988)
+
+Let me get back to you. You see? Now — let me get back to you. Thank you, Bailey.
+
+**Bailey Hayes** [33:14](https://youtu.be/7-CWNEDqYyQ?t=1994)
+
+I just want to point out something funny, too. So — you guys, I actually think in WAT. That is how my brain works. And then anytime I have to try to do this WIT stuff, I'm like: I can already do it all in WAT. Why do I have to keep adding all of these ten new features when it's just right there? You can just do it now. So it's nice to hear what a normal human is like.
+
+**Yordis Prieto** [33:39](https://youtu.be/7-CWNEDqYyQ?t=2019)
+
+Yeah — you're crazy. If you think this is actually beautiful to deal with — oh my god. Nah, nah.
+
+**Bailey Hayes** [33:47](https://youtu.be/7-CWNEDqYyQ?t=2027)
+
+Well, you could do everything — literally, 70% of the features we've been adding to the component model, you could have already done the whole time.
+
+**Yordis Prieto** [33:56](https://youtu.be/7-CWNEDqYyQ?t=2036)
+
+You could have just written binary as well. Exactly. Programming by assembly.
+
+**Bailey Hayes** [34:05](https://youtu.be/7-CWNEDqYyQ?t=2045)
+
+Yes. You know, Oscar Spencer — one of my favorite people in the WebAssembly space — actually wrote a Python interpreter on stage, live, in WAT. If you haven't seen that talk, you should see it. Maybe some of us are just truly broken.
+
+**Yordis Prieto** [34:25](https://youtu.be/7-CWNEDqYyQ?t=2065)
+
+That's why people pick Lisp — data and programming are the exact same thing, so you get really, really beautiful things with that language. Anyway — so that's the update thus far. I made it work in wasm-tools; the WIT side I had to go back to, because I broke some changes there, but the bindings are also there. So by now, I'm just waiting for people to code-review this one — primarily because folks will say, you know, "okay, what about these cases?"
+
+**Bailey Hayes** [35:09](https://youtu.be/7-CWNEDqYyQ?t=2109)
+
+Well, that's awesome. Thank you for doing that, Yordis. I mean, the one I'm most excited about is your annotation stuff. But you have to do that so that you can have them in the annotation — is that basically why?
+
+**Yordis Prieto** [35:20](https://youtu.be/7-CWNEDqYyQ?t=2120)
+
+Yeah, yeah. So first of all, Luke already has other use cases where people keep saying, "please give me this as well." But the goal that I have is this one — 695, which is the annotations we talked about before, right? Where we would have — wait, where did it go? Where did my example go?
+
+**Bailey Hayes** [35:47](https://youtu.be/7-CWNEDqYyQ?t=2147)
+
+Well, that's the type declaration. You need your annotations.
+
+**Yordis Prieto** [35:51](https://youtu.be/7-CWNEDqYyQ?t=2151)
+
+I'm not in the correct one — okay, I'm like, what the heck is this? Here. Okay, sorry. Yeah — so technically, my goal is this one, where we would need to do something like that. So you'd be like: hey, this type is an annotation type, right? But at this point, your package is no longer about interfaces or the world. Now you could have a complete package that is just about the types, for the sake of the annotations. That's why they're allowed at the top level. It's like a bundle of types, I guess, and then you would just annotate with the name of the package, the type, and then the inputs that are effectively the type that is pointed to. So this is the goal.
+
+<img src="/img/community/2026-08-19/image008.webp" alt="Component-model issue 695 — WIT: declare as a package-scope type, apply with @annotate — the annotations proposal that top-level types unlock" />
+
+**Bailey Hayes** [36:40](https://youtu.be/7-CWNEDqYyQ?t=2200)
+
+You asked me to add to this last week, and I didn't do it — and it's still actually on a piece of paper in front of me right now, I promise. But that paper also looks like nonsense. I will get to it as soon as I can. I want to write in here why I want to use this: I want to be able to define basically domain-type APIs — like interacting with GitHub — have them all there, but then be able to delineate between what's doing a read and what's doing a write.
+
+**Yordis Prieto** [37:13](https://youtu.be/7-CWNEDqYyQ?t=2233)
+
+Yep. Well, leave that comment here — it's better for others. I mean, Luke is already on board, but it's better for other people to understand why this is needed. But my goal is this one. That one is first needed because we need to just allow packages with just types in them.
+
+**Bailey Hayes** [37:35](https://youtu.be/7-CWNEDqYyQ?t=2255)
+
+Cool. Any questions for Yordis, y'all? I just gave him a pop quiz. Anybody else want to? All right — you're off the hook now. Nobody's interested —
+
+**Yordis Prieto** [37:49](https://youtu.be/7-CWNEDqYyQ?t=2269)
+
+— in giving me more work.
+
+**Bailey Hayes** [37:50](https://youtu.be/7-CWNEDqYyQ?t=2270)
+
+I can keep thinking of them. I think this all started when you had asked me, "what could I do?" and I'm like, well, there's this thing that I've always wanted. So I'm feeling good about that. Please keep coming to the community call so that we can totally keep sharing work. Well, everybody, this is it for the agenda. I've run out of things that I have to talk about — but if anybody has one more topic —
+
+**Adam de Delva** [38:18](https://youtu.be/7-CWNEDqYyQ?t=2298)
+
+One of my engineers just asked a question — their only question, and apologies if this is not on course; this is real time, and they're not on the call. Let me read it directly: if they are doing wasmCloud networking, is there use of tracers through a reverse SOCKS proxy?
+
+**Bailey Hayes** [38:47](https://youtu.be/7-CWNEDqYyQ?t=2327)
+
+Okay. So, the way that the wasmCloud host itself works: right now you have two different built-in host capabilities, and you can build your own — and I think you guys, from when I was just looking, should build your own — and you can build your own natively. We have a Rust macro for building a plugin, and if you want to do anything like a SOCKS proxy, you could build that into your host. For us, the most common thing for networking in is that you're running wasmCloud in Kubernetes — that's our happy path. You're running in Kubernetes, you're coming in through some load balancer, and then you hit either our runtime gateway or you have some type of ingress configured. We support the gamut in terms of all the different options — you're using Gateway, or using Ingress, or using whatever — you can configure that in our Helm chart and get what you want. It will go through that ingress, which is usually some kind of reverse proxy, and then it will land on our host, which is listening on an HTTP port. That's the basics. But so much of wasmCloud — and actually, it's fun to call this out; I didn't go too in-depth on this — my product embeds wasmCloud open source, and what that basically means is I build my own custom host. So I'm constantly dogfooding a couple of different things, but essentially one of them is, as an embedder, building my own host. There are certain things that I want to make sure are really nice and ergonomic on our API — on our wash-runtime API and our host-builder APIs. You can see that every once in a while, dogfooding it, I catch things that can be improved on our side. But in our docs, Eric wrote a really great walkthrough on how to build your own host. Eric, are you on? Why am I messing up here?
+
+**Eric Gregory** [41:15](https://youtu.be/7-CWNEDqYyQ?t=2475)
+
+Yeah, that should be under — oh, go on.
+
+**Bailey Hayes** [41:24](https://youtu.be/7-CWNEDqYyQ?t=2484)
+
+Runtime. Found it. Okay, I'm so sorry — I was so slow. So we have Building Custom Hosts, and the reason why you build your own host is that potentially you've added a native plugin. We build in all of the WASI capabilities, but in a lot of cases you may want to add your own, and there may be new WASI proposals that aren't standardized yet that you want to go ahead and add. An example of that would be wasi-webgpu — we actually already build that one in as well — but there are plenty of cases where you're doing I/O, networking, hardware-specific APIs, where you would want to build your own host. We lean into this really hard, and it has production use cases. So — a full walkthrough on how to do your own host plugins. And the stuff that I was massaging yesterday is about making sure that you have type checks when you're messing with all of these options. So yeah — anyways.
+
+<img src="/img/community/2026-08-19/image009.webp" alt="The Creating Host Plugins page in the wasmCloud docs, showing the HostPlugin trait for extending hosts with additional capabilities" />
+
+**Adam de Delva** [42:29](https://youtu.be/7-CWNEDqYyQ?t=2549)
+
+Thank you.
+
+**Bailey Hayes** [42:41](https://youtu.be/7-CWNEDqYyQ?t=2561)
+
+Alrighty. Well, if anybody has anything else — I guess we get eleven minutes back. I'm going to try to get at least one or two issues filed before I move on to the next thing. I'm also going to be doing WASI issue triaging tomorrow in the WASI subgroup meeting. So if folks are interested in that, and you're already part of the WASI SG, come join me in looking at the past. Starting in 2019, there are issues that have not been triaged. It'll be fun, or hard — I don't know. But if you join me, it'll definitely be fun.
+
+**Yordis Prieto** [43:24](https://youtu.be/7-CWNEDqYyQ?t=2604)
+
+How do we join in?
+
+**Bailey Hayes** [43:26](https://youtu.be/7-CWNEDqYyQ?t=2606)
+
+Oh, okay. So, if you haven't joined the WebAssembly Community Group, let me drop a link to that. Basically, first you have to join this. When you join any W3C call, you go here, you do "join," and then it will ask you to log in — and if you haven't created an account, go create one. Oh — it thinks I'm a bot. And then basically, you're going to say: I won't patent anything that I hear on this call. That's sort of the TL;DR. I won't set up royalties; I won't do any patents. Once you've signed off on that, then you get access. I have a hard time getting to it from this page, so I'm just going to Google "community calendar" one more time. Then, to get to it, you can join the WASI subgroup community calendar — but you can't get to it until you've logged into the W3C community group, and that's how you can join. You can also DM me, and I will send you a link — but I want you to sign the no-royalties rule first, and then you can join. That's how we protect open standards.
+
+**Yordis Prieto** [44:50](https://youtu.be/7-CWNEDqYyQ?t=2690)
+
+Sounds good. Thank you for this.
+
+**Liam Randall** [44:58](https://youtu.be/7-CWNEDqYyQ?t=2698)
+
+To be fair, Bailey — sometimes I think you're a bot, based on what you accomplish. I mean, you do have "AI" in your name.
+
+**Bailey Hayes** [45:06](https://youtu.be/7-CWNEDqYyQ?t=2706)
+
+That is kind of great. Yeah, thanks — didn't realize that until now, which is kind of funny. It is my name.
+
+**Yordis Prieto** [45:15](https://youtu.be/7-CWNEDqYyQ?t=2715)
+
+I think — how do you retain all this information in your head? Is it because you repeat it every day? What the heck is this? I'm taking this note into my graph. Hold on — jungle.
+
+**Bailey Hayes** [45:25](https://youtu.be/7-CWNEDqYyQ?t=2725)
+
+No — you didn't have this already in your graph? You're slipping.
+
+**Yordis Prieto** [45:28](https://youtu.be/7-CWNEDqYyQ?t=2728)
+
+No, I'm adding it.
+
+**Liam Randall** [45:31](https://youtu.be/7-CWNEDqYyQ?t=2731)
+
+And then the next two letters are L, L. Oh wait — L, like large language? I don't know.
+
+**Bailey Hayes** [45:37](https://youtu.be/7-CWNEDqYyQ?t=2737)
+
+You're stretching it. Well — I'm the chair of this meeting, so that is why I have this information. I'm the one person who's supposed to have it. So yeah — contributions welcome. It is a standards meeting, which means it's supposed to be dry, but I try to make it as fun as I can. Basically, we've got a lot of different questions, a lot of different things that were false starts that'll never actually be real, since WASI was established in December 2019. Obviously, WASI P1 was a whole era — some of these things are from prior to WASI P1, even. So it'll be a journey.
+
+**Yordis Prieto** [46:23](https://youtu.be/7-CWNEDqYyQ?t=2783)
+
+What is coming in WASI P4?
+
+**Bailey Hayes** [46:27](https://youtu.be/7-CWNEDqYyQ?t=2787)
+
+There's going to be no WASI P4.
+
+**Yordis Prieto** [46:30](https://youtu.be/7-CWNEDqYyQ?t=2790)
+
+Is that perfect? That's it?
+
+**Bailey Hayes** [46:33](https://youtu.be/7-CWNEDqYyQ?t=2793)
+
+No, nope. There's definitely already stuff that we want to change. However, we can do all of this basically on top of P3, where we do additive-only changes in P3 — so, no breaking changes. When you say, "I've got a better API than what I had before," you just add the other version of that, right? Just add it. Don't change the API that you wish you had done differently the first time. One case is: hey, I wouldn't have introduced the separate world for the handler. Liam actually filed this issue during our last meeting — if he had had access to the component model feature of implements, he could actually get rid of that world and say, well, now you can just do an implementation of these already-established worlds. Instead, that's really just a WIT doc comment talking about the way that you can consume this differently. And then we are filing issues for when we do 1.0 — all we're going to be doing is shaving off warts. So in that scenario, where he's like, "well, I wouldn't have even created another world if I had the implements feature" — we're just going to delete the world in 1.0. The move from WASI P3 to 1.0 will be intentionally breaking. But everything that you're going to try to do in 1.0 will be in P3, so you will have a deprecation path — you'll be able to move to it, and then allow us to shave off warts. And in theory, the move from P3 to 1.0 won't be too painful. Yeah — no P4. You've heard it here. And if people start talking about that, I'm going to be real hot. We're going to have to talk, because we're so close. We have the native async — that was the hardest, biggest lift. And I do want to call out that between P2 and P3, that was non-breaking. It was a huge lift, and we didn't break anything — that was additive-only, which is pretty freaking cool. That's why I'm very positive that we can get there on the base that we've built. And we've got continuous releases — the next one is October 12th or something. I will be cutting that next, and my goal is to have cooperative threads in there, like what we were talking about with why you should try out the new WASI SDK right now. I'm also jockeying for a couple of major features — I'm kind of scared to say them out loud, because I might freak somebody out. But things like — maybe Yordis' work would be huge to land by then and get into WASI 0.3.2, because we've already cut 0.3.1.
+
+**Yordis Prieto** [49:20](https://youtu.be/7-CWNEDqYyQ?t=2960)
+
+Bailey, I have a question for you — because, since I'm the one who's touching these new things in WIT the most, the question is: how can I tell which version of WIT you generated the things with, from the runtime, and be able to deal with the shenanigans there?
+
+**Bailey Hayes** [49:41](https://youtu.be/7-CWNEDqYyQ?t=2981)
+
+It's got a version identifier in it, in the ABI — not in the WIT, but in the component model ABI. So, in the .wasm. Not only that: there's a little bit of human here, where Luke is managing a table of gates — which ones have been admitted to which release of WASI — and that's where they're basically ungated features that everybody can consume.
+
+**Yordis Prieto** [50:19](https://youtu.be/7-CWNEDqYyQ?t=3019)
+
+Okay. Sorry — I can't look it up myself, but I'm just trying to be human. What is in that .wasm, per se? Its version? Is this from bindgen, or the WIT, or what?
+
+**Bailey Hayes** [50:36](https://youtu.be/7-CWNEDqYyQ?t=3036)
+
+There is a version in the ABI. One second, let me find it. I always have a hard time going through the design spec space — I don't know if you guys have felt that.
+
+**Yordis Prieto** [50:54](https://youtu.be/7-CWNEDqYyQ?t=3054)
+
+I felt bad for Luke, to be honest, because I asked him this time — I said, hey, let me do the pull request and the issue for the component model — but then I'm running into silly things that most likely are just obvious to him, and I have to learn all of this: the WIT file, and the other one — no, no, the WAT — and the — what is the other file?
+
+**Bailey Hayes** [51:17](https://youtu.be/7-CWNEDqYyQ?t=3077)
+
+Canonical ABI — that's where I'm looking right now, because that's where I think it should be, but it's not —
+
+**Yordis Prieto** [51:24](https://youtu.be/7-CWNEDqYyQ?t=3084)
+
+The Explainer. Like, okay — some stuff is in the Explainer, the other is in the WIT, and — oh my god. And here I am, trying to learn.
+
+**Bailey Hayes** [51:34](https://youtu.be/7-CWNEDqYyQ?t=3094)
+
+All right, it took me a million and one years, but I got there. Here — this is what you're looking for.
+
+<img src="/img/community/2026-08-19/image010.webp" alt="The component-model Binary.md specification showing the component definitions and the version field in the binary preamble" />
+
+**Yordis Prieto** [51:41](https://youtu.be/7-CWNEDqYyQ?t=3101)
+
+Okay — ah, you see? So it's in the binary. You see, it's just another jungle. You know what? Let me add this jungle sword to my jungle thingy.
+
+**Bailey Hayes** [51:50](https://youtu.be/7-CWNEDqYyQ?t=3110)
+
+I think some people haven't seen it — you should show us your latest version while you do that.
+
+**Yordis Prieto** [51:57](https://youtu.be/7-CWNEDqYyQ?t=3117)
+
+Yeah — wait, hold on. I can add — let me do that.
+
+**Liam Randall** [52:06](https://youtu.be/7-CWNEDqYyQ?t=3126)
+
+Have a great day, everybody. Adam, it's great to see you again, by the way — don't be a stranger. Join the wasmCloud Slack; get your team on there. As Bailey mentioned, there's no shortage of great ideas for us to collaborate on, and what I've always loved about WebAssembly and CNCF and open source and cloud is that it's really just about building better together.
+
+**Adam de Delva** [52:26](https://youtu.be/7-CWNEDqYyQ?t=3146)
+
+That's right. Thank you. See you.
+
+**Liam Randall** [52:28](https://youtu.be/7-CWNEDqYyQ?t=3148)
+
+Yeah. Have a great day. See you guys.
+
+**Yordis Prieto** [52:31](https://youtu.be/7-CWNEDqYyQ?t=3151)
+
+Bye-bye. Oh, he left. Yeah — the jungle. Where I'm at with the jungle. Hold on. What the heck is this? I'm so lost right now. Give me a second.
+
+**Bailey Hayes** [52:54](https://youtu.be/7-CWNEDqYyQ?t=3174)
+
+You're lost in the jungle — is that what you're saying?
+
+**Yordis Prieto** [52:55](https://youtu.be/7-CWNEDqYyQ?t=3175)
+
+I am. Hey — have you seen this? This is just my weekly jungle thingy. Now I can add relationships between people — I added context, so you could see, between these two, who they are. I need to make some jokes in the profiles, because this is my jungle. Anyway — so yeah, this is what I have thus far. Okay, should I put the people over here? Because it's really difficult — why the heck is Victor on this side? It would be more like —
+
+**Bailey Hayes** [53:53](https://youtu.be/7-CWNEDqYyQ?t=3233)
+
+Well, that's the challenge, right? Because really, whenever you look at us, you'll see that our hands are in a couple of different boxes here.
+
+**Yordis Prieto** [54:06](https://youtu.be/7-CWNEDqYyQ?t=3246)
+
+Yeah — maybe I should just put the people over here in their own graph and then point into these things. Because, Victor, you should be closer to me here than there.
+
+<img src="/img/community/2026-08-19/image011.webp" alt="Yordis Prieto's knowledge graph of the WebAssembly component ecosystem — his 'jungle' — mapping projects like JCO, ComponentizeJS, AssemblyScript, and the WASI previews" />
+
+**Victor Adossi** [54:22](https://youtu.be/7-CWNEDqYyQ?t=3262)
+
+Oh, but I also work on ComponentizeJS as well.
+
+**Yordis Prieto** [54:28](https://youtu.be/7-CWNEDqYyQ?t=3268)
+
+Yeah, that's what I'm trying to say. So — am I going to continue doing this? Like, yes or yes. This is basically me documenting Bailey's brain. If you're wondering what Bailey does — go ahead, click on that guy. Look at that. This is like halfway done.
+
+**Victor Adossi** [54:45](https://youtu.be/7-CWNEDqYyQ?t=3285)
+
+I'm glad we're being cheerful about the surveillance apparatus you're building.
+
+**Yordis Prieto** [55:00](https://youtu.be/7-CWNEDqYyQ?t=3300)
+
+For people that don't know: in this call, one of these technically needs to expand, and I have to include a branch that is literally a Git branch, because behind it there are multiple things in it.
+
+**Victor Adossi** [55:15](https://youtu.be/7-CWNEDqYyQ?t=3315)
+
+Is this all vibe-coded? Yeah? I mean, come on — really, can you go 3D?
+
+**Yordis Prieto** [55:23](https://youtu.be/7-CWNEDqYyQ?t=3323)
+
+I thought — you know, I had the conversation. I wanted to do it like a Pokémon game, but then I'm like: why would people be walking around to see — at some point it's not going to be productive. But yes, it could be 3D.
+
+**Victor Adossi** [55:41](https://youtu.be/7-CWNEDqYyQ?t=3341)
+
+Just a graph might be okay. Just a graph. I don't think you have to make it a game. But anyway.
+
+**Yordis Prieto** [55:50](https://youtu.be/7-CWNEDqYyQ?t=3350)
+
+Yeah, but yeah — it's vibe-coded. I just keep adding to it: hey, here's the information about it. I already had to add the Bailey one today. And I may just put all the people over here. I don't know who this person is, but he's alone over there.
+
+**Bailey Hayes** [56:13](https://youtu.be/7-CWNEDqYyQ?t=3373)
+
+Okay, this is worth talking about. Bobby Holley is CTO of Firefox. He is on the board for the Bytecode Alliance, and he is a total awesome dude. Hang on — I need to turn off the live stream so I can actually say what I want to say.
