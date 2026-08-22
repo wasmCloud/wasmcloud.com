@@ -1,0 +1,182 @@
+---
+date: '2026-08-19'
+title: 'Go WebAssembly Toolchains Compared, a WASI SDK GitHub Action, and Top-Level WIT Types'
+description: 'The rewritten Go WebAssembly guide weighs TinyGo against componentize-go, Victor Adossi ships a WASI SDK GitHub Action for C/C++, and top-level WIT types land.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - go webassembly
+  - go wasm
+  - tinygo
+  - wasm component model
+  - wasi sdk
+  - componentize-go
+  - github actions
+  - wit
+  - wasi
+  - webassembly news
+chapters:
+  - { seconds: 8, label: "Welcome and agenda" }
+  - { seconds: 53, label: "Doc of the Week: the rewritten Go language guide" }
+  - { seconds: 154, label: "Hot take: pick componentized Go — and componentize componentize-go" }
+  - { seconds: 371, label: "wasmCloud 2.7 release blog walkthrough" }
+  - { seconds: 474, label: "Epoch vs fuel: cutting off runaway guest code" }
+  - { seconds: 684, label: "Renaming max invocations: the instance refresh limit" }
+  - { seconds: 850, label: "Local routing for hosts behind load balancers" }
+  - { seconds: 946, label: "Virtual loopback: service.wasmcloud.internal for workloads" }
+  - { seconds: 1069, label: "Victor demos the WASI SDK GitHub Action v0.1.0" }
+  - { seconds: 1456, label: "New face: Adam de Delva on BTR's Wasm compute portal" }
+  - { seconds: 1709, label: "Top-level types land in the Wasm component model (PR #699)" }
+  - { seconds: 2120, label: "Annotations next: the #695 use case" }
+  - { seconds: 2298, label: "Q&A: ingress, reverse proxies, and custom hosts" }
+  - { seconds: 2561, label: "Join the WASI subgroup: issue triage from 2019" }
+  - { seconds: 2787, label: "No WASI P4: the intentionally breaking road to 1.0" }
+  - { seconds: 3117, label: "Yordis' component-ecosystem knowledge graph and wrap-up" }
+image: https://i.ytimg.com/vi/7-CWNEDqYyQ/maxresdefault.jpg
+duration: 3390
+showTitle: true
+slug: 2026-08-19-community-meeting
+speakers:
+  - bailey-hayes
+  - eric-gregory
+  - victor-adossi
+  - adam-de-delva
+  - yordis-prieto
+  - liam-randall
+about: wasmCloud
+mentions:
+  - Go
+  - TinyGo
+  - componentize-go
+  - WASI
+  - ComponentModel
+  - JCO
+  - Wasmtime
+---
+
+import YouTube from 'react-player/youtube';
+
+{/* Video hero — the whole point of this page */}
+
+<YouTube url="https://www.youtube.com/watch?v=7-CWNEDqYyQ" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=7-CWNEDqYyQ" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The August 19, 2026 wasmCloud community call is a tour of the **Go WebAssembly** toolchain landscape and the standards work underneath it. Eric Gregory presents the rewritten [Go language guide](/docs/wash/developer-guide/language-support/go/) — TinyGo versus componentized Go, trade-off by trade-off — and Bailey Hayes makes the case for skating to where the puck is heading: **componentize-go**, with cooperative threading for goroutines on the horizon. Victor Adossi ships a [WASI SDK GitHub Action](https://github.com/bytecodealliance/setup-wasi-sdk-action) that turns C/C++-to-Wasm builds into two steps of CI, Yordis Prieto lands top-level types in the **Wasm component model**, and newcomer Adam de Delva introduces BTR's Wasm-powered compute portal.
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **The Go language guide now covers both toolchains honestly** — the ecosystem leaned on TinyGo through v1 and early v2, but the rewritten guide breaks down TinyGo and componentized Go side by side: compiler, path to a component, bindings generator, and support library, so Go developers can pick the right path instead of being funneled down one
+- **Bailey's hot take: just pick componentize-go** — when goroutines run natively on cooperative threading within WASI, the componentized Go toolchain will be "so screaming fast and nice that any other option is just gonna be kind of weird"
+- **componentize-go itself is now a component** — Bailey bundled its bindings generation and adapter steps into a Wasm component, embedded the wazero runtime (pure Go, no CGo) inside Helm, and had Helm generate its own Wasm plugins from a component; the same pattern works for any project that wants sandboxed plugins without downloading a toolchain zoo
+- **Docs got LLM-friendly** — new contributor Shreya added a copy dropdown to every v2 docs page: copy the page as Markdown, view the Markdown source, or grab the llms.txt link
+- **Epoch beats fuel for wasmCloud's hardening** — Aditya's timeout-hardening PR ([#5451](https://github.com/wasmCloud/wasmCloud/pull/5451)) uses Wasmtime's timer-based epoch interruption rather than fuel's deterministic instruction counting, which only pays for itself if you're billing per instruction; the release cuts Tuesday with or without your feedback
+- **"Max invocations" is being rethought as an instance refresh limit** — users assumed it meant max concurrent invocations in flight; it actually caps invocations per instance before the instance is killed and refreshed — essential for nominally stateless components that accumulate state, like TinyGo builds with the garbage collector disabled
+- **Two routing proposals want your use cases** — [#5399](https://github.com/wasmCloud/wasmCloud/pull/5399) lets a host behind a load balancer self-route instead of egressing the network stack, and [#5440](https://github.com/wasmCloud/wasmCloud/pull/5440) gives workloads a Docker-style virtual loopback via `service.wasmcloud.internal` and `host.wasmcloud.internal`
+- **The WASI SDK GitHub Action hit v0.1.0** — Clang plus wasi-libc set up in two steps of CI, with release-candidate support (WASI SDK 34.0-rc.2) so you can target `wasm32-wasip3` and cooperative threading today; JCO already uses it to test P3 components built in C, and Brett Cannon is using it for CPython
+- **Top-level WIT types are real** — Yordis' [component-model PR #699](https://github.com/WebAssembly/component-model/pull/699) lets records, enums, and resources live at package scope, already working in wasm-tools and bindgen; it's the prerequisite for [annotations (#695)](https://github.com/WebAssembly/component-model/issues/695), and Bailey assigned homework: unit tests for how it interacts with `implements` and `external-id`
+- **There will be no WASI P4** — everything stays additive on P3; the move to 1.0 will be intentionally breaking only to shave off warts, with a deprecation path guaranteed, and the next continuous release (~October 12) aims to include cooperative threads
+
+## Chapters
+
+- [0:08 — Welcome and agenda](https://youtu.be/7-CWNEDqYyQ?t=8)
+- [0:53 — Doc of the Week: the rewritten Go language guide](https://youtu.be/7-CWNEDqYyQ?t=53)
+- [2:34 — Hot take: pick componentized Go — and componentize componentize-go](https://youtu.be/7-CWNEDqYyQ?t=154)
+- [6:11 — wasmCloud 2.7 release blog walkthrough](https://youtu.be/7-CWNEDqYyQ?t=371)
+- [7:54 — Epoch vs fuel: cutting off runaway guest code](https://youtu.be/7-CWNEDqYyQ?t=474)
+- [11:24 — Renaming max invocations: the instance refresh limit](https://youtu.be/7-CWNEDqYyQ?t=684)
+- [14:10 — Local routing for hosts behind load balancers](https://youtu.be/7-CWNEDqYyQ?t=850)
+- [15:46 — Virtual loopback: service.wasmcloud.internal for workloads](https://youtu.be/7-CWNEDqYyQ?t=946)
+- [17:49 — Victor demos the WASI SDK GitHub Action v0.1.0](https://youtu.be/7-CWNEDqYyQ?t=1069)
+- [24:16 — New face: Adam de Delva on BTR's Wasm compute portal](https://youtu.be/7-CWNEDqYyQ?t=1456)
+- [28:29 — Top-level types land in the Wasm component model (PR #699)](https://youtu.be/7-CWNEDqYyQ?t=1709)
+- [35:20 — Annotations next: the #695 use case](https://youtu.be/7-CWNEDqYyQ?t=2120)
+- [38:18 — Q&A: ingress, reverse proxies, and custom hosts](https://youtu.be/7-CWNEDqYyQ?t=2298)
+- [42:41 — Join the WASI subgroup: issue triage from 2019](https://youtu.be/7-CWNEDqYyQ?t=2561)
+- [46:27 — No WASI P4: the intentionally breaking road to 1.0](https://youtu.be/7-CWNEDqYyQ?t=2787)
+- [51:57 — Yordis' component-ecosystem knowledge graph and wrap-up](https://youtu.be/7-CWNEDqYyQ?t=3117)
+
+## Meeting Notes
+
+### Doc of the Week: One Go Guide, Two Toolchains
+
+Eric Gregory opened with the totally rewritten **[Go language guide](/docs/wash/developer-guide/language-support/go/)**. Historically, the wasmCloud ecosystem leaned into **TinyGo** for building WebAssembly components from Go — especially in v1 and early v2 — at the expense of the newer **componentized Go** approach. Rather than pushing readers down a single path, the guide now breaks both options down mechanically: which compiler you run (TinyGo's LLVM-based `tinygo` versus the stock `go` toolchain), how each gets from Go source to a **[WebAssembly component](/docs/overview/workloads/components/)**, which bindings generator is involved (wit-bindgen-go versus componentize-go's bindings), and what support libraries you build on — with clear trade-offs and the situations that favor each toolchain. Eric also shouted out a new contributor, **Shreya**, who added a copy dropdown to every v2 docs page across two PRs: copy the page's Markdown for LLMs, view the Markdown source, or copy the llms.txt link.
+
+Bailey's self-declared hot take followed: her goal is for the decision to become a non-decision. "I want us all to skate towards where the puck is heading" — and that's **componentized Go**, because once goroutines run natively on **cooperative threading** within WASI, that path will be "so screaming fast and nice that any other option is just gonna be kind of weird and off the beaten path."
+
+### Componentizing componentize-go: Wasm Plugins for Helm
+
+Not ready to demo, but too good not to trail: Bailey **componentized componentize-go** itself. The insight is that componentize-go's internal steps — bindings generation, the adapter that lifts a Go module to a WASI P3 component — can themselves be bundled into a Wasm component. What she really wants is a componentized **wit-bindgen**, the step that generalizes to every language. The proof of concept is delightful: she embedded [wazero](https://wazero.dev/) — the WebAssembly runtime written in pure Go, no CGo — inside **Helm**, so Helm can run a componentized componentize-go as a component and generate Helm plugins that are themselves components, loadable inside Helm's runtime. Today Helm plugins run as external processes ("obviously not super secure"), and Wasm-curious users are told to download wasm-tools, componentize-go, and an adapter first. Instead: just the Helm binary, everything else bundled. The pattern applies to any project that wants sandboxed, componentized plugins — a direct echo of wasmCloud's own [host plugin](/docs/overview/hosts/plugins/) architecture.
+
+### wasmCloud 2.7 in Print, and Epoch over Fuel
+
+Eric brought up his **[wasmCloud 2.7 release blog post](/blog/wasmcloud-2-7-release/)**, and Bailey used it to re-run the release at a humane pace — the raw release notes, she conceded, are "not for mere mortals to parse." The one action item for users: to get the new concurrency behavior, you must set **`maxConcurrency` and `poolSize`** yourself. From the policy-controls section of the release, the discussion moved to what's next: Aditya's **timeout hardening for guest code that spins CPU forever** ([PR #5451](https://github.com/wasmCloud/wasmCloud/pull/5451)), expected in the release being cut Tuesday. Bailey explained the design choice in Wasmtime terms: **fuel-based metering** counts instructions, which is deterministic — exactly what you want if you're charging money per instruction, and wasmCloud does surface some OpenTelemetry metrics around it — but you pay for that accuracy. **Epoch interruption** is just a timer: don't count, just cut it off when it's been too long. For preventing spin locks and noisy neighbors on a shared host, the timer wins.
+
+### New Knobs: The Instance Refresh Limit
+
+Bailey then did some public penance over a name. The **max invocations** setting she shipped two weeks earlier made perfect sense to its author — and everyone who tried it assumed it meant the maximum number of *concurrent invocations in flight*. What it actually means: the number of invocations an instance serves before the host **kills and refreshes it**. She's now thinking of it as an *instance refresh limit*. The scenario it serves is subtle and real: an ephemeral, scale-to-zero workload using warm pooled instances for fast, concurrent service can quietly accumulate state that was never supposed to persist. The sharpest case is **TinyGo with the garbage collector disabled** — a popular default, since it yields a much smaller component. No GC plus long-lived instances equals memory that grows forever; the refresh limit gives operators a clean "at this point, start over fresh" knob. This sprint and the last are deliberately about surfacing policy knobs, and Bailey asked people to try them — "the release is Tuesday, and if you don't [give feedback], we're cutting the release anyways."
+
+### Two Routing Proposals Looking for Feedback
+
+Two related drafts round out the networking work. The first, which Jeremy Fleitz is driving ([PR #5399](https://github.com/wasmCloud/wasmCloud/pull/5399)), targets deployments where wasmCloud sits behind a **load balancer or reverse proxy** rather than a service-mesh sidecar. Sidecar users (Linkerd, Istio/Envoy) are happy — the proxy shares the pod's local network. But when there's no mesh or network policy between hosts, forcing traffic to exit the machine just to come back is pure waste; the draft adds an explicit "I know what I'm doing" flag for **local self-routing**. The second ([PR #5440](https://github.com/wasmCloud/wasmCloud/pull/5440)) is the workload-level counterpart, inspired by Docker's internal DNS: today `localhost` inside a workload hits the built-in TCP loopback — the most secure default — but a workload that knows it wants hostname routing could opt into a **virtual loopback** via `service.wasmcloud.internal` (the workload's own service) or `host.wasmcloud.internal` (services elsewhere on the same host), never egressing the host. Bailey wants concrete use cases before either lands.
+
+### Victor Ships the WASI SDK GitHub Action
+
+Victor Adossi released v0.1.0 of the **[WASI SDK GitHub Action](https://github.com/bytecodealliance/setup-wasi-sdk-action)** — a Bytecode Alliance project now live on the GitHub Actions Marketplace. The [WASI SDK](https://github.com/WebAssembly/wasi-sdk) packages Clang and the WASI sysroot ("libc, but WASI-fied"), which is what lets Clang-based languages — C and C++ — compile straight to WebAssembly components. Whatever your build system (Ninja, Meson, CMake), the chore is the same: find the right WASI SDK release, download it, unpack it, install it. The action collapses that to two steps: use the action, then `$CC hello.c -o hello.wasm`. The headline feature of the tagged release is support for **experimental release candidates** — WASI SDK **34.0-rc.2** includes the P3 threading work — which matters because [JCO](https://github.com/bytecodealliance/jco) needed exactly that to CI-test a P3 component written in C (an issue Mendy Berger filed using the new toolchain), and it's how you get Clang's **`wasm32-wasip3`** target today, before the next LLVM release makes it official. Visible in Victor's browser tabs: **Brett Cannon**, who works on CPython, is using it too — the same cooperative-threading ABI implementation Bailey wants for October. A v1 tag follows once Victor finishes testing.
+
+### New Face: Adam de Delva and BTR
+
+Bailey welcomed a new voice: **Adam de Delva**, whose CTO told him years ago to pay attention to this Wasm thing — he stopped Liam Randall two years back to say so, and now returns with a team behind him. His company, **BTR**, is building a portal for **heterogeneously scheduled compute**: from neo-cloud data centers to a developer portal that instantiates a Linux environment in Wasm, enabling in-browser development without logging into a hyperscaler for compute. The team draws engineers from Cisco, Google, AWS, and Azure — and his co-founder, he noted, wrote most of the original Docker source code. BTR wants to contribute upstream, and Adam teased a demo of **Hollow Spaces**, a project underpinning Wasm instances with novel mathematics for simulated quantum effects on standard silicon. Bailey's review: "It sounds awesome. It sounds sci-fi. Can't wait to see it." Later in the call, Adam relayed a networking question from one of his engineers, which Bailey turned into a walkthrough of wasmCloud's happy path — load balancer to ingress ([Gateway or Ingress, configured via Helm](/docs/kubernetes-operator/)) to the host's HTTP listener — plus the escape hatch for everything else: [build your own custom host](/docs/runtime/building-custom-hosts/) with native plugins, exactly what her own product does by embedding wasmCloud open source.
+
+### Top-Level Types Land, Annotations Next
+
+Yordis Prieto's component-model update: **[PR #699](https://github.com/WebAssembly/component-model/pull/699), allowing type declarations at package scope**, is up and working. Records, enums, and resources no longer have to live inside an interface "for no strong reason" — a package can be, in effect, a bundle of types. The change turned out less brutal than Bailey expected ("previously all types were associated with an interface") because WIT's encoding already imports types and gives them identities in the self-contained WAT file; dropping to package scope removes a layer of nesting while the package itself still namespaces everything. Yordis has it working in **wasm-tools and bindgen**, backed by a wall of paranoid unit tests ("half of them is me being paranoid... until the AI tells me, 'dude, buddy, just stop'"). Bailey handed him homework on the spot: test how it interacts with **`implements`** — which is by definition an instance type on a world item — and **`external-id`**. ("I come here for like two things, and I leave with more work.")
+
+The point of it all is **[annotations (#695)](https://github.com/WebAssembly/component-model/issues/695)**, the proposal discussed [the week before](/community/2026-08-12-community-meeting/): declare a package-scope annotation type, then apply it with `@annotate` and WAVE-encoded values. Bailey still owes the issue her use case — it's on a piece of paper in front of her, she promised — which is domain-type APIs like a GitHub interface where reads and writes are delineated by annotation rather than by hand-split interfaces. Luke Wagner is on board, and the exchange ended with the call's best running gag, as the group toured Yordis' vibe-coded **knowledge graph** of the component ecosystem — his "jungle," a map of who works on what from JCO to ComponentizeJS to wasm-opt ("this is basically me documenting Bailey's brain"), which Victor cheerfully labeled "the surveillance apparatus you're building."
+
+### No WASI P4, and October's Release
+
+Asked what's coming in WASI P4, Bailey was unequivocal: **"There's going to be no WASI P4."** Everything WASI wants to change can be done additively on P3 — a better API gets added alongside the old one, never replacing it mid-stream. The breaking changes are saved for **1.0**, and they'll be strictly wart-shaving: for example, a world that only exists because `implements` didn't yet (an issue Liam filed at the previous WASI meeting) simply gets deleted in 1.0, with the P3 deprecation path already in place. Her proof this is achievable: **P2 to P3 — native async, the hardest lift — was fully additive and broke nothing.** The next continuous WASI release lands around **October 12**, and her goal is **cooperative threads** in it — the same feature you can already exercise via the WASI SDK release candidates — plus, wink wink, maybe Yordis' type work in WASI 0.3.2. She also invited everyone into the machinery: WASI subgroup **issue triage** of the backlog stretching to 2019 ("it'll be fun or hard, I don't know"), after joining the [W3C WebAssembly Community Group](https://www.w3.org/community/webassembly/) and signing the no-royalties pledge — "that's how we protect open standards." Along the way she answered Yordis' versioning question: a component's WIT feature level is recorded as a **version identifier in the component model ABI** — in the `.wasm` binary itself — alongside Luke's table of which features are ungated in which WASI release.
+
+## WebAssembly News and Updates
+
+This week in **webassembly news**: the [WASI SDK GitHub Action](https://github.com/bytecodealliance/setup-wasi-sdk-action) is live on the marketplace with release-candidate support, making `wasm32-wasip3` reachable from any C/C++ CI pipeline before LLVM ships it as a known target; [componentize-go](https://github.com/bytecodealliance/componentize-go) is the future-default path for **Go WebAssembly** as cooperative threading approaches; [top-level WIT types](https://github.com/WebAssembly/component-model/pull/699) are working in [wasm-tools](https://github.com/bytecodealliance/wasm-tools) with [annotations](https://github.com/WebAssembly/component-model/issues/695) queued behind them; CPython and [JCO](https://github.com/bytecodealliance/jco) are both exercising the P3 threading toolchain; and the next WASI continuous release targets October 12 with cooperative threads. Follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [wasmCloud blog](/blog/) for what lands next.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a production substrate for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: Go WebAssembly, from TinyGo to componentize-go
+
+If you write Go and you're evaluating **WebAssembly**, this call is the state of the art in one sitting. The [rewritten Go language guide](/docs/wash/developer-guide/language-support/go/) frames the choice mechanically. **TinyGo** is an LLVM-based Go compiler for constrained environments: it targets `wasip2` directly, emits lean components, and has carried the ecosystem for years — with the sharp edge discussed on this very call, that its commonly-disabled garbage collector turns long-lived instances into slow memory leaks (one reason wasmCloud is adding the instance refresh limit). **Componentized Go** runs your program through the stock `go` toolchain — upstream Go has no `wasip2` target yet, so [componentize-go](https://github.com/bytecodealliance/componentize-go) compiles to a `wasip1` core module and wraps it into a WASI P2 component with an adapter. Today that path trades some binary size for full standard-library compatibility; tomorrow it's the main road, because **cooperative threading** in WASI (targeted at the ~October release, already testable via [WASI SDK 34.0-rc.2](https://github.com/bytecodealliance/setup-wasi-sdk-action)) gives goroutines a native execution model inside [Wasmtime](https://wasmtime.dev/). Both toolchains produce standard [components that run on wasmCloud](/docs/overview/workloads/components/), and `wash` is toolchain-agnostic — `wash build` runs whatever your `.wash/config.yaml` says. Bailey's componentize-componentize-go trick — embedding the whole pipeline in a host application via wazero — shows where this ends up: **Go WebAssembly** builds as a library feature of your platform, not a toolchain your users install.
+
+## Who Should Watch This
+
+**Go developers** should watch from the Doc of the Week ([0:53](https://youtu.be/7-CWNEDqYyQ?t=53)) through Bailey's componentize-go hot take ([2:34](https://youtu.be/7-CWNEDqYyQ?t=154)) — it's a complete, current map of building Wasm components from Go, plus the TinyGo garbage-collector gotcha at [11:24](https://youtu.be/7-CWNEDqYyQ?t=684). **C and C++ developers, and anyone who owns a CI pipeline**, should catch Victor's WASI SDK Action demo ([17:49](https://youtu.be/7-CWNEDqYyQ?t=1069)) for the two-step path to `wasm32-wasip3` builds. **Platform operators** get two routing proposals to weigh in on ([14:10](https://youtu.be/7-CWNEDqYyQ?t=850)) and the instance-refresh knob explained. And **standards watchers** should not miss "there will be no WASI P4" ([46:27](https://youtu.be/7-CWNEDqYyQ?t=2787)) — the clearest statement yet of how WASI gets from P3 to 1.0.
+
+## Up Next
+
+The wasmCloud release train cuts again **Tuesday**, expected to carry Aditya's epoch timeout hardening ([#5451](https://github.com/wasmCloud/wasmCloud/pull/5451)); the routing proposals ([#5399](https://github.com/wasmCloud/wasmCloud/pull/5399), [#5440](https://github.com/wasmCloud/wasmCloud/pull/5440)) are gathering use cases; Victor bumps the WASI SDK Action to **v1** after testing; Yordis adds `implements`/`external-id` unit tests to [#699](https://github.com/WebAssembly/component-model/pull/699) and Bailey writes up her read/write-API use case on [#695](https://github.com/WebAssembly/component-model/issues/695); WASI subgroup issue triage starts on the 2019-era backlog; and the **~October 12 WASI release** aims for cooperative threads. Adam promised BTR demo videos — Hollow Spaces included — on a future call.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-08-19-community-meeting-transcript/)**

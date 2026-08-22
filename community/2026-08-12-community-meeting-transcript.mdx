@@ -1,0 +1,367 @@
+---
+date: '2026-08-12'
+title: 'Transcript: wasmCloud 2.7 Ships 13.6x Concurrency, WIT Annotations Take Shape, and an OCI Registry Made of Components'
+description: 'Full transcript of the August 12, 2026 wasmCloud community call covering wasmCloud 2.7, maps and implements in the component model, epoch interruption, WIT annotations, and the Wasm OCI registry.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wit annotations
+  - wit
+  - protobuf
+  - oci registry
+  - epoch interruption
+  - instance pooling
+  - wasi
+  - component registry
+  - webassembly news
+image: https://i.ytimg.com/vi/5x35I8fk5pE/maxresdefault.jpg
+showTitle: true
+slug: 2026-08-12-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - ComponentModel
+  - WASI
+  - OCIRegistry
+  - Wasmtime
+  - NATS
+  - wasmTools
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-08-12-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=5x35I8fk5pE" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=5x35I8fk5pE" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:11](https://youtu.be/5x35I8fk5pE?t=11)
+
+Hello and welcome to our community call for August 12. We don't really have a set agenda today. We just have a handful of different discussion topics that we want to go through — changes that we have in flight — and as always, if you have questions or any other things you want to bring up, please raise them up to us and we'll run through them. Yesterday we cut wasmCloud 2.7. I don't know if folks saw that. It's got a lot of stuff in it. It's not as heavy, luckily, as 2.6, but a lot of hardening improvements on top of the base that we had in 2.6 is mainly how I would summarize it. One of the biggest things that landed is max concurrency on an instance pool, and in my testing I actually saw — in the absolute best case possible, because I totally cheesed this benchmark by doing just a sleep in the component workload — a 13.6x improvement. So that's huge, and y'all should try that and check it out. Max concurrency only takes effect if you set a pool size, but essentially the way it works is you say, "All right, I want a pool of warm instances, so keep these toasty for me," and then if you have max concurrency, we will take that set and we will call into every instance in that pool up to that max concurrent setting. What that essentially means is instead of, for example, handling HTTP requests effectively serially — and cold every time — your requests are coming in and we were doing them basically one to one. Now with concurrency, we're very, very efficient with the use of resources. It's very important when you're doing this with I/O-bound work. If you're doing something totally compute-heavy, and it's not going into a wait — paused while it's waiting for some other HTTP request or a request to a database to go off — so if it's not I/O bound, then you probably won't see a crazy huge improvement. But if you're like our typical workload, I think you'll actually see a pretty significant boost. So that's probably the most important thing to call out. We do have some other niceties that landed. Our OCI registry component got a lot better. It now has basic auth — it reads from wasmCloud Secrets for being able to do the authentication — and we're now also using that fully end-to-end with TLS encryption inside our end-to-end tests. So it's kind of a yo dawg: I heard you like components, so we're going to test components with our components inside our end-to-end tests. Basically all of our test fixtures that are under test, we actually push them to this OCI registry and pull them down, and that in itself is a pretty good exercise of our feature set. So definitely call out that one. I would call out our instance limits changes and the max concurrency changes, and the other thing is that we enabled implements and maps by default in wasmCloud. The reason for that is last week I held a vote within the WASI subgroup within the W3C, and we determined that as a WASI subgroup, we're willing to depend on two stabilized component model features. One of them is maps inside your WIT definition, and the other one is implements, which you can basically use to say, "I want to use these two different stores." In wasmCloud, the way we read that is: oh hey, I recognize those interfaces that you're asking for, and you're basically asking me to multiplex to two different backends — or five backends, as many as you name uniquely. And so we build off of that to let you have multiple different backends. So that is also out.
+
+**Bailey Hayes** [4:40](https://youtu.be/5x35I8fk5pE?t=280)
+
+And so yesterday I cut the release for WASI, and so we just had our first release on top of WASI 0.3.0, and that version is now 0.3.1. That's exciting because that basically meant we got a really nice, hefty release for WASI, and now that's percolating through the system. None of the existing WASI proposals depends on maps or implements, but a whole lot of the not-phase-3 proposals — like blobstore and key-value and all those — are very interested in them. So I expect them to start adding that now that they're allowed to depend on those features of the component model. Pretty excited about that. And because I was extremely excited to try this out after I enabled it by default, I also created a WIT definition that takes advantage of this inside our host. If you take a look at our wasmCloud host WIT definition, you can see what it looks like to pass and use a map inside one of our WIT definitions, which is nice. And you know — hey, why would I do this instead of the actual form that's inside the ABI, which is a list-tuple form? The answer is, you get nicer bindings. Both on the host side and on the guest side, if your language supports it, you get a nice, pretty map instead of a thing that you've got to iterate through. So I liked that. We basically use a map to say: given this workload ID, this is the interface that I'm trying to target — or really for us, it's the list of interfaces that we can target. That part's kind of fun. Let's see what else is worth calling out. We have a new field that you can pass in: if you've got a private OCI instance that you're using, you can now pass in those CA roots to our operator, and we'll thread it all the way through to the host. If you're using something like public GHCR, you probably never ran into this. But if you're like me and you wanted to secure your componentized registry with TLS, you needed this. So that's why that one landed. I also did a bunch of work around continuing to improve the host component plugin use case. Essentially, now host component plugins can not only provide a capability — like, I can create a host component that says "I know how to do key-value stuff, and if you want to do key-value stuff, call my API and I will go and do it for you on some backend that I'm registered for." Now we're working towards the ability for a host component to say: no, I'm going to be the trigger here, and I will trigger a workload. You can imagine there are some pretty cool cases like that — say you wanted to create a Kafka host component plugin, or a NATS JetStream host component plugin, or your bring-your-own-trigger kind of host component plugin. That can be pretty cool. Now you might be thinking: okay, well, you added this ability for services, so I kind of can already do this as a service. And the answer is: yep, you can. It's basically already there, and a lot of the challenges are basically solved by having it be workload-tenanted, where it knows what components it's allowed to call. When you're trying to do this at a host level, you now need to think through being able to call across different workloads, and that's definitely a lot more complicated. So that was a pretty big feature that landed and got threaded through. Something else that was done: Jeremy and I both worked on setting connection limits and having a quota for both HTTP connections, incoming and outgoing, and sockets, inbound and outbound. So a bunch more knobs are now surfaced, and that should help people who are hitting types of exhaustion. There are actually more types of quotas that we've been talking about recently that we want to surface all the way up.
+
+**Bailey Hayes** [8:51](https://youtu.be/5x35I8fk5pE?t=531)
+
+One of those — the symptom of it is you see too many instances and you've exhausted the pooling allocator's pool. Right now that's hard-coded to 1,000, and we want to bump that up to a higher number, but also make that configurable and pass that all the way into Wasmtime's pooling allocator. That's not in this release, but I think it's a totally reasonable thing to try to get into a patch release if we get it done in the next week or so — and if not, it'll be in the next bump that we do on our release train. I also had a lot of changes to protect host component plugins: they're doing an invocation, and if something traps, it would trap the host component plugin too, so we put in some protection around that. That's again all about being able to call exported interfaces that are on the workloads, so a plugin can act as a trigger. There's more that I want to do there, but a lot of it I'm super interested in building on top of the epoch work that Aditya has been working on. Essentially, we're trying to find all the different ways that we can harden our host from user-defined code, right? A user can bring in a workload component — maybe they don't know what it is; they've got it off the internet — and we need that thing to be totally sandboxed, and the host, and the service even, and the host component plugins that it talks to, all protected from that random code. One of the other ways that we can protect ourselves is to know when we need to cancel because we're in some type of spin lock, and that is work that Aditya is doing. I found it — I'm going to drop it in the chat, but it's PR 5451. I don't think we have too much more to say on that, Aditya. It's in progress, and we're excited about it.
+
+**Aditya Salunkhe** [11:05](https://youtu.be/5x35I8fk5pE?t=665)
+
+Yeah, I always get shy when you mention my PRs, but thanks for mentioning them. The work is mostly done. The main idea is: if your guest code is executing something — for example, a really, really naive regex search — and it gets stuck there, in the worst case it could take up to O(n³), even n⁴. It could take months for the whole compute cycle to end, and you don't want that. You want something that just times out and saves you from CPU exhaustion, and for that you need a cancellation mechanism that's baked into the whole sandbox. But the thing is, if your guest code is executing, there's no way for the host to get a callback, or for the poll to even return to say: hey, this is taking too long, and this needs to cancel out. But with epoch interruption — it's a Wasmtime feature — it basically bakes incremental checks inside every loop of your Wasm guest code. Say, for example, every 10 milliseconds there's going to be a check that fires, and typically, if the cancellation flag is not set, it'll just continue. It barely takes up any more CPU compute — it adds almost a nanosecond of time. So I think that's a fair compute cycle to add to harden our code. And in the worst case, if there's a timeout, there's a timeout propagation that my PR is going to add. It basically flips a flag that gets transmitted to that checker — the thing that keeps asking, "do we need to do anything?" — and that gets triggered and sets off a cancellation teardown. Currently it tracks the entire store, but I believe there was a Wasmtime pull request for having per-task cancellation inside of a run-concurrent task loop — I always forget these numbers, but I'll link it in the chat — and I believe that'll help add a layer of additional teardown support.
+
+**Bailey Hayes** [13:49](https://youtu.be/5x35I8fk5pE?t=829)
+
+Oh, I want this one really bad too. Sorry, I got excited — go ahead.
+
+**Aditya Salunkhe** [13:59](https://youtu.be/5x35I8fk5pE?t=839)
+
+Yeah, that's basically it for the epoch interruption. I also have a pull request for adding an async wasmcloud:messaging host plugin, and that's going to get merged soon. Hopefully we should see it in the 2.8 release or a patch release for 2.7. And also, I might get some work started on wasmcloud:nats that includes JetStream support. Now that Claude Code is basically a lot more capable, there's a good steering hand, and I think it'll be pretty fun to implement. So there's another thing to watch out for.
+
+**Bailey Hayes** [14:43](https://youtu.be/5x35I8fk5pE?t=883)
+
+Sweet, yeah. And Jeremy just posted in chat the async wasmcloud:messaging PR that you've also been working on, and that's 5413. You and Victor iterated on it, and it looks like it's just about good to go. There's a weird templates error — I'll look at that. That could be me.
+
+**Aditya Salunkhe** [15:05](https://youtu.be/5x35I8fk5pE?t=905)
+
+I think it would be a flake, but yeah, who knows?
+
+**Bailey Hayes** [15:08](https://youtu.be/5x35I8fk5pE?t=908)
+
+GHCR does flake on us more than —
+
+**Aditya Salunkhe** [15:16](https://youtu.be/5x35I8fk5pE?t=916)
+
+Indeed. Also, a big shout-out to some of the new contributors that are contributing to our wasmCloud organization. There's Mr. Junji Takakura, who is from Japan. Big shout-out to you, and please keep contributing — we love the contributions, and I hope you're watching this in the playback, because there's a big time-zone difference that I know of. Hopefully you can join us sometime on the call.
+
+**Bailey Hayes** [15:50](https://youtu.be/5x35I8fk5pE?t=950)
+
+And also, I just want to leave it open: anytime people have a demo or anything they want us to give a shout on the community call, throw yourself on the notes. Even if this isn't a good time zone for you — if you make a video or give us a web page or a PR, we're always happy to bring it up and scroll through it and give it an even better shout than just letting it go by because this time zone doesn't work for you. Thank you for that call-out, Aditya. And we've also been working on fleshing out awesome-wasmcloud, which was your idea, and I've been playing around a little bit there. I think there's more to be added, but we have Bharat's demo up, so if anybody wants to play around with that, they should check it out.
+
+**Aditya Salunkhe** [16:38](https://youtu.be/5x35I8fk5pE?t=998)
+
+I'm a bit guilty on that, because I've not been able to get that more into focus, but I promise I will this weekend. There are a lot of good first issues that I was going to file — I've basically got them drafted. I just need to re-verify a bit of the development guide so that it's more clear to any new contributors that are getting into our project, but hopefully I should be able to pull up some time for that.
+
+**Bailey Hayes** [17:08](https://youtu.be/5x35I8fk5pE?t=1028)
+
+Cool. Yeah, I think it'll be an excellent landing zone for new contributors. One of my biggest hopes is that now, with all the features that we've added for P3 services and P3 host component plugins, now is the time to build out all these different reusable building blocks for everybody — a ton of different ones that a lot of people will be able to use. Basically building out a catalog: if you think about Lego bricks, actually being able to assemble components like we promised. That's probably the best place to start landing them. And one thing I can do is go ahead and shout out some of the good examples that I think are reusable, from wasmCloud examples over in awesome-wasmcloud, so they don't get missed. The OCI registry is a reusable component. Blobby continues to be my favorite reusable component — a component that can point to any blob store that you give it, including your own local filesystem if you want, if you're using the filesystem native plugin or with wash up. There are just so many things that we get to do there now, so now's the time if you're interested. So I think that is kind of the whole set of 2.7 and what's in flight right now: epoch cancellation, async wasmcloud:messaging, and certainly a lot of different things that we want to do on hardening the current messaging plugin as well. Some issues got filed for that — I think we've got a few more to file, but we'll work through those and probably create patch releases around that. Then, just talking through some other things that are going to be next: we've got a couple of issues filed asking for the ability to publish ports. What that essentially means is, say you have a host component or you have a service, and somebody on the outside of the host wants to call it. Today, we say you do it with HTTP — that's our only really good answer on that front. But it's totally reasonable that people want to be able to do that. And the other flip side of that coin is: if I've got a port that a service is surfacing, I would also want to be able to target that from other workloads, or internally on the host with my component. So that feature is twofold, and I have two different drafts for that already up, if folks want to give feedback — that's 5440 and 5441. It works fairly similarly, at least in terms of the internal addressing, to how it was suggested in the issue — basically how Docker does this, with an internal DNS name. I think that one's less likely to land this week, but maybe next week we'll have more time to work on it, and I'm also interested in making sure that it's got the right knobs set up. Right now, what I'm playing with is: if you want to target it, it's a service.wasmcloud.internal or host.wasmcloud.internal, and that will let you essentially have both. We already have the TCP loopback that we implemented for sandboxing reasons, but this also enables a loopback on the host itself — not just on the service, but on the host as a whole. That's useful if, for example, you have one function or one capability that you want every workload on your system to be able to call into. Some people might call those platform functions. So that's essentially what that one does. And I think that's probably enough — that's a lot of things that we'll be working on over the next two weeks. If there are other things that folks are interested in — I think we're doing a really good job going through our roadmap this quarter. The main thing I would highlight is that we haven't made as much progress as I'd hoped on "are we componentized yet."
+
+**Bailey Hayes** [21:58](https://youtu.be/5x35I8fk5pE?t=1318)
+
+However, we did get the wasmCloud Secrets plugin built into the host, so that's something that had gotten done. We had on our roadmap epoch interruption, instance pooling, and instance reuse — oh hey, I can actually do this live with everybody, so that you can experience the joy of moving things on a triage board together. We did it! This is now done as part of the latest release. This one's almost done. This one's almost done. We've started this one, but I haven't finished it. This one is pretty trivial, but the large portion of what was required to make it real is already done. I have PRs for this one in draft, so I can probably take that over the line. This one I also have built — I just need to push it up. And oh yeah, guess what? Also done now, as of this latest release. So we're doing a great job on this. And the new contributor that you called out also said they wanted to jump in on this one, I believe — I need to respond over here and help out on that. But I think this is a great call-out, and we'll move this one forward, because I know a lot of folks want it: we also want to be able to publish the wash CLI to crates.io. It's definitely a frequently requested ticket, so I'm glad we've got an outside contributor jumping on it. In terms of our roadmap, I think we're looking really great. We need to do a design and iteration sprint on a distributed cache, but otherwise I think we've got this well in hand.
+
+<img src="/img/community/2026-08-12/image001.webp" alt="The wasmCloud roadmap project board on GitHub during live triage, showing the ticket for publishing the wash-runtime crate to crates.io" />
+
+**Aditya Salunkhe** [23:53](https://youtu.be/5x35I8fk5pE?t=1433)
+
+So the distributed cache could be something for a 2.9 or a 3.0 release, I believe.
+
+**Bailey Hayes** [23:59](https://youtu.be/5x35I8fk5pE?t=1439)
+
+It's a big one, yeah.
+
+**Aditya Salunkhe** [24:00](https://youtu.be/5x35I8fk5pE?t=1440)
+
+Yeah, it's a big dig-in.
+
+**Bailey Hayes** [24:04](https://youtu.be/5x35I8fk5pE?t=1444)
+
+I think your suggestion that maybe we do a design call just around that is right. I haven't started really working through it yet. I need to explore the space a little bit, look at what's been worked on and proposed, and then maybe we could all join a call together. I don't know if this time works for everyone, and if it doesn't, we can do a different kind of whiteboarding session.
+
+**Aditya Salunkhe** [24:31](https://youtu.be/5x35I8fk5pE?t=1471)
+
+Yeah, of course. I'll just share my notes of all the findings that we've had so far, because we've been using a similar format of a precompiled cache personally over at Betty Blocks. So we have some interesting findings for that, and it should help.
+
+**Bailey Hayes** [24:51](https://youtu.be/5x35I8fk5pE?t=1491)
+
+Cool, yeah. And at that point, it'll be KubeCon season before we know it — so, good time.
+
+**Aditya Salunkhe** [25:00](https://youtu.be/5x35I8fk5pE?t=1500)
+
+By the way, is WasmCon still on as a co-located event, or is it being deferred this year?
+
+**Bailey Hayes** [25:07](https://youtu.be/5x35I8fk5pE?t=1507)
+
+CNCF did a kind of rejiggering of some of the smaller events that were half-day colos. What they're going to do is have a theater and a time slot, essentially. So it's not like a formal colo, but a community-led event. I'm probably going to pop in and just talk about wasmCloud to anybody that's willing to listen, and facilitate folks coming up and showing what they're working on.
+
+**Aditya Salunkhe** [25:35](https://youtu.be/5x35I8fk5pE?t=1535)
+
+Yeah, that's nice, because I didn't really see any WasmCon-specific news, and I was a bit surprised. But yeah, thanks.
+
+**Bailey Hayes** [25:44](https://youtu.be/5x35I8fk5pE?t=1544)
+
+Yeah, a lot of that comes down to sponsors — we need a lot of sponsors to put on a full event, and those have been few and far between recently. So probably next year we'll go bigger in the EU. All right. Well, any other discussion items or things folks want to talk about? Hi, Yordis. You missed me talking about maps.
+
+**Yordis Prieto** [26:21](https://youtu.be/5x35I8fk5pE?t=1581)
+
+Well, two things — but yeah, answering your question over here on the map support: I didn't add the custom type as a key because I didn't want to bring in the complexity for wasm-tools of "okay, what is actually allowed there?" Because there's a tricky situation — which I don't have any strong opinions about — where some programming languages would not like really weird keys, right? In Elixir, for example, you could dump an entire list or map or, well, whatever you want in the key. But other programming languages will be like, "I don't know what this is." So I left it out. There's no reason why not, in my opinion, to have an alias that eventually resolves into one of the native keys that are allowed today — that was my reasoning. Maybe the follow-up will be: we allow the keys as long as they resolve into those — I'm going to call them native allowed types. But I didn't know how to do that, so I didn't.
+
+**Bailey Hayes** [27:21](https://youtu.be/5x35I8fk5pE?t=1641)
+
+Let me give folks context on this. I was super excited to enable maps by default in wasmCloud — which really just meant that when we're doing parsing of a WIT definition or a component, we need to make sure the CM maps feature is enabled, and in a future release of wasm-tools it'll be enabled by default. But I went ahead and turned it on because I'm very excited, and it's also stable. Where I wanted to use it, Yordis, is that I have this definition for how to call workloads from a host component plugin, and I've got a shared set of types, and one of my types is a workload ID. This workload ID is actually just a string — so it's nothing weird, and it's already supported by maps, being able to pass in a string. What's not supported is that I can't right now pass in an alias. So here, where I'm using the new map type for saying "hey, is this callable?" — I wanted this to be keyed as workload-id, but unfortunately I have to say that it's just a string, and then explain in the doc comments that these are workload IDs, and that this will then call into an interface and give you the interface ref that you can call.
+
+<img src="/img/community/2026-08-12/image002.webp" alt="The wasmCloud host's workload.wit on GitHub, using the new WIT map type keyed by workload ID to describe callable interfaces" />
+
+**Yordis Prieto** [28:41](https://youtu.be/5x35I8fk5pE?t=1721)
+
+I can follow up on that. Like I say, I agree that this should be allowed. I just didn't know how to deal with "hey, resolve that workload ID down to make sure that it's one of the allowed list."
+
+**Bailey Hayes** [28:53](https://youtu.be/5x35I8fk5pE?t=1733)
+
+Yeah. Well, actually, Claude and I have already played around with the spec a little bit. So let me get that PR up, and maybe you could review it. I did also ask Luke, and he agreed — he thought that we probably should have already been doing that, but it was an issue with how the original way we were writing specs was done: it wasn't passing through a val type, and if it had been, your original definition of the val type would have been propagated all the way through, and it could have already included the alias, which has the subset of types that you've said is allowed.
+
+**Yordis Prieto** [29:34](https://youtu.be/5x35I8fk5pE?t=1774)
+
+Okay, tag me on it, because I really want to learn — exactly what you said honestly went over my head, but that was good.
+
+**Bailey Hayes** [29:40](https://youtu.be/5x35I8fk5pE?t=1780)
+
+Yeah, I was just playing around with the spec grammar that's defined in the Markdown, basically.
+
+**Yordis Prieto** [29:46](https://youtu.be/5x35I8fk5pE?t=1786)
+
+Yeah. Okay. Yeah, that's cool. And the second thing is: I came away with consensus with — what is his name? Luke —
+
+**Bailey Hayes** [29:56](https://youtu.be/5x35I8fk5pE?t=1796)
+
+Luke Wagner. On your annotation idea.
+
+**Yordis Prieto** [29:59](https://youtu.be/5x35I8fk5pE?t=1799)
+
+Somewhat, okay. So here's the too-long-didn't-read of what's going to be, for now. The way it evolved is that effectively there are two sides to the question. One is a usage, and the other one is a declaration. In that declaration, you would have a top-level type — which needs to be allowed first — that defines whatever the annotation is supposed to be. This one is not it yet, but imagine you're going to do something like that. So you say this top-level type is actually allowed to be an annotation, and then in the usage, you just have the package here — I don't know, maybe tooling-with-binding, whatever — and then you can just name it and pass the arguments as if they were actually the type that you defined behind it.
+
+<img src="/img/community/2026-08-12/image003.webp" alt="A working sketch of WIT annotations: an @annotation type declaration with an alias, and an @annotate usage applying it with arguments" />
+
+**Bailey Hayes** [31:05](https://youtu.be/5x35I8fk5pE?t=1865)
+
+The part that brought this together for me is that this will use WAVE syntax. If folks aren't familiar, there's essentially a JSON-style syntax that a lot of CLIs are using, and WAVE is inside wasm-tools if you want to play around with it — essentially a canonical way of being able to write something like this inside the annotate. So it's structured text that we can now interpret as WIT types. That's super powerful.
+
+**Yordis Prieto** [31:34](https://youtu.be/5x35I8fk5pE?t=1894)
+
+Yes, yeah. So he mentioned that WAVE most likely could become this — or my idea was something like this, right? Then you put whatever stuff you want here, and then it's going to be controlled by that. So overall, this is the idea. I need one issue to allow this, and then a second issue to introduce the annotate and annotations, and then follow up to be able to filter by annotations and stuff like that — small things in the SDK for you to control things.
+
+**Bailey Hayes** [32:07](https://youtu.be/5x35I8fk5pE?t=1927)
+
+Let's talk about why it's so important to be able to filter, for other folks. Essentially, we've talked before about how we do capability-driven interfaces. That's one of the key tenets of WASI as a whole, and whenever we're creating our own WIT definitions, that's something you've got to keep in mind. Essentially, what we say is: if you have an import on an interface, you're saying "I want a capability grant." A handle is what the host is essentially granting you to that capability, because you have a reference to it — and that could be a reference to a resource, or it could be a direct reference to how I handle a call to a database, right, over a WIT definition. One challenge that presents is that a lot of people want to have one big old interface — let's say, here's my interface for GitHub. Here are all the puts, here are all the posts that I would do, here are all of the gets that I might do. And you can see why somebody maybe wouldn't want to closely and carefully delineate all these different interfaces between "well, this one's an update, this one's a read-only, this one's a write." That's a little bit annoying if you have to decouple all of these out into their own separate little interfaces, when a lot of the CRUD APIs want to come together. So by using something like annotations, like what Yordis is proposing here, I can basically say: this annotation means this is a read API. And if somebody wants to consume my GitHub interface, they can consume it by doing an alias of the type — "I just want a set of these; give me only the read-only ones, or give me only the write ones" — and then you would get essentially a resolved world definition of exactly those APIs.
+
+**Yordis Prieto** [34:23](https://youtu.be/5x35I8fk5pE?t=2063)
+
+Yeah, something like that. It would be something like that, just to make a point.
+
+**Bailey Hayes** [34:32](https://youtu.be/5x35I8fk5pE?t=2072)
+
+Yeah, and that allows you to basically, when you're writing WIT, do more domain-driven design, rather than something that's way less familiar to people — thinking through capability-driven design or interface-driven design. So you can keep it all together, all your CRUD operations, but then delineate them with these annotations.
+
+**Yordis Prieto** [34:54](https://youtu.be/5x35I8fk5pE?t=2094)
+
+Yep. So now, Bailey, I'm going to follow up with you, since you have some AI use cases that I want to add as an example in the WAVE examples. But yeah, overall, this is what I'm trying to chase now and make work.
+
+**Bailey Hayes** [35:12](https://youtu.be/5x35I8fk5pE?t=2112)
+
+And not just me — I'd like to connect you with Yash as well, because he's actually who presented this kind of structured-annotations desire, round three, round four — I'm not sure which one we're on now. It's been a frequently asked request since the early days of WIT, and he has AI use cases for this as well. He also has automated generation of WIT definitions as a use case: he created this auto-stamp project — you can see it over in wasm.directory — where he basically stamped out a bunch of different CRUD APIs for a bunch of common SaaS services that people use. He would probably be one of the first consumers of your proposal, Yordis.
+
+**Yordis Prieto** [36:04](https://youtu.be/5x35I8fk5pE?t=2164)
+
+Yep. And if I manage to get this in, plus the lazy types, we are effectively a superset of Protobuf. That means you could go one way or the other — you just pick one. Most likely it's going to be WIT, so your type generations are there. But nevertheless, at that point we are allowed to do a superset of Protobuf.
+
+**Bailey Hayes** [36:31](https://youtu.be/5x35I8fk5pE?t=2191)
+
+I think there's still an impedance mismatch going from Protobuf to WIT, because Protobuf versions things with minor and not with a patch. So if you're counting on additive, non-breaking changes by changing something like an enum — in WIT parlance, you would have to actually create that as a separate type, whereas in Protobuf land, that's considered a non-breaking change that you can make in a minor release. The reason why it's a breaking change for us is, as you can imagine: we're a bytecode, and we represent that enum in exact bytes of what you've defined across all these different languages. So it would work going from WIT to Protobuf, no problem. But I think you might run into impedance mismatches if you're always blindly going from Protobuf to WIT.
+
+**Yordis Prieto** [37:28](https://youtu.be/5x35I8fk5pE?t=2248)
+
+Interesting. Yeah. Okay. I mean, my thought was doing WIT-only, to be honest. Protobuf is there just as a — wink, wink — marshaling into the storage or whatever.
+
+**Bailey Hayes** [37:42](https://youtu.be/5x35I8fk5pE?t=2262)
+
+If you go from WIT — WIT as your source of truth — to Protobuf, Protobuf over the wire, Protobuf on the other end, Protobuf out into WIT, you won't run into problems.
+
+**Yordis Prieto** [37:52](https://youtu.be/5x35I8fk5pE?t=2272)
+
+Yeah. My idea is that eventually I give you the marshaling component that's going to be embedded into whatever you're using. That's my intent there — so you don't care how the wire and the stuff like that works. Here's a component for you that knows how to do that for you, and that's the goal. Eventually, technically, you shouldn't even care about what Protobuf is doing behind the scenes, or if it's there at all.
+
+**Bailey Hayes** [38:18](https://youtu.be/5x35I8fk5pE?t=2298)
+
+That's a cool type.
+
+**Yordis Prieto** [38:19](https://youtu.be/5x35I8fk5pE?t=2299)
+
+Yeah. And maybe in the world now with annotations, I can also say: this is a service resource or interface, whatever. And then inside the annotator, okay, now you could take it and make it like a protocol for a service. So companies like you, for example — sometimes you're a proxy, right? You could take the exact same annotations and say, "I can construct the entire HTTP routing for you from those annotations, and here's a proxy for you." So you could start doing those things at the platform level.
+
+**Bailey Hayes** [38:53](https://youtu.be/5x35I8fk5pE?t=2333)
+
+That's awesome. I'm pumped about this. And not only that — I also asked Luke about your conversation, by the way, once you told me you talked to him. I asked Luke: how hard is this going to be? How fast can we do it? And he said, depending on how fast Yordis goes, we could get it into 0.3.2 of WASI.
+
+**Bailey Hayes** [39:20](https://youtu.be/5x35I8fk5pE?t=2360)
+
+No promises, but yeah. And I guess on that update: I was really excited about us getting 0.3.1 out the door yesterday with two new features. Right now, what I'm looking at for 0.3.2 — which will be in October for WASI — maybe it'll be this, but we'll see. Wink, wink, nudge, nudge. But the other one is that cooperative threads might actually be able to make it, which a month ago we thought would be totally crazy and insane to pull off, and now we're like — oh no, this is actually shaping up really quickly. We're able to build CPython with cooperative threads and get through their unit tests now. Basically, our blocker was that we want to make sure cooperative threading feels ergonomic and native in at least two languages, but ideally three. So we've got C, C++, Rust, and Python now exercising it and giving us feedback, and if that gets far enough along, that is what we really needed to be able to move it through.
+
+**Yordis Prieto** [40:27](https://youtu.be/5x35I8fk5pE?t=2427)
+
+Okay, for people — in Go, Protovalidate. Let me show you something that is amazing — why I care so much about this. This is one of the packages that the entire ecosystem uses around Protobuf. Effectively, it's like: okay, you have the stream, but sometimes you have to annotate, you know — okay, that's a UUID, and it's less than whatever; or that's an email, yada yada. Well, if we allow that, it's going to be the first time where you could actually use backend code the exact same way that you could use it in your frontend code. No in-betweens, no something in the middle trying to marshal into another type of thing for the sake of the clients. No — the exact same component, like literally. So that's going to be cool. I want to showcase this as soon as it's out. And the same for, I don't know, putting retry information and stuff like that. Now both components are technically using it, so there's no discrepancy between them — it's very low discrepancy at that point, because today people just lean on code generation in a different stack. It's not the exact same code, so technically it's like: yeah, well, hopefully what you use actually does what I use in the backend.
+
+<img src="/img/community/2026-08-12/image004.webp" alt="The Protovalidate documentation showing annotated Protobuf messages with standard and custom validation rules" />
+
+**Bailey Hayes** [41:50](https://youtu.be/5x35I8fk5pE?t=2510)
+
+Honestly, the moment this lands, I'm going to use this in wasmCloud. We use a Protobuf definition for our workload scheduling over NATS, and we're also using Buf to do it. So here — it'll look very familiar to you.
+
+**Yordis Prieto** [42:06](https://youtu.be/5x35I8fk5pE?t=2526)
+
+Send it over, because this is — you know, I've been chasing this probably for like three years by now, I think.
+
+**Bailey Hayes** [42:12](https://youtu.be/5x35I8fk5pE?t=2532)
+
+Yes, yes you have. But yeah, I think we would convert this immediately, and that would give us some pretty cool benefits. Right now, I'm having to do a very awkward thing: define the way that we define our interfaces basically in YAML, and then turn it into something that we can generate bindings for inside the host. This is largely done to have nice ergonomics in Kubernetes land. But if I could represent these different Protobuf definitions with a WIT definition that can seamlessly transit, then I can create all kinds of cool things. I can have mock tests that are using components to mock the environment of doing workload scheduling — there are just so many things I can do. Yes, I know, people — I can do this with Protobuf today if I went and totally embraced the Protobuf ecosystem. But guess what? I'm a WebAssembly person. I want to fully embrace WebAssembly components.
+
+**Yordis Prieto** [43:17](https://youtu.be/5x35I8fk5pE?t=2597)
+
+I love that you mentioned the testing, because that's one of the very first things that I actually want to do for the event-sourcing stuff. I already have it working where it's just YAML files, and directly from your browser you could take the exact same component and run it there.
+
+**Bailey Hayes** [43:32](https://youtu.be/5x35I8fk5pE?t=2612)
+
+Yes, yes. Run the same page.
+
+**Yordis Prieto** [43:37](https://youtu.be/5x35I8fk5pE?t=2617)
+
+Yeah, so that's going to be one of my first ones, for sure.
+
+**Bailey Hayes** [43:44](https://youtu.be/5x35I8fk5pE?t=2624)
+
+Well, thank you for taking it on. I'll try not to apply too much pressure when I continuously ask, one week, "where is it at?"
+
+**Yordis Prieto** [43:51](https://youtu.be/5x35I8fk5pE?t=2631)
+
+No, no. To be honest, I like it — I don't mind it. Hopefully people react fast enough in the issues. I'm going to pretend as if I already know the decision and try to be ahead of people. To be honest, if you diverge 100%, then I'm screwed. But if you diverge a few percentage points — fine, whatever, I can just change it. So that's what I'm going to be doing, to be honest.
+
+**Bailey Hayes** [44:18](https://youtu.be/5x35I8fk5pE?t=2658)
+
+I can't wait.
+
+**Aditya Salunkhe** [44:25](https://youtu.be/5x35I8fk5pE?t=2665)
+
+This is a bit unrelated, but you mentioned something about having an OCI registry as a library that could talk to an OCI registry via a Wasm component. I was a bit interested in that. If that's true, would it completely fall in line with the OCI spec? For example, listing and doing a whole registry sweep — like, hey, can you list all the components that are inside this registry, and then being able to download those, assemble them into WIT or Wasm bytes? Would that be possible?
+
+**Bailey Hayes** [45:07](https://youtu.be/5x35I8fk5pE?t=2707)
+
+Yes — you could build a whole WebAssembly infrastructure with WebAssembly. I even had it run against, and be fully compliant with, the conformance test suite for OCI. So this is fully out — and here's how to run it if you want to run it and see: boom, we pass. The things that we're skipping are optional things that don't make sense for us, like cross-mounting different kinds of things. So doing it just inside OCI, we are compliant. So what does it look like? Well, we do it with blobstore, which means if you want an OCI registry backed by your local filesystem, you can do that. Or you want it backed by S3 and be super scalable? You can do that too. Here's what it would look like to list all these things. Now, you can search this registry — although I don't have that here — or you can put a search in front of this registry for, what's it called, the content type on the OCI, which is part of the OCI spec, actually. Let me show that — the WebAssembly OCI artifact. This is sort of the standard that we came up with, and this is how you would know: the media type will say that, hey, this is a .wasm. So you can find all of those there. But in theory, you could also put containers on this thing if you wanted, because it's just tarballs at the end of the day.
+
+<img src="/img/community/2026-08-12/image005.webp" alt="The OCI registry component's conformance documentation: the example passes the official OCI distribution-spec conformance suite across pull, push, content discovery, and content management" />
+
+**Aditya Salunkhe** [46:48](https://youtu.be/5x35I8fk5pE?t=2808)
+
+Yeah, this is really cool. Is there support for a /catalog endpoint, for getting a whole list of all the Wasm components inside the registry? Or is that inside listing the tags? Because Harbor has something — I had to modify wkg to have OCI Wasm support, but yeah.
+
+**Bailey Hayes** [47:26](https://youtu.be/5x35I8fk5pE?t=2846)
+
+I thought they had newer support. Basically, this spec rule is supposed to apply to everybody now — I would think Harbor would have it, but maybe you landed it for them, and then they were like, "yay, now we have it." But this media type field — what we did here is common for a lot of other types. So now OCI can be used to distribute a lot of different things, more than just images or Wasm: name your own custom plugin type that you've built, your own binary type. So I think you should try this out, Aditya, and give me feedback, and we can keep improving it. I wanted it inside wasmCloud examples mainly because I'm using it in end-to-end tests — I'm building and maintaining it there. But like I was saying earlier, I think we should at least give it a big old shout over in awesome-wasmcloud and say: hey, there's a component here — you might want this one, and Blobby. Maybe there are others too that I think people would be really into. But yeah, check it out.
+
+<img src="/img/community/2026-08-12/image006.webp" alt="The CNCF Wasm OCI Artifact layout specification showing Config.mediaType application/vnd.wasm.config.v0+json" />
+
+**Aditya Salunkhe** [48:47](https://youtu.be/5x35I8fk5pE?t=2927)
+
+Yeah, thanks for that. Also, Victor says in the chat that cataloging doesn't exist in OCI registries, and we can't do the list-all-images-slash-manifests. But I do remember something that was on Harbor —
+
+**Aditya Salunkhe** [49:15](https://youtu.be/5x35I8fk5pE?t=2955)
+
+Yeah, most things won't do it. Zot doesn't have it, but Harbor does — it's one of the only CNCF-supported registries that does have it. We were trying to find something that could allow us to do that. Sad that we can't. But I saw something regarding the tags: if we list a specific component, we could get all the release tags and the versions for that specific application.
+
+**Bailey Hayes** [49:56](https://youtu.be/5x35I8fk5pE?t=2996)
+
+Yeah. And I also want to give a shout-out to wasm.directory. If you haven't seen that — are you familiar with that, Aditya?
+
+**Aditya Salunkhe** [50:03](https://youtu.be/5x35I8fk5pE?t=3003)
+
+I'm not familiar with that.
+
+**Bailey Hayes** [50:05](https://youtu.be/5x35I8fk5pE?t=3005)
+
+This is something that Yash has been working on that I think is pretty cool. If I search this, for example, for GitHub — there's a GitHub component and WIT definition that's published here, and you can click on some of these. Oh, also, shout out — these depend on our wasmCloud Secrets. Let me click packages — I don't know, we'll see what's in there. And then I can actually see these, and I can see what the record type is and what these different things are. So it's a nice little way to browse WIT and components. I want this, or a thing like this, to exist for the component ecosystem — I think it's very important to have. I'm also interested in building my own kind of curated "this is my favorite list of things." So I think we're going to need a lot more in that space. I think a lot of people are interested in trying to innovate there. It's maybe the fifth registry that I've seen for WebAssembly components, so there might be more.
+
+<img src="/img/community/2026-08-12/image007.webp" alt="wasm.directory, a meta-registry for WebAssembly: search components, libraries, and interface types published to OCI-compliant registries" />
+
+**Aditya Salunkhe** [51:25](https://youtu.be/5x35I8fk5pE?t=3085)
+
+Yeah, I've seen some myself. There's one called buildeverything.ai, and it's made by someone that was on the call here quite a few times — Brian Boynton. He does have a really cool catalog of all these different components. Really cool. I've linked it in the chat if anyone is interested.
+
+**Bailey Hayes** [51:54](https://youtu.be/5x35I8fk5pE?t=3114)
+
+Yeah, a lot of interesting stuff there. I think the more we start seeing this kind of stuff, it just calls out that code's mostly free, but what we're going to see with components is that their size footprint, their speed and responsiveness and performance, and the characteristics of the API itself — we're going to start to see the best of breed in components. Code's basically free, right? Anybody can go vibe out a GitHub component — five minutes, bada bing, bada boom, you've got a GitHub component. But that doesn't mean it's the best one. One of the biggest deciding factors, of course, is which language you chose to build it with — if you picked anything other than Rust, you probably picked wrong. And if you build it out and you get a component that's larger in size, maybe doesn't have a very ergonomic API, maybe it's obviously vibed, obviously generated — maybe people don't pick it or use it. Or maybe some of these will surface to the fold because everybody's building on top of it and everybody depends on it. I think we're going to see the cream of the crop rise to the top with a lot of these different components, and that's what I'm excited about. I don't have to build every component under the sun — I just want to use them.
+
+**Aditya Salunkhe** [53:25](https://youtu.be/5x35I8fk5pE?t=3205)
+
+It's almost like the second coming of Docker — WebAssembly component distribution. It's really cool to see, and I couldn't be more excited.
+
+**Bailey Hayes** [53:38](https://youtu.be/5x35I8fk5pE?t=3218)
+
+Well, now we can build it all.
+
+**Yordis Prieto** [53:41](https://youtu.be/5x35I8fk5pE?t=3221)
+
+Liam, I'm still waiting for your invite. You know — wink, wink.
+
+**Liam Randall** [53:45](https://youtu.be/5x35I8fk5pE?t=3225)
+
+Check your email. Wink, wink.
+
+**Yordis Prieto** [53:50](https://youtu.be/5x35I8fk5pE?t=3230)
+
+Wait — oh yeah. Okay, you just did it. Okay. Nice. Never mind. Thank you, sir.
+
+**Liam Randall** [54:00](https://youtu.be/5x35I8fk5pE?t=3240)
+
+You're welcome.
+
+**Bailey Hayes** [54:09](https://youtu.be/5x35I8fk5pE?t=3249)
+
+Well, this was a good discussion today. Thanks, everybody, for joining, and I'll see you next week.
