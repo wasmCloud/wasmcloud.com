@@ -46,7 +46,9 @@ When a service runs with multiple replicas on a host, the HTTP ingress distribut
 
 ### Messaging ingress
 
-A trigger service that exports `wasmcloud:messaging/handler@0.2.0` receives inbound messages through the messaging ingress. As of wasmCloud 2.6.0, the built-in messaging plugins deliver through this ingress for **service** workloads: a service exporting the handler receives every message on its pinned instance, while a plain component exporting the same handler is instantiated fresh per message.
+A trigger service that exports `wasmcloud:messaging/handler` receives inbound messages through the messaging ingress. As of wasmCloud 2.6.0, the built-in messaging plugins deliver through this ingress for **service** workloads: a service exporting the handler receives every message on its pinned instance, while a plain component exporting the same handler is instantiated fresh per message.
+
+As of wasmCloud 2.8.0, the messaging ingress invokes the async `wasmcloud:messaging/handler@0.3.0` interface. A service must export `handler@0.3.0`; a service exporting only the sync `handler@0.2.0` fails to start at 2.8.0. Plain components still run per message and may export either revision (the host prefers `0.3.0` when a component exports both). Messaging deliveries are bounded by `WASH_MESSAGING_DELIVER_TIMEOUT_SECS` (default 600 seconds, added in 2.8.0). See [Interfaces](../interfaces.mdx#wasmcloud-interfaces) for the differences between the revisions.
 
 ### Capability ingress
 
@@ -64,6 +66,8 @@ A trigger service is instantiated when its owning workload starts. The runtime i
 
 **Supervision.** If the guest instance traps, the runtime re-instantiates it within a bounded restart budget; in-flight invocations to the failed incarnation fail promptly rather than hanging. The budget is spent only on the trigger service's *own* faults — as of wasmCloud 2.7.0, a failure in a workload that a plugin calls via `workload-call` is reported to the plugin as an error value and never traps the pinned instance or consumes its restart budget.
 
+**Runaway guests.** As of wasmCloud 2.8.0, guest code that spins the CPU without yielding is subject to a host backstop. When a call passes its ingress deadline (or its client disconnects), no other call on the instance is still wanted, and the guest is measurably pinned, the host traps the instance: a pooled warm instance is replaced, a service is restarted under supervision, and a host component plugin is warned first and restarted only after an escalation window (losing its in-memory state). The caller sees an error at roughly the ingress deadline instead of a hang. A guest that yields normally is never affected, and a slow guest with a disconnected client is not trapped as long as it keeps yielding. Capability calls into plugins are bounded by `WASH_PLUGIN_CAPABILITY_CALL_TIMEOUT_SECS` (default 600 seconds); the grace and escalation windows are tunable with `WASH_ABANDONED_CALL_GRACE_SECS` (default 10) and `WASH_ABANDONED_CALL_ESCALATION_SECS` (default 60).
+
 ## Cancellation and host awareness
 
 Trigger services can import [`wasmcloud:host`](../interfaces.mdx) to observe and cooperate with their environment:
@@ -78,7 +82,7 @@ See the [authoring guide](../../runtime/creating-host-component-plugins.mdx) for
 
 - **Single instance, not a pool.** A trigger service is one instance. Blocking work in a handler blocks the tasks scheduled on the same async runtime; use non-blocking APIs and structured concurrency.
 - **Shared state.** All ingress handlers, `wasi:cli/run`, and any inter-handler background tasks share the instance's linear memory. Guard shared mutable state accordingly.
-- **WASI target.** The HTTP ingress requires WASI P3 (`wasi:http/handler@0.3.0`); the messaging ingress uses `wasmcloud:messaging/handler@0.2.0`; the capability ingress uses the capability's own package. A trigger service that only exports `wasi:cli/run` can target P2 or P3 to match its imports.
+- **WASI target.** The HTTP ingress requires WASI P3 (`wasi:http/handler@0.3.0`); the messaging ingress uses `wasmcloud:messaging/handler@0.3.0` as of wasmCloud 2.8.0; the capability ingress uses the capability's own package. A trigger service that only exports `wasi:cli/run` can target P2 or P3 to match its imports.
 
 ## Keep reading
 
