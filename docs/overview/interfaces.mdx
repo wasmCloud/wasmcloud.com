@@ -181,14 +181,14 @@ Well-known interfaces include six APIs built specifically for wasmCloud:
 
 | API                                                                                        | Versions    | Interfaces |
 | ------------------------------------------------------------------------------------------ | ----------- | ---------- |
-| [wasmcloud:messaging](https://github.com/wasmCloud/wasmCloud/tree/main/wit/messaging)      | 0.2.0       | `consumer`, `handler`, `types` |
+| [wasmcloud:messaging](https://github.com/wasmCloud/wasmCloud/tree/main/wit/messaging)      | 0.2.0 (sync), 0.3.0 (async) | `consumer`, `handler`, `types` |
 | [wasmcloud:keyvalue](https://github.com/wasmCloud/wasmCloud/tree/main/wit/keyvalue)        | 0.1.0       | `store`, `atomics`, `batch`, `cas`, `watcher`, `types` |
 | [wasmcloud:blobstore](https://github.com/wasmCloud/wasmCloud/tree/main/wit/blobstore)      | 0.1.0       | `blobstore`, `container`, `types` |
 | [wasmcloud:postgres](https://github.com/wasmCloud/wasmCloud/tree/main/wit/postgres)        | 0.1.1-draft (sync), 0.2.0 (async) | `query`, `prepared`, `types` |
 | [wasmcloud:host](https://github.com/wasmCloud/wasmCloud/tree/main/wit/host)                | 0.1.3       | `types`, `identity`, `cancel`, `workload-call`, `workload-lifecycle` |
 | [wasmcloud:secrets](https://github.com/wasmCloud/wasmCloud/tree/main/wit/secrets)          | 2.1.0       | `store`, `reveal`, `secret` |
 
-* **`wasmcloud:messaging`** facilitates communication through message brokers: `consumer` for publishing and request/reply, `handler` for receiving deliveries. A service that exports `wasmcloud:messaging/handler@0.2.0` receives messages through the [messaging ingress](./hosts/trigger-services.mdx#messaging-ingress).
+* **`wasmcloud:messaging`** facilitates communication through message brokers: `consumer` for publishing and request/reply, `handler` for receiving deliveries. As of wasmCloud 2.8.0 the package ships in two revisions: the sync `0.2.0` interfaces (vendored with the runtime) and an async `0.3.0` counterpart in `wit/messaging` (see the callout below). A service that exports `wasmcloud:messaging/handler@0.3.0` receives messages through the [messaging ingress](./hosts/trigger-services.mdx#messaging-ingress).
 * **`wasmcloud:keyvalue`** is the async-shaped key-value package (see the callout below), extending `wasi:keyvalue` with TTL on `set`, compare-and-swap, batch operations, and typed errors. A `watcher` interface is defined in the package, but watch delivery is not yet implemented by the runtime plugin. Runtime support for the package is carried by `wash-runtime` builds with the `wasm_component_model_implements` Cargo feature, part of the default feature set (and stock release images) as of wasmCloud 2.7.0; earlier releases required a custom build. See [Host Interfaces](../kubernetes-operator/crds.mdx#host-interfaces) for details.
 * **`wasmcloud:blobstore`** is the async-shaped blob/object storage package, the streaming counterpart to `wasi:blobstore`. Runtime support carries the same `wasm_component_model_implements` feature requirement as `wasmcloud:keyvalue` (default as of 2.7.0).
 * **`wasmcloud:postgres`** provides direct PostgreSQL access — one-shot `query`, `prepared` statements, and shared `types` — in a sync (`0.1.1-draft`) and an async (`0.2.0`) shape, both served by the built-in Postgres [host plugin](./hosts/plugins.mdx). The async package lives in `wit/postgres`; the sync package is vendored with the runtime.
@@ -203,6 +203,12 @@ These packages are published as [OCI artifacts](./packaging.mdx) to `ghcr.io/was
 Starting in 2.5.0, `wasmcloud:keyvalue` and `wasmcloud:blobstore` ship async-shaped WIT packages alongside the existing sync interfaces, together with **TTL on `set`**, **CAS** (compare-and-swap), and **typed errors** for missing keys, conflicts, and backend failures. The async packages depend on the `component-model-async` proposal (implied by WASI 0.3).
 
 The `bucket` resource (and `error`, `key-response`, `set-options`) live in a shared `wasmcloud:keyvalue/types` interface, and `store`, `atomics`, `cas`, `batch`, and `watcher` all `use types.{bucket, error}`. A guest using a labeled multi-backend `store` can therefore also use `cas`/`atomics`/`batch` against the same bucket — the resource identity matches across all five interfaces. This mirrors the shape that `wasmcloud:blobstore` uses.
+:::
+
+:::info[2.8.0: async `wasmcloud:messaging`]
+Starting in 2.8.0, `wasmcloud:messaging` ships an async `0.3.0` revision alongside the sync `0.2.0` interfaces. In `0.3.0`, `consumer.publish`, `consumer.request`, and `handler.handle-message` are `async func`s, message bodies are `stream<u8>` rather than `list<u8>`, `request` takes an optional `timeout-ms`, and errors are typed variants (`timeout`, `broker-unavailable`, `message-too-large`, and more) instead of strings. A handler returns a `handle-message-error` disposition (`reject`, `retry`, or `other`); at 2.8.0 the host logs the disposition, and mapping `retry` to broker redelivery is left to future backend support.
+
+The `version` on a component's `wasmcloud:messaging` [host interface entry](../kubernetes-operator/crds.mdx#host-interfaces) selects which `consumer` and `types` revision is linked for its imports: `"0.3.0"` binds the async surface, while `"0.2.0"` or an omitted version binds sync `0.2.0`. The handler revision follows the component's own export, with `0.3.0` preferred when both are exported. Both revisions share the same backends and configuration, including `subscriptions` and `consumer_group`.
 :::
 
 ## Custom interfaces

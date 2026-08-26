@@ -107,6 +107,12 @@ So the tuning workflow is:
 These quotas are per host process. A workload scaled to several `replicas` gets the quota once per replica, not divided across them, so scaling out multiplies the workload's total connection budget the same way it multiplies throughput.
 :::
 
+## Messaging admission (per component)
+
+As of wasmCloud 2.8.0, messaging-triggered components have their own in-flight limit, applied before an instance is created. The `max_in_flight` config key on the component (default: the host's per-component ceiling) caps concurrent deliveries across the component's replicas on a host. A delivery over the limit waits up to `admission_wait` (default `30s`) for a slot, then is dropped with a warning.
+
+This limit is separate from `maxConcurrency`: `maxConcurrency` bounds calls on one warm instance, while `max_in_flight` bounds total messaging deliveries executing for the component. For messaging workloads, size `max_in_flight` first, then the instance limits beneath it. See [Messaging admission control](/docs/kubernetes-operator/crds#messaging-admission-control) for the config keys and host flags.
+
 ## Replicas
 
 `replicas` is the third scaling axis: copies of the whole workload spread across the host group (the pool of hosts the operator manages). It scales throughput past what one host's instance pool can serve, and it is the axis a `HorizontalPodAutoscaler` or KEDA drives through the `/scale` subresource. See [Autoscaling](/docs/kubernetes-operator/operator-manual/autoscaling) for how to scale `replicas` automatically, and why the host group is a precondition for it.
@@ -118,3 +124,4 @@ These quotas are per host process. A workload scaled to several `replicas` gets 
 - The keep-alive pool is sized automatically from declared concurrency, so you tune concurrency and the quota, not the pool directly.
 - Outbound HTTP over quota waits up to `--http-connection-wait` (default `5s`) then fails; raw sockets and inbound connections are refused immediately.
 - The connection quota applies once per replica, so scaling out multiplies the total connection budget.
+- Messaging deliveries have their own admission limit (`max_in_flight`, as of 2.8.0), applied before instance limits come into play.

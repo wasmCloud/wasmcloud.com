@@ -162,7 +162,7 @@ spec:
 
 ### Host Interfaces
 
-Use the `hostInterfaces` field to define host interfaces used by the workload. Each entry requires `namespace`, `package`, and `interfaces`, and may optionally include `config` and `name`.
+Use the `hostInterfaces` field to define host interfaces used by the workload. Each entry requires `namespace`, `package`, and `interfaces`, and may optionally include `version`, `config`, and `name`.
 
 The optional `name` field enables **multi-backend binding**, meaning a component can import the same interface twice under distinct labels and have each labeled import routed to its own backend. This uses the Component Model's `implements` clause: the component declares each labeled import in its WIT world, and the runtime routes calls through the labeled namespace to the matching `hostInterfaces` entry.
 
@@ -220,10 +220,14 @@ Naming rules:
 
 ### Messaging subscriptions and consumer groups
 
-The built-in NATS `wasmcloud:messaging` plugin reads two config keys, each from the component's `localResources.config` first, falling back to the `config` on the workload's `wasmcloud:messaging` `hostInterfaces` entry (so workers in one workload can override the workload-scoped values):
+As of wasmCloud 2.8.0, the `version` on a `wasmcloud:messaging` entry selects which `consumer` and `types` revision is linked for the component's imports: `"0.3.0"` binds the async surface, while `"0.2.0"` or an omitted version binds sync `0.2.0`. The handler revision follows the component's own export: the host invokes `handler@0.3.0` when the component exports it, falling back to `@0.2.0`. See [Interfaces](../overview/interfaces.mdx#wasmcloud-interfaces) for the differences. The config keys below apply to both revisions.
+
+The built-in NATS `wasmcloud:messaging` plugin reads its config keys from the component's `localResources.config` first, falling back to the `config` on the workload's `wasmcloud:messaging` `hostInterfaces` entry (so workers in one workload can override the workload-scoped values):
 
 - **`subscriptions`**: A comma-separated list of NATS subjects the component's `wasmcloud:messaging/handler` export subscribes to.
-- **`consumer_group`**: Controls delivery when a component runs with multiple replicas (as of wasmCloud 2.6.0). When omitted, replicas join a consumer group derived from the workload namespace, workload name, and component name, so exactly one replica handles each message. Set it to the special value `broadcast` to deliver every message to every replica (the pre-2.6.0 behavior — e.g., for cache invalidation), or to any other NATS-safe name (no whitespace, `*`, or `>`) to place subscribers in an explicitly named group (e.g., to share one group across components).
+- **`consumer_group`**: Controls delivery when a component runs with multiple replicas (as of wasmCloud 2.6.0). When omitted, replicas join a consumer group derived from the workload namespace, workload name, and component name, so exactly one replica handles each message. Set it to the special value `broadcast` to deliver every message to every replica (the pre-2.6.0 behavior, useful for cache invalidation), or to any other NATS-safe name (no whitespace, `*`, or `>`) to place subscribers in an explicitly named group (e.g., to share one group across components).
+- **`max_in_flight`** (as of wasmCloud 2.8.0): Caps how many deliveries to the component may be in flight at once on a host, counted across the component's replicas on that host. When omitted, the host's per-component ceiling applies. The key can only lower a component below that ceiling; a value above it is clamped to it with a warning. Raising a component past the stock ceiling requires raising the host's per-component flag. See [Messaging admission control](#messaging-admission-control) below.
+- **`admission_wait`** (as of wasmCloud 2.8.0): How long a delivery waits for an in-flight slot before it is dropped. Accepts values like `45s`, `2m`, or bare seconds. Default `30s`, maximum `600s`.
 
 ```yaml
 spec:
@@ -241,6 +245,19 @@ spec:
           package: messaging
           interfaces: [consumer, handler]
 ```
+
+#### Messaging admission control
+
+As of wasmCloud 2.8.0, the host admits messaging deliveries to per-message components through an in-flight limit, applied before an instance is created. When a component is at its limit, further deliveries wait up to `admission_wait` for a slot; a delivery that cannot be admitted in time is dropped with a warning. There is no negative acknowledgment on core NATS, so size the limit for peak load rather than relying on redelivery.
+
+Two host-level ceilings back the per-component limit, set as flags or environment variables on the host (on Kubernetes, via [`runtime.hostGroups[].env`](./operator-manual/helm-values.mdx#runtimehostgroupsenv-envfrom-and-extraargs)):
+
+| Flag | Environment variable | Default |
+| --- | --- | --- |
+| `--wasmcloud-messaging-max-in-flight` | `WASH_WASMCLOUD_MESSAGING_MAX_IN_FLIGHT` | Derived from the instance pool (133 on a stock host) |
+| `--wasmcloud-messaging-max-in-flight-per-component` | `WASH_WASMCLOUD_MESSAGING_MAX_IN_FLIGHT_PER_COMPONENT` | A quarter of the host total (33 on a stock host) |
+
+The in-flight limit is distinct from [`maxConcurrency`](#component-resource-controls), which bounds calls on one warm instance, and from the [connection quotas](./operator-manual/concurrency-and-connections.mdx): it bounds how many messaging deliveries may be executing for the component at all.
 
 ### Runtime Configuration
 
