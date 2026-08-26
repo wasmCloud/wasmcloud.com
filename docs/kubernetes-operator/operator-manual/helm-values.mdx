@@ -376,6 +376,28 @@ Prefer this over `--allow-insecure-registries`, which switches every registry to
 
 For trusting private CAs on components' *outbound HTTPS* (a separate mechanism from OCI pulls), pass `--http-client-ca-path`/`--http-client-trust-roots` via [`runtime.hostGroups[].extraArgs`](#runtimehostgroupsenv-envfrom-and-extraargs) with the bundle mounted the same way.
 
+### `runtime.resources.defaultHeapMemory` and `runtime.resources.coreInstances`
+
+Introduced in 2.8.0. Wasmtime engine sizing for hosts, set inside the `resources` block alongside the Kubernetes requests and limits (the chart strips them out before rendering the container `resources`). Both are passed to the host as environment variables, so older host images ignore them.
+
+- **`defaultHeapMemory`**: Ceiling on any single guest linear memory. Defaults to wasmtime's 4 GiB.
+- **`coreInstances`**: Number of instance slots in wasmtime's pooling allocator. Defaults to 1000.
+
+Sizes accept Kubernetes quantity suffixes (`Gi`/`GiB` binary, `G`/`GB` decimal, bare values are bytes):
+
+```yaml
+runtime:
+  resources:
+    limits:
+      memory: "2Gi"
+    defaultHeapMemory: "512Mi"
+    coreInstances: "500"
+```
+
+As of 2.8.0 the chart also forwards `resources.limits.memory` to the host as its guest memory budget (`--max-guest-memory`). At 2.8.0 the budget is advisory: the host logs it at startup and warns when the heap ceiling or pool reservation looks inconsistent with it, but does not enforce it. When no limit is set, the host derives the budget from the cgroup limit or physical memory.
+
+These values size the engine for the whole host; they are not per-workload limits. A host group with its own `resources` block replaces the chart-wide `runtime.resources` wholesale, so repeat these keys per group if you use both.
+
 ### `runtime.hostGroups[].http.tls.certificate.generate.ipAddresses`
 
 Introduced in 2.7.0. Additional IP SANs for the host group's generated TLS certificate; needed when clients reach the host group by IP rather than name. Note that the chart reuses an existing `hostgroup-<name>-http-tls` Secret if one exists, so adding `ipAddresses` to a live release takes effect only after that Secret is deleted and the certificate regenerated.
