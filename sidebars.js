@@ -98,6 +98,7 @@ const sidebars = {
         },
         'kubernetes-operator/workload-security',
         'kubernetes-operator/crds',
+        'kubernetes-operator/host-interface-configuration',
         'kubernetes-operator/api-reference',
       ],
     },
