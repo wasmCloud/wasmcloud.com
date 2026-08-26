@@ -121,6 +121,7 @@ const sidebars = {
           id: 'wash/developer-guide/build-and-publish',
           label: 'Building and Publishing Components',
         },
+        'wash/developer-guide/managing-wit-dependencies',
         'wash/developer-guide/create-services',
         'wash/developer-guide/network-access-and-socket-isolation',
         'wash/developer-guide/debugging-components',
