@@ -5,25 +5,12 @@ import { useClickOutside } from '@theme/wasmcloud/hooks/use-click-outside';
 import { useKeypress } from '@theme/wasmcloud/hooks/use-keypress';
 import styles from './styles.module.css';
 
-// Converts a GitHub "edit this page" URL into a raw.githubusercontent.com URL
-// so we can fetch the page's original Markdown/MDX source.
-function editUrlToRawUrl(editUrl: string): string | undefined {
-  const match = editUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/edit\/([^/]+)\/(.+)$/);
-  if (!match) return undefined;
-  const [, org, repo, branch, path] = match;
-  return `https://raw.githubusercontent.com/${org}/${repo}/${branch}/${path}`;
-}
-
-function stripFrontMatter(source: string): string {
-  return source.replace(/^---\n[\s\S]*?\n---\n/, '').trim();
-}
-
-async function fetchPageMarkdown(rawUrl: string): Promise<string> {
-  const response = await fetch(rawUrl);
+async function fetchPageMarkdown(url: string): Promise<string> {
+  const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to fetch ${rawUrl}: ${response.status}`);
+    throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
-  return stripFrontMatter(await response.text());
+  return response.text();
 }
 
 function CopyPageDropdown(): React.JSX.Element {
@@ -38,14 +25,18 @@ function CopyPageDropdown(): React.JSX.Element {
   useKeypress('Escape', close);
   useEffect(() => () => window.clearTimeout(copyResetTimeout.current), []);
 
-  const rawUrl = metadata.editUrl ? editUrlToRawUrl(metadata.editUrl) : undefined;
+  // docusaurus-plugin-llms generates each page's Markdown file from its
+  // source path (metadata.id), not its permalink — the two diverge for
+  // index pages, where the permalink drops "index" (id "overview/index" ->
+  // permalink "/docs/overview/") but the generated file keeps it
+  // (".../overview/index.md").
+  const markdownUrl = `/docs/${metadata.id}.md`;
 
   const copyPage = useCallback(async () => {
-    if (!rawUrl) return;
     window.clearTimeout(copyResetTimeout.current);
     setCopyState('copying');
     try {
-      const markdown = await fetchPageMarkdown(rawUrl);
+      const markdown = await fetchPageMarkdown(markdownUrl);
       await navigator.clipboard.writeText(markdown);
       setCopyState('copied');
     } catch (error) {
@@ -54,7 +45,7 @@ function CopyPageDropdown(): React.JSX.Element {
     }
     copyResetTimeout.current = window.setTimeout(() => setCopyState('idle'), 2000);
     setIsOpen(false);
-  }, [rawUrl]);
+  }, [markdownUrl]);
 
   const copyLlmsTxtLink = useCallback(async () => {
     window.clearTimeout(copyResetTimeout.current);
@@ -69,13 +60,6 @@ function CopyPageDropdown(): React.JSX.Element {
     copyResetTimeout.current = window.setTimeout(() => setCopyState('idle'), 2000);
     setIsOpen(false);
   }, []);
-
-  // docusaurus-plugin-llms generates each page's Markdown file from its
-  // source path (metadata.id), not its permalink — the two diverge for
-  // index pages, where the permalink drops "index" (id "overview/index" ->
-  // permalink "/docs/overview/") but the generated file keeps it
-  // (".../overview/index.md").
-  const markdownUrl = `/docs/${metadata.id}.md`;
 
   const copyLabel =
     copyState === 'copied'
@@ -105,7 +89,6 @@ function CopyPageDropdown(): React.JSX.Element {
             role="menuitem"
             className={styles.menuItem}
             onClick={copyPage}
-            disabled={!rawUrl}
           >
             <div className={styles.menuItemText}>
               <span className={styles.menuItemLabel}>Copy page</span>
