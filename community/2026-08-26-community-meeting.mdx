@@ -1,0 +1,233 @@
+---
+date: '2026-08-26'
+title: 'wasmCloud 2.8 Ships, a Native NATS Host Plugin, and Seven Messaging Patterns Under Test'
+description: 'wasmCloud 2.8 lands epoch cancellation and async messaging, Jeremy Fleitz demos the native NATS host plugin, and a seven-pattern NATS test matrix on Kubernetes.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasmcloud nats
+  - nats jetstream
+  - wasm runtime autoscaling
+  - host plugin
+  - wasi p3
+  - async messaging
+  - componentize-go
+  - webassembly news
+chapters:
+  - { seconds: 10, label: "Welcome: wasmCloud 2.8 lands epoch cancellation and async messaging" }
+  - { seconds: 54, label: "Why stopping a spin lock matters: noisy neighbors and DoS" }
+  - { seconds: 138, label: "Jeremy demos the native NATS host plugin (PR #5494)" }
+  - { seconds: 403, label: "Live demo: JetStream replay, drain, and nak in wash dev" }
+  - { seconds: 502, label: "Host-side config: subject grants, streams, and connections" }
+  - { seconds: 569, label: "Review the public WIT API and the plugin config surface" }
+  - { seconds: 663, label: "Doc of the Week: concurrency and connections" }
+  - { seconds: 691, label: "wash wit revamp: manage WIT deps without reaching for wkg" }
+  - { seconds: 744, label: "Eric walks replicas, poolSize, maxConcurrency, and quotas" }
+  - { seconds: 852, label: "What's next: wasmCloud 2.9 and internal host routing" }
+  - { seconds: 950, label: "Distributed cache: reference implementation, pluggable backend" }
+  - { seconds: 1054, label: "Release signals: elevated installs, CRDify, and area/ labels" }
+  - { seconds: 1497, label: "Liam's NATS test matrix: six of seven patterns clean at defaults" }
+  - { seconds: 1975, label: "Portability vs. NATS-native semantics: why not both" }
+  - { seconds: 2142, label: "Why the host owns the client, not the component" }
+  - { seconds: 2378, label: "Dev Doshi and Lachlan Heywood drop in: event sourcing on Wasm" }
+  - { seconds: 2645, label: "Deliberately OOMing the host: JetStream lost nothing" }
+  - { seconds: 3177, label: "WASI HTTP handler: streaming bodies and concurrent requests" }
+  - { seconds: 3442, label: "Teaching LLMs about wasmCloud, and a note on Twitter" }
+image: https://i.ytimg.com/vi/zO9oIwkD4bw/maxresdefault.jpg
+duration: 3558
+showTitle: true
+slug: 2026-08-26-community-meeting
+speakers:
+  - bailey-hayes
+  - jeremy-fleitz
+  - eric-gregory
+  - victor-adossi
+  - liam-randall
+  - dev-doshi
+about: wasmCloud
+mentions:
+  - NATS
+  - WASIPreview3
+  - ComponentModel
+  - Kubernetes
+  - Go
+  - componentize-go
+  - wash
+  - capabilityProvider
+---
+
+import YouTube from 'react-player/youtube';
+
+{/* Video hero — the whole point of this page */}
+
+<YouTube url="https://www.youtube.com/watch?v=zO9oIwkD4bw" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=zO9oIwkD4bw" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The August 26, 2026 wasmCloud community call opens the day after [wasmCloud 2.8](/blog/wasmcloud-2-8-release/) shipped with epoch cancellation and an async `wasmcloud:messaging` API. Jeremy Fleitz demos the **native NATS host plugin** ([PR #5494](https://github.com/wasmCloud/wasmCloud/pull/5494)) — Core NATS, JetStream, and KV as first-class host interfaces with per-workload credentials and subject grants — Eric Gregory walks the new [concurrency and connections doc](/docs/kubernetes-operator/operator-manual/concurrency-and-connections/), and Liam Randall presents a seven-pattern NATS test matrix run on **WebAssembly on Kubernetes**, where six of seven patterns are clean at stock settings and a deliberately OOMed host still lost zero JetStream messages.
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **wasmCloud 2.8 is out, and epoch cancellation is the headline** — Aditya Salunkhe's timeout-hardening work landed, so a guest that spins the CPU without yielding is detected and trapped instead of pinning a core; Bailey Hayes framed it as noisy-neighbor protection on a multi-tenant host and, per Victor Adossi's chat note, denial-of-service protection too
+- **`wasmcloud:messaging@0.3.0` is the async, WASI P3-shaped revision** — streamed message bodies, per-request timeouts, and typed errors served alongside the sync `0.2.0` interfaces, with messaging deliveries now under admission control
+- **The native NATS host plugin makes NATS a first-class citizen, not just pub/sub** — Core NATS publish and request/reply with a per-workload inbox, JetStream durable push, get-by-sequence, `scan` replay from an arbitrary sequence, pull consumers with explicit `ack` / `nak(delay)` / `in-progress` / `term`, and KV get/put/create/update (CAS on revision)/delete/purge/keys/history/status plus watch events
+- **Stream and consumer administration is deliberately absent** — the plugin does not let a workload provision streams or consumers; you create them out of band, and reads are filtered by the same subject grant, so `get-by-sequence` and `scan` only return messages whose stored subject is inside the grant
+- **Security lives on the host, not in the component** — connections are per workload and never the host's own client: each workload gets its own credentials, subject/stream/bucket grants, and inbox prefix, all declared in host config; a request for a stream outside the host's `stream-allow` fails host-side with a 403 without ever reaching the NATS server
+- **There is no P2 world for `wasmcloud:nats`** — because WASI P3 is on by default, the plugin ships P3-only; Jeremy built the demo component with `componentize-go` pinned to upstream Go with the P3 fix, and the interface sits at `wasmcloud:nats@0.1.0`
+- **The new concurrency and connections doc names every knob** — `replicas` at the deployment scope, `poolSize` at the component scope, and `maxConcurrency` at the instance scope, plus per-workload connection quotas (`maxInboundSocketConnectionsPerWorkload`, default 256) and the host-wide `maxConnections` ceiling; outbound HTTP *waits* for a slot up to `--http-connection-wait` (default 5s), while raw sockets and inbound connections are refused immediately so a guest can't deadlock against its own quota
+- **`wash wit` replaced the wkg detour** — 2.8 revamped it so automated manipulation of local WIT deps, and adding or removing interfaces from a world, no longer requires dropping down to `wkg`; `wkg.toml` still works for multi-world overrides
+- **Six of seven NATS patterns are clean at defaults** — Liam's matrix scored Core pub/sub (5,000 msg/s, 900KiB×1000 clean even on a 256M host), request-reply (8,417 req/s at p50 ~0.5ms — the old 2.5–6× tax is gone), JetStream push, JetStream pull (fastest, immune to burst overflow by construction), key-value, and KV watch (100% event delivery every run) as working; the in-host ×25 fan-out republish pattern fails at defaults, losing 56–72% of even 5k bursts with no log signature, and Jeremy is picking up the driver fix
+- **JetStream did its job even when the host was killed** — the one OOM case in the grid (≥512KiB sustained on a 256M host) never lost a message; overload became redelivery, which Liam called the point of the exercise since every user report of this failure mode has been a Kubernetes memory limit killing the host, not NATS
+- **The host-level interface argument, made concretely** — if the component creates the client, the component owns authentication, connection pooling, resource cleanup, retries, and reconnects; push that to the host and you get burst-to-zero, stateless event processing that a stateful in-guest client simply can't do
+- **Release process is getting explicit about elevated installs** — three releases running, users have asked whether a given upgrade touches CRDs or roles (an admin-privileged install) or just deployment YAML; Bailey is adopting the `area/` label convention used by Cilium, Flux, Helm, Grafana, Loki, and Linkerd, committing labels to the repo with a Flux-style reconciler action, and evaluating [CRDify](https://github.com/kubernetes-sigs/crdify) for CRD drift — possibly graduating the alpha CRDs so it can be strict
+
+## Chapters
+
+- [0:10 — Welcome: wasmCloud 2.8 lands epoch cancellation and async messaging](https://youtu.be/zO9oIwkD4bw?t=10)
+- [0:54 — Why stopping a spin lock matters: noisy neighbors and DoS](https://youtu.be/zO9oIwkD4bw?t=54)
+- [2:18 — Jeremy demos the native NATS host plugin (PR #5494)](https://youtu.be/zO9oIwkD4bw?t=138)
+- [6:43 — Live demo: JetStream replay, drain, and nak in wash dev](https://youtu.be/zO9oIwkD4bw?t=403)
+- [8:22 — Host-side config: subject grants, streams, and connections](https://youtu.be/zO9oIwkD4bw?t=502)
+- [9:29 — Review the public WIT API and the plugin config surface](https://youtu.be/zO9oIwkD4bw?t=569)
+- [11:03 — Doc of the Week: concurrency and connections](https://youtu.be/zO9oIwkD4bw?t=663)
+- [11:31 — wash wit revamp: manage WIT deps without reaching for wkg](https://youtu.be/zO9oIwkD4bw?t=691)
+- [12:24 — Eric walks replicas, poolSize, maxConcurrency, and quotas](https://youtu.be/zO9oIwkD4bw?t=744)
+- [14:12 — What's next: wasmCloud 2.9 and internal host routing](https://youtu.be/zO9oIwkD4bw?t=852)
+- [15:50 — Distributed cache: reference implementation, pluggable backend](https://youtu.be/zO9oIwkD4bw?t=950)
+- [17:34 — Release signals: elevated installs, CRDify, and area/ labels](https://youtu.be/zO9oIwkD4bw?t=1054)
+- [24:57 — Liam's NATS test matrix: six of seven patterns clean at defaults](https://youtu.be/zO9oIwkD4bw?t=1497)
+- [32:55 — Portability vs. NATS-native semantics: why not both](https://youtu.be/zO9oIwkD4bw?t=1975)
+- [35:42 — Why the host owns the client, not the component](https://youtu.be/zO9oIwkD4bw?t=2142)
+- [39:38 — Dev Doshi and Lachlan Heywood drop in: event sourcing on Wasm](https://youtu.be/zO9oIwkD4bw?t=2378)
+- [44:05 — Deliberately OOMing the host: JetStream lost nothing](https://youtu.be/zO9oIwkD4bw?t=2645)
+- [52:57 — WASI HTTP handler: streaming bodies and concurrent requests](https://youtu.be/zO9oIwkD4bw?t=3177)
+- [57:22 — Teaching LLMs about wasmCloud, and a note on Twitter](https://youtu.be/zO9oIwkD4bw?t=3442)
+
+## Meeting Notes
+
+### wasmCloud 2.8: Epoch Cancellation and Async Messaging
+
+Bailey Hayes opened the last call of the month a day after [wasmCloud 2.8](/blog/wasmcloud-2-8-release/) shipped. The biggest item is **epoch cancellation**, landed from Aditya Salunkhe's timeout-hardening work: guest code that spins the CPU without ever yielding is now detected and trapped. Victor Adossi asked the useful naive question — why does anyone care about a spin lock? — and Bailey's answer is the whole multi-tenancy argument in miniature: on a host running many tenants' workloads, you do not want one noisy neighbor burning CPU cycles that belong to everyone else. "I don't want to be spinning, wasting my CPU cycles on something that maybe is intentionally being bad or is mistakenly being bad. But regardless, it's got to stop." Victor's addendum in chat: it is also how you stop someone running a denial-of-service against your host.
+
+Second on the list is the **async `wasmcloud:messaging` API** — effectively a P3 revision of wasmCloud Messaging, with streamed message bodies, per-request timeouts, and typed errors served alongside the existing sync `0.2.0` interfaces, and messaging deliveries now bounded by admission control. Bailey also flagged a quieter quality-of-life win: **`wash wit` was revamped**. Users had been reaching for [`wkg`](https://github.com/bytecodealliance/wasm-pkg-tools) to manage local WIT dependencies in a couple of different ways; that detour is no longer necessary. `wash wit` now handles automated manipulation of local WIT deps and adding or removing interfaces from your world definition, with `wkg.toml` still supported out of the box for multi-world or special-override setups.
+
+### The Native NATS Host Plugin
+
+Jeremy Fleitz picked up Aditya's original spike and turned it into a **native NATS [host plugin](/docs/overview/hosts/plugins/)** — [PR #5494](https://github.com/wasmCloud/wasmCloud/pull/5494) on wasmCloud. The framing matters: today's `wasmcloud:messaging` gives you a subject and a subscription, which is genuinely all pub/sub is. It does not give you [NATS](/docs/overview/transport/) — not **JetStream**, and not a properly vetted **KV** surface. The plugin does.
+
+The PR's own scope statement is unusually precise about the boundary. **What it provides:** Core NATS publish and request/reply with a per-workload inbox, plus host-driven subscriptions with optional queue groups dispatched into a `core-handler` export; JetStream durable push, get-by-sequence, and `scan` — replay from an arbitrary stream sequence *without creating a consumer* — plus pull consumers via `open-pull-consumer` with batches dispatched into a `jetstream-handler` export and explicit `ack` / `nak(delay)` / `in-progress` / `term`; and KV get, put, create, update (compare-and-swap on revision), delete, purge, keys, history, and status, with watch events dispatched into a `kv-handler` export. **What it deliberately does not provide:** stream and consumer administration. That is absent by design rather than exported-and-denied — you provision out of band.
+
+Security is the other half of the design. Connections are **per workload, never the host's own client**: each workload gets its own credentials, subject/stream/bucket grants, and inbox prefix. Grants are declared on the host side, and reads are filtered through the same subject grant, so `get-by-sequence` and `scan` only return messages whose stored subject falls inside it. A request for a stream outside the host's `stream-allow` fails host-side and comes back as a 403 without ever reaching the NATS server. As Jeremy put it, the goal is that workload components don't have enough rights to NATS "to be too aggressive with making new NATS subjects and things like that."
+
+Because **WASI P3 is enabled by default** now, the plugin ships P3-only — there is no P2 component world for `wasmcloud:nats`, a deliberate divergence from Aditya's original spike, which had a P2 option. The interface sits at `wasmcloud:nats@0.1.0` (not yet bumped to a minor release), the matching Go package lands in [wasmCloud Go](https://github.com/wasmCloud/go) as a single `nats` package covering `corehandler`, `jetstreamhandler`, and `kvhandler`, and everything is pinned to 2.8.0.
+
+The demo — a `nats-stream-replay` example headed for the Go component repo — ran in **`wash dev`** at Bailey's request, though Jeremy noted he'd also been running the whole set in a Kind cluster. He published a handful of events including two deliberately bad ones (`nonsense` with no `=` sign, and `retry=fail`), then walked the HTTP surface: fetch message 1, replay from sequence 1 with a count of 2 (note the `"next": 3` in the response), replay from 3, and finally `POST .../consumers/workers/drain?batch=10` to drain the pull consumer — with the malformed message terming and the retry message naking with a backoff, exactly as intended. The component is built with `componentize-go` (`GOFLAGS=-tags=componentizego_async`) against an upstream Go pinned to the fix that makes WASI P3 work.
+
+Configuration is the part Jeremy wanted people to look at hardest, because it is host-side. In `wash dev`'s config, a `host_interfaces` entry names `wasmcloud`/`nats`/`0.1.0`, lists the interfaces the component may use (`types`, `jetstream`), and carries the connection details — `servers`, `stream-allow`, `subject-allow`. In a workload deployment manifest the same shape appears under `hostInterfaces`. Bailey's review guidance to the community was pointed: spend your code-review time on the **public API — the WIT definition and the plugin configuration surface** — because those are the parts that are hard to change after landing, while the implementation inside can always evolve. She singled out Yordis Prieto by name for feedback (he was on a cruise) and welcomed anyone with production NATS experience to weigh in.
+
+### Doc of the Week: Concurrency and Connections
+
+Eric Gregory presented the new **[concurrency and connections](/docs/kubernetes-operator/operator-manual/concurrency-and-connections/)** page, written because, in Bailey's words, "we got a lot of feedback from folks that it's kind of hard to conceptualize all the different knobs that you need and when to tune what and where and why and what axis they operate on."
+
+The doc splits the controls into two families. **Instance limits** decide how many calls a single warm instance serves concurrently and how many warm instances the host keeps; they live in the `Workload` or `WorkloadDeployment` custom resource. **Connection quotas** decide how much of the network a workload may hold open; they live on the host, set through Helm values or host flags, and apply to every workload that lands there. The three scoping settings are laid out as a table: `maxConcurrency` at the *instance* scope (calls one warm instance serves at the same time), `poolSize` at the *component* scope (warm instances the host keeps), and `replicas` at the *deployment* scope (copies of the workload across the host group). On the quota side, `maxInboundSocketConnectionsPerWorkload` (default 256) caps inbound published-port connections per workload, and `maxConnections` is the host-wide ceiling, derived from the process descriptor limit.
+
+The behavioral asymmetry is the part worth memorizing: **outbound HTTP waits** for a slot, up to `--http-connection-wait` (default 5s), then fails — which makes it the surface most sensitive to instance concurrency, because overlapping warm calls all draw from the same outbound pool. **Raw sockets and inbound connections are refused immediately**, which avoids a guest deadlocking against its own quota. The doc then works a sizing example: `poolSize: 10` with `maxConcurrency: 8` is up to 80 calls in flight on one replica, so a component making one outbound HTTP request per call wants up to 80 outbound connections at peak — comfortably under the default 128, but raise `maxConcurrency` to 16 or fan out to several backends and you cross it, at which point requests wait quietly and then fail, showing up as latency spikes and timeouts rather than an obvious error. Read it alongside [autoscaling WorkloadDeployments with HPA and KEDA](/docs/kubernetes-operator/operator-manual/autoscaling/) if you are tuning **wasm runtime autoscaling** end to end.
+
+### The Road to 2.9
+
+Bailey laid out the next two weeks. A **2.9** is already certain because the NATS plugin brings a new feature. The other large item is **routing internal to the host**, surfaced in a couple of ways: directing traffic to a service that is local to your workload, and directing traffic toward host components serving on your host — which means broadcasting those ports and introducing the concept of a **DNS internal name**. Host components can already trigger exports on workloads, but they cannot yet trigger a `wasi:cli/run` export; that lands next, so a call can target either a service or the components inside a workload. Beyond features, the team is "very much in the throes of battle testing" on preventing noisy-neighbor OOMs and CPU throttling, so expect a continued stream of fixes in that domain.
+
+On the **distributed cache**, Aditya asked for an update and Bailey was frank: not started, because the [host component plugin](/docs/runtime/creating-host-plugins/) has been her main unit of work and is nearly feature complete. The design tension is the interesting part. "We want to give folks the picks and shovels, but once you start stepping into a way to distribute cache for folks, you're stepping into telling them how they have to do their infrastructure." The goal is a way for people to plug in what they want via the Helm chart, with a **JetStream reference implementation** and a design that lets someone supply something else entirely. Since a community member already runs a JetStream implementation on top of wasmCloud, the plan is to get a session on the calendar and merge those lessons upstream. Zooming out: the team is midway through Q3, the quarter that lines up with what the wasmCloud booth will show at KubeCon, and every roadmap item except the distributed cache is closed out.
+
+### Release Signals: Elevated Installs, CRDify, and area/ Labels
+
+Jeremy prompted Bailey to share the labeling proposal she had dropped in the wasmCloud Slack, and it turned into the most operator-relevant segment of the call. The pattern that triggered it: three releases running, the same question. If an upgrade changes a **custom resource definition or the roles**, that is an *elevated install* — the user has to get their admins to run it. If it is just the deployment YAML, they are fine. With minor releases cutting every two weeks, that distinction needs to be obvious twice: at **code review**, so contributors know a change has larger impact, and at **release time**, so operators can see exactly what changed.
+
+Two mechanisms are in flight. First, labels: rather than inventing names, Bailey is adopting the `area/` convention already used by Cilium, Flux, Helm, Grafana, Loki, and Linkerd — `area/rbac`, `area/helm`, `area/crds` — on the reasoning that people working across CNCF projects should not have to learn a wasmCloud dialect. And rather than clicking labels into existence once by hand, she is copying a trick Flux CD popularized: **commit the label definitions into the repo** and let a reconciling GitHub Action create and sync them, so the definitions live in code and get code-reviewed. That PR was expected the same day. Second, **[CRDify](https://github.com/kubernetes-sigs/crdify)** — a schema checker for CRD drift, new to Bailey that morning. The wrinkle is that wasmCloud's CRDs are still `alpha`, and CRDify's default configuration won't complain about alpha-level changes. Bailey's take: the CRDs have effectively only been revved for multi-tenancy work (cluster- versus namespace-level install) and have otherwise been stable, everything else is at v2, so it may be time to **graduate them** and then be strict — with CRDify configured to be pedantic in the meantime either way.
+
+### Seven Messaging Patterns, Scored
+
+Liam Randall walked through the testing campaign behind the NATS work. Rather than benchmark first, he started by mapping the **archetypal patterns**: a couple in Core NATS (all stateless) and a couple in JetStream, seven foundational patterns in total, with key-value and blob store deliberately moved out to a round-two follow-up. Each pattern is scored across three message-size regimes — small (16B–16KiB), large (256KiB–900KiB), and at scale (10k+ bursts and sustained) — against a range of message rates, on a 512M host, with a final tuning pass to find the patterns worth writing into the docs. NATS' 64MB default memory limit motivated the extra size targets. Every row represents roughly 15–20 tests underneath.
+
+The bottom line, as of the call: **six of seven patterns work well at stock settings, one is broken at defaults.**
+
+| # | Pattern | Verdict | Notable |
+| --- | --- | --- | --- |
+| 1 | Core pub/sub | ✅ | 5,000 msg/s clean at 10k bursts; 900KiB×1000 clean even on a 256M host |
+| 2 | Request-reply | ✅ | 8,417 req/s at p50 ~0.5ms — the old 2.5–6× tax is gone; queue groups round-robin replicas exactly |
+| 3 | JetStream push | ⚠️ most resilient | Never lost a message in the knob grid — overload becomes redelivery; 30s fixed ack-wait plus slow handlers can cause a redelivery storm |
+| 4 | JetStream pull | ✅ fastest | 16KiB×10k clean; immune to burst overflow by construction |
+| 5 | Key-value | ✅ | ~333 ops/s serial, 1,000-op batches clean, no leaks |
+| 6 | KV watch | ✅ | 100% event delivery every run; 1,000 changes → 1,000 events; rebuilds after server restart |
+| 7 | Fan-out (in-host ×25 republish) | ❌ at defaults | Loses 56–72% of even 5k bursts; ~4,300 drops left no log signature |
+
+Pattern 7 — the in-host ×25 republish shape, which mirrors a real customer demo — is the one Jeremy picked up. Today it can be worked around by putting JetStream in the middle or raising capacity and burst (65536 was clean); the driver fix wanted is **byte-aware buffering plus a warning that names the offending workload**, since the current failure is silent.
+
+The single OOM case in the grid is worth its own paragraph, and Liam returned to it later for Dev Doshi's benefit. Sustained ≥512KiB payloads killed a 256M host (buffer + capacity + payload); 512M survives. Crucially, **every layer of that failure is Kubernetes**: the host is being OOM-killed by memory limits set in the pod spec, which is exactly the shape of every user report of this failure mode — a host running outside Kubernetes probably would not have OOMed. And when it happened, in JetStream *push* mode, with objects arriving faster than the components could take them, **not a single message was lost**. Everything restarted and the acknowledgements settled correctly. JetStream pull was the fastest of the set, because it lets wasmCloud pick up and go at its own pace. Liam was explicit that none of this is a performance campaign — instance reuse, pool sizing, and a dozen other knobs are untouched — the goal is "make it work" first, then a performance spike on the interesting edges.
+
+The output is documentation and templates: a set of "hero applications" walking through all the primary NATS modes including key-value and blob store, and a zero-to-hero story that runs the patterns through a single fictional scenario. Jeremy's take on the methodology: because the patterns are defined independently of language, the same matrix compares **componentized Go against Rust** — and Python later — which is how you answer "are we fast yet, and are we componentized yet" with data. Bailey's takeaway was about velocity: Jeremy started the NATS plugin work on a *Friday* and it was production-adjacent by the following Wednesday.
+
+### Portability vs. Native Semantics, and Where the Client Belongs
+
+Liam raised the recurring architectural question: lowest-common-denominator interfaces versus tightly coupled, product-specific ones. Now that adding a provider is cheap, will wasmCloud lean toward native interfaces — a Kafka provider, a Redpanda provider — to expose product-specific features?
+
+Bailey: **why not both.** You reach for the lowest common denominator when portability is the goal above all else. The [wasmCloud blob store interface](/docs/overview/interfaces/) is the model case — very S3-shaped, but it works across most S3-compatible APIs *and* your local filesystem on Windows, Linux, and macOS, which is "pretty freaking cool" and has real portability implications. An event bus is a different animal, because the broker's semantics are part of the contract on both sides. "Do you ack a nack? You're not going to ack a nack on a basic pub/sub API, which is all that wasmCloud Messaging and wasi:messaging were meant to be." Fire-and-forget is a legitimate interface; it is just not what people who need durability actually want. Aditya's chat comment landed the same point from the other side: chasing the lowest common denominator means everybody is a little unhappy with your API.
+
+That raised the natural follow-up, which Bailey anticipated: *why not just compile the NATS client into the component?* You have sockets now. You have gRPC. The answer is about what the component is responsible for. If the component creates the client, the component owns **authentication, client-side connection pooling, resource cleanup, retries, and reconnects** — all baked into every guest. On a large multi-tenant host with thousands of components, the binary-size cost is real but not decisive. Where it becomes decisive is exactly this use case: when you want to **fan out and burst instantly, then scale straight back down**. A stateful in-guest client can't do that. Push the connection lifecycle into the host and expose it over WIT, and serverless, stateless event processing becomes possible. Liam's closing note on the topic: the pub/sub-over-NATS pattern is where users have been stubbing their toes, and the plugin is aimed squarely at that sharp corner.
+
+### Drop-Ins: Event Sourcing, S2, and the WASI HTTP Handler
+
+Mid-call, **Dev Doshi** and Lachlan Heywood joined. Dev is building his own AI harness on WebAssembly and event sourcing, currently on a homegrown event store, and is evaluating wasmCloud among other directions for scaling it out. He raised a concern he'd been relayed about NATS for durable state — specifically around the [Jepsen analysis](https://jepsen.io/analyses) — which Liam answered with the OOM results above and Victor answered from the other direction: NATS came out of Jepsen better than some well-known databases, and the ease of meshing across clouds is why people are increasingly appreciating it. Bailey drew the important architectural line: **wasmCloud v2 uses NATS core pub/sub for its control plane only**, intentionally stateless and reconciled by the operator. The V1 assumption that everything travels over NATS is simply not true in V2 — bring whatever event bus and plugins you want, and opt out of the first-party NATS JetStream plugin if it doesn't suit you.
+
+Dev also asked about **[S2](https://s2.dev/)**, a stream abstraction over object storage that has been exploring WebAssembly compute on top of streams. Victor's read: since S2's core is hosted rather than open source, the relevant question for wasmCloud is whether it makes a good *messaging backend* — and given the API surface, that looks straightforward. Bailey noted Redpanda is on the same trajectory: data-pipeline products keep reaching for Wasm to run **custom transforms and UDFs**. Victor's caution is worth repeating for anyone building that way: take Wasm off the shelf and you still have to bring a way to move complex values and reference things — you have to bring a type system with you. Emscripten, wasm-bindgen, the [component model](https://component-model.bytecodealliance.org/), the Wasmer stack — pick the wrong one, or roll your own, and you either ship SDKs for every language or inherit a great deal of pain.
+
+That led into the call's most useful spec explainer. Dev asked whether there was a zero-copy way for an HTTP handler to be invoked with the capability to read the payload. Bailey: that is exactly what the **`wasi:http` handler** in the latest WASI standard is. Inside the handler you get streams for the body, the headers, even footers and trailers — all of it streaming, and battle-tested against the full battery of web tests from Fastly and others. wasmCloud faithfully implements the spec and surfaces most of what comes out of [Wasmtime](https://wasmtime.dev/). Two consequences fall out of it: one handler supports **HTTP/1, 2, and 3**, so you upgrade to HTTP/3 without touching guest code; and because of native async in [WASI P3](/blog/wasi-p3-on-wasmcloud/) and the component model, the host does **instance pooling and max concurrent requests** — while your component is blocked on an I/O-bound outbound call, the same instance services another request. When Victor mentioned a ~60k requests/second figure from Bailey's earlier testing and called it "suspiciously" close to native Rust, Liam explained the number: that test saturates one full CPU on a MacBook. Add threads and it goes considerably higher.
+
+### Teaching LLMs About wasmCloud
+
+The call closed on a distribution question Liam has been running as an experiment all year: publishing meeting transcripts, notes, summaries, and agendas so that LLMs learn the current state of wasmCloud rather than the 1.x-era version. Dev's answer was a useful data point. He *had* found the recent `wasi:http` handler work — via a ChatGPT research session that wasn't even targeted at WebAssembly — and, looking at these pages, said "the whole structure of the layout and the transcripts and everything, I think that makes perfect sense for why it's effective." His two pieces of feedback: he doesn't check the community page regularly (he described having "a WebAssembly phase like once every year"), and **he doesn't see wasmCloud on Twitter** — which, he suggested, would also help the models find it. Liam took the note and committed to posting agendas and meeting links going forward. Bailey closed by offering to host another wasmCloud Triangle meetup, and invited Dev back to demo his harness on a future call.
+
+## WebAssembly News and Updates
+
+This week in **webassembly news**: [wasmCloud 2.8](/blog/wasmcloud-2-8-release/) shipped with epoch-based cancellation for runaway guests, `wasmcloud:messaging@0.3.0` async interfaces with streamed bodies and typed errors, wasmtime memory tuning exposed through the Helm chart, and a revamped `wash wit`; the native NATS host plugin ([PR #5494](https://github.com/wasmCloud/wasmCloud/pull/5494)) is in review with Core NATS, JetStream, and KV as WIT interfaces at `wasmcloud:nats@0.1.0`; [componentize-go](https://github.com/bytecodealliance/componentize-go) is now the path for Go components targeting WASI P3, since the plugin ships P3-only; and the wider ecosystem keeps converging on Wasm for stream processing, with [Redpanda](https://www.redpanda.com/) transforms and [S2](https://s2.dev/) both exploring Wasm compute over streams — a reminder from Victor that the [component model](https://component-model.bytecodealliance.org/) is what saves you from shipping an SDK per language. Follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [wasmCloud blog](/blog/) for what lands next.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a production substrate for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: Running NATS-Backed WebAssembly on Kubernetes
+
+If you are running **WebAssembly on Kubernetes** and your workloads talk to a message bus, this call is the most concrete guidance wasmCloud has published on the subject. Three pieces fit together. First, the [native NATS host plugin](https://github.com/wasmCloud/wasmCloud/pull/5494) moves the NATS client out of your component and into the [host](/docs/overview/hosts/plugins/), which means authentication, connection pooling, retries, and reconnects stop being your guest's problem — and, more importantly, your components become burst-scalable, because there is no long-lived client state pinning them open. Second, [concurrency and connections](/docs/kubernetes-operator/operator-manual/concurrency-and-connections/) tells you which knob to turn: `maxConcurrency` per warm instance, `poolSize` per component, `replicas` per deployment, and the per-workload and host-wide connection quotas that those three multiply into. Get the arithmetic wrong — `poolSize: 10` × `maxConcurrency: 16` with a fan-out to several backends — and you exceed the default outbound pool, at which point requests wait for up to five seconds and then fail, which surfaces as unexplained tail latency rather than an error. Third, the test matrix says what actually happens under load: six of seven NATS patterns are clean at stock settings, and in the one case where a Kubernetes memory limit OOM-killed the host mid-stream, JetStream still delivered every message once the host came back. The security model is the quiet fourth piece: subject, stream, and bucket grants are declared on the host, so a workload that asks for a stream it wasn't granted is refused locally with a 403 that never reaches your NATS cluster — [capability-based security](/docs/kubernetes-operator/workload-security/) applied to messaging rather than bolted on after it.
+
+## Who Should Watch This
+
+**Platform engineers running NATS or JetStream behind Kubernetes** should start at Jeremy's plugin demo ([2:18](https://youtu.be/zO9oIwkD4bw?t=138)) and stay through the host-side config walkthrough ([8:22](https://youtu.be/zO9oIwkD4bw?t=502)) — subject grants and per-workload credentials are the operational model, not an afterthought. **SREs and anyone sizing a wasmCloud deployment** want Eric's concurrency doc walkthrough ([12:24](https://youtu.be/zO9oIwkD4bw?t=744)) plus Liam's OOM analysis ([44:05](https://youtu.be/zO9oIwkD4bw?t=2645)), which together explain both the knobs and what happens when you get them wrong. **Architects weighing portable interfaces against native ones** should watch the exchange starting at [32:55](https://youtu.be/zO9oIwkD4bw?t=1975) — it is the clearest statement of when wasmCloud reaches for a lowest-common-denominator API and when it doesn't. And **anyone building HTTP-heavy Wasm workloads** should catch the `wasi:http` handler explainer at [52:57](https://youtu.be/zO9oIwkD4bw?t=3177).
+
+## Up Next
+
+**wasmCloud 2.9** is expected roughly two weeks out, carrying new NATS plugin features and the first slice of internal host routing — directing traffic to workload-local services and to host components via a DNS internal name, plus letting host components trigger a `wasi:cli/run` export. The [NATS plugin PR](https://github.com/wasmCloud/wasmCloud/pull/5494) is in review, with feedback wanted specifically on the WIT definition and the plugin config surface; Jeremy is fixing the fan-out pattern that fails at defaults, and Liam's Rust and componentized Go runs finish out into documentation and templates. Bailey's `area/` label PR and label-reconciler action were due the same day, with CRDify under evaluation and a possible CRD graduation out of alpha behind it. A distributed-cache scoping session goes on the calendar next week, with a JetStream reference implementation and a pluggable design as the target. And Dev Doshi has an open invitation to demo his event-sourcing Wasm harness on a future call.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-08-26-community-meeting-transcript/)**
