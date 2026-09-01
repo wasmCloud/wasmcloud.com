@@ -1,0 +1,457 @@
+---
+date: '2026-08-26'
+title: 'Transcript: wasmCloud 2.8 Ships, a Native NATS Host Plugin, and Seven Messaging Patterns Under Test'
+description: 'Full transcript of the August 26, 2026 wasmCloud community call covering the 2.8 release, the native NATS host plugin, concurrency controls, and NATS testing on Kubernetes.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasmcloud nats
+  - nats jetstream
+  - wasm runtime autoscaling
+  - host plugin
+  - wasi p3
+  - async messaging
+  - componentize-go
+  - webassembly news
+image: https://i.ytimg.com/vi/zO9oIwkD4bw/maxresdefault.jpg
+showTitle: true
+slug: 2026-08-26-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - NATS
+  - WASIPreview3
+  - ComponentModel
+  - Kubernetes
+  - Go
+  - componentize-go
+  - wash
+  - capabilityProvider
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-08-26-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=zO9oIwkD4bw" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=zO9oIwkD4bw" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:10](https://youtu.be/zO9oIwkD4bw?t=10)
+
+Hey, welcome to wasmCloud's community call for Wednesday, August 26. It's our last one for this month. We yesterday released wasmCloud 2.8, and it came with some pretty nice new features. The biggest thing I want to call out right now is we got the epoch cancellation work from Aditya landed, so that's a really great way to prevent spin locks on the host. So that's probably one of the biggest features. After that one is an async API for wasmCloud Messaging, so basically a P3 rev on top of wasmCloud Messaging, and then a whole bunch of fixes. Yeah, Victor.
+
+**Victor Adossi** [0:54](https://youtu.be/zO9oIwkD4bw?t=54)
+
+Hey Bailey, why would someone want to prevent a spin lock?
+
+**Bailey Hayes** [0:58](https://youtu.be/zO9oIwkD4bw?t=58)
+
+Oh, that's a great question. Well, if you have a multi-tenanted host and you've got one tenant running on there, you don't want that noisy neighbor to be able to keep you from being able to do the work on your other workloads. I don't want to be spinning, wasting my CPU cycles on something that maybe is intentionally being bad or is mistakenly being bad. But regardless, it's got to stop. So I don't want to spin and waste my resources. I don't want to impact other workloads that are running on the host. And for the most part, you know, what we're going to detect there is basically cases where things have gone awry. And then Victor added in the chat, aka, you know, we don't want to have any kind of denial of service attack that people are able to run against those.
+
+**Victor Adossi** [1:48](https://youtu.be/zO9oIwkD4bw?t=108)
+
+Cool, thank you.
+
+**Bailey Hayes** [1:50](https://youtu.be/zO9oIwkD4bw?t=110)
+
+Thank you, Victor. So first thing I wanted us to get started with is a demo from Jeremy. So that's 2.8. We'll talk a little bit more about what's next for the next version of wasmCloud, and I think one of the biggest features will be what Jeremy's about to show.
+
+**Jeremy Fleitz** [2:18](https://youtu.be/zO9oIwkD4bw?t=138)
+
+Audio problems. Sorry. Hello, everybody. Yeah. So what I've been working on, this goes perfectly with 2.8. So wasmCloud 2.8, there were some changes that were put in just to help with managing host plugins. We do have component plugins, you know, that are available behind a feature branch. But what we want to do is make a native NATS host plugin. Now, there's been a lot of work already done by Aditya on this subject, and I went ahead and took his branch that was out there and just started adding some additional features to it. So I just wanted to just do a quick walkthrough on what this all does. So the native NATS host plugin. So this just basically makes it more of a first-class citizen. Instead of just doing wasmCloud Messaging, which is really just, you know, you have a subject and you subscribe to it, it doesn't really have the full functionality of NATS, in particular JetStream, or even, you know, fully vetting out the exact KV offering that NATS has.
+
+<img src="/img/community/2026-08-26/image001.webp" alt="GitHub pull request 5494, Native NATS Host Plugin, showing what the plugin provides for Core NATS, JetStream, and KV, plus the per-workload security model" />
+
+**Jeremy Fleitz** [3:20](https://youtu.be/zO9oIwkD4bw?t=200)
+
+There's also some security updates too in here as well. You basically have to have the subjects already pre-configured on NATS. This could be expanded later, you know, as a capability, but we want to have it so that the workload components don't have as much rights to NATS, so that it can't be too aggressive with making new NATS subjects and things like that. So this is in a branch right now, just native NATS host plugin. It's in wasmCloud pull request 5494. If people want to look at it, at the same time, what I wanted to also do is going back to wasmCloud Go. So it's going to be the Go package that is going to be merged up into main for wasmCloud Go later this week. It goes with 2.8.0. All the components have been updated to 2.8.0, and if you notice NATS right here, it's just NATS. There's not a NATS P3.
+
+<img src="/img/community/2026-08-26/image002.webp" alt="The wasmCloud Go repository showing the single nats package with corehandler, jetstreamhandler, and kvhandler directories" />
+
+**Jeremy Fleitz** [4:40](https://youtu.be/zO9oIwkD4bw?t=280)
+
+So what I ended up doing with the NATS native plugin, there's not a P2 component world that's available to NATS. If you want to use the NATS host plugin, you have to use WASI P3, because WASI P3 is enabled now by default, and we should just keep on moving forward, not support backwards. With that, there is a minor change with how Aditya started with this. Originally, I think, targeting or had a P2 in there as an option. I went ahead because this hasn't been released yet. The NATS WIT that is out there — I'm in the wrong spot. Sorry. Let me jump over to here. Yeah, so all the WIT is at 0.1.0. So it didn't bump up a minor release. It's not 0.2.
+
+<img src="/img/community/2026-08-26/image003.webp" alt="A world.wit file importing wasmcloud:nats/types@0.1.0 and wasmcloud:nats/jetstream@0.1.0 alongside wasi:cli/environment" />
+
+**Jeremy Fleitz** [5:50](https://youtu.be/zO9oIwkD4bw?t=350)
+
+So I'm just going to do a quick demo of just all this working. We have been doing some performance testing and some load testing. That's been driven by Liam on the call, just as in a separate project, just testing out this NATS plugin. But this is just a quick example, and this is going to be in the Go component repo of just how to use NATS stream replay. So I already went ahead and got this configured locally, running a NATS server, and actually used `wash dev`, because Bailey did call out that we needed to make sure we test this in `wash dev`. I've always been going through the Kind approach and testing everything in Kind, so I do have all these examples working also in a Kind cluster, but just to show off that this can run locally here. I'm just going to copy over just a couple of these events, and this one right here — if you notice, it's just not formed correctly. It's looking for an equal sign; there's no equal sign there, so we'll put that out there too, just to make sure it doesn't, you know, choke. And then this one right here, just to say that there's an error.
+
+<img src="/img/community/2026-08-26/image004.webp" alt="The nats-stream-replay README showing the nats stream add and nats consumer add setup commands and the componentize-go build line" />
+
+**Jeremy Fleitz** [6:43](https://youtu.be/zO9oIwkD4bw?t=403)
+
+So I do have — oh, see here. Yeah, so this is my `wash dev` that's running right now with this component. To build it I did use componentize-go. componentize-go upstream is tagged, I guess is the right word, or pinned to the upstream Go that does have the fix so that WASI P3 is supported, and so just, you know, building like this and running it just using `wash dev` — that's what I have going on right now. So I went ahead and already posted, you know, my subjects here. So with `wash dev`, you know, I expect to be able to get this message back, and sure enough, I got colour blue. I can go ahead and request two at a time. So this should go from one and two, and so there's sequence two right there. Might be hard to see. Sorry. And then also, you know, last one, sequence three. And if you notice right here, you know, it has the sequence there, and it says retry fail. So if I go ahead and drain, I can also just call the drain as well, and just make sure this all works happy. And sure enough, there's all the streaming events.
+
+<img src="/img/community/2026-08-26/image005.webp" alt="Terminal showing curl calls against the streams endpoint: fetching message 1, replaying from sequence 1 and 3, and draining the workers consumer with a batch of 10" />
+
+**Jeremy Fleitz** [8:05](https://youtu.be/zO9oIwkD4bw?t=485)
+
+Yeah. So once this is, once this — I encourage anybody to try this out right now in the branch. But once this is, you know, code reviewed, we will get this merged up. I guess one thing to call out also is the way that this looks like in the `config.toml`. So once again, this is a host plugin. It's native, but you have to give it — on the host side is where you do configuration. So that includes setting up what is allowed by this component, as well as which subjects are allowed. This is also where you'd put your connection information in. Now this is just a server that's unauthenticated, but if you do have any authentication, you'd put it inside the host config itself.
+
+<img src="/img/community/2026-08-26/image006.webp" alt="A wash dev config file declaring host_interfaces for wasmcloud:nats 0.1.0 with the types and jetstream interfaces, a NATS server address, stream-allow, and subject-allow grants" />
+
+**Jeremy Fleitz** [8:55](https://youtu.be/zO9oIwkD4bw?t=535)
+
+So that if you look at it from a workload deployment manifest perspective, so, you know, obviously this is the image, but here's the host interfaces right here, and right here is where it's saying it wants to use `wasmcloud:nats@0.1.0`, and it wants the types and JetStream interface. Any questions? Oh, buddy, I see something in the chat. Okay, well, I guess back to you, Bailey.
+
+<img src="/img/community/2026-08-26/image007.webp" alt="A workload deployment YAML showing the hostInterfaces block requesting the wasmcloud nats types and jetstream interfaces" />
+
+**Bailey Hayes** [9:29](https://youtu.be/zO9oIwkD4bw?t=569)
+
+Yeah, thank you, Jeremy. Aditya, you did the initial spike on this work, and I was looking at doing the review of it, and, you know, for the most part the WIT definitions are very, very similar. I think in terms of us spending our code review time, I think we need to really focus on the public API. So that's the WIT definition, and then also how to configure this plugin. That is where most of the API surface is that is harder to change after we land. The individual implementation on the inside can obviously always evolve. So that's probably where I'm going to spend my time code reviewing today. But I also really welcome folks who have domain knowledge and have done this type of thing with NATS before to chime in, especially because I want to make sure it works for everybody's workload that they care about. So also Yordis, I know you're not on the call right now, but if you're watching this later, that means you. Please, please check it out and give us feedback.
+
+So yeah, that's basically that one. We do have, I believe, a release blog up for wasmCloud 2.8. Let me drop a link to that. I will let that one basically be our doc of the week. Although, didn't we also get a concurrency doc together and landed, or am I misremembering?
+
+**Eric Gregory** [11:03](https://youtu.be/zO9oIwkD4bw?t=663)
+
+We sure did. I'll toss a link to that in the chat.
+
+**Bailey Hayes** [11:06](https://youtu.be/zO9oIwkD4bw?t=666)
+
+Yeah, actually, Eric, sorry to put you on the spot. Do you mind talking through that? I think that definitely warrants a little bit of time from folks.
+
+**Eric Gregory** [11:17](https://youtu.be/zO9oIwkD4bw?t=677)
+
+Yeah, no problem at all. Take me just a minute to bring it up here.
+
+**Bailey Hayes** [11:31](https://youtu.be/zO9oIwkD4bw?t=691)
+
+Oh, one other thing that we've gotten in on wasmCloud 2.8 is we revamped `wash wit`. There were cases where folks were using `wkg` to do a couple different types of ways to manage their WIT deps. You should not have to do that anymore. You should be able to just use `wash wit` for any automated manipulation you need to do of your local WIT deps, and updating and removing interfaces to your world definition that you're using now. If you have multiple worlds, you're doing some kind of special overrides — we still out of the box support `wkg.toml`, and so you can do any special types of configuration directly there. Okay, back to you, Eric.
+
+**Eric Gregory** [12:24](https://youtu.be/zO9oIwkD4bw?t=744)
+
+Yeah, as to this doc, this is really just trying to give users a full walkthrough of our concurrency and connections controls, to help people tune the dials on how much network they want a component to hold open, how much they're going to use, and this gives us scoping here for the different little dials that we have. We've got an infographic to try to help people who are a little more visually oriented walk through the different controls. So we're talking replicas here, pool size, max concurrency, max invocations, connection quotas, and then breaking down each of these: what are the defaults? What does it do?
+
+<img src="/img/community/2026-08-26/image008.webp" alt="The wasmCloud concurrency and connections documentation page showing the scoping table for maxConcurrency at instance scope, poolSize at component scope, and replicas at deployment scope" />
+
+**Eric Gregory** [13:00](https://youtu.be/zO9oIwkD4bw?t=780)
+
+We've got our connection quotas per workload, and then some guidance for thinking about all of these in conjunction. So pretty rich text here. I think that's going to be useful for folks, and then, as you mentioned, we've had a number of updates for 2.8, and we've got our release blog here for that, and this has links to the various pieces of documentation that are relevant for some of the new enhancements.
+
+<img src="/img/community/2026-08-26/image009.webp" alt="The per-workload connection quota table showing maxInboundSocketConnectionsPerWorkload and maxConnections, alongside the sizing-them-together worked example" />
+
+**Bailey Hayes** [13:44](https://youtu.be/zO9oIwkD4bw?t=824)
+
+Any questions for Eric, or other types of docs that you'd like to see? This one, the concurrency doc, was created largely because we got a lot of feedback from folks that it's kind of hard to conceptualize all the different knobs that you need, and when to tune what and where and why and what axis they operate on. So please keep dropping your feedback and any questions that you might have.
+
+All right, sweet. Okay. Hey, let's talk about what's next then. That was 2.8. In two weeks we're planning on another release. I can already tell that it's going to be a 2.9, because we're going to be adding a new feature for the NATS plugin, and so that's probably one of the first big ones. Another larger set is that we want to make it possible for you to do routing within the host, internal to the host, and there's a couple different ways that we want to surface that. We want it to be possible for you to direct traffic to your service that's local in your workload. We want to make it possible for you to direct traffic toward host components that are serving on your host. So being able to broadcast those ports and have a concept of a DNS internal name is one concept that we want to add. Host components today can now trigger exports on the workloads, but it cannot trigger a `wasi:cli/run` export, and so that's a new feature that we'll add so that we can basically target that both either on a service or on the components that are in a workload.
+
+Other top-of-the-line features that I think will come up: we're obviously very much in the throes of battle testing here on preventing noisy neighbor OOMs, CPU throttling, all of that type of work. So those types, I expect us to drop a number, and continue to drop a number, of fixes in that domain.
+
+And then Aditya just asked about any update on the distributed cache. I have not started working on that yet, although I think we're pretty much toward the end of being feature complete on the host component plugin, which has been the major feature that I've been working towards. So that could be my next big unit of work: figuring out how to surface a distributed cache in wasmCloud where we're not also totally dependent on the infrastructure. That's the biggest challenge for us — is that we want to give folks the picks and shovels, but once you start stepping into a way to distribute cache for folks, you're stepping into telling them how they have to do their infrastructure. So finding a way for people to kind of plug in what they want in our Helm chart, basically, for that, is the goal. And I think we would probably give a reference implementation of doing it on JetStream, but also I think making sure that it's designed in such a way that somebody could supply something else is an important design goal. So, no update yet, but we should probably try to get something on the calendar so that we can, you know, catch up — because we have someone that's already building on top of wasmCloud that's already done an implementation of this on JetStream. So there's probably a lot to learn there, and then take that back and merge it into upstream wasmCloud. Yeah, Jeremy.
+
+**Jeremy Fleitz** [17:22](https://youtu.be/zO9oIwkD4bw?t=1042)
+
+Yeah, I didn't know if you wanted to also talk about the thing that you dropped in the wasmCloud Slack on the labeling, just to get everybody else as, you know, feedback on that.
+
+**Bailey Hayes** [17:34](https://youtu.be/zO9oIwkD4bw?t=1054)
+
+Yeah, that's a great call-out. Okay, so we dropped the release yesterday, and then we got the exact same set of questions that we got the past two releases, and we're kind of like, oh man, there's a pattern here. Which was: hey, you know, I install wasmCloud in my clusters, but if you change the custom resource definition or the roles, that's an elevated install and I've got to basically get my admins to go and do that update for me. But if it's just the deployment YAML, everything's good. It's all great. And, you know, you guys are obviously going to keep dropping minor releases every two weeks, and that's going to hold for two weeks from now as well. So how do we make it really easy and obvious for people — A, in code review, that this is going to have a larger impact, and then B, at release time, exactly surfacing that this has changed. And so I posted in wasmCloud Slack, and Jeremy agreed that was a good approach. But I'm also interested in other labels that I'm not thinking of that other people would like to see, perhaps, that are in that domain.
+
+And I actually had been doing a little bit more research in addition, on top, since I had posted that, and I found another tool that I want to start using. That's called CRDify. Has anybody else heard of that? New to me today, but CRDify is a schema checker, basically, for your custom resource definitions, and catching drift. Now, downside: we're at alpha for our custom resource definitions right now. That means we can make changes. So I was kind of almost of a mind of maybe we shouldn't be at alpha. Maybe we should go ahead and graduate that one, and then be really strict about our updates. We are at a v2 for everything else, and so that would make sense. I guess that's a bigger discussion item. When we've revved our custom resource definitions, I feel like everything so far has been for multi-tenancy, basically, and how we do cluster level versus namespace level install. And otherwise, it's been pretty stable. Correct me if I'm wrong.
+
+**Jeremy Fleitz** [19:56](https://youtu.be/zO9oIwkD4bw?t=1196)
+
+I think you're completely right on that. Yeah.
+
+**Bailey Hayes** [20:00](https://youtu.be/zO9oIwkD4bw?t=1200)
+
+And so I feel like it really hasn't changed in a while, and it probably is worth graduating it. And if we do that, then it makes sense for CRDify to be super pedantic about making any kind of change that would be a drift. That's not a blocker for us adding CRDify. Like, I'm gonna try that tool out, see if it's helpful, and it should already complain about us making any changes to alpha. But the default configuration is it wouldn't complain about alpha-level changes. But I'll just ask it to be more pedantic on us.
+
+And then the other thing is that I posted about the labels in the wasmCloud Slack, and then I started looking at the labels that Cilium, Flux, Helm — actually, there's a few others that I thought were pretty cool. Let's see, I've got that handy real quick. Nope, my search has gone way too far. Grafana and Loki also had some cool stuff I wanted to copy. That's right. But essentially everybody's using `area/`, and so they have `area/rbac`, `area/helm`, `area/crds`, and that's handy in that if people are working across different CNCF projects, I'd rather just line up with them than come up with my own names for these things. So I'm just switching over to reuse the exact same names that all the ones I just mentioned, and also Linkerd, are using. So I'm just gonna kind of copy them there, and otherwise, that's kind of my set of labels.
+
+And I found this really cool trick that Flux CD started using, and then I see a lot of other people have started to copy them. Which is, instead of me manually going and creating my GitHub labels once myself, you know, and I go trigger that — they actually commit them into the repo, and then they basically have a reconciler, because of course they would, another, you know, Kubernetes-adjacent project. But they basically have a label action that will create those labels, and that way it keeps them all in sync. And the definition is living in code, and is therefore code reviewed. So I'm bringing that in. I should have that PR up later today.
+
+But I guess the main thing is, if there are other things that you're constantly asking yourself whenever we've done an update or a release — what can we do to surface, to make it clear what you need to care about as an operator, what you need to care about to surface to your end users — and we'll keep fine tuning that. Obviously, a new thing that we had started doing is creating these release blogs, aka basically release notes, for everything as we cut a release. But anyways, that is where we're at on that one. So just, you know, refining our release process, and again, really encourage feedback on that.
+
+Aditya actually dropped a few more things in the chat about the distributed cache work, and that they have had some harder lessons that they've learned. So I definitely want to hear about that, and how that's causing potential issues. So there's a lot of lessons learned. I knew there'd be dragons on that feature, which is why I wanted to scope it appropriately, give it all the time that it would require.
+
+As a reminder, we're kind of midway in our third quarter here, and our goal — like, our third quarter roughly lines up to exactly what we're going to be able to show off at KubeCon for the wasmCloud booth. And I would say, essentially, other than this feature that we're talking about, the distributed cache feature, we've closed everything else out that we wanted on our roadmap, which is pretty impressive. So, big old kudos to us on that one. Async NATS and async wasmCloud Messaging were some of the last chunk there, and getting host component plugin into a stabilized feature, which I think we're basically there. I want to get the last couple of things that I have in PR over the line for that, and then I think we could enable that by default. So, big kudos on that.
+
+**Bailey Hayes** [24:24](https://youtu.be/zO9oIwkD4bw?t=1464)
+
+I'm really happy with how fast we've moved on our roadmap. So yeah, maybe next week let's try to meet and kind of scope what we have to do for being able to close that one out. Okay, and Liam jumped in and said he came to share some of the testing that he's been doing against NATS. I think it's a pretty cool methodology, and I thought folks would be interested in how we've been iterating on this.
+
+**Liam Randall** [24:57](https://youtu.be/zO9oIwkD4bw?t=1497)
+
+Thank you, Bailey. Well, we've got a ton of new capabilities and features coming online all the time here, and Aditya, I think we're seeing — we've seen some more bug reports on messaging and OOMing in certain scenarios. So I have another whole set of testing that I've done to identify those, and some of the initial tuning points that we pulled together that are shared in the document earlier were created to help us understand and address those, but I still think there are some gaps there.
+
+But the approach that I took in testing out a new provider was to start by mapping out what are the archetypal patterns that we have. So with NATS, I sort of came up with these seven foundational patterns here, between the couple in NATS Core, which are all stateless, and then the couple with NATS JetStream, which enables some different types of common messaging patterns here. This is work that's still in flight, and we are still going to go back over and analyze this work, and still submit a few bug fixes. But essentially, where things are right now on main are really solid out of the box. Six out of seven of our primary use cases work without any modification, and were incredibly stable.
+
+<img src="/img/community/2026-08-26/image010.webp" alt="The NATS 2.8 testing README bottom-line-up-front table scoring core pub/sub, request-reply, JetStream push, and JetStream pull across small, large, and at-scale message regimes" />
+
+**Liam Randall** [26:30](https://youtu.be/zO9oIwkD4bw?t=1590)
+
+I'm doing essentially three full suites of runs here. This is in Rust. Separately, I'm also doing this in Go and looking at other languages as well. But there is an additional column here that is for, you know, small messages, large messages, and then very large messages. NATS has a default memory limit of 64 megabytes. So I picked out a couple of additional runtime targets to sort of really let us look at the long tail, and then I'm trying them at different — a whole range of different message rates and patterns, and then a final pass with experimenting with some of the different tuning options to see if we can, you know, sort of identify what are really solid patterns that we can then put into the documentation.
+
+So this work will drive the documentation for NATS. Now behind this, there are basic templates, and then we've also designed a set of, you know, we'll call them hero applications, that take you through all of the primary modes here for NATS, including key value and blob store in the broader demos. So we do plan to pull together a sort of zero-to-hero story here that takes you through all the different NATS patterns in a single fictional scenario so that you can see them. Bailey, Jeremy, I know you guys have started to look at these results a bit. Any color that you'd want to add on top of this?
+
+<img src="/img/community/2026-08-26/image011.webp" alt="The lower half of the NATS test matrix showing JetStream push and pull, key-value, KV watch, and the fan-out pattern that fails at defaults" />
+
+**Jeremy Fleitz** [27:58](https://youtu.be/zO9oIwkD4bw?t=1678)
+
+I mean, no — well, I mean, really the only thing is just, I love the approach of, you know, coming up with the seven different types of patterns to test for. This allows for us to, you know, compare against componentized Go, making sure that's, you know, performant. I know we've always been talking about, you know, are we fast yet, and are we componentized yet? Thank you. Yes. And this is a great way to, you know, basically we could take our Rust backend, you know, and then our Go, and you know, and then even Python at some point, and be able to compare them to see how they all behave.
+
+**Liam Randall** [28:36](https://youtu.be/zO9oIwkD4bw?t=1716)
+
+Yeah, yeah, but an impressive set of work so far. And Aditya, I know you got this started. You know, Jeremy, I know you picked it up and have been championing this for the last, you know, week or so to get this across. And for the general community, behind the scenes, this is on the other side of, you know, dozens of quality control audits and testing frameworks that we've already applied to sort of get things here, to get them, I think, pretty close to the starting line. So I think that this is on track and pretty close. And my two test runs are still finishing up right now, with componentized Go and Rust, and then Jeremy will pick up those results and identify what are the blockers to getting this out.
+
+And, you know, some really impressive scenarios here. This surfaces — think of each row as representing, you know, 15 to 20 tests behind the scenes. And with the JetStream push, we were able to come up with a scenario that crashed, OOMed the host — you know, like a contrived scenario where we didn't give the host enough memory, and we blew the host up with some large assets — but we still didn't lose a message. So to me, that shows that, hey, things are performing as we intend. So we're trying to test all the edge and the corner cases here. So be on the lookout for that, and we'd love any contributions or tests.
+
+**Bailey Hayes** [30:10](https://youtu.be/zO9oIwkD4bw?t=1810)
+
+Yeah, I guess, you know, one of my big takeaways — you say a week because it feels like it's been a week, but Jeremy actually started on that NATS plugin work on Friday, and it is now getting pretty darn close to production ready, which is crazy. It's really impressive how fast we can move now.
+
+**Liam Randall** [30:31](https://youtu.be/zO9oIwkD4bw?t=1831)
+
+When you work 40 hours every weekend, it is technically a week. You know, I mean, right? It's been a week.
+
+**Bailey Hayes** [30:40](https://youtu.be/zO9oIwkD4bw?t=1840)
+
+So I guess the big takeaways for me is, you know, we've got a lot of ways now to actually simulate what end users will do, the types of workloads that people will want to write and build. We have ways of traversing the API surface of what people would want out of something that would be brought into a provider, which was something that was prohibitively expensive before — and before meaning a year ago, even, but two years ago it was a big lift to introduce a new provider and to introduce a new interface, a new API for the host to support. It was like, okay, well, I've got to do all this manual research. Not only do I want to try to find an interface that's good, but I'm also trying to take on this Herculean challenge of, I also want to make this a pretty generic, general purpose interface — with a major motivation being I don't want to have to write a unique one for every single backend provider, because it's so hard and huge to provide this new surface layer and then build workloads on top of it.
+
+And I think my takeaway was just, this totally changes the game as to how I would want to actually build interfaces for WebAssembly. And Aditya just called it out: trying to find the lowest common denominator means potentially everybody's a little bit unhappy with your API. And so what I hope — and reviews from folks like Victor, Aditya, thank you guys, looking at Jeremy's PR — is that we've designed an API that is fully ergonomic and lets you do everything you would want to do against NATS, and it's exactly what you would want, and it's the best in class support for NATS. And said differently, we can do this for other interfaces now much easier. Yeah, Liam.
+
+**Liam Randall** [32:55](https://youtu.be/zO9oIwkD4bw?t=1975)
+
+You know, Bailey, we've always gone back and forth about the lowest common denominator of an interface versus tightly coupling. And, you know, messaging, I think here is a great example. And one of the things that we've seen that drove a little bit of the urgency here on NATS is we have a number of different users that have reported reliable conditions where they have found faults in the messaging provider. And in looking at it, you know, like the five whys underneath the hood, one of the things that we've kind of seen is that NATS has some very specific semantics to it on how it expects to interact with an interface, and it's very easy to misalign the sort of assumptions that are here under the hood.
+
+Do you think that, given now how easy it is — quote unquote easy — to bring on, let's say, like a Kafka provider or some other messaging bus, you know, Redpanda would probably be something along those lines — are we in the future going to be leaning more towards tightly coupling interfaces so that we can take advantage of all the product-specific features?
+
+**Bailey Hayes** [34:06](https://youtu.be/zO9oIwkD4bw?t=2046)
+
+I think the answer is, why not both. When you want to do lowest common denominator, is that you're trying to solve for portability above all else, and that's like what you get out of the wasmCloud blob store interface. It's very S3-y, but it actually will work through most S3-compliant APIs and also your file system on Windows, Linux, and Mac, and that's pretty freaking cool. And that has obviously major portability implications.
+
+But when you're selecting an event bus provider, there are very specific semantics both from your contract on your side and the guest of what you have to provide, and what your broker is doing for you, and that's just a very fundamental mismatch if you aren't agreeing to that contract and following those semantics. And what we're really talking about here is: do you ack a nack? You're not going to ack a nack on a basic pub/sub API, which is all that wasmCloud Messaging and `wasi:messaging` were meant to be. Is, I just want pub/sub semantics. I don't need the ability to ack, nack, or move around a commit header. What I need is fire and forget. And what a lot of people want is obviously not that — they want a full event bus that has the ability to not lose data. So you would specifically have to do this for NATS and any other event bus that's got specific semantics for you to build around.
+
+Now, there's probably a good chunk of people that are hearing this and they're thinking, okay, but why wouldn't I just compile that client into my component, right? Before that, something else has changed in the world, right? Is now I've got sockets, I've got gRPC, I've got all the things that these clients might want to do, compiled straight down into my component. So why shouldn't I, in my workload component, just do it all? Why do I need a provider in my host?
+
+And that's interesting. And we talked about it actually quite a bit when Aditya first proposed the wasmCloud NATS interface, and there's some really good reasons why you would want this done at the host level rather than in the component guest level. And the biggest one is being able to push out what the component itself is responsible for. If the component is the thing creating the client, then its job is to do the authentication. Its job is to handle client-side connection pooling, to clean up its resources, to be able to handle retries and reconnects, and all of that kind of logic now needs to be baked into that component.
+
+And when you're running a large, multi-tenanted host with thousands of components, moving all of that work into a component is not necessarily a huge negative in terms of footprint, because in the `.wasm` that's like, so what? I added another megabyte here. I think it would have some impact on scale, but maybe not a massive amount of scale difference. But where it really, really amplifies the difference is when you're talking about something like messaging, exactly like this use case. When I want to actually fan this out, and I want to be able to burst — I want to burst immediately and instantly, and I want all the stuff to start right away and then scale back down immediately. If you're doing something that's kind of stateful in your client, you can't really do that, and so you're not able to do more of the serverless, stateless style event processing that you could do if you had an interface like this and you exposed it over WIT.
+
+**Liam Randall** [38:05](https://youtu.be/zO9oIwkD4bw?t=2285)
+
+Thank you, Bailey. I'm not going to present the sort of research on the call, but I also did the deep dive on all the new features with messaging, and I think that essentially, in the pattern that we see a lot of people doing — which is using that pub/sub interface with NATS — we see maybe a sharp corner here where some people are all stubbing their toes. So I'm super excited to get this work across the line, and just grateful to the whole community for all the hard work that they're doing there. And I think it's going to be fascinating to see, now that there's all these options here — host components, plugins, host plugins — to see how new capabilities get attached here. So I think this is a cool example.
+
+**Bailey Hayes** [39:01](https://youtu.be/zO9oIwkD4bw?t=2341)
+
+And that was the entirety of our agenda, y'all. Any other random topics or things we wanna go through? Anything else we need to say before I send this link to Yordis and say, why weren't you here? We talked about your favorite topic.
+
+**Liam Randall** [39:18](https://youtu.be/zO9oIwkD4bw?t=2358)
+
+He's on a cruise today.
+
+**Bailey Hayes** [39:20](https://youtu.be/zO9oIwkD4bw?t=2360)
+
+Is he really? Oh, cool. Yeah, he's cruising.
+
+**Liam Randall** [39:24](https://youtu.be/zO9oIwkD4bw?t=2364)
+
+There's no excuse not to be here. We had a meeting the other day with an investor. Oh my gosh! Look who's on the call.
+
+**Bailey Hayes** [39:33](https://youtu.be/zO9oIwkD4bw?t=2373)
+
+Oh wow, two people I know. Hey Dev, hey Lachlan, how you doing?
+
+**Dev Doshi** [39:38](https://youtu.be/zO9oIwkD4bw?t=2378)
+
+Good. How are you? I'm assuming the surprise was for Lachlan and not me. I don't think I've met you, Liam.
+
+**Liam Randall** [39:46](https://youtu.be/zO9oIwkD4bw?t=2386)
+
+I shouted out to you in chat. So, but welcome to the call. Great to have a chance. I think I've already cyberstalked you. Is this your GitHub? Let me see if that is you. I think that's you. Yeah.
+
+**Bailey Hayes** [40:04](https://youtu.be/zO9oIwkD4bw?t=2404)
+
+Hey guys, how are you doing?
+
+**Liam Randall** [40:06](https://youtu.be/zO9oIwkD4bw?t=2406)
+
+But I was surprised Lachlan just hopped on the call. It's great to see him.
+
+**Dev Doshi** [40:09](https://youtu.be/zO9oIwkD4bw?t=2409)
+
+Yeah. Well, so the reason I hopped on is because I'm building my own, like, AI harness thing, but it's using WebAssembly and event sourcing and such. So I'll probably want to show it to you guys at some point, but perhaps not today.
+
+**Bailey Hayes** [40:23](https://youtu.be/zO9oIwkD4bw?t=2423)
+
+Please do. Also, feel free anytime that you've got a demo or anything you want to give it a shout. We'll add time on the call. If you're doing event sourcing stuff, are you using NATS for it, or some other bus?
+
+**Dev Doshi** [40:37](https://youtu.be/zO9oIwkD4bw?t=2437)
+
+No. So that's basically like, I just have my own event store, just server thing. But yeah. So basically, I'm looking at my next steps of scaling it out, and so I'm looking at wasmCloud or, like, SpaceTimeDB, or just, like, different kinds of directions for that. Yeah. Also, do you know S2?
+
+**Bailey Hayes** [41:02](https://youtu.be/zO9oIwkD4bw?t=2462)
+
+S2, I don't know.
+
+**Dev Doshi** [41:04](https://youtu.be/zO9oIwkD4bw?t=2464)
+
+So S2 is like a stream abstraction on top of object storage, and so I think they have been kind of investigating some direction of adding WebAssembly compute on top of the stream. So I pointed them in the direction of wasmCloud, but there seems to be some concern about NATS, especially at like the Jepsen analysis, for using it for durable state.
+
+**Liam Randall** [41:36](https://youtu.be/zO9oIwkD4bw?t=2496)
+
+JetStream is really solid. I shared our testing with the new JetStream provider, and we were able to even come up with some scenarios where we crashed the host deliberately, but we still didn't lose any messages. Everything still restarted, and did the acknowledgements all okay in the driver. So I think NATS is a pretty incredible piece of engineering and technology.
+
+**Dev Doshi** [42:05](https://youtu.be/zO9oIwkD4bw?t=2525)
+
+Cool. I see the link to the latest analysis, I suppose. So I'll just take another look. But that was — I'm just relaying the concern that was told to me.
+
+**Victor Adossi** [42:18](https://youtu.be/zO9oIwkD4bw?t=2538)
+
+Oh yeah, sorry. Not saying that that analysis gives them the all clear or doesn't, but just like, they did run through Jepsen, and you know they did better than Mongo, as far as I remember. But in general, NATS is, I think, actually somewhat overlooked, like, surprisingly. But I think lately people have been sort of really appreciating the sort of easy mesh feature of it, right? Like how easy it is to just go across clouds and like all this other stuff. And yeah, it's pretty cool that Jepsen did an analysis of it.
+
+**Dev Doshi** [43:01](https://youtu.be/zO9oIwkD4bw?t=2581)
+
+For sure.
+
+**Bailey Hayes** [43:05](https://youtu.be/zO9oIwkD4bw?t=2585)
+
+Yeah, I mean, wasmCloud itself has been building on top of NATS for a long time now. We only use their core, basically pub/sub, which is rock solid, for our command and control inside wasmCloud. A lot of people remember wasmCloud v1, and they think everything we send is over NATS, but that's just not the case in v2. And in v2, it's, you know, whatever event bus you want to bring, whatever plugin you want to bring, just drop it in and make it work. Obviously, we're adding first-party support for NATS JetStream as a host plugin, but you can easily opt out of that and use something else.
+
+I think there's definitely a part where, because you need NATS to make wasmCloud work, that's the first thing everybody jumps towards — for okay, well, I want the rest of my data plane to be here. But right now, effectively in wasmCloud, it's only the control plane that actually has NATS pub/sub, and it's intentionally basically stateless and reconciled by the operator.
+
+**Dev Doshi** [44:04](https://youtu.be/zO9oIwkD4bw?t=2644)
+
+Makes sense.
+
+**Liam Randall** [44:05](https://youtu.be/zO9oIwkD4bw?t=2645)
+
+Yeah, Dev, I'll share my screen again real fast and just give you the peek, as this is stuff that we're still cooking on, even today. But the sort of initial testing for where things are on the pull — there's a NATS pull request queued up right at the top of wasmCloud, so I'm just on that branch. But the sort of out-of-box for the seven key — there's probably more like nine key foundational NATS patterns. You know, I moved key value and blob store out of my kind of foundational testing. Those are a good round-two follow-up here. But out of the box right now with zero tuning, six of the seven patterns already work great. And Jeremy's going to pick up the seventh one, and we'll get the right tuning into the driver so that it works out of the box as well.
+
+<img src="/img/community/2026-08-26/image012.webp" alt="Detail of the fan-out row in the NATS test matrix, showing 56 to 72 percent message loss at defaults and the byte-aware buffering fix needed in the driver" />
+
+**Liam Randall** [45:30](https://youtu.be/zO9oIwkD4bw?t=2730)
+
+And then on some of the edge cases, you know, NATS has limits on — for small messages, NATS was rock solid, and I don't think in any of my hundreds of runs here I was able to crash it. When I started to raise the message size, I was able to come up with a scenario that I could deliberately OOM the host. And now all of these tests are, by the way, run in wasmCloud running in Kubernetes. So there's multiple layers of what's happening here. The host is being OOMed by config settings from Kubernetes, which is — that's the for all the users that have hit this so far, that's been their scenario, where they hit this. A host on its own, not being in Kubernetes, probably would not have OOMed in these circumstances. But I'm trying to replicate user testing here.
+
+But what impressed me is, without any additional testing, one of my OOM cases — which was blow the memory out on purpose and see what happens — JetStream did what it's supposed to do, which is even in push mode here, where JetStream is pushing as objects come in into the components, we still didn't lose a message, and that was impressive. You know, that it landed that way. JetStream pull was the fastest, because it let wasmCloud pick up and go here.
+
+All of these — and there's a dozen other really critical knobs or options that are available here depending on how you write these programs, like for example with HTTP there's instance reuse, there's a new pool size function — so I'm not trying to maximize performance here. I'm really just running through the edge cases. After all of that, I can do a performance spike on a couple of these edge cases, and then recommend, you know, hey, if you want to make this go brrr, here's a good pattern, you know, fan-out pattern or something along those lines, in order to get there. So I think the first step is make it work, and I think we're really close to making it work really reliably here with NATS, and I think it should address some of the concerns that are out there. And if you have more questions, we can pull up, and a piece of this will end up in the docs as part of our work here.
+
+**Victor Adossi** [47:22](https://youtu.be/zO9oIwkD4bw?t=2842)
+
+A quick question about S2. Are they actually open source, or is it just — because I see they have like the S2 Lite, but I don't see, like — I assume the core is actually hosted, right?
+
+**Bailey Hayes** [47:36](https://youtu.be/zO9oIwkD4bw?t=2856)
+
+Correct.
+
+**Victor Adossi** [47:40](https://youtu.be/zO9oIwkD4bw?t=2860)
+
+Okay. Yeah. So like I was thinking that it's like — so this kind of cuts back to something we were talking about, I think before y'all hopped on the call, but the whole distinction between targeting wasmCloud Messaging and targeting like a NATS-specific interface. Like, there's no reason — and not necessarily for control messages, but there's no reason we can't have S2 support, right? Because like the API is right there. So as far as a backend for messaging, that's probably really easy. Like, I think you could one-shot that today, almost certainly.
+
+**Dev Doshi** [48:18](https://youtu.be/zO9oIwkD4bw?t=2898)
+
+Yeah, yeah, interesting. I think they're coming from the other side, where they want their hosted platform, which is Kubernetes, to be able to run Wasm efficiently. So I think they haven't done the same work that you guys have done.
+
+**Victor Adossi** [48:31](https://youtu.be/zO9oIwkD4bw?t=2911)
+
+Yeah. Okay. That makes sense. For them, they're like essentially stream processing, right? They're trying to add stream processing essentially with Wasm.
+
+**Dev Doshi** [48:46](https://youtu.be/zO9oIwkD4bw?t=2926)
+
+Yeah, that's a super common, like, platform. Good use of Wasm.
+
+**Victor Adossi** [48:50](https://youtu.be/zO9oIwkD4bw?t=2930)
+
+Yeah, I was thinking more from like the wasmCloud side.
+
+**Dev Doshi** [48:53](https://youtu.be/zO9oIwkD4bw?t=2933)
+
+No, no, I totally agree with you too. So like, I may use that for mine, what you said.
+
+**Bailey Hayes** [48:56](https://youtu.be/zO9oIwkD4bw?t=2936)
+
+Yeah, definitely give a shout to Redpanda. Also uses Wasm for being able to add in compute. So a lot of these data pipelining use cases — they all basically are looking to add Wasm for basically custom transforms, custom UDFs.
+
+**Victor Adossi** [49:09](https://youtu.be/zO9oIwkD4bw?t=2949)
+
+What I haven't seen much of is how they're using Wasm. Because, like, I think there's a lot of, basically — how do you say? Not like a trap, but like places you can kind of fall down the wrong path. Because the thing about Wasm is, if you just take Wasm off the shelf, you can build whatever you want, right? Like, you have to bring the way to move complex values and reference things, and you have to bring a type system basically with you. And so there's Emscripten, there's wasm-bindgen, there's a component model, and if you don't know the difference — oh sorry, there's also like Wasmer — there are other ones, right? But if you pick the wrong one, or roll your own, there's so many other options.
+
+So I don't know if they're considering the component model, but if they're not, I think they're probably gonna have to think again. Or maybe everything will be fine, I don't know. But unless they give SDKs for every language, it's just like, you know, there's just a whole lot of pain. But I assume they'll figure it out, and hopefully they find us essentially, or find the Bytecode Alliance or whatever, and like component model — because I think it's just the best option right now. Like, people have complaints about like, oh, it's complex, but the thing is, once you start trying to do the things that you want to do, it will become that complex.
+
+**Eric Gregory** [50:41](https://youtu.be/zO9oIwkD4bw?t=3041)
+
+For sure.
+
+**Victor Adossi** [50:42](https://youtu.be/zO9oIwkD4bw?t=3042)
+
+Yeah, yeah. But it's interesting. It's great to see people, you know, more people take it up, though.
+
+**Dev Doshi** [50:48](https://youtu.be/zO9oIwkD4bw?t=3048)
+
+Yeah, I think in my harness, the Wasm stuff is using WASI 1-point-something, P1.
+
+**Bailey Hayes** [50:58](https://youtu.be/zO9oIwkD4bw?t=3058)
+
+And not P2 or P3. So you'll run into what Victor is talking about. Basically, unless you're using the component model and WIT — and you can think of WIT as like the dial tone for how to talk from any language to any other language, and up and down in the browser, or from Rust to Go and back again — you're gonna have a weird time. It matters less for folks — like, I talked to the folks working on Redpanda, I was like, yo, it's WASI P2, it's right around the corner, before they shipped it. And they were like, well, you know, all of our stuff is harnessed by Go. We gotta directly embed it, and then the types of things that people are writing is also — we only care about Go. So when you only care about one language, then those options are probably fine enough.
+
+**Dev Doshi** [51:52](https://youtu.be/zO9oIwkD4bw?t=3112)
+
+Yeah, exactly. Because mine's just for me, so it's just Rust and WebAssembly. But I've been thinking lately — I think Shopify does this in parts of their system, but not consistently — like, I wish every webhook provider would let you just ship Wasm to them, so they run it on their end, and then you can pull the reduced results. Or like all these different stream processors where you want to map, you want to fold, those kinds of operations. Like, it'd be nice to just run it on their side and then pull the results when I want them, or something like that, for some operations.
+
+Oh, the other thing I was thinking about, kind of like different HTTP kind of handler things. So it's like a CGI kind of model or something like that. I haven't looked at what you guys are doing in wasmCloud for like the HTTP interface, but it'd be nice if there was like a zero-copy kind of way, so your handler gets invoked with the capability to read the payload.
+
+**Bailey Hayes** [52:57](https://youtu.be/zO9oIwkD4bw?t=3177)
+
+Yeah. Okay. So this is part of actually the latest WASI standard. So, like, in the spec, we have what's called the handler, the HTTP handler. So it's `wasi:http` handler, and inside that, it gets streams for the body, for the headers that are brought through, even the footers and trailers. But basically, all of that is streaming, super duper efficient. We did the battery of like all the web tests basically against it, from Fastly and a lot of other folks that battle tested that. And so in wasmCloud, like how wasmCloud does this, we just faithfully implement that spec, and we surface basically most of what comes out of Wasmtime. The other cool thing is that with one handler, you're able to support HTTP 1, 2, and 3, which is nice. So you don't have to deal with all that, and you should be able to just seamlessly upgrade to 3 without having to do anything in your guest code.
+
+**Dev Doshi** [53:57](https://youtu.be/zO9oIwkD4bw?t=3237)
+
+Yeah, that's awesome. Yeah, because I had the thought recently, and then I was asking my AIs, and they were telling me that you guys had recently done that, so I need to look into it more.
+
+**Bailey Hayes** [54:05](https://youtu.be/zO9oIwkD4bw?t=3245)
+
+That's the way, yeah.
+
+**Dev Doshi** [54:07](https://youtu.be/zO9oIwkD4bw?t=3247)
+
+But it feels like that's the fastest possible way, like fastest and most concurrency friendly or whatever. So it should be crushing everybody else.
+
+**Bailey Hayes** [54:14](https://youtu.be/zO9oIwkD4bw?t=3254)
+
+Oh yeah, not only that. Exactly. Because of the native async that's been built in now to WASI P3, and in the component model, we basically also do instance pooling and max concurrent requests. So if you've got a `wasi:http` component and it exports a handler, our host will call into that handler. But while you're doing an I/O bound request, like going out over the network, that component could service another request, and so yeah, we're concurrently pushing requests onto it.
+
+**Victor Adossi** [54:52](https://youtu.be/zO9oIwkD4bw?t=3292)
+
+I was gonna say, Bailey shared some testing — actually, it might have been two weeks ago — but I think you were hitting something like 60k requests or something, which is like roughly, surprisingly close to Rust native, which is honestly a little suspicious to me. But it was basically there, so I haven't dug in, but yeah, that was nice to see.
+
+**Liam Randall** [55:15](https://youtu.be/zO9oIwkD4bw?t=3315)
+
+Victor, I can explain that test. What you're hitting is, you're saturating one full CPU on the MacBook architecture. That's why you max out at 60. If you design and you add more threads, you can go a lot higher. And there's a lot of other tricks, but that is why that number keeps coming up. Basically, you're fully saturating the one CPU.
+
+Dev, I've got two questions for you. The first is that this year especially, we've spent a lot of time trying to teach LLMs about the latest things that are going on in wasmCloud, and part of that is that we've really quadrupled down here on putting out meeting transcripts and notes and summaries and, you know, like the agendas and all that kind of stuff. What was your experience? So first, I want to just make sure you're aware of this. If you just go back and scan, you'll find the topics that Bailey and Victor are talking about here. You should be able to identify them very quickly, and they're all live searchable too. But my second question is, what was your experience? Did you feel like you were getting the latest information? And what LLM were you using? Are you a Claude person? Are you a Codex, ChatGPT?
+
+**Dev Doshi** [56:30](https://youtu.be/zO9oIwkD4bw?t=3390)
+
+I kind of use Cursor, ChatGPT, and Claude all kind of, and then my own harness thing. But that search was in a chat with ChatGPT on web app, and so I had to do a bunch of research in general, not targeted at WebAssembly in general. It was more about the conceptual space of that invoking handler with capabilities and stuff. So, but it did find that recent work. My feedback though is that I don't regularly check that page. I think I told Bailey, like, I have like a WebAssembly phase, like once every year or so, to check in on what happens. The other side of it is, I don't see much on Twitter. I think that might help the LLMs and stuff find it more easily as well.
+
+**Liam Randall** [57:22](https://youtu.be/zO9oIwkD4bw?t=3442)
+
+I'll take that as a note, and we should at least be tweeting out the agendas and all that kind of stuff. Yeah, I figured that out. I'll do it. I'll try that for today's meeting, and we'll see what happens.
+
+But part of the thing that we've seen in the last year is that nobody's googling or reading things anymore. You wait for the AI to summarize it for you, and then when you find something that you want, you click on the reference and the link. And what I've found is wild, is that, you know, like Bailey is not only, I would say, one of the leaders of Wasm, but as our lead on this meeting — Claude will say, "well, what Bailey thinks is," but then "Yordis is curious about" — like, it actually quotes our community meetings. And I'm like, okay, we definitely have hit a hot channel here on how to communicate and teach LLMs how to learn about you.
+
+And I don't know what your experience is, but my experience with Cosmonic — and we have this new tool coming out called Cosmonic Desktop, I'll send you a DM if you want to try it — but I can reliably just one-shot things in Wasm in Rust that work amazing out of the box. I mean, I literally just go from prompt to production. I hardly even look at the code anymore. So I'll shoot you a link to that. You can toy with it.
+
+**Dev Doshi** [58:43](https://youtu.be/zO9oIwkD4bw?t=3523)
+
+Yeah, sure. Yeah, I definitely want to try that out. I was saying, yeah, my harness — I haven't really read the code yet, but I'm making it build the tools to review itself, kind of thing, or help me review it better. But I do think what you showed on that page, the whole structure of the layout and the transcripts and everything — I think that makes perfect sense for why it's effective.
+
+**Bailey Hayes** [59:02](https://youtu.be/zO9oIwkD4bw?t=3542)
+
+Yeah, and definitely welcome to hop back on. I should totally host another wasmCloud Triangle meetup so we can hang out more IRL. And yeah, also loving the feedback you're giving. I'm gonna stop the stream now.
