@@ -63,9 +63,7 @@ A common organizational pattern divides a package into:
 * `world.wit`
 * `my-interface-name.wit`
 
-An interface may also have a `deps` folder holding WIT files for other WIT files used as dependencies in your interface.
-
-{/* For more information on organizing an interface, see [Creating an interface](TK). */}
+The packages an interface depends on are fetched into a `deps` folder next to the package's `.wit` files. `wash` resolves and fetches these for you; see [Managing WIT dependencies](../wash/developer-guide/managing-wit-dependencies.mdx).
 
 ### Worlds
 
@@ -89,7 +87,7 @@ In addition to using the `wasi:logging` interface, logs printed to STDERR will b
 
 There are often at least two worlds defined in a package. A common convention is to have an `imports` world and the world components typically target.
 
-In a wasmCloud component project, it is conventional to include a top-level WIT world at the root of a `wit` folder in the project directory.
+In a wasmCloud component project, it is conventional to include a top-level WIT world at the root of a `wit` folder in the project directory. For the recommended layout in projects with several components, see [Project layout](../wash/developer-guide/managing-wit-dependencies.mdx#project-layout-one-top-level-wit-directory).
 
 
 ### Interfaces
@@ -135,7 +133,7 @@ In spite of the name, WIT isn't limited to WebAssembly: wasmCloud also uses WIT 
 
 wasmCloud supports interfaces belonging to [WebAssembly System Interface (WASI)](https://wasi.dev/) P2 (also known as WASI 0.2 / P2) in addition to a selection of interfaces proposed for inclusion in WASI, and interfaces belonging to the wasmCloud host.
 
-Starting in wasmCloud 2.5.0, the runtime also ships WASI 0.3 (P3) support alongside P2 — including `wasi:http` and `wasi:cli` at 0.3.0 and the P3 `wasi:sockets` interfaces — so components may target either P2 or P3 worlds. See [WASI 0.3 in the Runtime section](../runtime/index.mdx#wasi-03) for the current P3 surface.
+The runtime has shipped WASI 0.3 (P3) support alongside P2 since 2.5.0, including `wasi:http` and `wasi:cli` at 0.3.0 and the P3 `wasi:sockets` interfaces, so components may target either P2 or P3 worlds. See [WASI 0.3 in the Runtime section](../runtime/index.mdx#wasi-03) for the current P3 surface.
 
 ### WASI interfaces
 
@@ -154,7 +152,7 @@ Starting in wasmCloud 2.5.0, the runtime also ships WASI 0.3 (P3) support alongs
 :::info[wasi-filesystem and wasi-sockets]
 `wasi-filesystem` access is granted through preopens. By default, components have no filesystem access. Directories can be explicitly mounted to a component via volume mounts in the workload manifest — see [Filesystems and Volumes](../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx) for details. [wasi-virt](https://github.com/bytecodealliance/wasi-virt) can be used to embed a virtual filesystem directly into a component binary (for example, to bundle static assets).
 
-`wasi-sockets` is supported with host-enforced policy: outbound TCP connections are allowed, services can bind on loopback, and DNS name resolution is denied by default. Since wasmCloud 2.6.0, a workload can opt in to name resolution with a per-component `allowedIpNameLookups` allowlist (named `allowIpNameLookup` before 2.6.1), whose entries may be exact names, `*.suffix` wildcards, `*`, or literal IPs. The host enforces these restrictions unconditionally&mdash;components do not need to implement their own socket access control. For an overview of socket policy and the service model for intra-workload TCP, see [Network Access and Socket Isolation](../wash/developer-guide/network-access-and-socket-isolation.mdx).
+`wasi-sockets` is supported with host-enforced policy: outbound TCP connections are allowed, services can bind on loopback, and DNS name resolution is denied by default. A workload can opt in to name resolution with a per-component `allowedIpNameLookups` allowlist (since 2.6.0; named `allowIpNameLookup` before 2.6.1), whose entries may be exact names, `*.suffix` wildcards, `*`, or literal IPs. The host enforces these restrictions unconditionally&mdash;components do not need to implement their own socket access control. For an overview of socket policy and the service model for intra-workload TCP, see [Network Access and Socket Isolation](../wash/developer-guide/network-access-and-socket-isolation.mdx).
 :::
 
 Additionally, wasmCloud supports proposed WASI APIs that are in the process of implementation and standardization:
@@ -172,7 +170,7 @@ Additionally, wasmCloud supports proposed WASI APIs that are in the process of i
 `wasi:webgpu` support ships in default `wash-runtime` builds via the `wasi-webgpu` Cargo feature, with the implementation provided by the [wasi-gfx](https://github.com/wasi-gfx/wasi-gfx-runtime) project. The runtime's registration is version-tolerant, so components built against earlier revisions of the proposal (such as `0.0.1`) continue to bind; the proposal itself is early-stage and its WIT surface may change substantially.
 
 :::info[wasi-tls]
-`wasi:tls` (added in wasmCloud 2.2) lets components terminate TLS connections themselves over `wasi:sockets` using the WASI Preview 3 `wasi:tls/client` and `wasi:tls/types` interfaces. Support is opt-in via the `wasi-tls` Cargo feature on `wash-runtime` while the upstream WIT stabilizes. Embedders can register a custom TLS provider through `EngineBuilder::with_tls_provider` — see [Building Custom Hosts](../runtime/building-custom-hosts.mdx#tls-for-wasitls-components) for details.
+`wasi:tls` (since 2.2.0) lets components terminate TLS connections themselves over `wasi:sockets` using the WASI Preview 3 `wasi:tls/client` and `wasi:tls/types` interfaces. Support is opt-in via the `wasi-tls` Cargo feature on `wash-runtime` while the upstream WIT stabilizes. Embedders can register a custom TLS provider through `EngineBuilder::with_tls_provider` — see [Building Custom Hosts](../runtime/building-custom-hosts.mdx#tls-for-wasitls-components) for details.
 :::
 
 ### wasmCloud interfaces
@@ -182,34 +180,32 @@ Well-known interfaces include six APIs built specifically for wasmCloud:
 | API                                                                                        | Versions    | Interfaces |
 | ------------------------------------------------------------------------------------------ | ----------- | ---------- |
 | [wasmcloud:messaging](https://github.com/wasmCloud/wasmCloud/tree/main/wit/messaging)      | 0.2.0 (sync), 0.3.0 (async) | `consumer`, `handler`, `types` |
-| [wasmcloud:keyvalue](https://github.com/wasmCloud/wasmCloud/tree/main/wit/keyvalue)        | 0.1.0       | `store`, `atomics`, `batch`, `cas`, `watcher`, `types` |
+| [wasmcloud:keyvalue](https://github.com/wasmCloud/wasmCloud/tree/main/wit/keyvalue)        | 0.2.0       | `store`, `atomics`, `batch`, `cas`, `watcher`, `types` |
 | [wasmcloud:blobstore](https://github.com/wasmCloud/wasmCloud/tree/main/wit/blobstore)      | 0.1.0       | `blobstore`, `container`, `types` |
 | [wasmcloud:postgres](https://github.com/wasmCloud/wasmCloud/tree/main/wit/postgres)        | 0.1.1-draft (sync), 0.2.0 (async) | `query`, `prepared`, `types` |
 | [wasmcloud:host](https://github.com/wasmCloud/wasmCloud/tree/main/wit/host)                | 0.1.3       | `types`, `identity`, `cancel`, `workload-call`, `workload-lifecycle` |
 | [wasmcloud:secrets](https://github.com/wasmCloud/wasmCloud/tree/main/wit/secrets)          | 2.1.0       | `store`, `reveal`, `secret` |
 
-* **`wasmcloud:messaging`** facilitates communication through message brokers: `consumer` for publishing and request/reply, `handler` for receiving deliveries. As of wasmCloud 2.8.0 the package ships in two revisions: the sync `0.2.0` interfaces (vendored with the runtime) and an async `0.3.0` counterpart in `wit/messaging` (see the callout below). A service that exports `wasmcloud:messaging/handler@0.3.0` receives messages through the [messaging ingress](./hosts/trigger-services.mdx#messaging-ingress).
-* **`wasmcloud:keyvalue`** is the async-shaped key-value package (see the callout below), extending `wasi:keyvalue` with TTL on `set`, compare-and-swap, batch operations, and typed errors. A `watcher` interface is defined in the package, but watch delivery is not yet implemented by the runtime plugin. Runtime support for the package is carried by `wash-runtime` builds with the `wasm_component_model_implements` Cargo feature, part of the default feature set (and stock release images) as of wasmCloud 2.7.0; earlier releases required a custom build. See [Host Interfaces](../kubernetes-operator/crds.mdx#host-interfaces) for details.
-* **`wasmcloud:blobstore`** is the async-shaped blob/object storage package, the streaming counterpart to `wasi:blobstore`. Runtime support carries the same `wasm_component_model_implements` feature requirement as `wasmcloud:keyvalue` (default as of 2.7.0).
-* **`wasmcloud:postgres`** provides direct PostgreSQL access — one-shot `query`, `prepared` statements, and shared `types` — in a sync (`0.1.1-draft`) and an async (`0.2.0`) shape, both served by the built-in Postgres [host plugin](./hosts/plugins.mdx). The async package lives in `wit/postgres`; the sync package is vendored with the runtime.
-* **`wasmcloud:host`** lets [host component plugins](./hosts/plugins.mdx#host-component-plugins) (and other components running as [trigger services](./hosts/trigger-services.mdx)) observe and act on their runtime environment. It provides `identity` (the workload and component IDs of the current caller, for per-caller state partitioning), `cancel` (cooperative per-invocation cancellation), `workload-call` (as of 2.7.0, invokes interfaces that workloads export, with failures reported as `types.call-error` values rather than traps), and the shared `types` as imports, plus `workload-lifecycle` (added in 2.6.0), which a plugin can optionally export to observe workloads binding to and unbinding from it.
-* **`wasmcloud:secrets`** defines opaque-handle access to a secrets backend: `store` looks up a secret as a borrowable resource, and `reveal` gates access to its value so a host can permit lookup and reveal independently. As of wasmCloud 2.6.0 the package is async-shaped, which makes it servable by a [host component plugin](./hosts/plugins.mdx#host-component-plugins); 2.7.0's `2.1.0` revision adds a labeled `secret` interface (one nullary `get` per labeled import) so a plugin's own secrets resolve before instantiation. As of wasmCloud 2.7.0 the runtime also ships a **built-in `wasmcloud:secrets` plugin** that delivers each component's secrets from deploy-time configuration (Kubernetes Secrets via `secretFrom`), isolated per component. A host component plugin remains the path for serving secrets from an external backend, typically provisioning per-workload secrets in a `workload-lifecycle` bind hook and partitioning access via `wasmcloud:host/identity`.
+* **`wasmcloud:messaging`** facilitates communication through message brokers: `consumer` for publishing and request/reply, `handler` for receiving deliveries. The async `0.3.0` revision (since 2.8.0) adds an optional `timeout-ms` on `request`, typed error variants such as `timeout` and `broker-unavailable`, and a `reject`/`retry`/`other` disposition returned by handlers. The host currently logs the disposition; mapping `retry` to broker redelivery is left to future backend support. A service that exports `handler@0.3.0` receives messages through the [messaging ingress](./hosts/trigger-services.mdx#messaging-ingress).
+* **`wasmcloud:keyvalue`** is the async-shaped key-value package, extending `wasi:keyvalue` with TTL on `set`, compare-and-swap, batch operations, and typed errors for missing keys, conflicts, and backend failures. The `bucket` resource and error types live in a shared `types` interface, so a labeled multi-backend `store` import can use `cas`, `atomics`, and `batch` against the same bucket. A `watcher` interface is defined in the package, but watch delivery is not yet implemented by the runtime plugin. Runtime support requires the `wasm_component_model_implements` Cargo feature, part of the default feature set and stock release images since wasmCloud 2.7.0. See [Host Interfaces](../kubernetes-operator/crds.mdx#host-interfaces) for details.
+* **`wasmcloud:blobstore`** is the async-shaped blob/object storage package, the streaming counterpart to `wasi:blobstore`. It uses the same shared-resource pattern through its `container` interface and carries the same `wasm_component_model_implements` requirement.
+* **`wasmcloud:postgres`** provides direct PostgreSQL access (one-shot `query`, `prepared` statements, and shared `types`) in a sync (`0.1.1-draft`) and an async (`0.2.0`) shape, both served by the built-in Postgres [host plugin](./hosts/plugins.mdx).
+* **`wasmcloud:host`** lets [host component plugins](./hosts/plugins.mdx#host-component-plugins) (and other components running as [trigger services](./hosts/trigger-services.mdx)) observe and act on their runtime environment. It provides `identity` (the workload and component IDs of the current caller, for per-caller state partitioning), `cancel` (cooperative per-invocation cancellation), `workload-call` (since 2.7.0), which invokes interfaces that workloads export and reports failures as `types.call-error` values rather than traps, and the shared `types` as imports, plus `workload-lifecycle` (since 2.6.0), which a plugin can optionally export to observe workloads binding to and unbinding from it.
+* **`wasmcloud:secrets`** defines opaque-handle access to a secrets backend: `store` looks up a secret as a borrowable resource, and `reveal` gates access to its value so a host can permit lookup and reveal independently. The package is async-shaped (since 2.6.0), which makes it servable by a [host component plugin](./hosts/plugins.mdx#host-component-plugins), and its labeled `secret` interface (one nullary `get` per labeled import) lets a plugin's own secrets resolve before instantiation. The runtime also ships a **built-in `wasmcloud:secrets` plugin** that delivers each component's secrets from deploy-time configuration (Kubernetes Secrets via `secretFrom`), isolated per component. A host component plugin remains the path for serving secrets from an external backend, typically provisioning per-workload secrets in a `workload-lifecycle` bind hook and partitioning access via `wasmcloud:host/identity`.
 
 You may also encounter `wasmcloud:runtime@0.1.0` in the wasmCloud source: it holds the runtime's own internal world definitions (the typed surfaces of the built-in host plugins), and is not an interface for components to import.
 
-These packages are published as [OCI artifacts](./packaging.mdx) to `ghcr.io/wasmcloud/interfaces/` and indexed in the `wasmcloud` namespace on [wasm.directory](https://wasm.directory/wasmcloud), a community-run meta-registry for WebAssembly packages.
+These packages are published as [OCI artifacts](./packaging.mdx) to `ghcr.io/wasmcloud/interfaces/` and indexed in the `wasmcloud` namespace on [wasm.directory](https://wasm.directory/wasmcloud), a community-run meta-registry for WebAssembly packages. `wash` fetches them automatically when a world references them; see [Managing WIT dependencies](../wash/developer-guide/managing-wit-dependencies.mdx#wit-packages-are-oci-artifacts).
 
-:::info[2.5.0: async `wasmcloud:keyvalue` and `wasmcloud:blobstore`]
-Starting in 2.5.0, `wasmcloud:keyvalue` and `wasmcloud:blobstore` ship async-shaped WIT packages alongside the existing sync interfaces, together with **TTL on `set`**, **CAS** (compare-and-swap), and **typed errors** for missing keys, conflicts, and backend failures. The async packages depend on the `component-model-async` proposal (implied by WASI 0.3).
+### Sync and async revisions
 
-The `bucket` resource (and `error`, `key-response`, `set-options`) live in a shared `wasmcloud:keyvalue/types` interface, and `store`, `atomics`, `cas`, `batch`, and `watcher` all `use types.{bucket, error}`. A guest using a labeled multi-backend `store` can therefore also use `cas`/`atomics`/`batch` against the same bucket — the resource identity matches across all five interfaces. This mirrors the shape that `wasmcloud:blobstore` uses.
-:::
+Several wasmCloud packages come in two shapes. Sync revisions use plain functions and buffered payloads. Async revisions use `async func`, typed error variants, and streams where payloads can be large (`stream<u8>` message and object bodies, `stream<row>` query results). Async revisions depend on the `component-model-async` proposal implied by WASI 0.3, so building against them takes a bindings generator with async support, the same tooling used for WASI 0.3 components (`wit-bindgen` with its async features in Rust, `componentize-go` async worlds in Go).
 
-:::info[2.8.0: async `wasmcloud:messaging`]
-Starting in 2.8.0, `wasmcloud:messaging` ships an async `0.3.0` revision alongside the sync `0.2.0` interfaces. In `0.3.0`, `consumer.publish`, `consumer.request`, and `handler.handle-message` are `async func`s, message bodies are `stream<u8>` rather than `list<u8>`, `request` takes an optional `timeout-ms`, and errors are typed variants (`timeout`, `broker-unavailable`, `message-too-large`, and more) instead of strings. A handler returns a `handle-message-error` disposition (`reject`, `retry`, or `other`); at 2.8.0 the host logs the disposition, and mapping `retry` to broker redelivery is left to future backend support.
+* `wasmcloud:messaging` (`0.2.0` sync, `0.3.0` async since 2.8.0) and `wasmcloud:postgres` (`0.1.1-draft` sync, `0.2.0` async) ship both revisions.
+* `wasmcloud:keyvalue` and `wasmcloud:blobstore` (since 2.5.0) are async only; their sync counterparts are `wasi:keyvalue` and `wasi:blobstore`.
+* `wasmcloud:secrets` is served only in its async shape (since 2.6.0); the earlier sync `1.0.0` WIT was never served by the runtime.
 
-The `version` on a component's `wasmcloud:messaging` [host interface entry](../kubernetes-operator/crds.mdx#host-interfaces) selects which `consumer` and `types` revision is linked for its imports: `"0.3.0"` binds the async surface, while `"0.2.0"` or an omitted version binds sync `0.2.0`. The handler revision follows the component's own export, with `0.3.0` preferred when both are exported. Both revisions share the same backends and configuration, including `subscriptions` and `consumer_group`.
-:::
+A component's WIT fixes which revision it imports, and the host interface entry has to match. The `version` on a [host interface entry](../kubernetes-operator/crds.mdx#host-interfaces) selects the revision the host links; an omitted version binds the sync revision (`0.2.0` for messaging, `0.1.1-draft` for postgres). For exports, the host invokes the revision the component exports, and a messaging component that exports both handlers is invoked at `0.3.0`. Both revisions share the same backends and configuration. See the [Host Interface Configuration Reference](../kubernetes-operator/host-interface-configuration.mdx) for each package's revisions and config keys.
 
 ## Custom interfaces
 
@@ -230,6 +226,8 @@ world greeter {
 ```
 
 While reading the [spec][wit-spec] is the best way to learn about WIT, it is also designed to be easy to understand at a glance. WASI interfaces written in WIT contain their own documentation and are useful to consult as examples.
+
+To share a custom interface across repositories, publish it as a package to an OCI registry; while it is still under development, a consumer can point the dependency at a local directory instead. See [Publishing your own interfaces](../wash/developer-guide/managing-wit-dependencies.mdx#publishing-your-own-interfaces) and [Local file references](../wash/developer-guide/managing-wit-dependencies.mdx#local-file-references).
 
 :::warning[Compared to gRPC and Smithy...]
 While similar frameworks and languages like [gRPC][grpc] and [Smithy][smithy] are meant to perform over network boundaries, WIT is _in-process_, and performs at near-native speed.
