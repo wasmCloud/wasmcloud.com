@@ -74,8 +74,9 @@ wash-runtime = { version = "*", default-features = false, features = [
 | `wasm_component_model_implements` | Yes (since 2.7.0) | Multi-backend binding via the `implements` clause |
 | `wasi-otel` | Yes | OpenTelemetry traces, metrics, and logs export |
 | `washlet` | Yes | Washlet support (depends on `oci`) |
-| `wasi-webgpu` | No | WebGPU interface |
-| `oci` | No | OCI registry integration for pulling components |
+| `wasi-webgpu` | Yes | WebGPU interface |
+| `oci` | Yes (via `washlet`) | OCI registry integration for pulling components |
+| `wasi-tls` | No | TLS termination for `wasi:tls` components |
 | `host-component-plugins` | No | Host component plugin support |
 
 ## Architecture overview
@@ -131,7 +132,7 @@ let engine = Engine::builder()
 | `with_config(wasmtime::Config)` | Provide a fully custom Wasmtime configuration for advanced use cases |
 | `with_host_memory(HostMemoryBudgets)` | Set the guest memory budget, per-memory heap ceiling, and pool instance slots (since 2.9.0). `HostMemoryBudgets::resolve_strs` and `parse_bytes` turn textual config (Kubernetes quantity grammar) into budgets |
 | `with_guest_memory_mode(GuestMemoryMode)` | `Count` (default) records what enforcement would refuse; `Enforce` refuses guest memory growth past the budget (since 2.9.0) |
-| `with_fuel_consumption(bool)` | Compile fuel counters into guest code, required for `--meters fuel`-style exact execution metering |
+| `with_fuel_consumption(bool)` | Compile fuel counters into guest code, required for `--meters fuel`-style exact execution metering (predates 2.9.0) |
 
 :::info[Pooling allocator]
 The pooling allocator is automatically enabled on machines with sufficient virtual memory. You can override this behavior with the `with_pooling_allocator()` method.
@@ -219,7 +220,7 @@ Two embedder-facing changes in 2.8.0:
 ### Embedder changes at 2.9.0
 
 - **Metering is on by default.** A host built without `with_meters` measures invocation counts, failures, and durations (`guest.invocation.duration`). Fuel metering requires both `with_meters(Meters::new(MeterKind::Fuel))` and `EngineBuilder::with_fuel_consumption(true)`.
-- **Breaking signatures**: `UnresolvedWorkload::resolve` takes a new `&Meters` parameter; `HostHandler::deliver_trigger_service_message` gained an `attributes: Arc<[KeyValue]>` parameter; the `observability::invocation_meter` free function is gone.
+- **Breaking signatures**: `UnresolvedWorkload::resolve` gained two parameters, `plugin_bindings: &PluginBindings` (inserted before `http_handler`) and `meters: &Meters` (last); `HostHandler::deliver_trigger_service_message` gained an `attributes: Arc<[KeyValue]>` parameter; `Meters::new` takes a `MeterKind` instead of a `bool`.
 - **Plugin dispatch** is public API: `engine::dispatch` lets a native plugin push calls into workload guest code through `ResolvedWorkload::dispatch_target` (see [Creating host plugins](./creating-host-plugins.mdx#dispatching-into-workloads)).
 - **Descriptor limits**: `wash host` raises the process's soft file-descriptor limit toward the hard limit at startup; library embedders should call `raise_descriptor_limit()` themselves if they serve ingress traffic.
 

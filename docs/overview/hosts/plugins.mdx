@@ -45,7 +45,7 @@ Native host plugins are Rust implementations of the `HostPlugin` trait, linked i
 
 ### Built-in plugins
 
-The [`wash-runtime`](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-runtime) crate includes built-in plugins for common WASI interfaces. These plugins come in two variants: in-memory implementations for local development (used by `wash dev`), and NATS-backed implementations for production deployments.
+The [`wash-runtime`](https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-runtime) crate includes built-in plugins for common WASI interfaces. Several of these plugins come in two variants, in-memory implementations for local development (used by `wash dev`) and NATS-backed implementations for production, while `wasmcloud:nats`, `wasmcloud:postgres`, and `wasmcloud:secrets` have a single implementation.
 
 | Plugin | Interface | Description |
 |--------|-----------|-------------|
@@ -63,7 +63,7 @@ The [`wash-runtime`](https://github.com/wasmCloud/wasmCloud/tree/main/crates/was
 HTTP is handled by the `Ingress` server (named `HttpServer` before wasmCloud 2.6.1), which implements the `HostHandler` trait and is registered separately via `with_http_handler()` rather than `with_plugin()`. In addition, all [WASI P2 interfaces](https://docs.wasmtime.dev/api/wasmtime_wasi/p2/index.html#wasip2-interfaces) provided by `wasmtime-wasi`—including `wasi:filesystem`, `wasi:clocks`, `wasi:random`, `wasi:io`, `wasi:sockets`, and the `wasi:cli` suite—are built into the host core and always available without registration.
 :::
 
-Messaging is always available. The remaining plugins are controlled by Cargo feature flags when building your host; the ones above are all in the default feature set, so to trim the set, disable default features and re-enable only what you need (note that the defaults also include features like `washlet`, `wasi-otel`, `wasmcloud-postgres`, and `wasmcloud-nats`, which this drops too). Build against the Git repository — the `wash-runtime` crate on crates.io is a stale early snapshot that predates the current API:
+Messaging and the secrets plugin are always available. The remaining plugins are controlled by Cargo feature flags when building your host; the ones above are all in the default feature set, so to trim the set, disable default features and re-enable only what you need (note that the defaults also include features like `washlet`, `wasi-otel`, `wasmcloud-postgres`, and `wasmcloud-nats`, which this drops too). Build against the Git repository — the `wash-runtime` crate on crates.io is a stale early snapshot that predates the current API:
 
 ```toml
 [dependencies]
@@ -116,10 +116,6 @@ Host component plugins are suitable when:
 
 Native host plugins remain the right choice when the capability needs direct host resources (raw sockets, filesystem paths, hardware) or must run with host privileges outside the sandbox. See [Plugin or Service?](../../recipes/plugin-or-service.mdx) for a full decision guide.
 
-### Configuring plugins
-
-Since 2.9.0, one declaration block configures plugins of both kinds. In host configuration (`host.plugins`, `dev.plugins`) or Helm values ([`runtime.hostGroups[].plugins`](../../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsplugins)), each entry names a plugin by `id` (with an `image` or `file` source for component plugins), carries the plugin's own `config`/`configFrom`/`secretFrom`, and can declare named `bindings` that components import under `implements` labels. A `workloadConfig` policy (`deny` by default on `wash host` and Kubernetes, `allow` under `wash dev`) keeps host-owned keys like connection addresses and credentials out of workload manifests: under `deny`, a manifest that sets one, widens a grant ceiling, or names an undeclared binding is refused at deploy, and `warn` logs what `deny` would refuse. The earlier `hostPlugins` spelling remains as a deprecated alias for component plugin entries.
-
 ### The `wasmcloud:host` interface
 
 Host component plugins can import [`wasmcloud:host`](../interfaces.mdx) (0.1.4 since wasmCloud 2.9.0) to observe and cooperate with their runtime environment:
@@ -141,6 +137,14 @@ wash-runtime = { git = "https://github.com/wasmCloud/wasmCloud", tag = "v{{WASMC
 ```
 
 On Kubernetes, build a custom host image — the source [Dockerfile](https://github.com/wasmCloud/wasmCloud/blob/main/Dockerfile) takes `CARGO_FEATURES=host-component-plugins` as a build arg — and point the Helm chart at your image via the `runtime.image` values (`registry`, `repository`, and [`tag`](../../kubernetes-operator/operator-manual/helm-values.mdx#runtimeimagetag)).
+
+## Configuring plugins
+
+Plugins of both kinds are declared in one block: `plugins` in host configuration (`host.plugins`, `dev.plugins`) or in Helm values under [`runtime.hostGroups[].plugins`](../../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsplugins) (since 2.9.0). Each entry names a plugin by `id` (with an `image` or `file` source for component plugins), carries its configuration and secrets, and can declare named `bindings` that components import under `implements` labels.
+
+A `workloadConfig` policy decides what a workload manifest may set. Under `deny`, the default outside `wash dev`, connection addresses and credentials come only from the operator's declaration: a manifest that sets one or widens a grant ceiling is refused at deploy, and once any binding is declared for a plugin, so is a manifest naming a binding the declaration does not carry. `warn` allows while logging what `deny` would refuse.
+
+See [Creating host component plugins](../../runtime/creating-host-component-plugins.mdx#named-bindings) for the full entry shape, and the [`wasmcloud:nats` reference](../../kubernetes-operator/host-interface-configuration.mdx#wasmcloudnats) for the key ownership model in practice.
 
 ## Keep reading
 
