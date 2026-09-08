@@ -394,9 +394,119 @@ runtime:
     coreInstances: "500"
 ```
 
-As of 2.8.0 the chart also forwards `resources.limits.memory` to the host as its guest memory budget (`--max-guest-memory`). At 2.8.0 the budget is advisory: the host logs it at startup and warns when the heap ceiling or pool reservation looks inconsistent with it, but does not enforce it. When no limit is set, the host derives the budget from the cgroup limit or physical memory.
+The chart also forwards `resources.limits.memory` to the host as its guest memory budget (`--max-guest-memory`, since 2.8.0). When no limit is set, the host derives the budget from the cgroup limit or physical memory. Since 2.9.0 the host counts guest memory use against the budget and can enforce it; see [`guestMemoryMode`](#runtimeresourcesguestmemorymode) below.
 
-These values size the engine for the whole host; they are not per-workload limits. A host group with its own `resources` block replaces the chart-wide `runtime.resources` wholesale, so repeat these keys per group if you use both.
+These values size the engine for the whole host; they are not per-workload limits. A host group with its own `resources` block replaces the chart-wide `runtime.resources` wholesale, so repeat these keys per group if you use both. (`probes` is the exception to this pattern: per-group probes overlay field by field.)
+
+### `runtime.resources.guestMemoryMode`
+
+Since 2.9.0. How the host treats the guest memory budget: `count` (the default when unset) records what enforcement would refuse without refusing anything, and `enforce` refuses guest memory growth past the budget. Set inside the `resources` block like the sizing values above; passed to the host as the `WASH_GUEST_MEMORY_MODE` environment variable.
+
+Under `enforce`, a guest whose `memory.grow` would cross the budget sees the growth fail (the same result as hitting its own heap ceiling), not a trap. A refusal during instantiation surfaces as a workload start error. The host publishes `guest_memory.in_use`, `guest_memory.high_water`, `guest_memory.limit`, `guest_memory.refused`, and `guest_memory.would_refuse` metrics whenever an OpenTelemetry exporter is configured, so the intended rollout is: run in `count`, watch `high_water` and `would_refuse`, then switch to `enforce`.
+
+Leave headroom. The chart forwards `resources.limits.memory` verbatim, so an enforced budget equal to the pod limit can be OOM-killed before a refusal ever fires; the host warns at startup when an enforced budget exceeds 90% of the detected memory limit. Set `limits.memory` above the guest budget you want, or set a lower budget explicitly with `WASH_HOST_MAX_GUEST_MEMORY` in `runtime.env`.
+
+### `runtime.resources.maxConcurrentStarts`
+
+Since 2.9.0. How many workload starts (the image pull plus the compile) a host admits at once; further start commands queue. Set inside the `resources` block; passed as `WASH_MAX_CONCURRENT_STARTS`. When unset, the host sizes it to one fewer than the CPUs it can see, clamped between 1 and 4, and logs the effective value on its startup line. A literal `0` is preserved by the chart and clamps to 1.
+
+Each admitted compile spreads across every core the process can see, so this value bounds how many compiles contend with serving traffic, not how many threads a compile uses. To bound the compiles themselves, set `RAYON_NUM_THREADS` or `WASMTIME_PARALLEL_COMPILATION=false` via `runtime.env`.
+
+### `runtime.probes` and `runtime.hostGroups[].probes`
+
+Since 2.9.0, host pods expose HTTP health endpoints on a dedicated probes port (default `8081`, rendered as `--probe-addr`):
+
+- **`/livez`** means "restart me": it fails when the host's command loop has stalled or its HTTP ingress has stopped permanently.
+- **`/readyz`** means "stop sending me work": it fails while the host is `starting` or `draining`, and while the HTTP ingress connection ceiling is reached.
+
+The failure body names the failing condition, so `kubectl describe pod` shows why a probe failed. Chart defaults:
+
+```yaml
+runtime:
+  probes:
+    endpoint:
+      enabled: true              # false restores the pre-2.9.0 TCP probe on the http port
+      port: 8081
+      startupFailureThreshold: 60 # at a 5s period, a 5 minute startup budget
+    readiness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 1
+      failureThreshold: 3
+    liveness:
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 5
+```
+
+Liveness is deliberately slower than readiness: a restart loses every workload on the host. Unlike `resources`, a per-group `hostGroups[].probes` block overlays `runtime.probes` field by field, so a group can retune one timing without redeclaring the rest. The chart refuses to render when the probe port collides with the group's HTTP port or a declared container port.
+
+:::warning[Pinning an older host image]
+`--probe-addr` requires a 2.9.0 or later host image. A host group pinned to an older `image.tag` must set `probes.endpoint.enabled: false` and clear `runtime.drainDelaySeconds` and `runtime.natsConnectTimeoutSeconds`; otherwise the host refuses the unknown flags and the pod crash-loops.
+:::
+
+The operator's probes are also values-driven since 2.9.0 (`operator.probes.startup`, `.liveness`, `.readiness`), including a new startup probe whose budget covers the operator's NATS connect window. Operator liveness fails only on a permanently closed NATS connection and stays healthy through reconnects, so a NATS rolling restart no longer restarts the operator.
+
+### Shutdown draining and termination grace
+
+Since 2.9.0, host pods drain on termination instead of exiting immediately:
+
+1. On SIGTERM the host reports `draining`: readiness fails and the pod leaves its Service endpoints while the host is still serving.
+2. The host keeps serving for `runtime.drainDelaySeconds` (default `5`, rendered as `--drain-delay`).
+3. In-flight commands get 5 seconds to finish, and each plugin's stop is capped by `WASH_PLUGIN_STOP_TIMEOUT_SECS` (default 5 seconds) plus a 1 second grace.
+
+The chart now sets `terminationGracePeriodSeconds` on every pod (previously hardcoded to `0`): `runtime: 15`, `operator: 45`, `gateway: 45`, `nats: 30`. Rendering fails if the runtime grace is less than `drainDelaySeconds + 5`. A second signal exits immediately rather than waiting out the drain.
+
+`runtime.natsConnectTimeoutSeconds` (default `60`, rendered as `--nats-connect-timeout`) lets a starting host wait for a NATS server that is not up yet instead of exiting and burning pod restarts.
+
+### `runtime.hostGroups[].networking`
+
+Maps to the host's socket policy and connection quota flags. Since 2.9.0 the chart actually renders these keys (the block existed in the 2.8.0 values file but was not wired to the host):
+
+| Key | Default | Host flag |
+| --- | --- | --- |
+| `allowHostLoopback` | `false` | `--allow-host-loopback` |
+| `socketEgress` | `count` | `--socket-egress` |
+| `denySpecialRanges` | `true` | `--deny-special-ranges` |
+| `denyPrivateRanges` | `false` | `--deny-private-ranges` |
+| `maxConnections` | empty (derived from the descriptor limit) | `--max-connections` |
+| `maxOutboundHttpConnectionsPerWorkload` | `128` | `--max-outbound-http-connections-per-workload` |
+| `maxOutboundSocketConnectionsPerWorkload` | `256` | `--max-outbound-socket-connections-per-workload` |
+| `maxInboundSocketConnectionsPerWorkload` | `256` | `--max-inbound-socket-connections-per-workload` |
+| `maxHttpIngressConnections` | empty (a quarter of the descriptor limit, floor 256; since 2.9.0) | `--max-http-ingress-connections` |
+
+See [Concurrency and connections](./concurrency-and-connections.mdx) and [Workload security](../workload-security.mdx) for what these bound. `publishPorts` and `publishPortRange` appear in the values file but are not yet wired to the host; setting them changes nothing today.
+
+### `runtime.hostGroups[].plugins`
+
+Since 2.9.0, one declaration block configures host plugins of both kinds: native plugins built into the host (an entry with only an `id`) and [host component plugins](../../runtime/creating-host-component-plugins.mdx) (an entry with an `image` or `file` source). Every entry is rendered into the host's config file rather than CLI arguments, so credentials never appear in the pod spec. Each entry accepts:
+
+- **`config` / `configFrom` / `secretFrom`**: entry-wide configuration, layered under each binding's own.
+- **`workloadConfig`**: `deny` (the default), `warn`, or `allow`. Under `deny`, host-owned keys (connection and credential settings) come only from this declaration: a workload manifest that sets one, widens a grant ceiling, or names an undeclared binding is refused at deploy. `warn` behaves like `allow` but logs everything `deny` would refuse, for rehearsing a lockdown.
+- **`hostOwnedKeys`**: additional keys to claim for the host under `deny`.
+- **`bindings`**: a map of label to `{config, configFrom, secretFrom}`. A component imports the plugin's interface under that label (the Component Model's `implements` clause), and the labeled import resolves against the binding's config layered over the entry's.
+- Component-plugin-only fields: `maxRestarts`, `expectedDigest`, `allowedHosts`, `allowedIpNameLookups`, `ports`.
+
+```yaml
+runtime:
+  hostGroups:
+    - name: default
+      plugins:
+        - id: wasmcloud-nats
+          workloadConfig: deny
+          config:
+            servers: nats://nats.example.com:4222
+            subject-allow: 'orders.>'
+          secretFrom:
+            - name: nats-creds
+```
+
+`runtime.hostGroups[].hostPlugins` remains as a deprecated alias for component plugin entries: it merges into `plugins`, each entry must carry a source, and binding fields on it fail rendering. The 2.9.0 chart refuses to render the transient `wasmcloudNats` and `wasmcloudNatsWorkloadConfig` keys with a message pointing at `plugins`.
+
+### `runtime.hostGroups[].wasmcloudNatsUrl`
+
+Since 2.9.0. The default NATS address for the [`wasmcloud:nats` plugin's](../host-interface-configuration.mdx#wasmcloudnats) per-workload connections (rendered as `--wasmcloud-nats-url`). Empty means the group's data NATS URL, including its TLS settings. When set, TLS and credentials do not carry over from the data plane; provide them through the plugin's `plugins` entry.
 
 ### `runtime.hostGroups[].http.tls.certificate.generate.ipAddresses`
 
