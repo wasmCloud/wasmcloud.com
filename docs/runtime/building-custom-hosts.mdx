@@ -69,10 +69,14 @@ wash-runtime = { version = "*", default-features = false, features = [
 | `wasi-logging` | Yes | Logging interface |
 | `wasi-blobstore` | Yes | Blob storage interface |
 | `wasi-keyvalue` | Yes | Key-value storage interface |
-| `wasmcloud-postgres` | Yes | PostgreSQL-backed implementations for keyvalue and blobstore |
+| `wasmcloud-postgres` | Yes | Direct PostgreSQL access (queries and prepared statements) |
+| `wasmcloud-nats` | Yes (since 2.9.0) | NATS-native core, JetStream, and key-value access |
+| `wasm_component_model_implements` | Yes (since 2.7.0) | Multi-backend binding via the `implements` clause |
+| `wasi-otel` | Yes | OpenTelemetry traces, metrics, and logs export |
 | `washlet` | Yes | Washlet support (depends on `oci`) |
 | `wasi-webgpu` | No | WebGPU interface |
 | `oci` | No | OCI registry integration for pulling components |
+| `host-component-plugins` | No | Host component plugin support |
 
 ## Architecture overview
 
@@ -125,6 +129,9 @@ let engine = Engine::builder()
 |--------|-------------|
 | `with_pooling_allocator(bool)` | Enable/disable instance pooling for better performance with many short-lived instances |
 | `with_config(wasmtime::Config)` | Provide a fully custom Wasmtime configuration for advanced use cases |
+| `with_host_memory(HostMemoryBudgets)` | Set the guest memory budget, per-memory heap ceiling, and pool instance slots (since 2.9.0). `HostMemoryBudgets::resolve_strs` and `parse_bytes` turn textual config (Kubernetes quantity grammar) into budgets |
+| `with_guest_memory_mode(GuestMemoryMode)` | `Count` (default) records what enforcement would refuse; `Enforce` refuses guest memory growth past the budget (since 2.9.0) |
+| `with_fuel_consumption(bool)` | Compile fuel counters into guest code, required for `--meters fuel`-style exact execution metering |
 
 :::info[Pooling allocator]
 The pooling allocator is automatically enabled on machines with sufficient virtual memory. You can override this behavior with the `with_pooling_allocator()` method.
@@ -199,6 +206,8 @@ let host = host.start().await?;
 | `with_label(key, value)` | Add metadata labels for identification |
 | `with_http_handler(Arc<dyn HostHandler>)` | Register the HTTP handler (`Ingress` implements `HostHandler`, not `HostPlugin`) |
 | `with_plugin(Arc<dyn HostPlugin>)` | Register a plugin (can be called multiple times; IDs must be unique) |
+| `with_plugin_bindings(PluginBindings)` | Install operator-declared plugin bindings; validated against each plugin's schema at `build()`, so a bad declaration fails startup (since 2.9.0) |
+| `with_meters(Meters)` | Choose guest execution metering. A host built without it gets duration metering by default (since 2.9.0); `build()` warns when fuel meters and the engine's fuel setting disagree |
 
 ### Embedder defaults at 2.8.0
 
@@ -206,6 +215,13 @@ Two embedder-facing changes in 2.8.0:
 
 - **Socket policy defaults now match the CLI.** A host built without an explicit socket policy previously ran with egress address screening off. As of 2.8.0, the default denies special address ranges, allows private ranges, uses `count` egress mode, and keeps host loopback off, matching the defaults `wash` applies. Embedders that relied on the permissive default should set a policy explicitly.
 - **OCI CA trust is settable via `HostConfig`.** The new `oci_ca_paths` field (default empty) adds CA certificates to trust when pulling from OCI registries, matching the CLI's `--oci-ca-path`.
+
+### Embedder changes at 2.9.0
+
+- **Metering is on by default.** A host built without `with_meters` measures invocation counts, failures, and durations (`guest.invocation.duration`). Fuel metering requires both `with_meters(Meters::new(MeterKind::Fuel))` and `EngineBuilder::with_fuel_consumption(true)`.
+- **Breaking signatures**: `UnresolvedWorkload::resolve` takes a new `&Meters` parameter; `HostHandler::deliver_trigger_service_message` gained an `attributes: Arc<[KeyValue]>` parameter; the `observability::invocation_meter` free function is gone.
+- **Plugin dispatch** is public API: `engine::dispatch` lets a native plugin push calls into workload guest code through `ResolvedWorkload::dispatch_target` (see [Creating host plugins](./creating-host-plugins.mdx#dispatching-into-workloads)).
+- **Descriptor limits**: `wash host` raises the process's soft file-descriptor limit toward the hard limit at startup; library embedders should call `raise_descriptor_limit()` themselves if they serve ingress traffic.
 
 ### Customizing outgoing HTTP requests
 

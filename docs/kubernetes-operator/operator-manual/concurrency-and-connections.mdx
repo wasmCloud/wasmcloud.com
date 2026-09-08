@@ -51,6 +51,8 @@ These three fields sit directly on a component entry, under `spec.template.spec.
 | `poolSize` | none kept (every call gets a fresh instance) | how many warm instances the host keeps between calls |
 | `maxConcurrency` | `1` | how many calls one warm instance serves at the same time |
 | `maxInvocations` | unlimited reuse | retires a warm instance after it admits this many calls, then replaces it |
+| `reclaimWindowSeconds` | never reclaimed | lets an idle pool shrink: each window, instances beyond what peak load needed are drained and retired (since 2.9.0) |
+| `reclaimMinInstances` | `0` | floor on reclaim; sweeps never shrink the pool below this count (since 2.9.0) |
 
 ```yaml
 spec:
@@ -62,11 +64,14 @@ spec:
           poolSize: 10
           maxConcurrency: 8
           maxInvocations: 1000
+          reclaimWindowSeconds: 60
 ```
 
 * `maxConcurrency` above `1` lets one instance overlap calls while it waits on I/O, which is what makes pooling pay off for network-bound work. It is only safe for a guest (the component's own code) that yields while it waits rather than blocking the thread. 
 
 * `maxInvocations` bounds how long a warm instance lives, which is useful when a component accumulates state you would rather reset periodically. Both are only meaningful alongside `poolSize`, since an unpooled component starts fresh on every call. 
+
+* `reclaimWindowSeconds` (since 2.9.0) lets the pool shrink back after a spike: every window the host retires idle instances beyond what the window's peak load needed, never interrupting a call in flight. `reclaimMinInstances` sets a floor. By default a pool holds its high-water mark until the workload stops.
 
 The [component runtime fields reference](/docs/kubernetes-operator/crds) covers the pooling semantics in full, including how linked components share a store and what a guest trap does to calls in flight.
 
@@ -80,13 +85,14 @@ Every workload gets one connection quota across three surfaces. You set these on
 | `maxOutboundSocketConnectionsPerWorkload` | `--max-outbound-socket-connections-per-workload` | `256` | raw `wasi:sockets` outbound connections a workload may hold |
 | `maxInboundSocketConnectionsPerWorkload` | `--max-inbound-socket-connections-per-workload` | `256` | inbound published-port connections a workload serves at once |
 | `maxConnections` | `--max-connections` | derived from the process file-descriptor limit | host-wide ceiling across every workload |
+| `maxHttpIngressConnections` | `--max-http-ingress-connections` | a quarter of the descriptor limit, floor 256 | connections the host's own HTTP listener holds open, across every workload (since 2.9.0); connections past the ceiling are accepted and immediately closed |
 
 The three surfaces behave differently when a workload reaches the limit:
 
 - **Outbound HTTP waits.** A request over the quota waits for a slot, up to `--http-connection-wait` (default `5s`), then fails. This is the surface most sensitive to instance concurrency, because the outbound pool is what warm, overlapping calls draw from.
 - **Raw sockets and inbound connections are refused immediately.** They do not wait, which avoids a guest deadlocking against its own quota.
 
-All three roll up into the host-wide `maxConnections` ceiling. The [workload security](/docs/kubernetes-operator/workload-security) page covers these quotas alongside the raw-socket egress policy they ship with.
+All of these roll up into the host-wide `maxConnections` ceiling. Since 2.9.0 the host raises its own soft file-descriptor limit toward the hard limit at startup, and an unlimited descriptor limit derives a large budget instead of a silent 512, so hosts running under `LimitNOFILE=infinity` permit far more concurrent connections after upgrading. The [workload security](/docs/kubernetes-operator/workload-security) page covers these quotas alongside the raw-socket egress policy they ship with.
 
 ## Sizing them together
 
@@ -111,7 +117,7 @@ These quotas are per host process. A workload scaled to several `replicas` gets 
 
 As of wasmCloud 2.8.0, messaging-triggered components have their own in-flight limit, applied before an instance is created. The `max_in_flight` config key on the component (default: the host's per-component ceiling) caps concurrent deliveries across the component's replicas on a host. A delivery over the limit waits up to `admission_wait` (default `30s`) for a slot, then is dropped with a warning.
 
-This limit is separate from `maxConcurrency`: `maxConcurrency` bounds calls on one warm instance, while `max_in_flight` bounds total messaging deliveries executing for the component. For messaging workloads, size `max_in_flight` first, then the instance limits beneath it. See [Messaging admission control](/docs/kubernetes-operator/crds#messaging-admission-control) for the config keys and host flags.
+This limit is separate from `maxConcurrency`: `maxConcurrency` bounds calls on one warm instance, while `max_in_flight` bounds total messaging deliveries executing for the component. Since 2.9.0, async (`0.3.0`) deliveries to a pooled component run on its warm instances under the same `poolSize` and `maxConcurrency` rules as HTTP, so for messaging workloads, size `max_in_flight` first, then the instance limits beneath it. See [Messaging admission control](/docs/kubernetes-operator/crds#messaging-admission-control) for the config keys and host flags.
 
 ## Replicas
 
@@ -119,7 +125,7 @@ This limit is separate from `maxConcurrency`: `maxConcurrency` bounds calls on o
 
 ## Takeaways
 
-- A component's warm capacity is `poolSize × maxConcurrency` calls in flight; `replicas` multiplies that across hosts.
+- A component's warm capacity is `poolSize × maxConcurrency` calls in flight; `replicas` multiplies that across hosts. With `reclaimWindowSeconds` set, an idle pool shrinks back after a spike.
 - Instance concurrency sets connection demand; the per-workload quota sets the ceiling. Size them as a pair.
 - The keep-alive pool is sized automatically from declared concurrency, so you tune concurrency and the quota, not the pool directly.
 - Outbound HTTP over quota waits up to `--http-connection-wait` (default `5s`) then fails; raw sockets and inbound connections are refused immediately.

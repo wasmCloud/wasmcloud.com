@@ -367,6 +367,9 @@ _Appears in:_
 | `imagePullPolicy` _[PullPolicy](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#pullpolicy-v1-core)_ |  |  | Optional: \{\} <br /> |
 | `poolSize` _integer_ |  |  | Optional: \{\} <br /> |
 | `maxInvocations` _integer_ |  |  | Optional: \{\} <br /> |
+| `maxConcurrency` _integer_ |  |  | Optional: \{\} <br /> |
+| `reclaimWindowSeconds` _integer_ |  |  | Optional: \{\} <br /> |
+| `reclaimMinInstances` _integer_ |  |  | Optional: \{\} <br /> |
 | `localResources` _[LocalResources](#localresources)_ |  |  | Optional: \{\} <br /> |
 
 

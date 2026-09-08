@@ -55,6 +55,7 @@ The [`wash-runtime`](https://github.com/wasmCloud/wasmCloud/tree/main/crates/was
 | **Logging** | `wasi:logging` | Structured logging output |
 | **OpenTelemetry** | `wasi:otel` | Traces, metrics, and logs export |
 | **Messaging** | `wasmcloud:messaging` | Message passing and pub/sub communication |
+| **NATS** | `wasmcloud:nats` | NATS-native core pub/sub, JetStream, and key-value, with per-workload connections and deny-by-default grants (since 2.9.0) |
 | **Postgres** | `wasmcloud:postgres` | Direct PostgreSQL access: queries and prepared statements |
 | **Secrets** | `wasmcloud:secrets` | Secrets delivery from deploy-time configuration (added in 2.7.0) |
 
@@ -62,7 +63,7 @@ The [`wash-runtime`](https://github.com/wasmCloud/wasmCloud/tree/main/crates/was
 HTTP is handled by the `Ingress` server (named `HttpServer` before wasmCloud 2.6.1), which implements the `HostHandler` trait and is registered separately via `with_http_handler()` rather than `with_plugin()`. In addition, all [WASI P2 interfaces](https://docs.wasmtime.dev/api/wasmtime_wasi/p2/index.html#wasip2-interfaces) provided by `wasmtime-wasi`—including `wasi:filesystem`, `wasi:clocks`, `wasi:random`, `wasi:io`, `wasi:sockets`, and the `wasi:cli` suite—are built into the host core and always available without registration.
 :::
 
-Messaging is always available. The remaining plugins are controlled by Cargo feature flags when building your host; the ones above are all in the default feature set, so to trim the set, disable default features and re-enable only what you need (note that the defaults also include features like `washlet`, `wasi-otel`, and `wasmcloud-postgres`, which this drops too). Build against the Git repository — the `wash-runtime` crate on crates.io is a stale early snapshot that predates the current API:
+Messaging is always available. The remaining plugins are controlled by Cargo feature flags when building your host; the ones above are all in the default feature set, so to trim the set, disable default features and re-enable only what you need (note that the defaults also include features like `washlet`, `wasi-otel`, `wasmcloud-postgres`, and `wasmcloud-nats`, which this drops too). Build against the Git repository — the `wash-runtime` crate on crates.io is a stale early snapshot that predates the current API:
 
 ```toml
 [dependencies]
@@ -115,11 +116,15 @@ Host component plugins are suitable when:
 
 Native host plugins remain the right choice when the capability needs direct host resources (raw sockets, filesystem paths, hardware) or must run with host privileges outside the sandbox. See [Plugin or Service?](../../recipes/plugin-or-service.mdx) for a full decision guide.
 
+### Configuring plugins
+
+Since 2.9.0, one declaration block configures plugins of both kinds. In host configuration (`host.plugins`, `dev.plugins`) or Helm values ([`runtime.hostGroups[].plugins`](../../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsplugins)), each entry names a plugin by `id` (with an `image` or `file` source for component plugins), carries the plugin's own `config`/`configFrom`/`secretFrom`, and can declare named `bindings` that components import under `implements` labels. A `workloadConfig` policy (`deny` by default on `wash host` and Kubernetes, `allow` under `wash dev`) keeps host-owned keys like connection addresses and credentials out of workload manifests: under `deny`, a manifest that sets one, widens a grant ceiling, or names an undeclared binding is refused at deploy, and `warn` logs what `deny` would refuse. The earlier `hostPlugins` spelling remains as a deprecated alias for component plugin entries.
+
 ### The `wasmcloud:host` interface
 
-Host component plugins can import [`wasmcloud:host`](../interfaces.mdx) (0.1.3 as of wasmCloud 2.7.0) to observe and cooperate with their runtime environment:
+Host component plugins can import [`wasmcloud:host`](../interfaces.mdx) (0.1.4 since wasmCloud 2.9.0) to observe and cooperate with their runtime environment:
 
-- **`wasmcloud:host/identity`**: query the workload and component identifiers of the caller currently invoking this plugin. This allows a plugin to partition state for each caller (e.g., keep one connection or session per workload without callers seeing each other's state).
+- **`wasmcloud:host/identity`**: query the workload and component identifiers of the caller currently invoking this plugin, and (since 2.9.0) `get-binding-name`, the label the current call arrived on when a component imports the plugin's interface under an `implements` label. This allows a plugin to partition state for each caller or binding (e.g., keep one connection or session per workload without callers seeing each other's state).
 - **`wasmcloud:host/cancel`**: cooperative per-invocation cancellation. A handler can identify its current job, check whether it has been asked to stop, and observe cancellation signals for long-running work.
 - **`wasmcloud:host/workload-call`** (added in 2.7.0): invoke interfaces that workloads export, targeting either the current caller or an explicitly opened workload. Failures come back as error values — a failing workload can never fault the plugin.
 - **`wasmcloud:host/workload-lifecycle`** (an interface the plugin *exports* rather than imports): observe workloads binding and unbinding, to set up and tear down per-workload state.
@@ -128,7 +133,7 @@ For details on authoring, packaging, and deploying a host component plugin, see 
 
 ### Feature-gated
 
-Host component plugins shipped in wasmCloud 2.6.0 and remain opt-in as of 2.8.0: release images are built with default features only, which do not include the plugin support, so enable the `host-component-plugins` Cargo feature when building a host. If you embed `wash-runtime`, enable the feature on a Git dependency (the crate on crates.io is a stale early snapshot that predates the current API):
+Host component plugins shipped in wasmCloud 2.6.0 and remain opt-in as of 2.9.0: release images are built with default features only, which do not include the plugin support, so enable the `host-component-plugins` Cargo feature when building a host. If you embed `wash-runtime`, enable the feature on a Git dependency (the crate on crates.io is a stale early snapshot that predates the current API):
 
 ```toml
 [dependencies]

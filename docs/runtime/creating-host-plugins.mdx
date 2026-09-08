@@ -92,6 +92,11 @@ pub trait HostPlugin: Any + Send + Sync + 'static {
     async fn stop(&self) -> anyhow::Result<()> {
         Ok(())
     }
+
+    // Since 2.9.0, four defaulted methods support operator-declared
+    // plugin bindings (see below): binding_schema(), validate_bindings(),
+    // narrows(), and defers_unnamed_instances(). Existing plugins
+    // compile unchanged.
 }
 ```
 
@@ -104,6 +109,8 @@ Plugins follow a defined lifecycle within the host:
 3. **Workload binding**: When a workload starts, the host calls `on_workload_bind()` once per plugin, then calls `on_workload_item_bind()` for each component and service in that workload.
 4. **Resolution**: After successful binding, `on_workload_resolved()` is called.
 5. **Unbinding**: When workloads stop, `on_workload_unbind()` is called for cleanup.
+
+A plugin that pushes work into workloads (broker subscriptions, timers) resolves its dispatch targets in `on_workload_resolved()`, before the workload starts serving; see [Dispatching into workloads](#dispatching-into-workloads).
 6. **Stop**: During host shutdown, all plugins' `stop()` methods are called (with a 3-second timeout per plugin).
 
 ### Key types
@@ -111,11 +118,26 @@ Plugins follow a defined lifecycle within the host:
 The `HostPlugin` trait uses several types from the `wash_runtime` crate:
 
 - **`WitWorld`** - Contains `imports` and `exports` as `HashSet<WitInterface>`, representing the WIT interfaces the plugin provides.
-- **`WitInterface`** - Describes a specific interface with `namespace`, `package`, `interfaces` (a set of interface names), an optional `version`, an optional `name` (used for multi-backend binding), and a `config` map.
+- **`WitInterface`** - Describes a specific interface with `namespace`, `package`, `interfaces` (a set of interface names), an optional `version`, an optional `name` (used for multi-backend binding), and a `config` map. Since 2.9.0 `version`, `name`, and `config` are serde-defaulted, so a manifest entry can carry only a `name`.
 - **`WitInterfaces<'a>`** - A borrowed wrapper around `&HashSet<WitInterface>` passed to `on_workload_bind`, `on_workload_item_bind`, and `on_workload_unbind`. Provides `iter()`, `get(namespace, package, interfaces)`, and `contains(namespace, package, interfaces)` lookup helpers, avoiding a clone of the interface set per callback. Introduced in 2.4.0; earlier releases passed an owned `HashSet<WitInterface>` by value.
 - **`UnresolvedWorkload`** - A workload that has been initialized but not yet bound to plugins.
 - **`WorkloadItem<'a>`** - An enum passed to `on_workload_item_bind`. Variants are `WorkloadItem::Component(&mut WorkloadComponent)` and `WorkloadItem::Service(&mut WorkloadService)`. Implements `Deref<Target = WorkloadMetadata>`, so `item.linker()` is accessible directly without pattern matching. Use `item.is_component()` / `item.is_service()` when you need to handle the two variants differently.
 - **`ResolvedWorkload`** - A fully bound workload ready for execution.
+
+### Operator-declared bindings
+
+Since 2.9.0, operators can configure a plugin through a generic `plugins` declaration ([host config or Helm values](../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsplugins)) instead of ad hoc per-plugin settings. Four defaulted `HostPlugin` methods let a plugin participate:
+
+- **`binding_schema()`**: classify the plugin's config keys by ownership (host-owned, ceiling, or workload-owned). A plugin with a schema gets a closed key set: unknown keys are refused at deploy.
+- **`validate_bindings()`**: validate the operator's declaration at host startup, so a bad declaration fails the host rather than the first workload.
+- **`narrows()`**: define what it means for a workload to request a subset of a granted ceiling (for example, a narrower subject allowlist).
+- **`defers_unnamed_instances()`**: whether declaring a named binding removes the plugin's unnamed (plain import) service.
+
+By the time `on_workload_item_bind` runs, each interface's `config` map is already merged and policy-checked; plugins never see the `workloadConfig` policy itself.
+
+### Dispatching into workloads
+
+Since 2.9.0, a native plugin can push calls into guest code through a `DispatchTarget`, resolved once per workload item in `on_workload_resolved()` via `ResolvedWorkload::dispatch_target(item_id, plugin_id)`. Dispatched component calls run on the component's warm instance pool (honoring `poolSize`, `maxConcurrency`, and `maxInvocations`) or one-shot stores; dispatched service calls land on the service's pinned instance. A service reached this way must target WASI P3, and it stays up after `wasi:cli/run` returns so it can keep receiving dispatches. The host arms deadlines, tracks abandonment, and records guest metrics under the plugin's id for every dispatched call; the `wasmcloud:nats` plugin's handler deliveries are built on this API.
 
 ### Looking up other plugins
 

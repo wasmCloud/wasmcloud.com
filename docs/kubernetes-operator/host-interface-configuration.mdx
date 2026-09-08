@@ -22,7 +22,7 @@ platforms: [wasmCloud, Kubernetes, wash]
 
 # Host Interface Configuration Reference
 
-This page is the complete reference for the configuration keys each built-in host interface reads, as of wasmCloud 2.8.0. For the structure of the `hostInterfaces` field itself (`namespace`, `package`, `interfaces`, `version`, `config`, `name`, and multi-backend binding), see [Host Interfaces in the CRD guide](./crds.mdx#host-interfaces).
+This page is the complete reference for the configuration keys each built-in host interface reads, as of wasmCloud 2.9.0. For the structure of the `hostInterfaces` field itself (`namespace`, `package`, `interfaces`, `version`, `config`, `name`, and multi-backend binding), see [Host Interfaces in the CRD guide](./crds.mdx#host-interfaces).
 
 ## How configuration reaches an interface
 
@@ -37,7 +37,7 @@ Some interfaces also read keys from the component's `localResources.config`, whi
 Two rules that apply across interfaces:
 
 - **Named vs. unnamed entries bind differently.** An entry with a `name` serves a labeled `(implements ..)` import and reads backend-selection keys (`backend`, `url`, and friends). An **unnamed** entry binds to the host's standalone plugin for that package, which on stock hosts means backend-selection keys on unnamed `wasi:keyvalue`, `wasi:blobstore`, and `wasmcloud:messaging` entries are ignored. Use a named entry (or the async `wasmcloud:keyvalue`/`wasmcloud:blobstore` packages) to select a backend per entry.
-- **A labeled import with no matching named entry is an error at workload start**, never a silent fallback to the default backend.
+- **A labeled import with no matching named entry is an error at workload start**, never a silent fallback to the default backend. Since 2.9.0 a labeled import can also be served by a plugin binding the operator declares in the host's [`plugins` block](./operator-manual/helm-values.mdx#runtimehostgroupsplugins).
 
 ## `wasi:http`
 
@@ -69,6 +69,20 @@ A **named** entry serving a labeled `consumer` import additionally reads:
 | --- | --- |
 | `backend` | `nats` or `in-memory`. Default `in-memory`. |
 | `url` | NATS server URL. Required when `backend: nats`; the workload fails to start without it. |
+
+## `wasmcloud:nats`
+
+Since 2.9.0. Serves the async `wasmcloud:nats@0.1.0` package: `core` (publish, request), `jetstream` (acknowledged publish, stored-message reads, pull consumers, stream and consumer info), `kv` (get, put, create, compare-and-swap update, delete, history, watch), and the handler exports the host drives (`core-handler`, `jetstream-handler`, `kv-handler`). Connections are made per workload under the workload's own credentials, never the host's control-plane client. Stream, consumer, and bucket administration is deliberately absent; provision those out of band.
+
+Configuration keys fall into three ownership classes, enforced by the plugin's declaration in the host's [`plugins` block](./operator-manual/helm-values.mdx#runtimehostgroupsplugins) (`workloadConfig: deny` by default on Kubernetes):
+
+- **Host-owned** (operator declaration only): `servers`, `name`, `jetstream-domain`, `inbox-prefix`, and the credential and TLS keys (`creds`, `jwt`, `nkey-seed`, `username`, `password`, `token`, `tls-ca`, `tls-cert`, `tls-key`, `tls-first`). A workload manifest that sets one is refused at deploy.
+- **Grant ceilings**: `subject-allow`, `stream-allow`, `bucket-allow`. The operator declares the maximum grant; a workload may request an equal or narrower one. Empty or omitted denies all. Reserved subject spaces (`$JS.>`, `$SYS.>`, key-value and object store internals, and the host's own control subjects) stay denied even under a `>` grant.
+- **Workload-owned** (manifest `config` or `localResources.config`): `jetstream-subscriptions` (`STREAM:filter` specs), `core-subscriptions` (subjects, with optional queue group), `kv-watches`, `component` (which component of the workload receives dispatched handler calls), `ack-mode` (`auto` or `manual`), `request-timeout-ms`, `max-in-flight` (default 64), `max-ack-pending`, `max-deliver` (default 32 deliveries before a poison message is terminated; `0` means server-unlimited), `subscription-capacity`, and `subscription-capacity-bytes`.
+
+Key spellings are canonicalized (case-insensitive, `_` and `-` interchangeable), and unknown keys are refused. Configuration errors, unreachable servers, and out-of-grant subscriptions fail the deployment, not the first call. The entry supports named bindings, so a component can import `wasmcloud:nats` under two labels to bridge two clusters.
+
+For choosing between this package and `wasmcloud:messaging`: `wasmcloud:messaging` abstracts the broker away (portable across backends, no delivery guarantees surfaced); `wasmcloud:nats` exposes NATS semantics, including explicit acknowledgement, redelivery, and revision-checked writes.
 
 ## `wasi:keyvalue` and `wasmcloud:keyvalue`
 
@@ -103,11 +117,11 @@ The filesystem and in-memory backends used by `wash dev` read no keys and apply 
 
 Serves `wasi:config/store`. There are no fixed key names: the component's entire view is a merged map, later layers winning on conflicts:
 
-1. The `wasi:config` entry config map.
+1. The workload's `wasi:config` entries, unnamed entry first and then named entries in a stable order, later entries winning (the host warns on conflicting keys; since 2.9.0).
 2. The component's `localResources.config`.
 3. The component's `localResources.environment`.
 
-`get` and `get-all` expose exactly this merged map. Under `wash dev`, the project's `workload.config` values are injected into the `wasi:config` entry automatically.
+`get` and `get-all` expose exactly this merged map, and every component of the workload sees the same merged store. (Before 2.9.0, a workload with several `wasi:config` entries gave each component one arbitrary entry's config, varying between starts.) Under `wash dev`, the project's `workload.config` values are injected into the `wasi:config` entry automatically.
 
 ## `wasmcloud:secrets`
 
