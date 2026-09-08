@@ -108,6 +108,27 @@ spec:
 
 The component itself doesn't need to be aware of KEDA: it emits standard OpenTelemetry metrics, Prometheus (or another OTel collector) scrapes them, and KEDA closes the loop.
 
+### Metrics you can scale on
+
+The host emits guest execution metrics whenever an OpenTelemetry exporter is configured. Since 2.9.0 every guest metric carries the same attribute set, so one query shape works across every call path:
+
+| Metric | Type | Meaning |
+| --- | --- | --- |
+| `guest.invocation.duration` | histogram (seconds) | Wall-clock time a guest spent in one invocation; the count is the invocation rate, and `error.type` appears only on failures |
+| `fuel.consumption` | histogram | Exact instruction-proportional work per invocation; only under `--meters fuel` |
+| `guest_memory.in_use`, `guest_memory.high_water`, `guest_memory.limit`, `guest_memory.refused`, `guest_memory.would_refuse` | gauges and counters | The [guest memory budget](./helm-values.mdx#runtimeresourcesguestmemorymode) |
+
+| Attribute | Value |
+| --- | --- |
+| `plugin` | The host surface that drove the call (for example `wasi-http`) |
+| `operation` | The WIT export invoked |
+| `workload.namespace` | The workload's namespace |
+| `workload.name` | The workload's name |
+| `component` | The component within the workload |
+
+HTTP calls add one bounded attribute, `http.request.method`. Attribute values are manifest names, never per-instance identifiers, so series cardinality stays bounded by workload count and a scaler can select on `workload.name` directly.
+
+
 ## Selector label
 
 The operator stamps a managed label on every `WorkloadReplicaSet` it creates:
@@ -139,7 +160,7 @@ Both fields are operator-managed; they are not part of the user-authored spec.
 
 A few cases where `WorkloadDeployment` autoscaling is a worse fit than alternatives:
 
-- **Bursty, short-lived traffic on a static host group.** Each new component instance starts in milliseconds, but the value of autoscaling drops if the host group is already large enough to handle peaks. A higher per-component `poolSize` can absorb burst without any controller in the loop.
+- **Bursty, short-lived traffic on a static host group.** Each new component instance starts in milliseconds, but the value of autoscaling drops if the host group is already large enough to handle peaks. A higher per-component `poolSize` can absorb burst without any controller in the loop (with `reclaimWindowSeconds`, the pool shrinks back afterward).
 - **Scale-to-zero.** Setting `minReplicas: 0` is supported, but only the workload scales to zero&mdash;the host group keeps running. If you need true zero-cost idle, scale the host group separately or shut down the deployment entirely.
 - **Tight latency targets where cold-start of a new instance matters.** Even at sub-millisecond instantiation, a scale-up step that lands on a p99-sensitive request is visible; pre-warming via a higher `minReplicas` is usually cheaper than chasing a metric.
 

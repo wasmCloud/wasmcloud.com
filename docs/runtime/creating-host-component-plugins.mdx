@@ -50,8 +50,8 @@ package example:messaging-plugin;
 
 world plugin {
   // Import the host awareness interfaces (optional but recommended)
-  import wasmcloud:host/identity@0.1.3;
-  import wasmcloud:host/cancel@0.1.3;
+  import wasmcloud:host/identity@0.1.4;
+  import wasmcloud:host/cancel@0.1.4;
 
   // Export the capability this plugin provides
   export wasmcloud:messaging/consumer@0.2.0;
@@ -157,7 +157,7 @@ Two import surfaces deserve special mention:
 
 Host component plugins are declared in **host configuration**, not in a workload's manifest. A plugin serves every workload on the host that imports its interface, so it's a privileged install the host operator controls. Plugins are loaded once at host start; there is no dynamic reload today.
 
-Every declaration carries a host-unique **id** (a duplicate ID is a hard error at host startup) and a **source** (OCI image reference or file path). Optional fields include a digest pin (for supply-chain verification, OCI sources only) and a per-plugin `max-restarts` override. As of wasmCloud 2.7.0, a declaration can also carry:
+Every host component plugin declaration carries a host-unique **id** (a duplicate ID is a hard error at host startup) and a **source** (OCI image reference or file path); a native plugin entry in the same `plugins` block carries an `id` alone. Optional fields include a digest pin (for supply-chain verification, OCI sources only) and a per-plugin `max-restarts` override. As of wasmCloud 2.7.0, a declaration can also carry:
 
 - **`config` / `configFrom` / `secretFrom`** — the plugin's own bind-time configuration, resolved against top-level `configs:`/`secrets:` catalogs and delivered to every native capability the plugin imports (e.g., `wasmcloud:secrets`) the way a workload's config is — values stay in memory and are never written to a file the plugin reads. Sources merge in order (inline `config`, then `configFrom`, then `secretFrom` — last wins). Catalog entries can be sourced from a directory of files (`dir:`, the Kubernetes ConfigMap/Secret volume-mount shape, filename = key), a single file (`file:`), inline values (`inline:`), or the environment (`fromEnv:`). Single-file (`file:`) secret sources must be permission-restricted (`0600`/`0400`); directory sources are exempt because Kubernetes-projected volumes are symlink farms.
 - **`allowedHosts` / `allowedIpNameLookups`** — the plugin's own egress allowlists (see [Plugin imports](#plugin-imports)); omitted means deny-all.
@@ -188,7 +188,7 @@ Required keys: `id`, and exactly one of `image` or `file`. Optional keys (image 
 
 For image sources in an authenticated registry, pass credentials through the environment — `WASH_HOST_PLUGIN_REGISTRY_USER` and `WASH_HOST_PLUGIN_REGISTRY_PASSWORD` (or the `--host-plugin-registry-user` / `--host-plugin-registry-password` flags). Credentials are deliberately kept out of the `--host-plugin` spec string so they never appear in process listings or shell history; both must be set together.
 
-Note that the `--host-plugin` flag grammar covers only the basic fields (`id`, source, `pull`, `digest`, `max-restarts`). The 2.7.0 fields — `config`/`configFrom`/`secretFrom` and the egress allowlists — can only be expressed in a config file (below) or chart values.
+Note that the `--host-plugin` flag grammar covers only the basic fields (`id`, source, `pull`, `digest`, `max-restarts`). The richer fields, `config`/`configFrom`/`secretFrom` and the egress allowlists (2.7.0) and `workloadConfig`, `hostOwnedKeys`, and `bindings` (2.9.0), can only be expressed in a config file (below) or chart values.
 
 ### `wash host` config file
 
@@ -231,7 +231,7 @@ dev:
 
 ### Helm chart
 
-Declare per host-group under [`runtime.hostGroups[].plugins`](../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsplugins) (`hostPlugins` remains as a deprecated alias whose entries must carry a source and cannot carry binding fields):
+Declare per host-group under [`runtime.hostGroups[].plugins`](../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsplugins) (`hostPlugins` remains as a deprecated alias whose entries are rendered identically):
 
 ```yaml
 runtime:
@@ -246,7 +246,7 @@ runtime:
 
 The Helm YAML uses `digest` (matching the CLI grammar), not `expectedDigest` — that camelCased form is only for `wash dev`'s local config file.
 
-Since the 2.9.0 chart, every `plugins` entry is rendered into a mounted `wash host` config file rather than CLI arguments, so secret values never appear on the command line or in `kubectl describe` output. Entries accept `config`/`configFrom`/`secretFrom`, `allowedHosts`/`allowedIpNameLookups`, and the binding fields below.
+Since the 2.9.0 chart, any entry carrying `config`/`configFrom`/`secretFrom`, the allowlists, or binding fields is rendered into a mounted `wash host` config file rather than CLI arguments, so secret values never appear on the command line or in `kubectl describe` output; a bare entry (`id` plus a source) still renders as a `--host-plugin` argument.
 
 Two operational notes on config delivery:
 
@@ -255,7 +255,7 @@ Two operational notes on config delivery:
 
 ### Named bindings
 
-Since 2.9.0, a plugin's declaration can carry a `bindings` map so one plugin serves several configured backends. Each key is a label; each value layers `config`/`configFrom`/`secretFrom` over the entry-wide values. A component imports the plugin's interface under the label with the Component Model's `implements` clause, and the plugin reads the label at bind time (`interface-binding.name` in `workload-lifecycle`) and per call via `identity.get-binding-name`:
+A plugin's declaration can carry a `bindings` map (since 2.9.0) so one plugin serves several configured backends; shown here in `wash host` config, the same map applies to `dev.plugins` and Helm values. Each key is a label; each value layers `config`/`configFrom`/`secretFrom` over the entry-wide values. A component imports the plugin's interface under the label with the Component Model's `implements` clause, and the plugin reads the label at bind time (`interface-binding.name` in `workload-lifecycle`) and per call via `identity.get-binding-name`:
 
 ```yaml
 host:
@@ -272,7 +272,7 @@ host:
             bucket: sessions
 ```
 
-The entry's `workloadConfig` policy (`deny` by default on `wash host`; `allow` under `wash dev`) governs what workload manifests may set: under `deny`, host-owned keys come only from the declaration, and naming an undeclared binding is refused at deploy. Two unnamed entries of one package resolve to a single binding; give them labels to keep them distinct.
+The entry's `workloadConfig` policy (`deny` by default on `wash host`, `allow` under `wash dev`, with `warn` allowing while logging what `deny` would refuse) governs what workload manifests may set: under `deny`, host-owned keys come only from the declaration, and once any binding is declared, naming an undeclared one is refused at deploy. Two unnamed entries of one package resolve to a single binding; give them labels to keep them distinct.
 
 ### After loading
 
