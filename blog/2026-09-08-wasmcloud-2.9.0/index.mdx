@@ -1,0 +1,145 @@
+---
+title: 'wasmCloud 2.9: NATS-native interfaces, guest memory enforcement, and Kubernetes-grade lifecycle'
+authors: [ericgregory]
+date: '2026-09-08'
+description: 'wasmCloud 2.9 ships the NATS-native wasmcloud:nats interface with JetStream and key-value access, makes the guest memory budget enforceable, lets idle instance pools shrink, and teaches host pods to drain, probe, and survive control plane outages.'
+slug: wasmcloud-2-9-release
+about: wasmCloud
+image: './images/2.9-blog-header.webp'
+mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS]
+---
+
+![wasmCloud 2.9 release banner](./images/2.9-blog-header.webp)
+
+[wasmCloud 2.9.0](https://github.com/wasmCloud/wasmCloud/releases/tag/v2.9.0) is now available! This release centers on NATS-native workloads and production operations:
+
+- **A NATS-native interface**: The new `wasmcloud:nats` package gives components direct access to core NATS, JetStream, and key-value buckets, with explicit acknowledgement, redelivery, and per-workload connections under deny-by-default grants
+- **Guest memory enforcement**: The guest memory budget introduced in 2.8 is now counted in real time and enforceable, so a host can refuse guest memory growth past the budget instead of relying on the pod's OOM killer
+- **Kubernetes-grade lifecycle**: Host pods gain real liveness and readiness endpoints, drain on termination instead of dropping requests, wait out a NATS server that isn't up yet, and survive operator control plane outages without losing workloads
+
+2.9 also lets warm instance pools shrink when components go idle, runs async messaging deliveries on the instance pool, turns guest execution metrics on by default, and unifies host plugin configuration in one declaration block.
+
+{/* truncate */}
+
+## At a glance
+
+| Area | 2.8.0 | 2.9.0 |
+|---|---|---|
+| NATS access | through the `wasmcloud:messaging` abstraction | plus NATS-native `wasmcloud:nats`: JetStream, KV, explicit acks |
+| Guest memory budget | advisory, logged at startup | counted live, enforceable with `--guest-memory-mode` |
+| Warm instance pools | grow to `poolSize`, never shrink | idle instances reclaimed with `reclaimWindowSeconds` |
+| Async messaging deliveries | a store per message | pooled, under the same knobs as HTTP |
+| Host pod health | TCP probe on the HTTP port | `/livez` and `/readyz` on a dedicated port |
+| Host pod shutdown | immediate exit | readiness flips, drain delay, bounded grace |
+| Guest execution metrics | off (and broken when enabled) | on by default (`--meters duration`) |
+| Plugin configuration | per-plugin flags and values | one `plugins` block with bindings and config policy |
+
+## NATS-native workloads with `wasmcloud:nats`
+
+`wasmcloud:messaging` deliberately abstracts the broker away, but some workloads exist *because* of broker semantics. The new `wasmcloud:nats@0.1.0` package (served by a native plugin, on by default) exposes those semantics for NATS:
+
+- **JetStream**: acknowledged publish, stored-message reads, pull consumers, and explicit `ack`/`nak`/`term` dispositions with bounded redelivery, so a failed delivery comes back and a poison message stops
+- **Key-value**: get, put, create, revision-checked compare-and-swap updates, history, and watch-driven handlers
+- **Core NATS**: publish, request, and queue-group subscriptions
+
+Connections are opened per workload under the workload's own credentials. Subjects, streams, and buckets are grants (`subject-allow`, `stream-allow`, `bucket-allow`) that the operator declares as ceilings and a workload may only narrow, and connection and credential settings are host-owned keys a workload manifest cannot set. Reserved subject spaces stay denied even under a `>` grant.
+
+Handler exports (`core-handler`, `jetstream-handler`, `kv-handler`) are driven by the host and honor the component's pooling settings. See the [`wasmcloud:nats` reference](/docs/kubernetes-operator/host-interface-configuration/#wasmcloudnats) and the [nats-jetstream-replay example](https://github.com/wasmCloud/wasmCloud/tree/main/examples/nats-jetstream-replay).
+
+## Guest memory: from advisory to enforced
+
+wasmCloud 2.8 introduced a guest memory budget (`--max-guest-memory`) that the host logged but did not enforce. In 2.9, every Wasmtime store charges its memory growth against the budget in real time, and the new `--guest-memory-mode` flag (chart value [`runtime.resources.guestMemoryMode`](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeresourcesguestmemorymode)) decides what happens at the line:
+
+- **`count`** (the default) records what enforcement would have refused and changes nothing else, so upgrading is a no-op
+- **`enforce`** refuses the growth: the guest sees `memory.grow` fail, an ordinary outcome allocators already handle, rather than a trap
+
+Five metrics, on whenever an OpenTelemetry exporter is configured (`guest_memory.in_use`, `high_water`, `limit`, `refused`, `would_refuse`), support a measured rollout: run in `count`, watch the high-water mark and would-refuse counter, then flip to `enforce`. On Kubernetes, remember that the chart forwards `resources.limits.memory` verbatim as the budget, so give the pod headroom above the guest budget before enforcing.
+
+## Pools that breathe
+
+Two changes make instance pooling both broader and cheaper:
+
+- **Idle reclaim**: A pooled component can now declare `reclaimWindowSeconds`, and the host retires warm instances the window's peak load didn't need, draining them without interrupting calls. `reclaimMinInstances` sets a floor. Unset means the pre-2.9 behavior: a pool holds its high-water mark until the workload stops. See [component resource controls](/docs/kubernetes-operator/crds/#component-resource-controls).
+- **Pooling everywhere**: The pool now serves every call path uniformly. Async `wasmcloud:messaging@0.3.0` deliveries and `wasmcloud:nats` core and key-value deliveries run on warm instances under the same `poolSize` and `maxConcurrency` rules as HTTP, including overlapping deliveries on one instance. JetStream deliveries reuse warm instances one at a time.
+
+Cold starts got attention too. Workload compilation moved off the async runtime, so a host keeps heartbeating and serving during a burst of starts, and the new `--max-concurrent-starts` bound (chart value `runtime.resources.maxConcurrentStarts`) keeps a stampede of image pulls and compiles from starving running workloads. Components are also cached by digest, so `wash dev` reload loops and workload restarts reuse compiled components instead of recompiling.
+
+## Kubernetes-grade lifecycle
+
+A stack of changes make host and operator pods behave more like conventional Kubernetes citizens:
+
+- **Real probes**: Host pods serve `/livez` and `/readyz` on a dedicated port (default 8081). Readiness means "no room" (`starting`, `draining`, ingress saturated); liveness means "restart me" (command loop stalled, ingress stopped). Failure bodies name the condition in `kubectl describe pod`. Probe timings are chart values, per host group.
+- **Draining shutdown**: On SIGTERM a host flips to `draining` (leaving Service endpoints while still serving), keeps serving for a configurable drain delay, then bounds in-flight work and plugin stops. The chart sets real `terminationGracePeriodSeconds` on every pod, where previous releases used `0`.
+- **Startup patience**: `runtime.natsConnectTimeoutSeconds` (default 60) lets a starting host wait for NATS instead of burning pod restarts, and the operator's new startup probe covers its own connect window.
+- **Bus-loss safeguard**: An operator that loses its NATS connection no longer deletes silent hosts (and their workloads). Hosts stay `Unknown` until the operator has heard the rest of the fleet continuously for the unreachable window, and a restarted operator waits for hosts to re-announce.
+- **No more descriptor exhaustion**: The host raises its file descriptor limit at startup, backs off on accept failures, and bounds its HTTP listener with `--max-http-ingress-connections`, closing a failure mode where connection floods could take a host pod down with exit code 137.
+
+Full details in the [Helm values reference](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeprobes-and-runtimehostgroupsprobes).
+
+## Guest metrics on by default
+
+2.8's `--enable-meters` flag could take down non-HTTP call paths, and its metrics carried unbounded attributes. 2.9 rebuilds metering:
+
+- **`--meters duration` is the default**: every guest invocation is measured (count, failures, wall-clock duration as the `guest.invocation.duration` histogram) for the cost of two clock reads per call. `--meters fuel` adds an exact instruction-proportional work count; `--meters off` disables measurement.
+- **One attribute scheme**: `plugin`, `operation`, `workload.namespace`, `workload.name`, and `component`, all manifest names rather than per-restart UUIDs, with HTTP adding a bounded `http.request.method`. High-cardinality values like subjects and URIs moved to spans and logs.
+- `--enable-meters` still parses as a deprecated alias for `--meters fuel`, and now works on every call path.
+
+## One way to configure plugins
+
+Host plugins of both kinds, native and [host component plugins](/docs/runtime/creating-host-component-plugins/), are now configured through a single `plugins` block in host config and chart values ([`runtime.hostGroups[].plugins`](/docs/kubernetes-operator/operator-manual/helm-values/#runtimehostgroupsplugins)). Each entry carries the plugin's config and secrets, a `workloadConfig` policy that keeps host-owned keys like credentials out of workload manifests, and named `bindings` that components import under `implements` labels, so one plugin can serve several configured backends. The `wasmcloud:host` package moves to 0.1.4 with `identity.get-binding-name`, letting a plugin tell which label a call arrived on. `hostPlugins` remains as a deprecated alias.
+
+For native plugin authors, the new public dispatch API is the piece that makes push-mode plugins first-class: a plugin can resolve a `DispatchTarget` and drive calls into workload guest code on the instance pool, with the host arming deadlines and recording metrics per call. It is the same machinery that carries `wasmcloud:nats` deliveries. See [Creating host plugins](/docs/runtime/creating-host-plugins/#dispatching-into-workloads).
+
+## Other notable changes
+
+- **[`wasi:config` reaches every component](https://github.com/wasmCloud/wasmCloud/pull/5526)**: A workload with several `wasi:config` entries previously gave each component one arbitrary entry's config, varying between starts. All entries now merge in a stable order, so every component sees the same entry layer beneath its own `localResources`.
+- **[A saturated pool no longer wastes the overflow instance](https://github.com/wasmCloud/wasmCloud/pull/5532)**: The declined call runs on the instance the pool already built, lowering overflow latency.
+- **[Hosts under `LimitNOFILE=infinity` get a real connection budget](https://github.com/wasmCloud/wasmCloud/pull/5529)**: An unlimited descriptor limit previously derived a silent 512-connection ceiling; it now derives a large one.
+- **[Size parsing follows the full Kubernetes quantity grammar](https://github.com/wasmCloud/wasmCloud/pull/5506)**: Fractional (`1.5Gi`) and exponent (`1e9`) forms work everywhere sizes are accepted, and `500m` is a hard error instead of a misread 500 MB.
+
+## What to check before you upgrade
+
+- **Async messaging components with `poolSize` now serve deliveries on warm instances**: In-memory state persists across deliveries on the same instance. A handler that relies on a fresh instance per message should not set `poolSize` (or should keep exporting the sync `0.2.0` handler, which still runs per message).
+- **Pinned older host images need probe values cleared**: The 2.9.0 chart passes `--probe-addr`, `--drain-delay`, and `--nats-connect-timeout`, which older host images refuse. A host group pinned to an older `image.tag` must set `probes.endpoint.enabled: false` and clear `runtime.drainDelaySeconds` and `runtime.natsConnectTimeoutSeconds`.
+- **Guest metrics are on by default**: The cost is two clock reads per invocation. Set `--meters off` to disable, and note the metric attribute scheme described above if you had dashboards on 2.8's fuel metric.
+- **Hosts with four or fewer visible cores admit fewer concurrent starts**: The `maxConcurrentStarts` default is one fewer than visible cores, clamped between 1 and 4. A 2-core pod now admits one start at a time; raise the value if you prefer the old behavior.
+- **Termination grace changed from 0**: Pods now take up to their grace period to exit on rollout (runtime 15s by default) in exchange for connection draining.
+
+Everything else is backward compatible: existing manifests, chart values, and workloads run unchanged, and `count` memory mode changes nothing at runtime.
+
+## What's coming
+
+Host component plugins remain opt-in while the binding surface matures, and the `wasmcloud:nats` package is at 0.1.0 with stream and consumer administration deliberately out of scope. As always, the [roadmap](https://github.com/orgs/wasmCloud/projects/7) has what's in progress, and [wasmCloud Wednesday](/community/) is the place to weigh in.
+
+## Get started with wasmCloud 2.9
+
+Install or upgrade `wash`.
+
+On macOS or Linux via install script:
+
+```bash
+curl -fsSL https://wasmcloud.com/sh | bash
+```
+
+With Homebrew:
+
+```bash
+brew install wasmcloud/wasmcloud/wash
+```
+
+On Windows with [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+
+```shell
+winget install wasmCloud.wash
+```
+
+For new users, the [quickstart](/docs/quickstart/) gets you from installation to a running component on Kubernetes in a few minutes.
+
+Full changelog: [v2.8.0...v2.9.0](https://github.com/wasmCloud/wasmCloud/compare/v2.8.0...v2.9.0)
+
+## Join the community
+
+- [wasmCloud Slack](https://slack.wasmcloud.com/): Questions, announcements, and #wasmcloud-dev
+- [wasmCloud Wednesday](/community/): Weekly community call, Wednesdays at 1PM ET
+- [wasmCloud Roadmap](https://github.com/orgs/wasmCloud/projects/7): What's in progress and what's ready for contributors to pick up
+- Good first issues: [github.com/wasmCloud/wasmCloud/issues](https://github.com/wasmCloud/wasmCloud/issues?q=label%3A%22good+first+issue%22+is%3Aopen)
