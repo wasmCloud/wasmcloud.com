@@ -1,0 +1,433 @@
+---
+date: '2026-09-02'
+title: 'Transcript: wasmcloud:nats on main, Custom Go Host Plugins, and Warm Pools That Scale Back Down'
+description: 'Full transcript of the September 2, 2026 wasmCloud community call covering the wasmcloud:nats host plugin, unified plugin config, guest metrics, and instance pooling.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm runtime autoscaling
+  - webassembly kubernetes
+  - go webassembly
+  - wasmcloud nats
+  - host plugin
+  - componentize-go
+  - wasi p3
+  - instance pooling
+  - webassembly observability
+  - webassembly news
+image: https://i.ytimg.com/vi/e6tCo9WEbGo/maxresdefault.jpg
+showTitle: true
+slug: 2026-09-02-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - NATS
+  - ComponentModel
+  - WASIPreview3
+  - Kubernetes
+  - Go
+  - componentize-go
+  - Rust
+  - wash
+  - capabilityProvider
+  - OpenTelemetry
+  - Prometheus
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-09-02-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=e6tCo9WEbGo" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=e6tCo9WEbGo" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:15](https://youtu.be/e6tCo9WEbGo?t=15)
+
+Hello and welcome to wasmCloud's community call for September 2. So our first call of September — we've landed a lot of changes between last week and today, and so we're going to go through where all the fire is at. I think roughly we're going to talk about some of the Go work that we've been working through. We'll talk about the NATS plugin work that's now landed on main, and that includes basically a new interface, `wasmcloud:nats`, and a native plugin for an implementation around it. We've also landed a bunch of different hardening fixes. Another thing that we've landed is the ability to basically have a nice way of configuring your plugin and host binding config. And so there's a lot there, and I'm going to pass it to Jeremy to talk about, starting with most of the Go stuff, but that also touches the rest.
+
+**Jeremy Fleitz** [1:11](https://youtu.be/e6tCo9WEbGo?t=71)
+
+All right, thank you so much, Bailey. Yeah, and as Bailey said, I mean, if everybody just goes even just to wasmCloud and just looks at the PRs that are closed — and if I just start at the bottom here, where 2.8 is, this was last week — and if you just notice all of the changes that we put in there: the NATS plugin support, the host config for the plugins, a lot of different checks for concurrency, and really just making sure that we keep the host as healthy as possible, preventing noisy neighbors from taking over memory and connections and things like that. And that also drives into the NATS plugin itself.
+
+<img src="/img/community/2026-09-02/image001.webp" alt="The wasmCloud GitHub repository's closed pull requests since the 2.8 release, showing NATS plugin, host config, and concurrency work" />
+
+So as wasmCloud grows and adds more changes, that's when we needed to also add more additional features to our actual Go support. So Go for wasmCloud — there is a wasmCloud Go project, and this is only for these components that are basically deployed with wasmCloud. And you'll notice most of these are just updated for wit-bindgen and also for 2.8.0. But there's also a NATS component here that also just targets directly at the new native host plugin. So this isn't an official release yet. This is really pointing towards main. So if you do try to use this this week right now, you will need to basically get a wasmCloud version from main versus 2.8.0, or you will get an error.
+
+<img src="/img/community/2026-09-02/image002.webp" alt="The wasmCloud Go repository file listing showing packages updated for wit-bindgen and 2.8.0 alongside the new nats package" />
+
+There have also been changes as this wasmCloud Go package has been crafted and tested. There have been a couple changes to upstream as well, to componentize-go and wit-bindgen-go, and that's really just around making sure that the WIT that is compiled does support async for wasmCloud Go, especially around NATS, because there is some NATS functionality in there that is asynchronous.
+
+And just to call out: if somebody does get componentize-go — the way it works is componentize-go uses the normal upstream Go binary to compile, but there is a patched version of Go out there. If it generates and finds something that needs async support, it will check to see if your version of Go that's local is installed with this patch that's out there, and if it's not, it'll go ahead and download a version of Go that's 1.25.5 with the patch that's on there, so that it can compile it and it will work with WASI P3.
+
+So I'd like to just quickly do a quick little demo here. So I have a couple Kind clusters. This is my one Kind cluster that is running a NATS demo, and this is one that I did show — actually, this first one right here for orders — started last week on the community call. And I started making some very different versions of it, testing like a fan-out process, and JetStream and queuing and all these various different types of patterns when we were building the NATS plugin last week, just to make sure that everything is working okay.
+
+So these are workload deployments, and if I look at the workload deployment, you'll notice that it basically looks the exact same way as far as the host interface, but now instead of using `wasmcloud:messaging` — I hate how it makes this out of order — it'll now say `wasmcloud:nats` 0.1.0. So this means it's going to be using the host plugin 0.1.0 that Aditya started, and it's going to be using it against — here's the config it wants to get to for the subjects, and what it would like to do with it, etc. And if you notice, there's no connectivity here, and that's by design, because we don't want to have any type of connection credentials or anything like that inside the workload deployment. We want to keep that on the host itself.
+
+<img src="/img/community/2026-09-02/image003.webp" alt="A wasmCloud WorkloadDeployment manifest declaring the wasmcloud:nats@0.1.0 host interface with subject configuration and no connection credentials" />
+
+So now, if I go to the host here — now this is inside the Helm chart, so it's way easier to see, but I'm obviously in the cluster, so it's going to be a little weirder.
+
+**Jeremy Fleitz** [5:49](https://youtu.be/e6tCo9WEbGo?t=349)
+
+But if I look at the host here, it's all passed in by — well, that's weird. Why am I not finding it? Hang on. Oh, that's right, it's a ConfigMap. So inside the ConfigMap there's one that's mounted. If I go to the host ConfigMap — yeah. So here's what the configuration looks like, and this goes into the host plugin configuration that Bailey was talking about.
+
+We wanted to have it so that instead of having all these different places to configure all the different plugins that a host might have, we could just have one spot where you basically have host plugins, and then you have a list of the plugins that you want to configure, and then the ID. And the ID itself is actually the name of the component — the plugin — that you're using. So this is going to be configuring `wasmcloud:nats`. Here's the configuration. So the config right here, you'll see the buckets, what subjects are allowed. Right here under bindings, this is where you can start naming different types of configurations on how it's going to bind, and this is where you can also put in some overrides if you want, for like the server. This one right here: if I use `wasmcloud:nats` config named, it'll use archive right here. If I use orders, it'll use subject C and subject D.
+
+<img src="/img/community/2026-09-02/image004.webp" alt="The host ConfigMap showing the host.plugins list with bindings, subject-allow grants, and per-binding overrides" />
+
+So now switching over to my other Kind cluster — this is where I have another little quick demo that I was looking at. Instead of — yes, this is great having a native NATS plugin that's shipped with wasmCloud — but I wanted to go ahead and just get a host plugin that's written in Go and is actually deployed to a cluster, just to show that you can write your own host plugin, and you can load it inside, and then you can have it called by other Go applications. So this is like a fully Go type of demo here. I am going to check this in and publish it publicly once I get some more testing done.
+
+But what this does is it basically just is a simple thing to show that you can do — if a plugin's taking a long time, it's asynchronous, so it's doing an await call. Maybe it takes a little bit longer time to run, but it doesn't drop any type of messaging going on. So this is just the overall thing of deploying the actual component, and then a quick little example of calling a Go routine — or I'm sorry, a Go component that calls into the host component. I know it sounds really confusing, and then that host component actually is what's doing all the work.
+
+<img src="/img/community/2026-09-02/image005.webp" alt="Jeremy Fleitz's custom Go host plugin source, composed from two Go components and deployed to a Kind cluster" />
+
+So that's where — demo plugin under here is actually two separate components, and they're composed together. They're `wac`'d together as one component, and that's going to be my host plugin. So this host plugin, what it does is it's called from another Go app — Go component — that's running on the host, and it basically just takes the data, it does some simulated processing, and then it throws it into a key-value store on the back end. So I have that running over here, and I'm just going to show how that looks.
+
+And if I go here — so if you notice, as far as back to the host plugin config, it's the exact same way I could configure it with the native plugin. This is my own custom plugin I made. I just call it demo plugin, but it has the same structure here. So if I was using like the native NATS one, or `wasmcloud:messaging`, I can just put all the configuration in one spot. Yeah, I guess I'll hand it back to you, Bailey.
+
+**Bailey Hayes** [10:16](https://youtu.be/e6tCo9WEbGo?t=616)
+
+Questions for Jeremy? Yeah, I think one thing that would be helpful to call out is that we've also tried out building out a bunch of different types of patterns for workloads that we're going to make available, and share a link to that. And that was part of all the work we were doing to exercise and validate the NATS plugin. I think that'll be a good valuable resource for folks.
+
+And I really like where we landed with the host plugin config, so that you can basically layer what the host needs to configure, what the operator is configuring, and then on top of all of that, what the workload itself configures given that single binding. So now all of that can be declarative and static and easily analyzed, and we can basically decide: are we good to launch this workload? Are we not good to launch this workload? And we can give that feedback right away rather than at runtime. So happy with where all that turned out, and I think we'll be able to reuse that for both native and host component plugins.
+
+I think that's the other big thing to call out — that little block there is actually shared between both of them, and the only thing that really makes a host component plugin different is the fact that it's being handed a `.wasm` source to load, versus a native plugin itself is built into the host, so there's no source to load. So yeah, I think that's a lot of that. Let's jump on to doc of the week. Eric, do you mind sharing where we're at there?
+
+**Eric Gregory** [11:54](https://youtu.be/e6tCo9WEbGo?t=714)
+
+Absolutely. Can I have sharing power?
+
+**Bailey Hayes** [11:58](https://youtu.be/e6tCo9WEbGo?t=718)
+
+Oh man.
+
+**Eric Gregory** [12:06](https://youtu.be/e6tCo9WEbGo?t=726)
+
+Awesome, thank you. So we actually had a lot of docs land this week, but we have two particularly high-leverage pieces that I think are worth highlighting here.
+
+So the first is managing WIT dependencies. This is something that can get pretty gnarly, especially in circumstances where it's not being handled automatically. So this was a space where we needed some best-practice guidance for users. So under developing workloads, we've got this new managing WIT dependencies page that walks through how WIT packages work, the tooling that is built into wash, a recommended project layout — and the kind of layout that you'll see in our templates and examples — how do you use local file references in cases where you might not be grabbing WIT dependencies from a registry, publishing your own interfaces, and then connections throughout the docs to other pieces that might touch on this.
+
+<img src="/img/community/2026-09-02/image006.webp" alt="The Managing WIT Dependencies documentation page explaining that WIT packages are OCI artifacts" />
+
+We also have a new host interface configuration reference to give you a consolidated and more or less comprehensive reference on configuring the interfaces that you're going to be working with for most workloads. So we walk through the various keys and configs for `wasi:http`, messaging, key-value, blob store, config, secrets, Postgres, and so on, along with some background on interfaces with no config, and differences for when you're working locally with `wash dev`. So hopefully these are both pretty useful references that I'm glad we have in place now — we probably should have had a little earlier — and hopefully they'll be useful going forward.
+
+<img src="/img/community/2026-09-02/image007.webp" alt="The Host Interface Configuration Reference documentation page with the new Copy as Markdown control open" />
+
+Also, want to call out: we have Shreya on the call, and Shreya is a newer contributor who's been putting in a lot of awesome work on this functionality right here that allows us to copy our docs resources as Markdown, making for much smoother integration with LLM-assisted development. So thank you so much for that, Shreya. Any questions about this week's docs?
+
+**Bailey Hayes** [14:30](https://youtu.be/e6tCo9WEbGo?t=870)
+
+Awesome, cool. Thank you, Eric and Shreya. All right. So now we've basically gone through most of what we went through over the past week, but maybe it might be more helpful to concretely just call out a couple different PRs.
+
+I think one that we haven't highlighted much yet is on metrics. Probably the easiest way to consume that is to look at my PR that we landed yesterday. I'm gonna drop that in the chat — it's 5525. I'll share my screen on that one. Essentially, while we were working on the NATS plugin work, it was really clear that we needed to have observability on the messages that are getting dispatched, and we really wanted it to be a metric and not just another trace span, so that we can kind of measure things based off of the epoch work that Aditya did.
+
+<img src="/img/community/2026-09-02/image008.webp" alt="PR #5525, One attribute scheme for guest metrics, showing the fixed attribute set plugin, operation, workload.namespace, workload.name, and component" />
+
+So essentially, this never landed in a release. So I took the opportunity to kind of massage it out into one top-level metric called guest invocation duration. So this is basically your duration counter, and will effectively give you kind of all the things you would want in a dashboard, like how many times was this thing invoked for a given API. And so we kind of made it so that it's very consistent, again, so that people could generically create different kinds of plugins and all feed into the same metric. So it gives you information on the plugin, the operation, the workload namespace, workload name, and component — and taking very careful care to not have any caller-invented fields there. That way you don't have any kind of heuristic explosion for your dashboard. And so this is something that I'd like to see more people start making more kinds of observability dashboards around ourselves. But this is that first kind of load-bearing pass for folks.
+
+Jumping back out to other pull requests. Let's see if there's any above the line that I think folks will want to see. We've gotten a series of hardening changes in, like making sure we have enough time to fully drain the host and updating the Helm chart so that it doesn't immediately terminate. We had that in there from the original version of the Helm chart — so like from day one, it was always there and wasn't giving it enough time to clean up connections inside a plugin binding.
+
+And over the last week, Jeremy had also added making sure that we have an unbind loop for workloads in our plugin. So when a workload gets started, plugins are told, hey, you got a new workload and it's bound to you. You may do things like make a connection for them, make a TCP connection, and then when the workload goes away, you want to have an opportunity to clean that up. And so we had an on-workload-unbind, but what we weren't doing consistently everywhere was, also when we're taking down the whole host, we want to free all those connections too. So now we've got a whole pass just for that, and extra drift in our CI to make sure that all of our grace terminations line up — that everything has enough time to clear out.
+
+We have a handful of bug fixes in. This `maxConcurrentStarts` work is essentially hardening us for a thundering herd problem of, like, you try to schedule more workloads than a host can handle at one time, making sure that that's throttled. Made it so that we have `--meters` now. I don't think this — I think it was in 2.8. So now I alias `enable-meters`, and now we just say `--meters`, and then you can say epoch or fuel, because typically you only want one kind of metering. You don't want both. So those two go together.
+
+This is the big one that Jeremy was talking about. I think spending a little bit of time on that is probably worthwhile for folks, to kind of see the meat of it — which is essentially that we have this type of bindings config. And not only that, but we basically say now, in the host, we're very formal about each plugin has its own name. You can only have one plugin with that name, so it acts as a unique ID.
+
+<img src="/img/community/2026-09-02/image009.webp" alt="PR #5517, Generic host plugin bindings, showing the unified host.plugins YAML with native and component plugin entries" />
+
+**Bailey Hayes** [19:10](https://youtu.be/e6tCo9WEbGo?t=1150)
+
+And this is the difference between a native one and what a component looks like, and that's what I was talking about about having a source here for loading it. And this example is if you were loading `wasmcloud:secrets`.
+
+And one other thing that we didn't really talk through on Jeremy's demo — I think there are a couple things. We have a new concept of host-owned keys. So this is basically saying only on the plugin config — so only on the `wasmcloud:secrets` plugin config, so like right here — may you specify a Vault address and a Vault role. No workload can come in and override what the Vault address and Vault roles are. They can only be specified by the operator at deploy time. So in that way it's owned by the host and not by workloads. So that's sort of a new concept there.
+
+And then this is sort of the idea of like, well, hey, if you want workloads to override your config, that's fine, let them go, YOLO. But that's your knob to turn that off. And by default it's enabled — so, stricter default.
+
+Let's see, anything else? I think we should call out improvements, improvements, improvements. Oh, this one's fun. So two sprints back, I had added the ability to have instance pooling. Basically, it was done in a generic way with the intention that anybody that's doing something with P3 can now find ways to concurrently run your requests. And so I went through, after we got the async messaging WIT definition in and we have a native plugin that backs it, and plugged that into that infrastructure, so that if somebody has a handler that's async, we can basically do instance reuse against that handler — even if it's just a messaging handler, it's not specific to HTTP or something else.
+
+But like all of those, it's opt-in, so you have to basically say, "Hey, I've written this to be ephemeral. I've written it to not have global state that persists between different request handling. So yeah, give me an instance pool, and here's kind of like the max amount of concurrency I want to handle on that workload." So basically you're defining this workload is safe to reuse, and you want to benefit from a pool. This is especially useful if you're writing in languages like Go, where it is a little bit chunkier, has to instantiate basically a whole runtime. You probably want to hold on to that for a while. Versus, if you've got a couple-kilobyte Rust component, you may just always opt to keep that ephemeral and let that go completely cold, because it still starts in microseconds. Yeah, Frank.
+
+**Frank Schaffa** [22:19](https://youtu.be/e6tCo9WEbGo?t=1339)
+
+Can you change this dynamically, or once you set this up, it's there for the duration?
+
+**Bailey Hayes** [22:27](https://youtu.be/e6tCo9WEbGo?t=1347)
+
+It is actually — these fields are on your workload definition, so they're declarative and static. And we basically will look at this as part of the run and say, okay, if you had both pool size, and I'm allowed to run it concurrently, then when I build this thing, I'm actually going to build it into the shared pool rather than on the fly every time it comes in.
+
+**Frank Schaffa** [22:58](https://youtu.be/e6tCo9WEbGo?t=1378)
+
+So basically, if you want to increase or decrease, you just replace your workload.
+
+**Bailey Hayes** [23:06](https://youtu.be/e6tCo9WEbGo?t=1386)
+
+Exactly. Yeah, it would be a rollout.
+
+**Liam Randall** [23:11](https://youtu.be/e6tCo9WEbGo?t=1391)
+
+Frank, two things. One, there's a connected theme here that you're seeing, as Bailey's turning on some enhanced metrics, which our intention would be to feed back into a change loop for dynamically reconfiguring things on the fly. Two, these do very gracefully scale back down. I'm running a commercial instance of wasmCloud that's embedded in our product, but I'm sitting here with nearly 100 workloads running. All of them have that setting configured, and I'm at 50 to 60 megabytes of memory consumed.
+
+And then I'm going to figure out how we sort of share this back. But as part of getting that across the line, we invested a ton of time and ran hundreds of different configurations across the seven most common patterns of NATS — the NATS core patterns, JetStream patterns, key-value patterns — and we sort of came up with some recipes to hit particular scaling metrics at various artifact sizes. Like, for example, with NATS, it's really out of the box tuned for small messages. So we targeted like 25,000 messages a second. But we also have some use cases with customers that are moving larger messages through, like one meg, two meg messages. So it was very informative for us to take these new controls and then to test them in billions of messages, hundreds of different deployments, and come up with a set of recipes that worked.
+
+And there were some really neat insights. Bailey mentioned one earlier. For example, Rust is on average 20 to 25 times smaller than a Go component for the same workload shape, and that translates into a significantly longer cold start time. Even at WebAssembly scale, physics is still physics in order to get there. But with some of these new pool size and instance reuse, Rust would see say a three or four times performance increase, but the larger components would see a seven or nine times increase because of the reuse here and the pool sizing. So there were some really neat insights that we got from doing this work.
+
+And I did review some of the documents that we've prepared, which were for somebody that's working in a high-production, high-volume scenario. I'm going to see if we can't get some of these recipes republished back into a doc page in wasmCloud, or maybe over on Cosmonic. I need to think about where we choose to land those, but it was very interesting in order to do that.
+
+**Frank Schaffa** [26:16](https://youtu.be/e6tCo9WEbGo?t=1576)
+
+Thank you.
+
+**Bailey Hayes** [26:16](https://youtu.be/e6tCo9WEbGo?t=1576)
+
+Yeah, I think related to just having an individual plugin being able to opt in to doing concurrent instance reuse — I also had put in an enhancement so that even though we create a pool of these things, we can still start tuning down that pool as load decreases. So this basically reclaims them over a period of time that is operator specified.
+
+<img src="/img/community/2026-09-02/image010.webp" alt="PR #5507, reclaim warm instances when a component goes idle, documenting reclaimWindowSeconds and the reclaim floor" />
+
+But essentially, if you say I have a reclaim window and, look, I get a burst once an hour, then maybe you would just say reclaim it after a minute — because I don't need any of that compute after the first one minute of a burst, and so that'll let that scale down. But while you're getting the burst, you can reuse those instances in the pool. So this one also applies to basically anybody that defines a pool. These are new knobs that you can have on top of that.
+
+And obviously every workload is probably going to have different right-size tuning that they're going to want to use. So right now the philosophy has very much been surface everything we can. It does result in a lot of config knobs. We're definitely starting to creep up there. I think a lot about, like, is it too much? And I think where I'm kind of landing right now is it's up to the platform team that implements wasmCloud to decide what the opinionated set is, and for us to just surface all those capabilities and be the picks and shovels that any platform operator might need.
+
+I think I saw Yordis's hand first. Also, hi Yordis — we called you out last week. I don't know if you saw that. We missed you.
+
+**Yordis Prieto** [28:19](https://youtu.be/e6tCo9WEbGo?t=1699)
+
+No, I was on vacation. Hell yeah. So my girlfriend was happier than you. Sorry.
+
+**Bailey Hayes** [28:25](https://youtu.be/e6tCo9WEbGo?t=1705)
+
+That's fair. That's more important.
+
+**Yordis Prieto** [28:26](https://youtu.be/e6tCo9WEbGo?t=1706)
+
+Yeah. About the rehydration of like scaling down and stuff like that. Normally, in even event sourcing and for example in Erlang, when we combine things, we have an actor which somewhat will map to what you're saying, and based on the events or the commands, we say, you know what, shut down the actor. Again, I'm mapping actor to your stateful thing.
+
+**Bailey Hayes** [28:52](https://youtu.be/e6tCo9WEbGo?t=1732)
+
+Yeah, I would say actor here relates directly to a component that is acting as a reactor in the formal computer science sense. Okay, keep going.
+
+**Yordis Prieto** [29:00](https://youtu.be/e6tCo9WEbGo?t=1740)
+
+Yeah, yeah. So basically it's like, I want to keep it hot, and that decision is effectively based on my domain. So based on — I don't know — if the event is an account or transfer start, I know most likely you're gonna have like less than one second or whatever to do the transfer. So I want to keep that hot for that automation to happen, yada yada, right?
+
+Can I do that? Because that's, like, from inside my module. An operator wouldn't ever be able to tell, per se, right? That's not a static config, and it's more like a runtime decision that hopefully the hint would be like, yeah, don't stop this unless you have to for some other reason. Please keep it hot. And even we put inside timers, like keep it hot for like five minutes, and after that it doesn't really matter, or you can shut it down.
+
+**Bailey Hayes** [29:47](https://youtu.be/e6tCo9WEbGo?t=1787)
+
+And I'll also say it's very intentional that this isn't meant to be dynamic knobs that you can change at runtime up underneath the host — because the reclaim window, concurrency, pool sizing, all of that matters for scheduling decisions. So whether or not a host can actually handle what you're asking for, and so that's why that very fundamentally has to be a rollout. Yeah, Frank.
+
+**Frank Schaffa** [30:16](https://youtu.be/e6tCo9WEbGo?t=1816)
+
+Probably something similar to this. I don't know if we can have different priorities or something. So for instance, for transactions, we want to make sure — I mean, like Yordis mentioned, that we can have something quick, and we want to make sure that there's always a resource there. And the other point that I was thinking is actually, how do you know that — okay, I can define my concurrency here, but how do I know that I have enough resources, CPU-wise and memory-wise, to accomplish this?
+
+**Bailey Hayes** [30:58](https://youtu.be/e6tCo9WEbGo?t=1858)
+
+Yeah, I think ultimately your workloads can make requests and have limits. You can set your own limits, and you can set your own requests. But only the host really knows where it's at in terms of resource utilization and what's available to it.
+
+We did make a change recently — this one that applies some probing in our Helm chart. Let me jump down to this one, where essentially — it's not this PR. Boo. Okay, blanking on exactly. It's been a blur. We add probes now, basically to say how many CPU cores have you given me, and I will use up to that limit. And then we also build on top of that for parallel compilation, and we're using that for the thundering herd problem of how many maximum things can I be instantiating and starting all at once. I'm gonna limit that number to how much I think I have available to my host, and basically throttle it until I've got everything instantiated. And the moment that I can't, I need to fail the workload start and say I'm out of resources. So from that perspective, it's very tightly controlled by the host.
+
+I would love to be able to do something more akin to — OpenCost is one of the tools built. I think that's like the open source version, or like the CNCF version, of Kubecost — where I can look at a component and then it can tell me some things about it. I will say that an LLM now is surprisingly good at napkin math, basically, where you can say, "Hey, given these fields, given this size of my node and the limits that I'm going to give it for what it gets scheduled in Kubernetes, right-size these types of workloads. How many hosts do I need to be able to fit?" It actually is surprisingly good at that. And again, that's all stuff that you would be specifying basically in your Kubernetes manifest for all of these different workloads.
+
+And so what I think a platform consumer of this would have is templates, basically, of like this is a small, medium, and large. And you're in the small ephemeral category, you're going to get this one; but you are in the medium data pipeline, you're doing transactional work, I'm gonna give you basically a different priority. But all that should be done as the platform operator. They own that, and we're just kind of surfacing all these different knobs in all the different ways. Did that answer your question, Frank?
+
+**Frank Schaffa** [33:54](https://youtu.be/e6tCo9WEbGo?t=2034)
+
+Yes, it does. And actually, as we were talking — a comparison between Kubecost and OpenCost.
+
+**Bailey Hayes** [34:03](https://youtu.be/e6tCo9WEbGo?t=2043)
+
+You know, it's been a hot minute since I've played around. But I remember being a platform operator, and I owned the Kustomize templates for about 300 different microservices, and they were all their own special little snowflakes. Oops, I can't curse here. I almost did it. Sometimes I use a dirty word when I say "lift and shift" — I use a different word for shift. There was a lot of that in those microservices, and just trying to determine up front which template bucket I needed to put them in. Is this one cloud native and actually a 12-factor app? Is this one not, and it's just kind of much closer to like an appliance thing? And then Kubecost was what I was using quite a bit at the time to make that work.
+
+And I've actually never played with OpenCost, but I've been told that I should hype it up more than the other one. Interesting. Yeah, so it's pretty minimal. Kubecost was pretty incredible when I used it at the time, and I think that was reasonably the only way I could tell the different microservice teams that depended on me what to use. And you know, it would be cool if we had a WasmCost. Somebody should LLM that bad boy, because I really do think it could work. But I also think WasmCost probably should use LLM inferencing, given the workload and the state of everything in your deployment, and give you a good answer. So it's probably more like a skill.
+
+**Frank Schaffa** [35:35](https://youtu.be/e6tCo9WEbGo?t=2135)
+
+Okay, thanks.
+
+**Bailey Hayes** [35:38](https://youtu.be/e6tCo9WEbGo?t=2138)
+
+All right, so that calls out kind of, sort of, around the house on some of the things that have changed over the past week. I think I've talked through most of the top-of-the-line pieces. I'm just scrolling through really quick to make sure I'm not forgetting anything huge, but roughly speaking, yeah, I think hardening and throttling on thundering herds is kind of the other area of development that's been happening.
+
+All right, so let's take a look at our project board. I'll share that up. Okay, so where are we at? Hey, we did this one, didn't we, Jeremy? We did it.
+
+**Jeremy Fleitz** [36:39](https://youtu.be/e6tCo9WEbGo?t=2199)
+
+Uh, yes.
+
+**Bailey Hayes** [36:42](https://youtu.be/e6tCo9WEbGo?t=2202)
+
+Do you mind posting on that one — and that you've also made example ones? I think we also have literally examples in there, so we can close that one out.
+
+<img src="/img/community/2026-09-02/image011.webp" alt="The wasmCloud Q3 2026 roadmap project board showing Triage, Ready for Work, In Progress, and Completed columns" />
+
+This one is basically still there, and I need to fix it, and I have started on it. I also have a PR in draft up for this one, so I need to get this one up as well. I think we can close that one out pretty quickly.
+
+This one's harder. This one's like, we're doing version string comparisons, and there was a defect filed I think two weeks ago on us, on basically — we were treating, let's say you have a local deployment and you're doing `wash dev`, and you're not doing `wash host`. In `wash dev` we just chop off the version string entirely, and then it's like, oh, you're using messaging and you're using messaging — doesn't matter that it's two and three. We treated them the same. So that's definitely something that's got to get fixed.
+
+And I was going to wrap all of that up in this one fix, where we basically propagate version as a first-class typed field all the way through, and then follow the component model's canonical versioning. Which, short answer, is basically make it work until it can't. And that is really like, okay, treat everything that's within the same major-minor as going to be forward compatible. So even though this person is on, let's say, 2.4.1 and you now support 2.4.5, that should just be supported and work, because they're asking for an older version — you should already match that. Now, if you flip those and that person is asking for a newer version than what your host provides, that should also work too, unless they're calling a new API that you don't provide. So you need to do the detection on whether or not they're calling the new API. If they're calling the new API, then you need to fail it. And all of that work happens within wasmCloud's `resolve_workload`. So that body of work hasn't started, but it's sort of a small feature size, just been in the back of the queue.
+
+And actually, I believe we've unblocked everything that's required for CI publishing for the wash-runtime crate. I think now it's blocked on, like, me to just go and turn on the flags in crates.io. So we should probably do that sooner rather than later. We can close that out for our Q3 roadmap.
+
+We haven't done the K6 benchmarking suite, but we still want it. Still a good thing to do. We haven't necessarily wrapped a bunch of things up into "are we componentized yet," but I hope you see that part of this is we've been doing a big sprint on Go, and in the background we've also been doing stuff with Python. So you're going to see a bunch more stuff in Rust, TypeScript, Python, Go, and wrapping them all up together in a place where people can consume and see what the heck does what support, and what's the drift, and what versions do I need to use for each of these, and what are we testing. All that kind of stuff would be wrapped up here. Aditya, I think you may have filed an issue. I've got to put it on the board.
+
+**Aditya Salunkhe** [40:02](https://youtu.be/e6tCo9WEbGo?t=2402)
+
+I actually filed it on the Q4 because I thought it's a bit too late for Q3. Yeah, when does —
+
+**Bailey Hayes** [40:09](https://youtu.be/e6tCo9WEbGo?t=2409)
+
+Q3 end? Actually, let's find out.
+
+**Aditya Salunkhe** [40:16](https://youtu.be/e6tCo9WEbGo?t=2416)
+
+Yeah. Oh, one —
+
+**Bailey Hayes** [40:19](https://youtu.be/e6tCo9WEbGo?t=2419)
+
+Month. We have one month to do it. I think it's possible. I think it's possible. Let me clear these out, and then we'll make a call on it. I think we should at least get started on it this quarter, and make progress, and have a concrete design and plan. And maybe it'll be behind a flag and it won't be stabilized, but we should be able to land that before we're done.
+
+I guess one other thing on the "are we componentized yet" update. I don't know if y'all saw — Alex Crichton has put in a PR to add `wasm32-wasip3` as a supported target in Rust, and that's because he got the release out for the WASI SDK 34, which has updates for WASI libc, and all of that then also rides on top of LLVM changes, where now the ABI that gets produced when you target a WASI P3 component has a cooperative threading ABI that's compatible with when we enable cooperative threading.
+
+So basically it doesn't mean cooperative threading's in and it's done — not saying that. My super aggressive estimate for that was like October would be crazy cool. Most likely estimate is December. But essentially now the symbols that we're producing — I can take a component and compose it with another component, and that other component can just decide to start doing threading, and that will just work, and they won't break. So in theory, we've got all our ducks in a row that we've got a very stable and additive-only path for the target, and that's the whole game plan. And so all that has been rolling out, which is great. And I don't see any blockers right now, which is also great.
+
+So yeah, I think in terms of wasmCloud roadmap, I don't think we're planning to target any more native plugins. That was our large T-shirt size that we've now landed over here in the landed column. And then I would say, going from also in large T-shirt size, the distributed cache and precompiled component — extra large, actually, for that one. This one's a large, and this one I would say medium to large. And these — give me a date, you know — I'll knock those out now that we've gotten the hard stuff.
+
+So all in all, pretty good for a roadmap. I've always been told that when you're doing roadmapping, you just got to shoot for a passing grade. If you get an A-plus on having completed your roadmap, you failed, because you weren't aggressive enough. Aggressive goals on a status — that's what my mentor always said. So, yay. I think that's it. Any questions, comments, other things?
+
+**Yordis Prieto** [43:19](https://youtu.be/e6tCo9WEbGo?t=2599)
+
+A follow-up to what I asked.
+
+**Bailey Hayes** [43:22](https://youtu.be/e6tCo9WEbGo?t=2602)
+
+Oh, for me, for the annotations thing.
+
+**Yordis Prieto** [43:26](https://youtu.be/e6tCo9WEbGo?t=2606)
+
+No. Well, that one I definitely need your help with, because I like — yeah, let's talk about it later. But no, the stuff about keeping it hot based on the domain and stuff like that. If the host or whatever — and it's not gonna be a static configuration — would I be able to do that at some point, or how would you recommend to do that?
+
+**Bailey Hayes** [43:45](https://youtu.be/e6tCo9WEbGo?t=2625)
+
+So, did you ask this question in chat and I missed it?
+
+**Yordis Prieto** [43:50](https://youtu.be/e6tCo9WEbGo?t=2630)
+
+Yeah, yeah. Oh, it's too late. It's up here, like — Bailey, I talk too much s\*\*\*. Like, I can either entertain Aditya, because he's like a consumer right now, or I don't. So like, what do you want me to do? It's up there.
+
+No, but it doesn't really matter. The point is, if — how can I keep those modules hot, whatever that means, based on the domain if I need it, right? It doesn't have to be right now, but I think that's something that, like, the more people go for this actor base — that technically you are the actor system — most likely they're gonna want to do that somehow.
+
+**Bailey Hayes** [44:35](https://youtu.be/e6tCo9WEbGo?t=2675)
+
+So basically exactly those config knobs I was just showing — you would set a pool size, you would set a limit for the max concurrency that you want that to be allowed. If you're doing something with NATS or Kafka, you're going to want to set the max number of messages in flight as well, just to make sure that you don't overexpend on parallelism. And then the third thing is you would set a reclaim limit or knob. You could set it to infinite if you wanted. Zero basically means no reclaim.
+
+**Yordis Prieto** [45:12](https://youtu.be/e6tCo9WEbGo?t=2712)
+
+But that's at the host or the system level. I understand, but I need to be able to say, hey, don't touch these particular components as much.
+
+**Bailey Hayes** [45:21](https://youtu.be/e6tCo9WEbGo?t=2721)
+
+It's in the workload config. So your workload definition — so your specific component, it's on them.
+
+**Yordis Prieto** [45:29](https://youtu.be/e6tCo9WEbGo?t=2729)
+
+But you don't know, right? It's a runtime decision. There are definitely static configurations you want to put for, like, safe upper and lower bound limits and stuff like that. I get that, right? And even for the component, I understand that. But there are definitely, at runtime, some hinting to, hey — wink, wink — for the next two seconds, don't ever touch this, period. And I'm okay doing OOM kill. I'm okay going above. Obviously those things have to make sense eventually. But it's like, keep it as hot as you can.
+
+For example — and this is a precise situation, because I'm working on this — I work on this and trying to migrate it into WebAssembly: bidding, ad tech. In this particular case, right, the auction is like literally five seconds, 15 seconds. It's not something that's like, oh, go long running. So for that period of time, you're better off don't ever touch anything. And every single millisecond of latency that I pay is a problematic thing sometimes. So for those, I'd like to say, hey, don't touch the auction until the auction finishes, or stops, or whatever, based on some triggers — for me, it's our event.
+
+That's already built into the Erlang actor system that I have. I have a function that takes the event, and then it says you want it to join, or to stop, or to continue, and for how long to continue. I can say stop, or continue for five seconds more, something like that.
+
+**Bailey Hayes** [47:06](https://youtu.be/e6tCo9WEbGo?t=2826)
+
+Two ideas to run by you. First one is I think that type of thing needs to be capability driven. Like, that's going to be specific on the interface that's being invoked. What is your actor reacting on? It needs to be based on that interface, and you need to be able to tightly control that. So that would be, I think, based on the plugin that's trying to handle and run that invocation. So the plugin itself actually owns the invocation and the parameters around it.
+
+And then the second thing that I think is related is that it seems like maybe for your system it would be beneficial that we supported a feature of dynamic workload scheduling. So you've decided there's work to do — now dynamically create a workload and schedule it here for it to work. And at that moment of scheduling is when you actually know what reclaim and what limits you want to set. So schedule it, let it do its thing, and part of that is also making sure that it has the right capability-oriented interface with those config knobs set exactly to what you know you want right then.
+
+**Yordis Prieto** [48:12](https://youtu.be/e6tCo9WEbGo?t=2892)
+
+Yes, yes. May I share the screen real quick for you to see what the interface I have is? And again, you don't have to follow this particular interface, but this is actually the professional things that I've done before. Like, in Commanded we have something called the aggregate lifespan. So, call it whatever you want, but as you can see, there is an interface that reacts to an event, a command, or an error, and then you decide to either continue infinitely, stop, or there is a timeout for you.
+
+<img src="/img/community/2026-09-02/image012.webp" alt="Yordis Prieto's aggregate lifespan interface from Commanded, reacting to an event, command, or error and returning continue, stop, or a timeout" />
+
+So in this particular case, for example, it's like, hey, the deposit or bank account closes, you stop it; or if you're gonna do a transfer or whatever, then you continue for an hour or whatever, because you know there are some automations around it. So this is somewhat the interface I'm used to. This is a runtime situation.
+
+**Bailey Hayes** [49:03](https://youtu.be/e6tCo9WEbGo?t=2943)
+
+We do have a timeout bound on a given capability, which I think roughly matches to this. But to do what you want, to make it a runtime decision, you need to own scheduling the workload — to schedule it with the right values at that moment, and then let it go through. And I think that would give you what you're looking for.
+
+**Yordis Prieto** [49:24](https://youtu.be/e6tCo9WEbGo?t=2964)
+
+Yeah, I leave you to think about it. But definitely, when you're talking about high-critical, latency-sensitive things, this type of toggle at runtime you actually want.
+
+**Bailey Hayes** [49:35](https://youtu.be/e6tCo9WEbGo?t=2975)
+
+Well, and it's good feedback from you too, which is, like, give me all the config. So I've been worrying — I've been worrying about over-rotating on it, but it sounds like probably not.
+
+**Yordis Prieto** [49:47](https://youtu.be/e6tCo9WEbGo?t=2987)
+
+My stand on it, and especially lately, the problem I've been dealing with is: make every single config something that people could change, but also everything is behind a profile name. Never ever meaning, oh, there is a five-second timeout. No — there is a default profile that has a five-second timeout.
+
+This is one of the biggest pains in Erlang, for example. Especially in Erlang, everything is five seconds. You don't know it. The gen_server timeout is five seconds, so everything around is five seconds. Nobody knows about them. Nobody knows in the entire thrashing thing when it breaks. And then in the opposite end of that, there are some packages that change the timeout. And now at the system level, you're actually screwing with me, because I picked the default timeout because it was five seconds, but now you change it to six, and at the system level the entire system starts timing out just because of that one value.
+
+So what I would recommend is, everywhere you put the default, put that in a direction that says here's the profile in between — which is a static name that points to a set of configuration — and then you make everybody happy. So at the system level you can say, no, we decided that the default profile is going to be five seconds. So if you were using that, then you're understanding that we are making the decision for you. But it's extremely explicit on it.
+
+**Bailey Hayes** [51:09](https://youtu.be/e6tCo9WEbGo?t=3069)
+
+Our corollary to that right now is basically platform operators define their host groups. So different hosts may be totally configured differently, right? Like, you may have a host that's just for ingressing workloads in — just does HTTP stuff. You have another one that's just doing NATS event bus handling. You have another that's just doing GPU workloads. You have another one that's running on gold-plated hardware and it's talking to a transactional database. That is sort of our equivalent.
+
+So I'm interpreting the ask here to make sure that in the host config definition there's basically a flat map that tells you here is everything that this thing has configured, and everybody can just look at that and it's known what it is doing.
+
+**Yordis Prieto** [51:57](https://youtu.be/e6tCo9WEbGo?t=3117)
+
+Yeah, yeah. Okay. I would expose them all. I think it always has been a people problem and the reading. But now with tools like AI and so on, I think the burden will be a little bit less. As you already hinted, they're already getting really good at asking you, okay, what is your SLA, what is your SLO, and doing it for you. So the safety net is just the default, which is where I'm saying, hey, for those defaults, most likely don't shoot yourself in the foot, and put something that is like a profile name indirection.
+
+**Bailey Hayes** [52:33](https://youtu.be/e6tCo9WEbGo?t=3153)
+
+Well, as always, I appreciate your feedback, Yordis. You should look at our NATS plugin and the new WIT definition for it. We leaned as hard as we could. Yeah, it's not messaging — it is `wasmcloud:nats`.
+
+**Yordis Prieto** [52:47](https://youtu.be/e6tCo9WEbGo?t=3167)
+
+Oh, you changed it. Okay, I didn't — I did look at the wasmCloud, like, messaging. Okay, let me get it. I would definitely do that, because I need it.
+
+**Bailey Hayes** [52:58](https://youtu.be/e6tCo9WEbGo?t=3178)
+
+I think it's awesome, but maybe we screwed up somewhere. That's why we missed you last week, as Jeremy showed it all for the first time. We said your name like five times, and the whole time it was like — I mean, everything looks correct to me. It looks like a faithful port of the NATS service, their whole API surface. Yeah, let me get you a link real quick.
+
+**Jeremy Fleitz** [53:27](https://youtu.be/e6tCo9WEbGo?t=3207)
+
+It's still only in main, by the way. And it's not officially in the release yet.
+
+**Bailey Hayes** [53:32](https://youtu.be/e6tCo9WEbGo?t=3212)
+
+So give us feedback before it gets harder to change.
+
+**Yordis Prieto** [53:36](https://youtu.be/e6tCo9WEbGo?t=3216)
+
+I definitely gotta do that today. Thank you so much. This is frigging amazing. Hell yeah. Oh, I swear again.
+
+**Bailey Hayes** [53:59](https://youtu.be/e6tCo9WEbGo?t=3239)
+
+All right, guys. It looks like we are out of time, but as always, wherever — on the wasmCloud Slack, hit us up. Always want feedback. And yeah, I will always gift you more work, I promise. I will come back to the work that you've been doing. I did do you a solid — I actually bumped Yosh on the PRs that you made in the component model. I'm like, hey, can you look at this? Because I don't have time. So we'll see if that also worked. I'm always happy to delegate.
+
+**Yordis Prieto** [54:34](https://youtu.be/e6tCo9WEbGo?t=3274)
+
+Yeah, please help me with that, because I'm bothering two people effectively. So I don't think — no, they have enough already. Alex and Luke. So Alex already, like, dude, I don't have time for this. And, well, I need to bother you — I need people to help Alex and Luke when it comes to the top-level types. Luke already gave me feedback on the spec, or the WIT itself, the component model file. Alex already commented a few things, so I think that should be already good. And I have a PR for wasm-tools where I implemented the whole thing, and I think I have it locally or somewhere — even the bindgen also implemented. But again, I need people to be like, hey, help those two people. So for the top-level type, and then second is like in spec mode only for the annotation. So nothing subtle there.
+
+**Bailey Hayes** [55:33](https://youtu.be/e6tCo9WEbGo?t=3333)
+
+Well, Yosh has an immediate product need, so I'm hoping that he'll jump in and take the lead on that from our side, from the WASI hat perspective.
+
+**Yordis Prieto** [55:43](https://youtu.be/e6tCo9WEbGo?t=3343)
+
+Yeah.
+
+**Bailey Hayes** [55:47](https://youtu.be/e6tCo9WEbGo?t=3347)
+
+All right. Well, thanks everybody. Hope you have a good one.

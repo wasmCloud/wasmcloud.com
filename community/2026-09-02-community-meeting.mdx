@@ -1,60 +1,310 @@
 ---
 date: '2026-09-02'
-title: 'Meeting Agenda - 2026-09-02'
+title: 'wasmcloud:nats on main, Custom Go Host Plugins, and Warm Pools That Scale Back Down'
+description: 'wasmcloud:nats lands on main with a native host plugin, Jeremy Fleitz demos a custom Go host plugin, and warm instance pools now reclaim when idle.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm runtime autoscaling
+  - webassembly kubernetes
+  - go webassembly
+  - wasmcloud nats
+  - host plugin
+  - componentize-go
+  - wasi p3
+  - instance pooling
+  - webassembly observability
+  - webassembly news
+chapters:
+  - { seconds: 15, label: "Welcome: NATS plugin, host plugin config, and hardening land on main" }
+  - { seconds: 71, label: "Jeremy Fleitz walks the PRs that landed after wasmCloud 2.8" }
+  - { seconds: 200, label: "componentize-go, async, and the patched Go toolchain for WASI P3" }
+  - { seconds: 330, label: "Workload manifests move to wasmcloud:nats@0.1.0 — no credentials inside" }
+  - { seconds: 470, label: "A custom Go host plugin, composed and deployed to a cluster" }
+  - { seconds: 616, label: "Layering host, operator, and workload config declaratively" }
+  - { seconds: 726, label: "Doc of the Week: managing WIT dependencies" }
+  - { seconds: 800, label: "The host interface configuration reference, and Markdown export for LLMs" }
+  - { seconds: 870, label: "PR #5525: one guest invocation duration metric" }
+  - { seconds: 1010, label: "Hardening: shutdown draining, unbind loops, and maxConcurrentStarts" }
+  - { seconds: 1150, label: "PR #5517: generic plugin bindings and host-owned keys" }
+  - { seconds: 1290, label: "Instance pooling for async handlers, opt-in per workload" }
+  - { seconds: 1391, label: "Liam Randall: ~100 workloads in 60 MB, and the NATS scaling recipes" }
+  - { seconds: 1576, label: "Reclaim windows: shrinking a warm pool between bursts" }
+  - { seconds: 1699, label: "Yordis Prieto: keeping latency-sensitive components hot" }
+  - { seconds: 1816, label: "Frank Schaffa: priorities, and right-sizing CPU and memory" }
+  - { seconds: 2043, label: "Kubecost, OpenCost, and the case for a WasmCost" }
+  - { seconds: 2199, label: "Q3 roadmap review: what landed, what's left" }
+  - { seconds: 2280, label: "Version compatibility as a first-class typed field" }
+  - { seconds: 2560, label: "wasm32-wasip3 lands as a Rust target; cooperative threading ABI" }
+  - { seconds: 2892, label: "Dynamic workload scheduling as the runtime answer" }
+  - { seconds: 3153, label: "Review wasmcloud:nats before it ships in a release" }
+image: https://i.ytimg.com/vi/e6tCo9WEbGo/maxresdefault.jpg
+duration: 3350
+showTitle: true
+slug: 2026-09-02-community-meeting
+speakers:
+  - bailey-hayes
+  - jeremy-fleitz
+  - eric-gregory
+  - frank-schaffa
+  - liam-randall
+  - yordis-prieto
+  - aditya-salunkhe
+about: wasmCloud
+mentions:
+  - NATS
+  - ComponentModel
+  - WASIPreview3
+  - Kubernetes
+  - Go
+  - componentize-go
+  - Rust
+  - wash
+  - capabilityProvider
+  - OpenTelemetry
+  - Prometheus
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- Nats Plugin
-- Host Plugin configuration
-- Hardening work
+<YouTube url="https://www.youtube.com/watch?v=e6tCo9WEbGo" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=e6tCo9WEbGo" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+September's first wasmCloud community call is a landing-week call: the `wasmcloud:nats` interface and its native [host plugin](/docs/overview/hosts/plugins/) are on `main`, and with them a single unified plugin configuration block, a new guest invocation duration metric, and a run of hardening fixes for draining, unbinding, and concurrent starts. Jeremy Fleitz demos a **custom Go host plugin** built with [componentize-go](https://github.com/bytecodealliance/componentize-go), Eric Gregory ships two reference docs, and Bailey Hayes walks the warm-pool reclaim knobs that make **wasm runtime autoscaling** work on a real Kubernetes host — while Liam Randall reports roughly 100 workloads running in 50–60 MB of memory.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **`wasmcloud:nats` and its native host plugin are on `main`, not in a release yet** — the matching [wasmCloud Go](https://github.com/wasmCloud/go) package targets the new native plugin directly, so building against it this week means running a host built from `main`; a 2.8.0 host returns an error. Bailey Hayes's ask to the community was explicit: review the WIT definition and the config surface *now*, "before it gets harder to change"
+- **One config block now configures every host plugin, native or component** — [PR #5517](https://github.com/wasmCloud/wasmCloud/pull/5517) replaces the scattered per-plugin settings with a single `host.plugins` list keyed by plugin `id`, carrying `config`, named `bindings`, `secretFrom`/`configFrom` references, and — for component plugins — an `image` to load. The only structural difference between a native plugin and a host component plugin is that the component one has a source
+- **Host-owned keys stop workloads from overriding operator settings** — `hostOwnedKeys: [vault-addr, vault-role]` pins those values to the plugin config, so no workload manifest can redirect the secrets plugin at a different Vault. A per-plugin `workloadConfig: allow | warn | deny` is the escape hatch, and the strict behavior is the default
+- **Custom Go host plugins work the same way native ones do** — Jeremy's demo composes two Go components into a single host plugin, deploys it to a Kind cluster, and configures it through the exact same `host.plugins` structure as `wasmcloud-nats`, with an async handler that takes its time without dropping messages
+- **Guest observability collapses into one metric** — [PR #5525](https://github.com/wasmCloud/wasmCloud/pull/5525) lands `guest invocation duration`, with a fixed attribute set of `plugin`, `operation`, `workload.namespace`, `workload.name`, and `component`. No caller-invented fields means no cardinality explosion, and every plugin feeds the same series, so one dashboard covers them all
+- **Warm instance pools can now shrink** — `reclaimWindowSeconds` retires instances beyond what the window's peak actually needed, with `reclaimMinInstances` as a floor; combined with `poolSize` and `maxConcurrency`, that is burst capacity you do not pay for between bursts. Liam reported ~100 workloads with pooling configured sitting at 50–60 MB total
+- **Instance reuse pays off unevenly, and that is the point** — from hundreds of test configurations across seven NATS patterns, a Rust component runs 20–25× smaller than a Go component of the same shape, so pooling buys Rust a 3–4× improvement and the larger Go components 7–9×, because cold start is proportionally more of their cost
+- **Hardening was the quiet half of the week** — [shutdown draining](https://github.com/wasmCloud/wasmCloud/pull/5524) with a Helm chart that no longer terminates immediately, an unbind pass so plugin connections are freed on host teardown and not just on workload stop, [`maxConcurrentStarts`](https://github.com/wasmCloud/wasmCloud/pull/5522) to throttle a thundering herd, CPU-core probes feeding parallel compilation limits, and `--meters epoch|fuel` replacing the old `--enable-meters` alias
+- **The runtime-vs-static tension got its first concrete answer** — Yordis Prieto wants domain events, not manifests, to decide what stays hot for the next five seconds; Bailey's answer is that pool sizing is a scheduling input and therefore has to be a rollout, but **dynamic workload scheduling** — create and schedule a workload at the moment you know its limits — is the feature shape that would give him what he wants
+
+## Chapters
+
+- [0:15 — Welcome: NATS plugin, host plugin config, and hardening land on main](https://youtu.be/e6tCo9WEbGo?t=15)
+- [1:11 — Jeremy Fleitz walks the PRs that landed after wasmCloud 2.8](https://youtu.be/e6tCo9WEbGo?t=71)
+- [3:20 — componentize-go, async, and the patched Go toolchain for WASI P3](https://youtu.be/e6tCo9WEbGo?t=200)
+- [5:30 — Workload manifests move to wasmcloud:nats@0.1.0 — no credentials inside](https://youtu.be/e6tCo9WEbGo?t=330)
+- [7:50 — A custom Go host plugin, composed and deployed to a cluster](https://youtu.be/e6tCo9WEbGo?t=470)
+- [10:16 — Layering host, operator, and workload config declaratively](https://youtu.be/e6tCo9WEbGo?t=616)
+- [12:06 — Doc of the Week: managing WIT dependencies](https://youtu.be/e6tCo9WEbGo?t=726)
+- [13:20 — The host interface configuration reference, and Markdown export for LLMs](https://youtu.be/e6tCo9WEbGo?t=800)
+- [14:30 — PR #5525: one guest invocation duration metric](https://youtu.be/e6tCo9WEbGo?t=870)
+- [16:50 — Hardening: shutdown draining, unbind loops, and maxConcurrentStarts](https://youtu.be/e6tCo9WEbGo?t=1010)
+- [19:10 — PR #5517: generic plugin bindings and host-owned keys](https://youtu.be/e6tCo9WEbGo?t=1150)
+- [21:30 — Instance pooling for async handlers, opt-in per workload](https://youtu.be/e6tCo9WEbGo?t=1290)
+- [23:11 — Liam Randall: ~100 workloads in 60 MB, and the NATS scaling recipes](https://youtu.be/e6tCo9WEbGo?t=1391)
+- [26:16 — Reclaim windows: shrinking a warm pool between bursts](https://youtu.be/e6tCo9WEbGo?t=1576)
+- [28:19 — Yordis Prieto: keeping latency-sensitive components hot](https://youtu.be/e6tCo9WEbGo?t=1699)
+- [30:16 — Frank Schaffa: priorities, and right-sizing CPU and memory](https://youtu.be/e6tCo9WEbGo?t=1816)
+- [34:03 — Kubecost, OpenCost, and the case for a WasmCost](https://youtu.be/e6tCo9WEbGo?t=2043)
+- [36:39 — Q3 roadmap review: what landed, what's left](https://youtu.be/e6tCo9WEbGo?t=2199)
+- [38:00 — Version compatibility as a first-class typed field](https://youtu.be/e6tCo9WEbGo?t=2280)
+- [42:40 — wasm32-wasip3 lands as a Rust target; cooperative threading ABI](https://youtu.be/e6tCo9WEbGo?t=2560)
+- [48:12 — Dynamic workload scheduling as the runtime answer](https://youtu.be/e6tCo9WEbGo?t=2892)
+- [52:33 — Review wasmcloud:nats before it ships in a release](https://youtu.be/e6tCo9WEbGo?t=3153)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### What Landed Between 2.8 and Today
 
-### Topic 1
+Bailey Hayes opened the first call of September with a summary that doubled as a warning about scope: "we've landed a lot of changes between last week and today, and so we're going to go through where all the fire is at." The list is the NATS plugin work now on `main` — a new `wasmcloud:nats` interface plus a native plugin implementing it — a batch of hardening fixes, and a new unified way to configure plugin and host binding config.
 
-- Note 1
-- Note 2
+Jeremy Fleitz took the first pass, and his advice was to just go look at the [closed PR list](https://github.com/wasmCloud/wasmCloud/pulls?q=is%3Apr+is%3Aclosed) starting from the [2.8 release](/blog/wasmcloud-2-8-release/): NATS plugin support, host config for plugins, and a run of concurrency checks aimed at "making sure that we keep the host as healthy as possible, preventing noisy neighbors from taking over memory and connections."
 
-### Topic 2
+That growth is what forced matching work in [wasmCloud Go](https://github.com/wasmCloud/go). Most of its packages were updated for wit-bindgen and 2.8.0, but there is now also a `nats` component package that targets the new native host plugin directly. The important caveat, repeated twice on the call: **this is not an official release**. It points at `main`, and using it against 2.8.0 produces an error.
 
-- Note 1
-- Note 2
+### componentize-go, Async, and the Patched Go Toolchain
 
-## Weekly highlights
+Building that package pushed changes upstream into [componentize-go](https://github.com/bytecodealliance/componentize-go) and `wit-bindgen-go`, specifically so the compiled WIT supports **async** — the NATS surface has genuinely asynchronous operations, and the [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) shape is async-native.
 
-### Issue of the Week
+The toolchain detail is worth knowing before your first build fails. `componentize-go` compiles with the ordinary upstream Go binary, but async support requires a patched Go. When it generates code that needs async, it checks whether your local Go carries the patch, and if not it downloads a patched Go 1.25.5 so the result actually works against WASI P3. See the [Go language support docs](/docs/wash/developer-guide/language-support/go/) for the current build path.
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+### Workload Manifests: `wasmcloud:nats@0.1.0` With Nothing Sensitive Inside
 
-### Documentation of the Week
+Jeremy's demo ran across two Kind clusters, driven by the workload patterns he had built the previous week to exercise the plugin — fan-out, JetStream, queueing, "all these various different types of patterns," which existed specifically to validate the plugin rather than to demo well.
 
-- [title](/docs/v1/intro)
-  - summary
+The manifest shape is the part to look at. A workload deployment declares its host interface exactly as before, except the interface is now `wasmcloud:nats@0.1.0` instead of `wasmcloud:messaging`, and it carries the config that belongs to the workload: the subjects it wants and what it intends to do with them. What it does **not** carry is connection details. As Jeremy put it, that is by design — "we don't want to have any type of connection credentials or anything like that inside the workload deployment. We want to keep that on the host itself." This is the same [capability-based security](/docs/kubernetes-operator/workload-security/) posture wasmCloud applies everywhere else, now applied to a message bus.
 
-## Community Updates
+### One Config Block for Every Host Plugin
 
-### Tune in…
+On the host side, the same information lives in a ConfigMap mounted into the host — and this is where [PR #5517](https://github.com/wasmCloud/wasmCloud/pull/5517) changes the model. Instead of a different place to configure every kind of plugin a host might carry, there is now one `host.plugins` list. Each entry is keyed by an `id` that is also the plugin's unique name — one plugin per name, enforced by the host.
 
-{/* Add any upcoming events/streams/etc */}
+```yaml
+host:
+  plugins:
+    - id: wasmcloud-nats                              # native: no source
+      config:
+        servers: nats://nats.default.svc:4222
+      bindings:
+        orders:
+          config:
+            subject-allow: orders.processed,orders.received
+            stream-allow: ORDERS
+          secretFrom: [orders-nats-creds]
 
--
+    - id: wasmcloud-secrets                           # component: has a source
+      image: ghcr.io/wasmcloud/plugins/secrets:0.1.0
+      allowedHosts: [vault.internal]
+      hostOwnedKeys: [vault-addr, vault-role]
+      bindings:
+        prod:
+          configFrom: [vault-prod]
 
-### Catch up…
+    - id: wasmcloud-postgres
+      workloadConfig: warn                            # rehearsing `deny`
+      bindings:
+        primary:
+          configFrom: [primary-db]
+```
 
-{/* Add any blog posts/articles that the community might find interesting */}
+Named **bindings** are how one plugin serves several workloads with different grants: a workload that asks for the `orders` binding gets `subject-allow: orders.processed,orders.received` and the `ORDERS` stream; ask for `archive` and you get a different set, with server overrides available per binding. Credentials come in by reference through `secretFrom` and `configFrom` rather than inline.
 
--
+Two things Bailey highlighted that Jeremy's demo skipped past. First, **host-owned keys**: `hostOwnedKeys: [vault-addr, vault-role]` says those keys may only ever be specified on the plugin config, by the operator, at deploy time. No workload can override where the secrets plugin points. Second, the knob that turns that off — a per-plugin `workloadConfig` setting whose values run `allow` (workloads may override, "let them go, YOLO"), `warn` (log and rehearse), and `deny`. The default is the stricter one.
 
-## Recording
+The payoff of a single block is that the whole picture is declarative and static. "So now all of that can be declarative and static and easily analyzed, and we can basically decide: are we good to launch this workload? Are we not good to launch this workload? And we can give that feedback right away rather than at runtime." The same block is shared between native plugins and [host component plugins](/docs/runtime/creating-host-component-plugins/); the only real difference is that a component plugin is handed a `.wasm` source to load, and a native plugin is built into the host so there is nothing to load.
 
-{/* Automated - No need to adjust this unless automation fails */}
+### A Custom Go Host Plugin
 
-<YouTube url="https://youtube.com/live/e6tCo9WEbGo" />
+Having a first-party native NATS plugin is one thing; Jeremy's second demo was the more interesting proof. He wrote **his own host plugin in Go**, deployed it to a cluster, and had a separate Go component call into it.
+
+The plugin is two Go components composed — "whacked together" with [wac](https://github.com/bytecodealliance/wac) — into a single artifact that the host loads. A Go workload component calls into it; the plugin does simulated processing and writes into a key-value store on the back end. The specific property he wanted to demonstrate: the plugin's handler is asynchronous, so when it takes a long time on an `await`, it does not drop messaging traffic in the meantime.
+
+Configuration is the punchline. His plugin is not native and not first-party, and it configures identically: an entry in `host.plugins` with an `id`, an image, and bindings, sitting alongside `wasmcloud-nats` in the same list. If you are writing plugins, start with [creating host plugins](/docs/runtime/creating-host-plugins/) and the [plugin-or-service decision guide](/docs/recipes/plugin-or-service/).
+
+### Doc of the Week: WIT Dependencies and Host Interface Configuration
+
+Eric Gregory presented two docs he called high-leverage. The first is **[managing WIT dependencies](/docs/wash/developer-guide/managing-wit-dependencies/)**, written for a problem that "can get pretty gnarly, especially in circumstances where it's not being handled automatically." It covers how WIT packages work as OCI artifacts, the tooling built into [`wash`](/docs/wash/), a recommended project layout matching the templates and examples, local file references for when you are not pulling from a registry, and publishing your own interfaces.
+
+The second is the **[host interface configuration reference](/docs/kubernetes-operator/host-interface-configuration/)** — a consolidated page for the config keys each host interface reads, covering `wasi:http`, messaging, key-value, blob store, config, secrets, Postgres, and the rest, along with which interfaces need no config at all and how behavior differs under `wash dev` locally. Eric's own assessment: "we probably should have had [these] a little earlier."
+
+He also called out **Shreya**, a newer contributor whose work landed the ability to copy any docs page as Markdown — a small feature with a specific purpose, which is making the docs consumable by LLM-assisted development instead of scraped out of rendered HTML.
+
+### One Metric to Dashboard Them All
+
+Building the NATS plugin made it obvious that dispatched messages needed observability, and specifically that it had to be a **metric** rather than another trace span, so it could be measured against the epoch metering work Aditya Salunkhe contributed. [PR #5525](https://github.com/wasmCloud/wasmCloud/pull/5525) is the result: a single top-level **guest invocation duration** metric.
+
+Every guest measurement now carries the same attributes — `plugin`, `operation`, `workload.namespace`, `workload.name`, `component` — and, critically, **no caller-invented fields**. Bailey was blunt about why: arbitrary attributes mean "heuristic explosion for your dashboard," the cardinality problem that quietly ruins a metrics backend. The PR also specifies manifest names rather than ids, because ids are freshly generated per workload construction and attributing a series to one would mint a new time series on every restart, rolling update, and replica. Consistency is deliberate: any plugin, first-party or yours, feeds the same series, so a [Prometheus](https://prometheus.io/) or [OpenTelemetry](/blog/otel-observable/) dashboard built once works everywhere. Bailey's framing was that this is "that first kind of load-bearing pass" and she would like to see the community build dashboards on top of it.
+
+### The Hardening Pass
+
+The rest of the week's PRs were unglamorous and operationally important:
+
+- **[Shutdown draining](https://github.com/wasmCloud/wasmCloud/pull/5524)** — the Helm chart had been terminating hosts immediately since day one, never giving connections inside a plugin binding enough time to clean up. Grace periods across CI were audited to line up.
+- **Unbind on host teardown** — plugins already got an `on workload unbind` callback when a workload went away, so they could free the TCP connection they had opened for it. That was not happening consistently when the *whole host* came down. There is now a pass just for that.
+- **[`maxConcurrentStarts`](https://github.com/wasmCloud/wasmCloud/pull/5522)** — a throttle for the thundering-herd case where you schedule more workloads than a host can instantiate at once. Configured through [Helm values](/docs/kubernetes-operator/operator-manual/helm-values/).
+- **Resource probes** — the host now probes how many CPU cores it has actually been given, and uses that to bound parallel compilation and the concurrent-start limit. When it runs out, it fails the workload start rather than thrashing.
+- **`--meters`** — `--enable-meters` is now aliased to `--meters epoch|fuel`, since you generally want one metering strategy, not both.
+- **[wasi:config delivery](https://github.com/wasmCloud/wasmCloud/pull/5526)** — config now reaches every component of a workload, not just some of them.
+
+### Instance Pooling, Reclaim Windows, and Who Decides
+
+Two sprints back Bailey landed generic **instance pooling** for WASI P3 workloads. With the async messaging WIT definition and a native plugin behind it, that infrastructure now applies to messaging handlers too — [PR #5515](https://github.com/wasmCloud/wasmCloud/pull/5515) — not just HTTP.
+
+It is opt-in, and the opt-in is a statement about your component: you are declaring it ephemeral, free of global state that persists between requests, and therefore safe to reuse. In exchange you get a warm pool and a `maxConcurrency` ceiling. The economics depend heavily on language: "this is especially useful if you're writing in languages like Go, where it is a little bit chunkier, has to instantiate basically a whole runtime. You probably want to hold on to that for a while. Versus, if you've got a couple-kilobyte Rust component, you may just always opt to keep that ephemeral and let that go completely cold because it still starts in microseconds."
+
+Frank Schaffa asked the obvious operational question: can you change this dynamically, or is it fixed for the duration? Fixed — these fields live on the workload definition, they are declarative and static, and the host reads them at build time to decide whether to construct into a shared pool or instantiate on the fly. Changing them is a rollout.
+
+Bailey then showed the complement to pooling: **reclaim**. A pool that only grows is a memory leak with good manners, so [PR #5507](https://github.com/wasmCloud/wasmCloud/pull/5507) added `reclaimWindowSeconds`, which each window retires the instances beyond what that window's peak load actually needed, with `reclaimMinInstances` as a floor. Her example is the shape most bursty workloads have: "if you say I have a reclaim window and look, I get a burst once an hour, then maybe you would just say reclaim it after a minute, because I don't need any of that compute after the first one minute of a burst." Both knobs are documented in [concurrency and connections](/docs/kubernetes-operator/operator-manual/concurrency-and-connections/).
+
+Bailey was candid that the knob count is climbing — "we're definitely starting to creep up there. I think a lot about, is it too much?" — and equally clear about where she landed: it is up to the platform team implementing wasmCloud to decide what the opinionated set is. wasmCloud's job is to "surface all those capabilities and be the picks and shovels that any platform operator might need."
+
+### 100 Workloads in 60 MB, and the NATS Recipes
+
+Liam Randall connected two threads for Frank. The first is that the enhanced metrics Bailey is landing are intended to feed back into a change loop — dynamic reconfiguration driven by what the host actually observes. The second is empirical: he is running a commercial wasmCloud embedded in a product with **nearly 100 workloads, all with pooling configured, consuming 50 to 60 MB of memory**. These scale back down gracefully.
+
+Behind that number is the testing campaign from the previous month: hundreds of configurations across the seven most common NATS patterns — Core NATS, JetStream, and key-value — run across billions of messages, producing a set of **recipes** that hit particular scaling targets at particular artifact sizes. NATS ships tuned for small messages, so the baseline target was 25,000 messages/second, but real customer workloads push 1 MB and 2 MB messages, which is a different regime entirely.
+
+The insight worth carrying away is about where instance reuse pays. **A Rust component is on average 20–25× smaller than a Go component of the same workload shape**, and that size difference translates directly into cold start time: "even at WebAssembly scale, physics is still physics." So turning on pooling and `poolSize` buys Rust a 3–4× improvement, and buys the larger components 7–9×, because they had proportionally more startup cost to amortize. Liam committed to finding a home for the recipes — a docs page on wasmCloud or over on [Cosmonic](https://cosmonic.com/) — rather than leaving them in an internal document.
+
+### Keeping Things Hot: Runtime Signals vs. Static Config
+
+The longest thread of the call came from Yordis Prieto, arriving from an Erlang and event-sourcing background. His model is an actor whose lifespan is decided by the *domain*: an event arrives, and the system knows that a transfer will complete within a second, or an auction will run for five to fifteen seconds, so the actor stays hot for exactly that long and then goes away.
+
+Bailey's first move was to align vocabulary — an actor here maps directly to a **component acting as a reactor** in the formal computer-science sense — and her second was to explain why the current knobs are deliberately not dynamic. "Reclaim window, concurrency, pool sizing — all of that matters for scheduling decisions. So whether or not a host can actually handle what you're asking for, and so that's why that very fundamentally has to be a rollout." A host cannot honor a runtime request for capacity it has not reserved.
+
+Yordis pushed on the specific case: latency-sensitive real-time bidding, where the auction window is seconds and every millisecond of cold start is a real cost. "For those, I'd like to say, hey, don't touch the auction until the auction finishes."
+
+Bailey offered two directions. First, that kind of control should be **capability-driven** — it belongs to the interface being invoked and therefore to the plugin that owns the invocation and its parameters, not to a global runtime dial. Second, and more concretely, this is an argument for **dynamic workload scheduling**: "you've decided there's work to do. Now dynamically create a workload and schedule it here for it to work. And at that moment of scheduling is when you actually know what reclaim and what limits you want to set." wasmCloud already has a timeout bound on a given capability, which is the nearest existing analogue.
+
+Yordis's parting design advice was about defaults, drawn from Erlang's five-second-timeout-everywhere problem: expose every config value, but always behind a **named profile** rather than a bare number, so that changing the default is an explicit, legible act instead of a system-wide surprise. Bailey's answer is that wasmCloud's equivalent already exists as **host groups** — a host for ingress, another for NATS event-bus handling, another for GPU workloads, another on gold-plated hardware next to a transactional database — and that the ask reduces to making the host config a flat, readable map of everything a given host has configured.
+
+### Resource Sizing, Kubecost, and a WasmCost
+
+Frank Schaffa's second question was the sizing one: I can declare my concurrency, but how do I know I have the CPU and memory to back it? Bailey's answer splits the responsibility. Workloads set requests and limits; only the host knows its actual utilization and what is left. The new CPU probes are the host half of that — the host asks how many cores it has been given, uses up to that limit, and derives both parallel compilation and the concurrent-start throttle from it, failing a workload start honestly when it is out of resources.
+
+For the planning half, she reached for a comparison she used to live in. As a platform operator owning Kustomize templates for about 300 microservices — "all their own special little snowflakes" — [Kubecost](https://www.kubecost.com/) was how she told each team what to use. The CNCF-adjacent open-source counterpart is [OpenCost](https://www.opencost.io/), which she has been told to hype up more. The idea she floated for wasmCloud: a **"WasmCost"** that looks at a component and tells you something about it. Her own refinement, offered immediately, is that it probably should not be a static analyzer — an LLM is "surprisingly good at napkin math" for right-sizing when given the fields, the node size, and the Kubernetes limits, which makes the useful shape closer to a skill than a service.
+
+### Roadmap: Q3 With a Month Left
+
+The board review was brisk. **Native plugin work is considered landed** — that was the large T-shirt-size item for the quarter, and it is done. What remains:
+
+- **[Connection pool example for the `wasi:sockets` host plugin](https://github.com/wasmCloud/wasmCloud/issues/5053)** — done, along with additional examples; Jeremy just needs to post and close it out
+- **[wasmcloud:secrets plugin backed by Kubernetes Secrets](https://github.com/wasmCloud/wasmCloud/issues/5016)** — started, with a PR in draft
+- **[Wasmtime host resource types are string comparisons](https://github.com/wasmCloud/wasmCloud/issues/4953)** — the harder one, described below
+- **[CI publishing for the wash-runtime crate](https://github.com/wasmCloud/wasmCloud/issues/5030)** — unblocked; now waiting only on turning the flags on in crates.io
+- **[Benchmarking suite for wasmCloud v2](https://github.com/wasmCloud/wasmCloud/issues/5052)** — the K6 work, not done, still wanted
+- **[Are we componentized yet?](https://github.com/wasmCloud/wasmCloud/issues/5343)** — in triage, and the thing the Go and Python sprints feed into
+- **Distributed cache and precompiled component artifacts** — still planned, sized extra-large and large respectively
+
+The version-comparison bug is the one worth understanding, because it bites locally. A defect filed two weeks earlier showed that under `wash dev` — as distinct from `wash host` — the version string is chopped off entirely, so `wasmcloud:messaging@0.2.0` and `@0.3.0` are treated as the same interface. The fix Bailey wants to wrap around it propagates **version as a first-class typed field** all the way through `resolve_workload`, then follows the [component model's canonical versioning](https://component-model.bytecodealliance.org/): within the same major/minor, forward compatibility is assumed, so a workload asking for `0.2.41` against a host serving `0.2.45` just works — and the reverse works too, unless the workload calls an API the host does not provide, which is the case that has to be detected and failed.
+
+On **"are we componentized yet,"** the background sprints matter: a big push on Go, quieter work on Python, and more coming for Rust and TypeScript, all headed for one place where people can see what supports what, where the drift is, which versions pair, and what is actually tested. Aditya Salunkhe had filed an issue against Q4 assuming it was too late for Q3; with a month left in the quarter, Bailey's call was to start it now, land a concrete design and plan, and ship it behind a flag if it is not stabilized in time.
+
+The ecosystem note she closed on: Alex Crichton has a PR adding **`wasm32-wasip3` as a supported Rust target**, downstream of the WASI SDK 34 release with its WASI libc updates and the LLVM changes beneath them. The consequence is that the ABI a WASI P3 component produces now carries a **cooperative threading ABI** compatible with cooperative threading when it is enabled — so a component can be composed with another component that decides to start threading, and neither breaks. Cooperative threading itself is not done; Bailey's aggressive estimate is October, her likely one December. But the target path is now stable and additive-only, with no blockers in sight. Her roadmap philosophy, offered as a mentor's line: "if you get an A-plus on having completed your roadmap, you failed, because you weren't aggressive enough."
+
+## WebAssembly News and Updates
+
+This week in **webassembly news**: the `wasmcloud:nats@0.1.0` interface and its native host plugin are on `main` ahead of a release, with a matching `nats` package in [wasmCloud Go](https://github.com/wasmCloud/go); [componentize-go](https://github.com/bytecodealliance/componentize-go) and `wit-bindgen-go` gained the async support that WASI P3 interfaces require, including an automatic fetch of a patched Go 1.25.5 when your local toolchain lacks it; Alex Crichton's PR adds **`wasm32-wasip3` as a supported Rust target**, riding on [WASI SDK](https://github.com/WebAssembly/wasi-sdk) 34 and LLVM changes that produce a cooperative-threading-compatible ABI, which is the last structural piece before cooperative threading itself; and Yordis Prieto's [component model](https://component-model.bytecodealliance.org/) work on top-level types and spec-mode annotations is waiting on review bandwidth from the [Bytecode Alliance](https://bytecodealliance.org/). Follow the [wasmCloud blog](/blog/) for what lands next.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a production substrate for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: Wasm Runtime Autoscaling Without a Scaler
+
+**Wasm runtime autoscaling** usually means something outside the runtime — an HPA, a KEDA scaler — watching a signal and changing a replica count. This call is about the layer beneath that, where wasmCloud scales inside a single host with no controller involved, and the three settings that govern it are worth learning as a unit.
+
+`maxConcurrency` is per warm instance: how many calls one instance serves at once. `poolSize` is per component: how many warm instances the host keeps between calls. `replicas` is per deployment. Multiply the three and you have your warm capacity in calls in flight; that product is also, roughly, your peak connection demand, which is why [concurrency and connections](/docs/kubernetes-operator/operator-manual/concurrency-and-connections/) exists as a doc. What [PR #5507](https://github.com/wasmCloud/wasmCloud/pull/5507) adds is the missing downward direction: `reclaimWindowSeconds` retires instances beyond the last window's peak, `reclaimMinInstances` sets the floor, and no call in flight is ever interrupted. A pool that grows to meet a burst and shrinks back an hour later is autoscaling — it just happens in the host, in seconds, without a control loop.
+
+Two things make this cheaper in wasmCloud than in a container platform. First, cold start is measured in microseconds for a small Rust component, so *not* pooling is a legitimate choice: Liam's measurements put a Rust component 20–25× smaller than an equivalent Go one, which is why pooling improves Rust by 3–4× and Go by 7–9×. Choosing per component rather than per platform is the point of making it opt-in. Second, all of this is declared in the [workload manifest](/docs/kubernetes-operator/crds/), so a scheduling decision is made before a workload starts, not discovered under load — which is exactly why Bailey holds the line that changing the values is a rollout, and why the runtime-hint case Yordis raised routes to **dynamic workload scheduling** instead: create the workload at the moment you know its limits, rather than renegotiating them under one that is already running. With [PR #5525](https://github.com/wasmCloud/wasmCloud/pull/5525)'s single guest invocation duration metric now carrying a fixed attribute set, the feedback signal for tuning any of it lands in one series per plugin, operation, workload, and component — which is the input a change loop would need.
+
+## Who Should Watch This
+
+**Platform engineers running wasmCloud on Kubernetes** should start at the host plugin config walkthrough ([5:30](https://youtu.be/e6tCo9WEbGo?t=330)) and stay through host-owned keys ([19:10](https://youtu.be/e6tCo9WEbGo?t=1150)) — the single `host.plugins` block and the `workloadConfig` escape hatch are the new operator contract. **SREs sizing warm capacity** want the instance pooling segment ([21:30](https://youtu.be/e6tCo9WEbGo?t=1290)), the reclaim window explanation ([26:16](https://youtu.be/e6tCo9WEbGo?t=1576)), and Liam Randall's 100-workloads-in-60 MB report with the Rust-versus-Go cold start numbers ([23:11](https://youtu.be/e6tCo9WEbGo?t=1391)). **Go developers building components or plugins** should watch the componentize-go async toolchain notes ([3:20](https://youtu.be/e6tCo9WEbGo?t=200)) and the custom Go host plugin demo ([7:50](https://youtu.be/e6tCo9WEbGo?t=470)). And **anyone building event-driven or actor-shaped systems on Wasm** should watch the exchange starting at [28:19](https://youtu.be/e6tCo9WEbGo?t=1699) — it is the clearest statement yet of where wasmCloud draws the line between static scheduling inputs and runtime domain signals.
+
+## Up Next
+
+The immediate ask from this call was review: `wasmcloud:nats` and the generic plugin bindings were on `main` but not yet in a release, and Bailey wanted feedback on the WIT definition and the config surface "before it gets harder to change." That release has since shipped as [wasmCloud 2.9](/blog/wasmcloud-2-9-release/), carrying the NATS-native interfaces, guest memory enforcement, idle pool reclaim, and the draining and probing lifecycle work discussed here. Still outstanding from the board: Jeremy Fleitz's workload pattern examples to be published and their issue closed, Liam Randall's NATS performance and scaling recipes to find a documentation home, the version-compatibility fix propagating version as a typed field through workload resolution, crates.io flags for the `wash-runtime` crate, the K6 benchmarking suite, and an "are we componentized yet" matrix started before Q3 closes.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-09-02-community-meeting-transcript/)**
