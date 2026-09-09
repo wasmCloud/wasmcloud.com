@@ -1,58 +1,276 @@
 ---
 date: '2026-09-09'
-title: 'Meeting Agenda - 2026-09-09'
+title: 'wasmCloud 2.9, Component Model 1.0, and Node.js APIs in JCO'
+description: 'wasmCloud 2.9 lands enforced guest memory and Kubernetes-grade lifecycle, Bailey Hayes maps the road to Component Model 1.0, and JCO gains Node.js API support.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasmcloud 2.9
+  - wasmcloud nats
+  - guest memory enforcement
+  - cooperative threading
+  - component model 1.0
+  - jco
+  - nodejs webassembly
+  - wasm runtime autoscaling
+  - webassembly news
+chapters:
+  - { seconds: 9, label: "Welcome: wasmCloud Wednesday and the 2.9 release walkthrough" }
+  - { seconds: 60, label: "At a glance: what changed between 2.8 and 2.9" }
+  - { seconds: 130, label: "NATS-native workloads with wasmcloud:nats" }
+  - { seconds: 190, label: "Guest memory: from advisory to enforced" }
+  - { seconds: 250, label: "Pools that breathe: idle reclaim and pooling everywhere" }
+  - { seconds: 295, label: "Kubernetes-grade lifecycle: probes, draining, startup patience" }
+  - { seconds: 376, label: "Bailey Hayes: the only open source multi-tenant Wasm platform" }
+  - { seconds: 518, label: "Jeremy Fleitz: unified plugin config opens the door to community plugins" }
+  - { seconds: 575, label: "Aditya Salunkhe on the Thundering Herd test suite" }
+  - { seconds: 598, label: "Layered backpressure, and disabling libunwind for density" }
+  - { seconds: 807, label: "Shreya Deshannavar introduces herself" }
+  - { seconds: 875, label: "Open floor: will there be a wasmCloud 3.0?" }
+  - { seconds: 883, label: "Runtime instantiation and the micro-monolith workload" }
+  - { seconds: 1110, label: "The march to Component Model 1.0, and why browsers need it" }
+  - { seconds: 1245, label: "Additive features now, a deletion release candidate later" }
+  - { seconds: 1256, label: "WASI 0.3.1, 0.3.2, and cooperative threads in 0.3.3" }
+  - { seconds: 1380, label: "What cooperative threading actually is" }
+  - { seconds: 1678, label: "Concurrency vs. parallelism, and spawning components per core" }
+  - { seconds: 1933, label: "Two guest toolchains, two host runtimes: the stabilization bar" }
+  - { seconds: 1948, label: "Victor Adossi: Node.js API support has landed in JCO" }
+  - { seconds: 2235, label: "WIT contracts for Node APIs, and pass-through to the host" }
+  - { seconds: 2515, label: "Fixtures: node:child_process, console, and DNS in a component" }
+  - { seconds: 2687, label: "A call to action for JavaScript and TypeScript users" }
+image: https://i.ytimg.com/vi/1XwmyGuI2xk/maxresdefault.jpg
+duration: 2820
+showTitle: true
+slug: 2026-09-09-community-meeting
+speakers:
+  - eric-gregory
+  - bailey-hayes
+  - jeremy-fleitz
+  - aditya-salunkhe
+  - shreya-deshannavar
+  - victor-adossi
+about: wasmCloud
+mentions:
+  - ComponentModel
+  - Kubernetes
+  - NATS
+  - WASIPreview3
+  - Wasmtime
+  - JCO
+  - JavaScript
+  - TypeScript
+  - denyByDefault
+  - OpenTelemetry
+  - BytecodeAlliance
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- wasmCloud 2.9.0 release
+<YouTube url="https://www.youtube.com/watch?v=1XwmyGuI2xk" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=1XwmyGuI2xk" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The September 9, 2026 wasmCloud Wednesday walks through [wasmCloud 2.9](/blog/wasmcloud-2-9-release/), shipped the day before: NATS-native workloads, a guest memory budget that is now **enforced** rather than advisory, and a stack of lifecycle changes that make host pods behave like ordinary Kubernetes citizens. Eric Gregory presents the release, Bailey Hayes argues wasmCloud is now the only open source multi-tenant **WebAssembly on Kubernetes** platform and maps the road to **Component Model 1.0** and cooperative threading, and Victor Adossi demos newly landed **Node.js API support in JCO** — real `node:path`, `node:dns`, and `node:child_process` calls from inside a WebAssembly component.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **The guest memory budget crossed from advisory to enforced** — 2.8 logged it at startup; in 2.9 every Wasmtime store charges its growth against the budget in real time. The new [`--guest-memory-mode`](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeresourcesguestmemorymode) decides what happens at the line: `count` (the default) records what enforcement *would* have refused, so upgrading is a no-op, and `enforce` refuses the growth so the guest sees `memory.grow` fail — an ordinary allocator outcome, not a trap
+- **Host pods finally look like Kubernetes citizens** — real `/livez` and `/readyz` on a dedicated port where readiness means "no room" and liveness means "restart me", draining on SIGTERM instead of dropping requests, a real `terminationGracePeriodSeconds` where previous charts used `0`, startup patience for a NATS server that isn't up yet, and a bus-loss safeguard so an operator that loses its NATS connection no longer deletes silent hosts and their workloads
+- **wasmCloud is the only open source, multi-tenant WebAssembly platform** — Bailey Hayes's framing, drawn against Fastly's Viceroy and Spin, both single-tenant, and both built on the same Wasmtime runtime. The 2.9 push was about tight *and* elastic limits: hardening the whole path that protects a host from untrusted guest code, so tenant A cannot degrade tenant B
+- **One feature stands between v2 and feature-complete: the precompilation cache** — everything else Bailey listed is in place, including full WASI P3 support and the latest component model spec. The precompilation cache would let a host take a precompiled artifact and instantiate it instantly
+- **A wasmCloud v3 waits on Component Model 1.0, not on a wasmCloud decision** — specifically on **runtime instantiation** (also discussed as callbacks and child handles), which would let a workload's root service hold a direct handle to a composed component, scale it out, and tightly control what it talks to. That is the "micro monolith" architecture the workload definition already has abstractions for
+- **Component Model 1.0 comes before WASI 1.0, and browsers are the forcing function** — they need a spec stable enough to standardize inside WebAssembly's W3C group, and Mozilla is already sending feature requests from a native component model implementation in Firefox. The plan: land Luke Wagner's series of purely additive features, then cut a deliberately breaking release candidate that *deletes* the deprecated warts, and once everyone signs off on the RC, that is 1.0
+- **Cooperative threading is targeted for WASI 0.3.3 in December, and it is additive by design** — Luke Wagner designed the ABI a year ago so that WASI P3 0.3.0 is ABI-compatible with what ships in December. A 0.3.0 component and a 0.3.3 component that uses cooperative threading can be composed and simply work. That is also why there will be no WASI P4
+- **pthreads already pass** — Cybrand at Fastly ported the Open POSIX test suite to compile to WebAssembly against the cooperative threading branches, and wasmCloud has full compliance for the pthread suite. The ABI landed in LLVM 23 behind a flag. The motivation is blunt: a great deal of the world's C and C++ depends on pthreads
+- **It is concurrency, not parallelism — and that is workable** — Wasmtime's plan is one CPU core at a time, with cooperative yields. Victor Adossi's reframing: the spawning moves *out* of your component. Instead of a web server that spawns N threads, you spawn N single-request components across N cores and hand them requests, which is usually the better paradigm anyway
+- **JCO now implements the Node.js API surface for components** — [`jco-std`](https://github.com/bytecodealliance/jco) shipped in JCO 1.33.0 with shims for `node:path`, `node:os`, `node:dns`, `node:console`, `node:child_process`, `node:http`, and more. `jco componentize` scans your imports, finds the Node APIs you actually use, adds the matching imports and exports, and builds the component
+- **The point is sandboxing, not convenience** — each Node API gets a WIT contract, and things WebAssembly genuinely cannot do (FFI, child processes) pass through to the host. Victor's example: a GitHub Action written in Node that needs `node:streams` but has no business touching `node:fs` — componentize it, then hand it a streams adapter and withhold the filesystem one
+
+## Chapters
+
+- [0:09 — Welcome: wasmCloud Wednesday and the 2.9 release walkthrough](https://youtu.be/1XwmyGuI2xk?t=9)
+- [1:00 — At a glance: what changed between 2.8 and 2.9](https://youtu.be/1XwmyGuI2xk?t=60)
+- [2:10 — NATS-native workloads with wasmcloud:nats](https://youtu.be/1XwmyGuI2xk?t=130)
+- [3:10 — Guest memory: from advisory to enforced](https://youtu.be/1XwmyGuI2xk?t=190)
+- [4:10 — Pools that breathe: idle reclaim and pooling everywhere](https://youtu.be/1XwmyGuI2xk?t=250)
+- [4:55 — Kubernetes-grade lifecycle: probes, draining, startup patience](https://youtu.be/1XwmyGuI2xk?t=295)
+- [6:16 — Bailey Hayes: the only open source multi-tenant Wasm platform](https://youtu.be/1XwmyGuI2xk?t=376)
+- [8:38 — Jeremy Fleitz: unified plugin config opens the door to community plugins](https://youtu.be/1XwmyGuI2xk?t=518)
+- [9:35 — Aditya Salunkhe on the Thundering Herd test suite](https://youtu.be/1XwmyGuI2xk?t=575)
+- [9:58 — Layered backpressure, and disabling libunwind for density](https://youtu.be/1XwmyGuI2xk?t=598)
+- [13:27 — Shreya Deshannavar introduces herself](https://youtu.be/1XwmyGuI2xk?t=807)
+- [14:35 — Open floor: will there be a wasmCloud 3.0?](https://youtu.be/1XwmyGuI2xk?t=875)
+- [14:43 — Runtime instantiation and the micro-monolith workload](https://youtu.be/1XwmyGuI2xk?t=883)
+- [18:30 — The march to Component Model 1.0, and why browsers need it](https://youtu.be/1XwmyGuI2xk?t=1110)
+- [20:45 — Additive features now, a deletion release candidate later](https://youtu.be/1XwmyGuI2xk?t=1245)
+- [20:56 — WASI 0.3.1, 0.3.2, and cooperative threads in 0.3.3](https://youtu.be/1XwmyGuI2xk?t=1256)
+- [23:00 — What cooperative threading actually is](https://youtu.be/1XwmyGuI2xk?t=1380)
+- [27:58 — Concurrency vs. parallelism, and spawning components per core](https://youtu.be/1XwmyGuI2xk?t=1678)
+- [32:13 — Two guest toolchains, two host runtimes: the stabilization bar](https://youtu.be/1XwmyGuI2xk?t=1933)
+- [32:28 — Victor Adossi: Node.js API support has landed in JCO](https://youtu.be/1XwmyGuI2xk?t=1948)
+- [37:15 — WIT contracts for Node APIs, and pass-through to the host](https://youtu.be/1XwmyGuI2xk?t=2235)
+- [41:55 — Fixtures: node:child_process, console, and DNS in a component](https://youtu.be/1XwmyGuI2xk?t=2515)
+- [44:47 — A call to action for JavaScript and TypeScript users](https://youtu.be/1XwmyGuI2xk?t=2687)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### wasmCloud 2.9, Section by Section
 
-### Topic 1
+Eric Gregory opened by walking the [2.9 release post](/blog/wasmcloud-2-9-release/) live, pausing for questions. The headline framing is three items: a NATS-native interface, guest memory enforcement, and Kubernetes-grade lifecycle — plus four behavior changes worth knowing before you upgrade.
 
-- Note 1
-- Note 2
+The **at a glance** table is the fastest way to see what moved. NATS access went from the `wasmcloud:messaging` abstraction alone to *plus* NATS-native `wasmcloud:nats` with JetStream, KV, and explicit acks. The guest memory budget went from advisory-and-logged-at-startup to counted-live-and-enforceable. Warm instance pools went from "grow to `poolSize`, never shrink" to "idle instances reclaimed with `reclaimWindowSeconds`". Async messaging deliveries went from a store per message to pooled under the same knobs as HTTP. Host pod health went from a TCP probe on the HTTP port to `/livez` and `/readyz` on a dedicated port. Host pod shutdown went from immediate exit to readiness-flip, drain delay, bounded grace. Guest execution metrics went from off — and broken when enabled — to on by default. And plugin configuration went from per-plugin flags to one `plugins` block with bindings and a config policy.
 
-### Topic 2
+On **[`wasmcloud:nats`](/docs/kubernetes-operator/host-interface-configuration/#wasmcloudnats)**, Eric put the design tension plainly: `wasmcloud:messaging` deliberately abstracts the broker away, because wasmCloud does not assume any particular messaging implementation — but sometimes you need the specifics. That is what the NATS-native package is for: JetStream, the key-value operations you actually want from NATS, and core NATS semantics like publish, request, and queue-group subscriptions.
 
-- Note 1
-- Note 2
+### Guest Memory: From Advisory to Enforced
 
-## Weekly highlights
+The memory change is the one most likely to alter behavior in production, and it was designed so that it does not. 2.8 introduced a guest memory budget the host logged but never acted on. In 2.9 every Wasmtime store charges its memory growth against that budget in real time, and [`--guest-memory-mode`](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeresourcesguestmemorymode) decides the consequence.
 
-### Issue of the Week
+`count` is the default and it is a deliberate no-op: it records what enforcement *would* have refused and changes nothing else, so upgrading changes no runtime behavior. `enforce` refuses the growth, and the important detail is what the guest experiences — `memory.grow` fails, which is an ordinary outcome that allocators already handle, rather than a trap that kills the instance. The five supporting metrics (`guest_memory.in_use`, `high_water`, `limit`, `refused`, `would_refuse`) exist so the rollout can be measured: run in `count`, watch the high-water mark and the would-refuse counter, then flip.
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+The alternative this replaces is worth stating: before enforcement, a runaway guest was the pod's OOM killer's problem, which on Kubernetes means the whole host pod dies and takes every other tenant's workload with it.
 
-### Documentation of the Week
+### Kubernetes-Grade Lifecycle
 
-- [title](/docs/v1/intro)
-  - summary
+Eric's second section is a stack of unglamorous fixes with a single theme — making host and operator pods "work exactly as you'd expect for ordinary Kubernetes citizens."
 
-## Community Updates
+**Real probes.** Host pods serve `/livez` and `/readyz` on a dedicated port, default 8081. The semantics are separated properly: readiness means "no room" (starting, draining, ingress saturated) and liveness means "restart me" (command loop stalled, ingress stopped). Failure bodies name the condition in `kubectl describe pod`, and probe timings are chart values, set per host group.
 
-### Tune in…
+**Draining shutdown.** On SIGTERM a host flips to `draining`, which leaves Service endpoints while it is still serving, keeps serving for a configurable drain delay, and only then bounds in-flight work and stops plugins. The chart now sets a real `terminationGracePeriodSeconds` on every pod where previous releases used `0` — which is to say, previous releases dropped in-flight requests on every rollout.
 
-{/* Add any upcoming events/streams/etc */}
+**Startup patience.** A starting host can wait for NATS rather than burning pod restarts, and the operator has a new startup probe covering its own connect window.
 
--
+**Bus-loss safeguard.** This is the one with the worst previous failure mode: an operator that lost its NATS connection would delete hosts it could no longer hear from, and their workloads with them. Now hosts stay `Unknown` until the operator has heard the rest of the fleet continuously for the unreachable window, and a restarted operator waits for hosts to re-announce.
 
-### Catch up…
+**No more descriptor exhaustion.** The host raises its file descriptor limit at startup, backs off on accept failures, and bounds its HTTP listener with `--max-http-ingress-connections`, closing a failure mode where a connection flood could take a host pod down with exit code 137.
 
-{/* Add any blog posts/articles that the community might find interesting */}
+### The Only Open Source Multi-Tenant Wasm Platform
 
--
+Bailey Hayes made the positioning argument directly. There are excellent projects built on the same runtime wasmCloud uses — [Wasmtime](https://wasmtime.dev/) — including Fastly's Viceroy and [Spin](https://www.fermyon.com/spin), and they are single-tenant. wasmCloud is the only one that is multi-tenant *and* open source *and* in a foundation.
 
-## Recording
+That claim is what the 2.9 hardening work is in service of: "we're protecting the host from guests, because that's untrusted multi-tenanted code, and you don't want tenant A impacting tenant B's service." With this release the whole path is hardened end to end, and the design goal was **tight limits and elastic limits** together. The reclaim window is the elastic half — rapidly scale up, rapidly scale back down, and *not all the way down* when you don't want that: if a component has intermittent bursts and a tight SLA, `reclaimMinInstances` keeps one or two warm.
 
-{/* Automated - No need to adjust this unless automation fails */}
+Looking forward, Bailey's assessment is that v2 is feature complete except for one thing: a **precompilation cache**, taking advantage of Wasmtime's ability to instantiate a precompiled artifact instantly. Everything else is in place — full WASI P3 support, the latest component model spec, all the providers plumbed through. With `wasmcloud:nats` specifically, she argued, "you have basically everything you need to build an awesome serverless platform built into wasmCloud."
 
-<YouTube url="https://youtube.com/live/1XwmyGuI2xk" />
+### Community Plugins and the Thundering Herd
+
+Jeremy Fleitz picked up on the plugin config change as the community story. Host components versus native plugins arrived back in 2.6; the unified [host plugin config](/docs/runtime/creating-host-component-plugins/) in this release is what opens the door for people outside the core team to build plugins — and for the `awesome-wasmcloud` repo to grow shared components everyone can contribute to. He also flagged that this is the *first* release of the native NATS plugin, so more improvements are coming.
+
+Aditya Salunkhe called out the **Thundering Herd test suite**, which turned into the most interesting engineering anecdote of the call. Bailey described writing tests that deliberately blow past each stopgap: "the fun thing about Thundering Herd — when you have a bunch of requests come in all at once, and when you fix the first part of it, there's always another one." Back pressure had been applied at the concurrent-start limit derived from available cores; she then had to build a test that got *past* that limit to discover the next layer underneath, and the next. The result is defense in depth across starting workloads, stopping workloads, and compiling workloads. A precompilation cache adds its own version of the problem — fifty workloads trying to start at once from cache is a distinct set of complications.
+
+One finding from hitting the host with a thundering herd is still open: the ability to **disable libunwind and disable backtraces**. libunwind is what produces backtraces for both guest and host calls; dropping it eliminates a large amount of code and memory. Plenty of operators would take that trade in production for the performance and the higher component density, and the failure mode Bailey hit was instantiation failing fifty times simultaneously with libunwind uncached.
+
+### Welcoming Shreya Deshannavar
+
+Shreya Deshannavar introduced herself: a senior-year CS undergraduate from Mumbai, India, learning distributed systems, exploring wasmCloud, and contributing over the past few months — including the docs Markdown-export feature that shipped the week before. She is currently looking for internships. Eric noted the docs collaboration and Aditya added that she has been working on the server side as well.
+
+### Runtime Instantiation, and What Would Trigger a v3
+
+Asked whether there would be a milestone 3.0 like the v2 release, Bailey's answer was no — not on wasmCloud's own timeline. There is no need to rev a major, v2 feels feature complete apart from the precompilation cache, and extensibility is handled now that host components exist. She has a draft PR for letting a host component trigger a component's `wasi:cli/run` export rather than just a regular export, plus a few smaller items, and then the feature needs to be marked stable and enabled by default.
+
+What *would* trigger a wasmCloud v3 is **Component Model 1.0**. The feature she is tracking and contributing to is **runtime instantiation** — described by others as callbacks, a framing she thinks undersells it. Her illustration is worth following. Today a workload has a service acting as the gateway, the front door and back door into the workload. Imagine instead that one component represents the entire workload: one service and N components composed together, all sharing a lifetime. wasmCloud wants elastic workloads that burst and scale back down, but some users still want one place per tenant to cache things and hold state — a cached client-side connection pool, say.
+
+Now imagine the service is the **root application component**, holding a direct handle to another composed component. It can say "scale out this component I'm composed with," pass it exactly the information it should have, and tightly control who it talks to and why — because the root holds the state, knows it has an ETag cache for this whole request, and decides who gets which secret when. The composed component does one thing well and manages its CRUD resource and nothing else. "There's just so many other architectures that you can do when you can compose an app into a micro monolith." wasmCloud has already built the abstractions for this into its workload definition, and is holding until runtime instantiation exists.
+
+Her aside, delivered as a promise: there will not be a WASI P4. "Darn it, will not allow it. So there's only WASI P3, and then later a 1.0."
+
+### The Road to Component Model 1.0
+
+Asked for a timeline, Bailey pointed at [Eric Gregory's blog post](/blog/) as the piece wasmCloud still cites for what the march to 1.0 looks like, and then laid out the sequencing.
+
+**Component Model 1.0 comes before WASI 1.0**, because WASI depends on the component model. The biggest motivation for getting there quickly is **browsers** — they need a stable spec that can be standardized inside WebAssembly's W3C group. That is not hypothetical: Mozilla has a native component model implementation in Firefox and is sending rapid feedback, including feature requests like runtime instantiation.
+
+The mechanism is two-phase. Luke Wagner, the main driving force behind the component model, has already specced and scoped a series of **purely additive** features — runtime instantiation, child handles, scoped callbacks — that go together as a bundle. Because they are additive, the spec can keep building on 0.3 and revving the minor as each stabilizes. Then, once the MVP is feature complete, the plan is to cut a **release candidate that deletes things**: the deprecated warts, the uglies, intentionally a breaking change. Everyone works against the RC, agrees it looks right, and that becomes 1.0.
+
+WASI is already tracking stabilized component model features, adopted by vote in the WASI subgroup. In 0.3.1 that meant assuming a toolchain declaring 0.3.1 may use Yordis Prieto's maps feature and the `implements`/external-ID feature. 0.3.2 is expected to carry no new component model feature — refinements around `wasi:http`, `wasi:sockets`, and documentation. **0.3.3, targeted for December, is where cooperative threads stabilize.**
+
+### Cooperative Threading, Explained
+
+Asked to explain cooperative threading quickly — and warning up front that the answer would not be quick — Bailey gave the clearest account of it wasmCloud has published.
+
+If you know coroutines, you know the shape: support at the ABI level for `thread.spawn` and joining threads. The default plan in Wasmtime is to still take **one CPU core at a time**. Victor Adossi corrected the terminology mid-explanation and Bailey took it: one core repeatedly is **concurrency**, not parallelism. Each thread progresses on work cooperatively, sharing one main process, taking over as another yields.
+
+It is designed to work both **stackless and stackful**, which required substantial extra work to handle goroutines — "the weird odd one out." What worked immediately were C++ coroutines and the emulation and virtualization of **pthreads**. Cybrand, an engineer at Fastly who has done essentially all of this work, ported the **Open POSIX test suite** to compile to WebAssembly against the cooperative threading branches; the pthread suite passes in full, and the results are public in the Bytecode Alliance's Open POSIX test suite repository. The motivation is unromantic and important: an enormous amount of C and C++ that the world depends on relies on pthreads, and cooperative threading means that software just works against the new ABI.
+
+Getting there meant adding the new ABI inside **LLVM**, which shipped in LLVM 23. You flip a flag to get actual cooperative threading — the ABI is aware of the thread ABI but won't emit those symbols unless you opt in, since it hasn't stabilized. With a component that knows how to say `thread.spawn`, upstream languages can offer green threads, coroutines, or goroutines through idiomatic guest bindings, because the language compiling down to WebAssembly can now natively support its own concurrency features.
+
+The follow-up question — does this help take advantage of multi-core infrastructure? — got a nuanced answer. This is what CDN providers wanted: gold-plated hardware where you get *this* core and the scheduler is tuned to exactly that, maximizing density on the CDN edge, and, for wasmCloud, on the server-side datacenter edge.
+
+Victor Adossi added the practical reframing, and it is the most useful thing on the call for anyone porting a threaded server. It might look less convenient than real parallelism, but **the ability to spawn separate components per core doesn't go away** — the coordination just moves up a level, out of your code. Where you previously spawned N threads inside a web server for parallelism, now the component handles a single web request and *you* spawn N components across N cores, handing them requests as they arrive. "It kind of forces you into that paradigm, but usually that's the better paradigm." Parallelism with threads is planned, but a long way off.
+
+Stabilizing the ABI has its own bar, which is the same bar every component model feature faces: **two different guest languages** adopting it successfully and **two different host runtimes** implementing it. Victor is working with Cybrand to land it inside JCO with the Node.js backend, which is what wasmCloud has been using for many of its reference implementations.
+
+### Node.js APIs in JCO
+
+Which is how Victor mentioned, almost in passing, that **Node.js support has landed** — prompting Bailey's "Oh heck yeah! Is that all you're gonna say?" and a live walkthrough.
+
+The package is **`jco-std`**. It originally carried mostly a [Hono](https://hono.dev/) adapter — Hono being the more recent HTTP serving framework relative to Express or Koa — and the point of `jco-std` is to make ordinary JavaScript written against Node.js work in a component context. What landed recently is an implementation of the **Node APIs themselves**.
+
+The problem it solves is stated simply: you could not componentize an ordinary Node script, because you have no access to Node APIs in a WebAssembly context — you have no access to *anything* in a WebAssembly context. So `jco-std` adds shims for Node functionality usable from inside a component, and then a program written against those APIs can be componentized and executed wherever, as long as the platform brings the necessary APIs along. The exports now cover most of the Node surface: `assert`, `console`, `dns`, `http`, `http2`, `path`, `os`, `net`, and on and on, with roughly seven APIs left to go.
+
+Some parts of the surface deliberately don't translate. `wasi` doesn't make sense to replicate. Running a WebAssembly component from inside a WebAssembly component isn't something JCO has a way to do yet — "it's not that we can't, it's just that we don't have a way for that right now."
+
+Everything else **passes through to the host**. FFI is the sharp example: WebAssembly cannot dynamically link, so `node:ffi` becomes a WIT-backed call out to the host, and if the host is JCO, straight through to the real Node.js implementation. Each Node API gets a WIT contract — `jco:node/child-process`, for instance, mimicking what Node gives you even though WASI has no notion of a child process. If a host implements that interface, a component written like a regular Node program can run on it.
+
+**The reason to do this is sandboxing, not convenience.** Victor's example lands it: you write a GitHub Action as a Node script. It needs `node:streams`. It has no business touching `node:fs`. Take the program that previously depended on Node monolithically, compile it to a component, and then hand it a streams adapter while withholding the filesystem one — or plug in your own adapter entirely.
+
+The ergonomics are handled by the toolchain. **JCO 1.33.0** ships the updated `jco-std`, and `jco componentize` automatically detects which Node interfaces your JavaScript uses: it scans the imports, finds the Node APIs in play, adds the imports and exports — exports too, because callbacks need to be passed — to the WIT interface, and builds the component. Fixtures in the repo compile a component per API and assert it works, and the `jco-std` interfaces are versioned per Node major, with `24.x` and `26.x` present.
+
+Next up for it: testing against popular libraries — Express, a look at MCP — and a gRPC example. Bailey closed the segment with a direct ask, noting that wasmCloud has users with heavy JavaScript and TypeScript investment who are usually asleep at this hour: try it, and tell the team whether it is ergonomic.
+
+## WebAssembly News and Updates
+
+This week in **webassembly news**: [wasmCloud 2.9](/blog/wasmcloud-2-9-release/) shipped with the NATS-native `wasmcloud:nats@0.1.0` package, enforceable guest memory, idle pool reclaim, and Kubernetes lifecycle work; **JCO 1.33.0** landed Node.js API support in `jco-std`, letting ordinary Node programs compile to WebAssembly components with per-API WIT contracts and host pass-through for things like FFI; the cooperative threading ABI shipped in **LLVM 23** behind a flag, with the Open POSIX pthread suite passing in full against it, on track to stabilize in **WASI 0.3.3** in December; and [Component Model 1.0](https://component-model.bytecodealliance.org/) is being pulled forward by Firefox's native implementation, with runtime instantiation, child handles, and scoped callbacks queued as additive features before a deliberately breaking cleanup release candidate. Follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [wasmCloud blog](/blog/) for what lands next.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a production substrate for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: What "WebAssembly on Kubernetes" Has to Mean
+
+Running **WebAssembly on Kubernetes** is easy to demo and hard to operate, and 2.9 is mostly a release about the difference. The demo version needs a runtime that executes components. The operable version needs a pod that a cluster can reason about, and that is a longer list.
+
+It needs **honest probes**. wasmCloud 2.9 splits readiness from liveness the way Kubernetes intends: `/readyz` reports "no room" — starting, draining, ingress saturated — so the Service stops sending you traffic, while `/livez` reports "restart me" for a stalled command loop or stopped ingress. A single TCP probe on the HTTP port, which is what 2.8 had, cannot distinguish those, so a saturated host looks identical to a healthy one and a wedged host looks fine.
+
+It needs **shutdown that isn't a hangup**. Previous charts set `terminationGracePeriodSeconds: 0`, which means every rollout dropped in-flight requests. 2.9 flips readiness first, keeps serving through a configurable drain delay while leaving Service endpoints, and only then bounds in-flight work and stops plugins.
+
+It needs to **survive its own control plane**. The bus-loss safeguard is the clearest example of a distributed-systems bug with a Kubernetes blast radius: an operator that lost NATS used to conclude that silent hosts were dead and delete them along with their workloads. Now a host stays `Unknown` until the operator has heard the whole fleet continuously for the unreachable window.
+
+And it needs **resource limits that bind before the kernel's do**. This is where [guest memory enforcement](/docs/kubernetes-operator/operator-manual/helm-values/#runtimeresourcesguestmemorymode) matters more than it sounds. On Kubernetes the previous backstop for a runaway guest was the pod's OOM killer — which kills the *host*, and therefore every other tenant's workload scheduled on it. Charging every Wasmtime store's growth against the budget in real time turns a pod-level fatality into a `memory.grow` failure inside one guest, which its allocator already knows how to handle. The rollout path is designed for people who don't trust it yet: run `count`, watch `guest_memory.high_water` and `guest_memory.would_refuse`, then flip to `enforce`. Note the Kubernetes-specific footgun the release post calls out — the chart forwards `resources.limits.memory` verbatim as the guest budget, so give the pod headroom above the guest budget before enforcing, or the pod limit and the guest limit are the same number and you have gained nothing.
+
+Together with [idle pool reclaim](/docs/kubernetes-operator/crds/#component-resource-controls), this is what Bailey Hayes meant by tight limits *and* elastic limits: a workload that cannot hurt its neighbors, on a pod that a cluster can schedule, drain, probe, and restart like any other.
+
+## Who Should Watch This
+
+**Platform engineers upgrading to 2.9** should watch the guest memory section ([3:10](https://youtu.be/1XwmyGuI2xk?t=190)) and the lifecycle walkthrough ([4:55](https://youtu.be/1XwmyGuI2xk?t=295)) — `count` mode makes the upgrade a no-op, but the probe and termination-grace changes affect every rollout. **Anyone tracking the component model** wants Bailey Hayes's roadmap segment starting at [14:43](https://youtu.be/1XwmyGuI2xk?t=883), which explains what runtime instantiation would unlock and why Firefox is the forcing function for 1.0. **Developers waiting on threads in WebAssembly** should watch the cooperative threading explainer at [23:00](https://youtu.be/1XwmyGuI2xk?t=1380) and Victor Adossi's concurrency-versus-parallelism reframing at [27:58](https://youtu.be/1XwmyGuI2xk?t=1678) — the "spawn components, not threads" pattern is the practical takeaway. And **JavaScript and TypeScript developers** should watch the JCO demo from [32:28](https://youtu.be/1XwmyGuI2xk?t=1948), which is the first look at running ordinary Node code inside a component with per-API sandboxing.
+
+## Up Next
+
+The precompilation cache is the one significant feature left before v2 is complete, and a wasmCloud v3 waits on Component Model 1.0 rather than any wasmCloud milestone. Nearer term: Bailey Hayes's draft PR letting a host component trigger a component's `wasi:cli/run` export, plus marking host component plugins stable and on by default; the still-open request to disable libunwind and backtraces for density in production; and more improvements to the first release of the native NATS plugin. On the JCO side, Victor Adossi committed to testing Node componentization against popular libraries — Express, a look at MCP — and to getting a gRPC example up. WASI 0.3.2 is expected to be refinements only, with cooperative threads stabilizing in 0.3.3 in December. Feedback on JCO's Node.js support is explicitly wanted from the JavaScript and TypeScript side of the community.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-09-09-community-meeting-transcript/)**
