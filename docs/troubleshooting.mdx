@@ -258,14 +258,34 @@ If you were relying on `ClusterRole` bindings to grant host visibility, note tha
 
 ## Host health
 
-### Host pods restart under connection floods (exit code 137, not OOMKilled)
+### Host pods restart under load with exit code 137, not OOMKilled
 
-On releases before 2.9.0, a host that ran out of file descriptors under heavy inbound HTTP could spin a CPU core, flood its logs, miss its liveness probe, and be killed (exit code 137 with no OOMKilled event). 2.9.0 removes the failure mode: the host raises its own descriptor limit at startup, backs off on repeated accept failures, and bounds its listener with `--max-http-ingress-connections` (connections past the ceiling are accepted and immediately closed). If you see this signature, upgrade.
+A host pod restarts with exit code 137 and no `OOMKilled` event after a period of heavy inbound HTTP, with liveness probe timeouts and a pinned CPU core beforehand.
 
-### Reading `/readyz` and `/livez`
+**Cause:** On releases before 2.9.0, a host that ran out of file descriptors could spin on a failing accept loop, flood its logs, and miss its liveness probe until the kubelet killed it.
 
-Since 2.9.0, host pods serve HTTP probes on their own port (default 8081), and a failing probe's body names the condition, visible in `kubectl describe pod`: `starting` and `draining` are normal transitions, `http_ingress_saturated` means the ingress connection ceiling is reached (readiness only), and `stalled` or `http_ingress_stopped` mean the host needs a restart (liveness).
+**Fix:** Upgrade to 2.9.0 or later. The host raises its own descriptor limit at startup, backs off on repeated accept failures, and bounds its listener with [`maxHttpIngressConnections`](./kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsnetworking).
+
+### A host pod is Running but not Ready
+
+The pod passes liveness but stays out of its Service endpoints, or flaps in and out under load.
+
+**Cause:** Since 2.9.0 host pods serve HTTP probes on their own port (default 8081), and the failing probe's body names the condition, visible in `kubectl describe pod`:
+
+| Condition | Probe | Meaning |
+| --- | --- | --- |
+| `starting` | readiness | Normal transition while the host comes up |
+| `draining` | readiness | Normal transition after SIGTERM |
+| `http_ingress_saturated` | readiness | The ingress connection ceiling is reached |
+| `stalled` | liveness | The command loop has stalled; the host needs a restart |
+| `http_ingress_stopped` | liveness | HTTP ingress stopped permanently; the host needs a restart |
+
+**Fix:** For `http_ingress_saturated`, raise [`maxHttpIngressConnections`](./kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsnetworking) or add replicas. For `starting` that never clears, check NATS reachability against `runtime.natsConnectTimeoutSeconds`.
 
 ### `kubectl get hosts` is empty while host pods are Running
 
-On releases before 2.9.0, an operator that lost its own NATS connection (or restarted after downtime) could judge every host unresponsive at once and delete the Host resources along with their assigned Workloads. Since 2.9.0 hosts that fall silent together stay `Unknown` instead: a Host is removed only when the operator has been hearing the rest of the fleet continuously for the unreachable window (60 seconds by default). If you see mass Host deletion on an older release, check operator NATS connectivity and upgrade.
+Host resources disappear (taking their assigned Workloads with them) while the host pods themselves are healthy.
+
+**Cause:** On releases before 2.9.0, an operator that lost its own NATS connection or restarted after downtime could judge every host unresponsive at once and delete the Host resources.
+
+**Fix:** Upgrade to 2.9.0 or later, and check operator NATS connectivity. Since 2.9.0, hosts that fall silent together stay `Unknown`: a Host is removed only when the operator has been hearing the rest of the fleet continuously for the unreachable window (60 seconds by default).

@@ -266,6 +266,8 @@ _Appears in:_
 | `environment` _[ConfigLayer](#configlayer)_ |  |  | Optional: \{\} <br /> |
 | `config` _object (keys:string, values:string)_ |  |  | Optional: \{\} <br /> |
 | `allowedHosts` _string array_ |  |  | Optional: \{\} <br /> |
+| `allowedIpNameLookups` _string array_ |  |  | Optional: \{\} <br /> |
+| `allowedHostLoopbackPorts` _string array_ |  |  | Optional: \{\} <br /> |
 
 
 #### ReplicaSetStatus
