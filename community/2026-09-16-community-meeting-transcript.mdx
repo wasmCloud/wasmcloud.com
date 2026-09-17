@@ -1,0 +1,454 @@
+---
+date: '2026-09-16'
+title: 'Transcript: Native WASI P3 for Go, Node.js in JCO, and Couchbase Plugins'
+description: 'Full transcript of the September 16, 2026 wasmCloud community call covering native WASI P3 for Go, Node.js gRPC and MCP servers in JCO, Couchbase host components, and Erik.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - go webassembly
+  - golang wasm
+  - wasi p3
+  - cooperative threading
+  - componentize-go
+  - jco
+  - nodejs webassembly
+  - mcp server
+  - couchbase
+  - host components
+  - openapi
+  - wit annotations
+  - webassembly news
+image: https://i.ytimg.com/vi/AKoD_Tz7wkE/maxresdefault.jpg
+showTitle: true
+slug: 2026-09-16-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - ComponentModel
+  - WASIPreview3
+  - Go
+  - componentize-go
+  - JCO
+  - JavaScript
+  - TypeScript
+  - MCP
+  - NATS
+  - Wasmtime
+  - witBindgen
+  - OpenTelemetry
+  - BytecodeAlliance
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-09-16-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=AKoD_Tz7wkE" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=AKoD_Tz7wkE" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:08](https://youtu.be/AKoD_Tz7wkE?t=8)
+
+Hello and welcome to wasmCloud's community call for September 16. We've been working pretty hard on top of our last release, which is 2.9. That included a ton of work around thundering herd — thundering herd, which means we take a bunch of components and we try to schedule them all at the exact same time, and then we also, at the same time, trigger the hosts — like hit the HTTP endpoint on all of those components all at the same time. And what I'm hearing is that's working great in the field now, and people are able to make hay, and a lot of those problems have been resolved in 2.9, which is nice.
+
+There are a few more changes that are landing around the new NATS plugin. So, Yordis, if you want to give us feedback on that — but don't give it to me right now, because it's not me. You're giving it to Jeremy, not me. Jeremy created the NATS-native plugin, and that shipped in 2.9 for the first time. But it's major version zero, so we can keep making it nice. We had a new contributor come in — thank you, I forgot your name, though; I think it was Ace — came in and improved the documentation for it, and so we released a new patch version of that yesterday. There's a second fix that's coming in for it — it's like a performance improvement by being able to decide how you select keys. That is also an additive, non-breaking change, so that'll be another patch rev. But I'm not promising no breaking changes. It's major version zero, so let's get this thing right.
+
+That's a big thing that's been happening over the past week. There's been a lot of work that's been happening in upstream WebAssembly that I'd love to talk about. I think first let's go through what you've been working on, Victor, and share some of the updates you've been making in JCO.
+
+**Victor Adossi** [2:11](https://youtu.be/AKoD_Tz7wkE?t=131)
+
+Yeah, sure. Let me go ahead and share my screen and actually turn my camera on. Okay. So I talked about this a bit last week, but we added — hold on, I'm going to share my screen, I haven't forgotten. We added — JCO basically has Node.js support, and so this is support for the SDK of Node.js, which is a bit more of an accurate way to put it. So that means that you can import pieces of the SDK. So let's say `node:process` — that one's actually hard to implement, so maybe not a great example — but `node:timers`, let's say, and if you're using that code, or for example `node:http`, `node:http2`, `node:net`, et cetera. If you're using those SDKs that come with Node, we can actually shim those out into something that will work in a component context.
+
+Basically, this means you can write code as if it was just regular Node code, or take Node code that pre-exists, and hopefully, for many cases — not every case — compile it to a component and run it in a JCO host. One thing I didn't show last week, I think, was the MCP server example. So we have two new examples in the JCO repo. One is an MCP server, and one is actually a gRPC server. So gRPC ends up using basically gRPC, the library. We use Buf here — we use Buf's tooling here. It uses these APIs from Node, right? So `node:buffer`, `node:http2`, `node:stream/consumers`, and then the rest is kind of dependencies that come in.
+
+What's nice is we can write — so this is the server. I will zoom in so that this is a bit easier to see. We can write a server that basically looks like Node code, and compile it to a component, right? So this just looks like regular Node code. You're just using regular Node APIs here. Again, a lot of this is just gRPC stuff. It's not component-specific. And then this `handleRequest` thing is mostly regular-looking. I think what might be a little bit weird is that there's a `handleRequest`, and there is also a handler as well — this handler is actually from this — there's a little bit more ceremony. I think people might choose to lay this out differently, like have a `routes.js` or whatever, but either way, the example is kind of straightforward, and there's nothing that's super special and component-focused here, except for the exports, right?
+
+Since we need to export a start — we need a component export that says, "Hey, start running the server," and because this is P2, we have to pass a promise back that basically the host can wait on, so that the server doesn't shut down. So we have to do some things like that. In P3, this doesn't have to happen, but for now in P2 we do have to do this. So this is maybe the only line that is component-specific here. But again, `server.listen` is just a normal Node thing. So you can write a mostly normal — like 99% normal, except for maybe these lines right here — gRPC server, and then compile that to a component and serve it with JCO. And then you can sandbox and sort of change the functionality of `node:http2` if you want to, right? Because you can use the version we have that passes through to real Node, and you can just, let's say, remove a certain function, or change what it outputs, or do that kind of thing. There is also another example in here that is the MCP server, and it's the same kind of thing, right?
+
+<img src="/img/community/2026-09-16/image001.webp" alt="The gRPC server example's server.js in the bytecodealliance/jco repository, showing ordinary Node.js code with a createServer handler" />
+
+**Victor Adossi** [7:16](https://youtu.be/AKoD_Tz7wkE?t=436)
+
+If you go to `src`, you will see a `server.js` that just looks like normal server-side code, right? You're using `node:buffer`, `node:http`, `node:path`, et cetera. You're using the official Model Context Protocol server, using Zod like normal, and then you just do all the normal things with the server. You create the `McpServer` object, register tools, whatever, and right at the bottom, we have that same sort of pattern, right? So we've got a start export that does this sort of promise, because we need to keep the server going, and in this case, we actually return the port back. So basically, most of this is actually just normal-looking, and then we have a start and a stop. In this case, I think the stop was also in the gRPC example, but then the rest of this is really just — how you lay it out is up to you. But it's basically normal Node-looking code.
+
+<img src="/img/community/2026-09-16/image002.webp" alt="The MCP server example's server.js importing node:buffer, node:http, node:path, the official Model Context Protocol server package, and Zod" />
+
+And let's see, for this one — I don't think there's anything super-duper interesting in the WIT interface here. Ah, okay. I guess this is a little interesting. So one of the things that this means we did is we actually have intermediate WIT interfaces that represent Node built-ins, so the Node SDK itself. So we've called it — the namespace is `jco`, the package is `node` — but basically `node:http` is this. `node:http` happens to come with callbacks, because you can pass a callback, so you need an additional interface there. This is added also automatically by JCO, so you don't have to think about this. It just gets added. We've got `process` is used in here, so it also gets pulled in, and then here's the start and the stop.
+
+<img src="/img/community/2026-09-16/image003.webp" alt="The generated component.wit for the Node MCP server example, importing jco:node/http, jco:node/http-callbacks, jco:node/process, and wasi:cli/environment with start and stop exports" />
+
+So that's interesting. Why this is interesting — or one reason this is interesting — is now you can actually take a Node — you can run, and we don't have this yet, but it is makeable, or it's createable — you can run some Node code compiled to a component on Rust, or any host that supports the `jco:node/http` interface, or `jco:node/http-callbacks` and `jco:node/process`, right? So that is another interesting thing. Because the use case that JCO sort of takes care of is: you built some JavaScript, you wrote some JavaScript. Normally you'd run it natively. You use JCO, you componentize it, and it becomes a component rather than just running on Node normally, and then you run it with JCO, right? So you can actually pass in the real Node implementations of all these things. But there is a world where you can take that component, and as long as you have an implementation of these interfaces in your host — if your host is built with Wasmtime or WasmEdge or anything else that has component support, or is working towards component support — you can just run it. And then now you can completely change the host on which you run, which is interesting.
+
+Anyway, we've got two examples here which are pretty interesting. I think the MCP server — and again, they use upstream libraries, so you don't have to rebuild the world, which is a huge problem with other types of isolation that are like unikernels, for example. You just have to end up rebuilding the world, which is not great most of the time. So yeah, check it out. We would love to have bug reports and feature requests and stuff like that. So if you try it and it's broken, we'd love to know. We have a large test suite, but it can always be larger. So yeah.
+
+**Bailey Hayes** [11:14](https://youtu.be/AKoD_Tz7wkE?t=674)
+
+Any questions for Victor? This is awesome, by the way. Thank you. Is there anything else you feel like needs to be done, other than the call to action for more test cases and getting feedback and real usage?
+
+**Victor Adossi** [11:35](https://youtu.be/AKoD_Tz7wkE?t=695)
+
+Yeah, I don't think so, because right now — there are a few bits of the API that we can't really cover, right? Like, for example, `wasi` is part of the Node SDK, and we do not have nested component instantiation, so we can't really do that — or we can, but that's not a problem that we're choosing to solve right now. But yeah, I think just usage, because outside of me just trying to download, let's say, the thousand most popular packages and make them all run, it would be nice to know where people run into issues, or actually have trouble porting an existing app, right? There's a sea of Node apps out there that are almost all private. So seeing more of those would be great.
+
+**Bailey Hayes** [12:30](https://youtu.be/AKoD_Tz7wkE?t=750)
+
+Yeah. All right. Y'all here to hear first: it's ready for you to try it out. Give it a go. Let us know if it's working for you, or especially if it is not. So yeah. Thank you, Victor.
+
+I want to show something I've been cooking on the host component side of the world. I have a use case where I want to use Couchbase, and in wasmCloud v1 we had a Couchbase provider. Now that Couchbase provider was a lot like this one here, this host component that I implemented, and let me pull up its WIT. So essentially, we kind of did a key-value interface for it. In my opinion, it was pretty limited compared to what you can actually do with their native protocol. There are a couple of different ways to talk to Couchbase. One of them is actually using their Couchbase connectivity. The other is doing it through their Data API, which is HTTP. And so I had a thought of, let me do a round on having full support across their API stack, creating that WIT definition — which is what this is — and then experimenting between the Data API, which is hitting their HTTP endpoint, or their socket driver API and building in their SDK.
+
+And so what I have right here is actually two different host components. They're poorly named, and that's why my PR is still in draft. One is `couchbase-kv`, and this one here is actually the one that connects over essentially — not the Data API, the socket API. And what's interesting is I was able to basically build in their SDK to build this thing out. So as you can see, I'm using their Rust crate directly, which was really nice to be able to do, very similar to essentially what our wasmCloud v1 provider was doing. And largely kind of the same story over here on the one that is just talking over the Data API.
+
+The difference being, if you are an operator, you may actually always prefer using the Data API, because that means you don't have to open up extra sockets. Everything's going over layer seven. You get some nice observability benefits for that. You make Couchbase do connection pooling for you, next to the database. So it's actually one of the best ways to do serverless workloads. Or, "Hey, I want full support for everything that is in this thing" — every possible API that I could do with Couchbase, I want it all — and in that case, you're going to want to use their native client. But for me, I wanted to make it so that the person who writes a workload and says, "I'm just doing Couchbase, make it work, please" — that same component should be able to work regardless of whether or not it's going over the HTTP API or if it's going over the native API over the socket.
+
+And so that's what this little test script does. I basically am spinning up a little Couchbase and a Data API server. Now, this Data API server is actually kind of like a mock. It's not a pure mock — it actually has state — but it is a mock of their API server, because this is a paid feature of their platform, and so instead of having to pay to use their thing, I just used their OpenAPI and made their thing with Claude, which was nice. And so I was able to hit that and just do like, all right, same-same. It'll behave the same, because this is your stated contract already.
+
+And if you build them both, it's interesting. The one that builds in the Couchbase Rust SDK: 6.3 megs, which is way bigger than the little HTTP client one, which kind of makes sense, right? So one is basically generated from the OpenAPI spec and HTTP calls, and the other one is building in all their stuff. And then they both use the exact same WIT interface, and then I basically do a series of calls of all of the different types of transports and cases that they have. There are compare-and-swap operations, inserts, doing SQL++, all the jazz, and they both behave identically, which is nice.
+
+<img src="/img/community/2026-09-16/image004.webp" alt="Bailey Hayes's editor showing the Couchbase host component source and the wasmcloud:couchbase WIT interface" />
+
+<img src="/img/community/2026-09-16/image005.webp" alt="Terminal output of the Couchbase demo script: couchbase_plugin.wasm at 312K and couchbase_kv_plugin.wasm at 6.3M, then the same workload passing 32 checks over the Capella Data API and 32 over the binary KV protocol" />
+
+**Bailey Hayes** [17:24](https://youtu.be/AKoD_Tz7wkE?t=1044)
+
+So I was pretty happy with where I was able to get with LLMs, basically, to produce this thing, and then it was nice being able to have the ability to try out different approaches for how a plugin could supply an API to very different options, and operators may choose one or the other. So I plan to push this up once I have better names and have reviewed it all, to awesome-wasmcloud. But yeah, that's a thing that's been kind of fun.
+
+Oh, Aditya, you're asking about AutoStamp. I did not use AutoStamp. For folks who aren't aware, that's a fun project that Yoshua tried out for doing OpenAPI to WIT. I find that LLM OpenAPI-to-WIT is usually better, actually, than a lot of these. Mainly in that I can make very specific rules, like I prefer every resource to be a noun. But when you're converting from OpenAPI, people often make those verbs, or they make them plural, which is not what a resource is. A resource would be a single unit. So a lot of the automatic misses the actual English translation for each of those endpoints, and so, yeah, go LLMs on that case. It actually does a really great job, especially when you can just automate the test and verification for all of these things. You can get it right. So yeah — but not to disparage AutoStamp, I think that's a neat thing. But no, I'm over here with all the agents doing most of my things.
+
+Any other questions on that one? Oh yeah, and I see your comment there, Yordis. All I'm going to say is I'm not sure what I did is great, but it does return what I want it to, which maybe I need to — that's part of the reason why I need to code review this thing before we ship it.
+
+Okay. Before we move on to the next, I just want to say thank you to Shreya, to Steve Rogers, and to — I believe it was Ace — who are some new contributors to awesome-wasmcloud, putting up awesome PRs, helping us harden and fix things. We've been able to land a lot in a short period of time, and it's largely because we have a lot of people in the community contributing, so it's very, very much appreciated. Also, keep filing issues; we'll fix them. So, all right, thank you.
+
+Y'all want to see something kind of crazy? So, I haven't pulled an all-nighter since — I'm not going to say how long ago it was, because then you'll know how old I am. But let's say it could be over a decade since the last time I pulled an all-nighter, and I did it because I was having fun, and I also was pissed off. It's the combination, you know, in software. It's usually a little bit of both: "Oh no, I know I can make this work, and I'm so angry that it hasn't already been done," and on the same side, it is interesting and hard, and there's a good reason why it hasn't been done before.
+
+So I wanted to see what it would take to have full native support for WASI P3 for Go. If you're not aware, the way that Go works right now is it builds in and targets WASI P1. So the only thing that the upstream Go SDK knows about is actually WASI P1. It doesn't even know about WASI P2. And so what we do — and the project that most people are using now to build for Go is componentize-go — componentize-go kind of wraps these steps for you. It says, "Okay, Big Go, here's a patch for you. Here's a patch that lets me do async work for WASI P3, and target WASI P1 when you do your build, and then I will adapt that to make it work for WASI P2 and WASI P3." But doing that work, building in that adapter, has some downsides, and I have a little demo script here that kind of shows you some of those side by side.
+
+**Bailey Hayes** [22:19](https://youtu.be/AKoD_Tz7wkE?t=1339)
+
+So the first thing to understand, at a high level, of how that works today: when I say anything, any language — this applies to Go or anything else — if you are using the WASI P1 adapter, what that basically means is that when you're doing the syscalls, aka the WASI calls that you're making, those are synchronous. They're written against — they're literally WASI P1. So everything, even if you're saying, "I'm calling `wasi:cli/run` on the outside," or `wasi:http` P3 on the outside, it doesn't matter, because somewhere in the inside, it's going to hit the WASI P1 adapter and go through a sync path. And the way that we made everything work for WASI P1 and WASI P2 is we often call it the asyncify transform. In the case of Go, they actually don't use the formal project Asyncify from Binaryen, but they have what we kind of refer to as a CPS transform — basically in-memory, machine-code-generated stack switching. So it's not done by the runtime; it's built into it. And so every time we want to go to a different goroutine, that's an in-memory operation to be able to go to the other one. And so it's managing all that. It's also compiled in the whole garbage collector and everything else to run the Go runtime, essentially.
+
+Why I got mad at it, and why I stayed up all night Saturday, is that I ran into a bug where essentially I was sending it thousands of strings all at once in one big old allocation, and it kept going into this block for `cabi_realloc`, where we're doing allocation, allocation, allocation — "Oh crap, we're out of space" — you know, we triggered a chance to have to do a garbage collect. Well, because garbage collection is built into the `.wasm` inside it, it then says, "Oh okay, well, I'm going to run garbage collection." Well, the way that Go runs garbage collection is the first thing it says is, "All right, let me get the time right now" — and then that is a component model import, right? Because time is implemented by the WASI system interface. It goes into that, and then that's another import. It goes through the sync operation. We switch stacks to make that happen, and then that's a trap, and so the whole thing panics.
+
+And so what we've been doing a little bit is whack-a-mole, trying to adapt the P1 adapter to handle all of the different reentrancy ways that you could come into this thing. And so instead, I put up a PR to componentize-go to say, "All right, I'm just going to tell the garbage collector in Go that any time I'm doing a bunch of allocations, do not run GC, because that's not going to go great for me." So I tell the GC not to do this and just catch me next time. Basically, your bit will already have been flipped to do garbage collection. All this to say, we're having to do some weird stuff to make Go work right. And I'm like, okay, well, what would it actually look like if Go actually knew everything that was happening? Right — it actually built natively. We're not going through all these different shim layers, and layers on top of layers, to get to the point where I just want to make a call to a clock, and I want that to work, and I want it actually to be async sometimes. Sometimes I want it to be sync. I want control, and as the runtime, I should be able to control it.
+
+**Bailey Hayes** [25:52](https://youtu.be/AKoD_Tz7wkE?t=1552)
+
+It was a long-winded windup to say, okay, well, I forked Go, and I have like thirty commits or something on top of it to make all of this work. But one of the first things that it does is add a new target, WASI P3, directly on Go, that I've threaded all the way to the top-level toolchain that a lot of end users use, which is componentize-go, and I can just give it the switch, which will tell it to actually use my special-sauce fork that I put in here. And so this is going to be a comparison between basically what everybody's doing today, which is `GOOS=wasip1` — WASI P1 adapter gets that to WASI P3 —
+
+**Yordis Prieto** [26:37](https://youtu.be/AKoD_Tz7wkE?t=1597)
+
+Sorry, Bailey, real quick — are you sharing the screen or something? Because nothing is happening.
+
+**Bailey Hayes** [26:41](https://youtu.be/AKoD_Tz7wkE?t=1601)
+
+Oh, I've been mapping in my head —
+
+**Yordis Prieto** [26:44](https://youtu.be/AKoD_Tz7wkE?t=1604)
+
+— an entire Go binary, formatted linker and everything. Thank you. Thank you so much.
+
+**Bailey Hayes** [26:50](https://youtu.be/AKoD_Tz7wkE?t=1610)
+
+I made you guys diagrams and you didn't get to see them. No, no.
+
+**Yordis Prieto** [26:54](https://youtu.be/AKoD_Tz7wkE?t=1614)
+
+Can you start over, please?
+
+**Bailey Hayes** [26:57](https://youtu.be/AKoD_Tz7wkE?t=1617)
+
+I can't do it. I'm just going to do terminal. I think that's all I can handle. Obviously, I just proved that I don't know how to jump between windows, so we're just going to stay in the terminal now. It's all outlined fine here, I think. So we'll just do that. Okay. Thanks, Yordis, for saying something — ten minutes later. No. Okay. I appreciate you. Thank you.
+
+All right. componentize-go, WASI P1 adapter. It runs fairly fast. Do it with my native version — and I'm going to explain a little bit between this experiment versus this experiment — but essentially, target WASI P3 natively. One thing that I started with was trying to do stack switching natively, using the core Wasm spec, versus doing this in the component model side of the world. So this is really in the guts now, but basically, in the component model, we have canonical ABIs for doing things that will exist at some point, standardized in the core spec, and one of those is being able to essentially do stack switching, and that was a precursor for us to be able to support cooperative threading. And what's fun is none of those are stabilized yet, because that is what I'm expecting to land in WASI 0.3.3. I'm expecting those component model canonical ABIs to be ready. Then that component model feature — there's a lot of work to make that real, and this is one of those stepping stones towards that, which is exercising it from a guest language in a very different way from other guest languages and how they're using it.
+
+So I wanted to play around and see, what are the differences between these different things? Is it worthwhile to use component model cooperative threading for goroutines? And while this little bench didn't really show much of a difference — I'm also guessing I did a Rust compile or something, because those numbers are actually different from what I ran earlier, which is why we shouldn't do this on my local laptop — what I found at a decent scale, decent scale being like 40,000 requests, 80,000 requests, all of them pumping sizable-size strings, doing component model cooperative threads — which have not been optimized; we are in the get-it-working phase of things, and not in the make-it-fast phase of things — but even in the get-it-working phase, it is significantly faster, 20 to 30% faster, than the alternative that I played out with, even just trying to do cooperative threads. There are things that core native stack switching, which is soon to be standardized, is faster at, but at the scale of what I was doing, and doing it across lots of goroutines — for my call, I was doing like forty different goroutines for one HTTP handler request — the cooperative threads kick butt. So that was really nice.
+
+<img src="/img/community/2026-09-16/image006.webp" alt="Terminal comparing three componentize-go builds of the same app: today's GOOS=wasip1 plus adapter, native GOOS=wasip3, and native with GOEXPERIMENT=nowasmcoopthreads, with build times and output sizes" />
+
+So let's open these things up and compare them. We've got the WASI P1, which is basically — versus the native version. Now, the two experiment ones, they're different in size, but it's all pretty marginal differences. My WASI P1 obviously builds in the P1 adapter, so that's one of the big reasons why the size is different. Now, I had to do some hackery in both native approaches for being able to basically take the wit-component shims and basically say, all right, so Go has to start up a runtime. I have to have something that knows how to handle `cabi_realloc`, for example, before I can actually do stuff. So I have to change the way that I start and enter this thing. So that's why there are still some core modules in here where I'm like, all right, I'm shimming it, waiting for the thing to be ready, and then you can feed this through, and that's how we do our initialization and start. That's super low-level, and they're super tiny. One of them is 72 bytes or something crazy. So going through a little bit further, I have all of them running actually in Wasmtime right here, and they're all servicing HTTP.
+
+<img src="/img/community/2026-09-16/image007.webp" alt="Terminal breakdown of what came out: the wasip1 adapter build's core modules including wit-component:adapter:wasi_snapshot_preview1 and 27 preview-1 imports, versus the native build with neither" />
+
+**Bailey Hayes** [31:19](https://youtu.be/AKoD_Tz7wkE?t=1879)
+
+Actually, if you want to see, it's actually the exact same code for all three examples, which is the coolest part. So essentially, I'm able to just straight-up use the Go package `wasihttp` module for all of this, and so it's servicing an HTTP handler, and in that HTTP handler, I'm servicing all this information from having built it, so that we can compare and contrast these three different approaches. And I created the error that I was mad about in this scenario, and then I don't have it in the new native one. So okay: native is faster, more robust, and avoids a lot of these existing problems. So that's why we should switch to it.
+
+<img src="/img/community/2026-09-16/image008.webp" alt="Terminal showing all three builds running in Wasmtime and serving HTTP, with the reentrancy error reproduced in the adapter build and absent in the native one" />
+
+And you might say, "Okay, Bailey, when can your Go fork land in a neighborhood near me?" It's going to be a bit. So basically, cooperative threads has to stabilize before somebody can depend on it. And I also think this experiment was pretty interesting and fairly compelling. I kind of was toying around with the idea of, can I do this and not require Big Go to depend on component model cooperative threads? It's possible, right? I have it working. It does add quite a bit of complexity in the Go SDK to support the switch between the two. It was a really nice first additive step, because that's how I approached targeting the ABI directly. I think I actually should remove that layer. I think it'll be easier — just, they only deal with one world for WASI P3, and it's the one that uses cooperative threading. I think that'll be much easier to review and land, and it's just faster in every dimension. So it is higher memory, because it's got a reserved address space. It basically creates a cooperative thread for every goroutine. But it's worth it, because that's why it's fast.
+
+So yeah, we need cooperative threads to standardize and stabilize. I need a buddy on the Big Go side. So this is a callout to any of you out there that are Go maintainers: hit me up. I would love to have help landing this upstream. Landing is very different from making it work. I think that's probably a big part. I also have changes to wit-bindgen, Wasmtime, Go packages, and componentize-go, obviously, to wire all this up. But obviously the biggest, longest pole in the tent is landing it up in a Big Go fork. But what I can do in the interim is push up all my forkity forks and make it possible for other people to play around with this kind of stuff, which is pretty cool. And in componentize-go, we're totally okay with having additional experimental flags that you can flip on and let you point and build in different ways. We do that also in some fun ways for componentize-py and some of the other componentize SDKs — a lot of experimentation. Yeah. So, thoughts, questions?
+
+**Yordis Prieto** [34:36](https://youtu.be/AKoD_Tz7wkE?t=2076)
+
+Ship it.
+
+**Bailey Hayes** [34:40](https://youtu.be/AKoD_Tz7wkE?t=2080)
+
+Yeah, I mean, hyped-up Saturday night is probably good to go. I think it's fine. Yeah, it probably needs some rounds and some human review and stuff. But it's pretty incredible where we've gotten to. When we originally scoped this work for a human to do it — because we talked about this a year ago, before LLMs were that good — we said minimum three months for an expert that knows all this deeply, but probably six months of coding. And it was just one all-nighter, AI-assisted, which is crazy. So, to be fair, I had to really take it to the mat. It was actually kind of funny. It kept being like, "But Bailey, in the WASI subgroup meeting, you said this isn't going to standardize until December," and I'm like, "Shut up, Claude. Do what I say, Claude. I need you to get this through." And had other moments where it was like, "This is all so experimental. You have to make sure you can land this upstream before we can keep going. We've gone too far." I'm like, "We haven't gone far enough. Get it working all the way." So yeah. Anyways, it was fun. Every time it quotes me, I'm like, this is just rude. I need to stop publishing meeting notes.
+
+But yeah, so there are a lot of things that I found in terms of bugs with the current approach that we're taking with WASI P1. My game plan is actually to go back and backport a lot of the fixes that I made along the way, so that folks aren't waiting for the super awesome fork that's going to solve everything. I think a lot of this can actually land in the approach that we're taking today. And the other big TL;DR is that if you use componentize-go and our Go packages, you don't have to change your code. You will just have to change your build command that you pass in. So you don't even have to expect breaking changes. Just anticipate that things are going to get faster and better.
+
+All right, that was it for me. Thanks for listening — for coming to my TED talk. Any other questions, or anything folks want to go through? Otherwise, I'm going to stop the live stream. We can hang out. We've got fifteen more minutes.
+
+**Yordis Prieto** [37:15](https://youtu.be/AKoD_Tz7wkE?t=2235)
+
+I do need the links from you.
+
+**Bailey Hayes** [37:20](https://youtu.be/AKoD_Tz7wkE?t=2240)
+
+Which ones?
+
+**Yordis Prieto** [37:21](https://youtu.be/AKoD_Tz7wkE?t=2241)
+
+For the OpenAPI. So this is — I mean, I think Victor knows — my passion is to make deterministic testing.
+
+**Bailey Hayes** [37:31](https://youtu.be/AKoD_Tz7wkE?t=2251)
+
+Oh, so you didn't love that I did non-deterministic testing.
+
+**Yordis Prieto** [37:35](https://youtu.be/AKoD_Tz7wkE?t=2255)
+
+Part of that is I want to have a shared specification that I use in my unit tests for implementing my server, and I can give it to my client and also use it as a correctness check. So we are sharing the spec. That's one of the things. As soon as I finish with my g\*\*\*\*\*\* f\*\*\*\*\*\* WIT, I'm going to actually make the entire stack to show people all the way to the client. Here's everybody using the same spec: validation, unit tests, and stuff like that.
+
+**Bailey Hayes** [38:06](https://youtu.be/AKoD_Tz7wkE?t=2286)
+
+All right, let me do that live, because I'll be honest with you: if I don't do it live, I'll not get to it. So y'all can be my body double for this. So here is AutoStamp that we mentioned, that Yoshua made two months ago, and where you can see that is, if you go to the Wasm directory and you search for AutoStamp, you can see he had converted and made a WIT definition from an OpenAPI spec to this. And also fun things that he did: he depends on wasmCloud secrets to make that work, which made me very happy.
+
+<img src="/img/community/2026-09-16/image009.webp" alt="The autostamp/autostamp repository on GitHub, described as converting OpenAPI schema definitions to WebAssembly components" />
+
+**Yordis Prieto** [38:52](https://youtu.be/AKoD_Tz7wkE?t=2332)
+
+But where is the unit test that you say you use? Is it from that package as well?
+
+**Bailey Hayes** [38:56](https://youtu.be/AKoD_Tz7wkE?t=2336)
+
+Okay, so let me show you my gremlins. And to be fair, this isn't — it's still in draft, because I know what I did. You go to PR, this one. I'll drop the link here. And so essentially what I did is I downloaded this OpenAPI from Couchbase. So I downloaded this doc. I don't know if you care about that, but I'll give you one.
+
+**Yordis Prieto** [39:36](https://youtu.be/AKoD_Tz7wkE?t=2376)
+
+Yeah, yeah, yeah. Share the full context, because I want to see the way you work, because I'm really interested to learn from you. But also, what if I give you this the next time?
+
+**Bailey Hayes** [39:47](https://youtu.be/AKoD_Tz7wkE?t=2387)
+
+Yeah, I mean, not necessarily me. Just give it to BaileyBot, aka whatever my agent is that I'm running. That's my favorite thing. Give me a skill. That's what I want.
+
+But basically, I downloaded that, and then I set up Capella. So with Couchbase, they let you set up a cloud, and I did "start free." But unfortunately for me, I did that a month ago, and so my trial ended, and I got 99% of this written against a real Couchbase Data API and a real Couchbase server, and then it went away. And they do give you a Docker container, but the Docker container doesn't ship the Data API. You've got to pay for their cloud service to get that. And so I was like, "Oh, but that's okay. LLMs to the rescue." I said, "Okay, vibe out an implementation of what this would be for a Couchbase Data API server. I don't care what language you use." But now that I see that it's written in Python, I actually do care, and I don't like that it's in Python. But that is what got produced initially, and it took the OpenAPI and burned some tokens to make that real. But essentially, it kind of faithfully did that representation, and so that allowed me to not have to connect to an external Capella cluster to make it all work.
+
+<img src="/img/community/2026-09-16/image010.webp" alt="Bailey Hayes's draft Couchbase host component pull request in awesome-wasmcloud, showing the verification scenarios and WIT files" />
+
+**Bailey Hayes** [41:33](https://youtu.be/AKoD_Tz7wkE?t=2493)
+
+And you know, to run this thing, I was able to use their — they do allow you to download that, but again, it doesn't give you the Data API, so you can drop in your own there, and that's what I'm doing there: dropping in my vibed-out version.
+
+**Yordis Prieto** [41:51](https://youtu.be/AKoD_Tz7wkE?t=2511)
+
+Got it. Yeah, I can show you something.
+
+**Bailey Hayes** [41:59](https://youtu.be/AKoD_Tz7wkE?t=2519)
+
+Do you want me to stop the recording, or —
+
+**Yordis Prieto** [42:01](https://youtu.be/AKoD_Tz7wkE?t=2521)
+
+It's fine if you want to keep it in. I don't mind.
+
+**Bailey Hayes** [42:04](https://youtu.be/AKoD_Tz7wkE?t=2524)
+
+I'm into it.
+
+**Yordis Prieto** [42:06](https://youtu.be/AKoD_Tz7wkE?t=2526)
+
+Yeah. Because it started with the joke, with the naming. There's somebody called Erik at where I work, so I call the CLI Erik to make the joke that finally he is useful for once. So I am trying to create WebAssembly-first and -only. To be honest, I made it work without WebAssembly, and then I told the AI, "No, remove everything. It's WebAssembly only." So effectively, you have the generators, but you also have the linters and stuff like that, and I want to do contract testers, which is somewhat what you're talking about, and then everything is just based on the modules. For example, the linter rules are a WebAssembly type of situation, so you write them yourself. And in this particular case, for example, you hate the proto whatever — you could create rules that say, "This has to be singular." How are you going to do it, and so on.
+
+So I have the linter part of it. I also have the generator part of it, which again is like, here's a bunch of stuff, and then you implement the generator. So you give me a bunch of metadata out, and then all you say is, "Hey, go ahead and generate." And obviously, because it's WebAssembly, hell yeah, you can trust to run this in untrusted sandboxes and servers. So it doesn't have to be on CI; it could be in your browser, even, if you want to. I don't know, whatever you want to do here. So I also had that, and again, the generator is literally just, here's a file system interface for you to meet, and stuff like that.
+
+<img src="/img/community/2026-09-16/image011.webp" alt="Yordis Prieto's Erik repository tree in his editor, with erik-generator-*, erik-linter, erik-contract-tester, and other crates" />
+
+Yeah, so I have this almost done. I want to open source first the lint server, since it's a trivial one. So this is the stuff I've been working on. And anyway — where are the WIT files? Hell yeah, okay, wait, far too many things. Yeah, anyway, so here are the WIT files. Where is the linter? So yeah, the specification is also trying to use OpenTelemetry. By the way, I need some help there. I got lost.
+
+**Bailey Hayes** [44:22](https://youtu.be/AKoD_Tz7wkE?t=2662)
+
+Are you using — you should. In that import, you didn't have `wasi:otel` there. `wasi:otel` is really great.
+
+**Yordis Prieto** [44:30](https://youtu.be/AKoD_Tz7wkE?t=2670)
+
+I think it's somewhere here, I believe. Yeah, `wasi:otel`. Oh, there it is.
+
+**Bailey Hayes** [44:32](https://youtu.be/AKoD_Tz7wkE?t=2672)
+
+Okay. Yeah, yeah, yeah.
+
+**Yordis Prieto** [44:33](https://youtu.be/AKoD_Tz7wkE?t=2673)
+
+Right. Yeah. But I'm getting lost sometimes. By the way, I don't know to what extent I should vertical things. I'm getting so lost now that, like, okay, who's doing that where? But yeah, using WebAssembly. So the linter — basic interface, just like autofix, if you can lint the things, list of the rules, and stuff like that. Export that. And where is the CLI? Maybe I can show the CLI. No, sorry. Where am I looking? My task CLI: install, build, release. Well, I guess I can show you this. So eventually, you would do just something like that, but imagine that all the generator and stuff like that is a WebAssembly module. I'm trying to find the — where is this now?
+
+**Bailey Hayes** [45:37](https://youtu.be/AKoD_Tz7wkE?t=2737)
+
+Do you support an escape hatch? One thing I ran into — and also, I really appreciate you, Couchbase. Thanks for being WebAssembly-friendly. But I think I found a bug in their OpenAPI spec, where it was not behaving the way that they documented when I was hitting the actual Capella cluster. So I had to basically say, this contract is not what is in the doc. You need to just use this version, because it's the only real released version.
+
+**Yordis Prieto** [46:06](https://youtu.be/AKoD_Tz7wkE?t=2766)
+
+I love that you mentioned that, because here's the thing: in the one that I have, I have something called patches, so you could overwrite things. So you have the configuration. For example, I'm optimizing for you to codegen in your applications. In some languages, it's problematic to have the codegen ahead of time, right? That's why Protobuf, for example, is like, "Hey, you do it in your app," because there are configuration and options. I don't even know if it applies to me. I most likely want to have control for that. And sometimes, for example, you don't want to codegen a hundred endpoints; you only want two. So I thought about that, and in the codegen you would have some sort of files like that. In other times, you could have, for example, an Anthropic patch, which effectively is, you overlay this on top of the original OpenAPI spec. And as you can see here, I'm just saying, hey, for that operation in that path or whatever, just do a merge and allow this to happen. So you could effectively change the original OpenAPI spec into something else, because Bailey does not like product naming, or they got it wrong, without having to rely on them. So you could also do that. Yeah, that's from the OpenAPI perspective.
+
+<img src="/img/community/2026-09-16/image012.webp" alt="An Erik patch configuration in YAML overlaying changes onto specific OpenAPI operations and paths" />
+
+**Bailey Hayes** [47:26](https://youtu.be/AKoD_Tz7wkE?t=2846)
+
+This is really cool. It reminds me of a more featureful Speakeasy. Are you familiar with Speakeasy?
+
+**Yordis Prieto** [47:36](https://youtu.be/AKoD_Tz7wkE?t=2856)
+
+Yeah, I'm familiar with all of them. Speakeasy, the other one that now is left behind as well. Yeah.
+
+**Bailey Hayes** [47:45](https://youtu.be/AKoD_Tz7wkE?t=2865)
+
+Speakeasy, I think, is the one that got bought by Anthropic.
+
+**Yordis Prieto** [47:48](https://youtu.be/AKoD_Tz7wkE?t=2868)
+
+By Anthropic, yeah. If I show you here — I have them all written down, all the — I guess inspirations. I've done far, far too many OpenAPI generators.
+
+**Bailey Hayes** [48:07](https://youtu.be/AKoD_Tz7wkE?t=2887)
+
+Yeah, this is the —
+
+**Yordis Prieto** [48:08](https://youtu.be/AKoD_Tz7wkE?t=2888)
+
+Ecosystem. But now I'm trying to avoid almost six years, seven years of anti-patterns that I did before. But yeah, Speakeasy, Spectral, for example, was for the linter back then. If you follow the tooling from the company behind — I forgot the name — but there's a new company as well that took over the Speakeasy ecosystem; they also have good takes on it. So yeah, there's a lot of inspiration around everybody else. I need to find where it is here.
+
+<img src="/img/community/2026-09-16/image013.webp" alt="Erik's README comparison table: Spectral, OpenAPI Gen, Speakeasy, and Erik across linting, SDK generation, documentation, contract testing, runtime dependencies, plugin language, portability, license, and commercial status" />
+
+**Bailey Hayes** [48:43](https://youtu.be/AKoD_Tz7wkE?t=2923)
+
+Yeah. So I don't think you're in competition at all with AutoStamp, by the way. I think that was just kind of a fun side project to get more content on the Wasm directory. So it seems like maybe your tool might be really well suited for one thing. I didn't see that it does something like Speakeasy or Stainless — I think Stainless is the one that I'm thinking of.
+
+**Yordis Prieto** [49:06](https://youtu.be/AKoD_Tz7wkE?t=2946)
+
+Yep.
+
+**Bailey Hayes** [49:08](https://youtu.be/AKoD_Tz7wkE?t=2948)
+
+It lets you modify the generated code, and then they somehow are keeping and saving an AST of that, and only generating in certain spots, which I didn't understand how they were able to do. I mean, I obviously made a guess that they're saving the AST and they understand it.
+
+**Yordis Prieto** [49:29](https://youtu.be/AKoD_Tz7wkE?t=2969)
+
+What do you mean, generating that?
+
+**Bailey Hayes** [49:31](https://youtu.be/AKoD_Tz7wkE?t=2971)
+
+So my biggest problem with Go code specifically is that it's real obvious when it's generated. You know, with Rust, I can pretty anything up with a macro, right? And you can just shuffle your uglies away. But with Go, it's very in your face, and every OpenAPI generator I've ever used with Go is fugly — which is short for something I can't say on stream. And I think that Stainless — I was interested in their approach, so they're the ones that actually got bought by Anthropic. I liked their approach because they allowed you to actually edit the generated SDK, and then they saved your edits and folded those in as you generate it on top of them, which blew my mind.
+
+<img src="/img/community/2026-09-16/image014.webp" alt="Erik's ECOSYSTEM.md listing prior OpenAPI tools and their strengths and weaknesses as inspirations" />
+
+**Yordis Prieto** [50:24](https://youtu.be/AKoD_Tz7wkE?t=3024)
+
+So if you want to change, like apply a patch to the code?
+
+**Bailey Hayes** [50:30](https://youtu.be/AKoD_Tz7wkE?t=3030)
+
+Yeah, but you actually just edited where they had generated the code. You just edited that directly and made it more ergonomic. Like you added either a top-level API, or you changed how they output it, and then they just work with it. But your user experience is just writing Go code — editing Go code directly — and you don't do anything else beyond that. It's a very nice product.
+
+**Yordis Prieto** [50:49](https://youtu.be/AKoD_Tz7wkE?t=3049)
+
+Okay, I see. Give me a second. Where is it here? More work for you.
+
+**Bailey Hayes** [50:59](https://youtu.be/AKoD_Tz7wkE?t=3059)
+
+Thank you, Yordis.
+
+**Yordis Prieto** [51:02](https://youtu.be/AKoD_Tz7wkE?t=3062)
+
+So, but here's the thing, Bailey, and I'm going to push you back on something, especially for the sake of AI, not even humans — as in, why do you care? There's some trade-off that some codegens do, and some of those are — I'm doing it because I'm optimizing for avoiding a production outage. For example, the classic anti-pattern that you can find in JavaScript is that they create a class, and then you instantiate that class called client, and then you do object-oriented `client.thatFunction` or whatever. Okay, what happened in the web, where every single byte matters? Oops, now you cannot do it. So you need more functional. In situations like Go, for example, you may need to deal with annoyances of, why am I creating one data structure that wraps another data structure, and so on? And it's because in some cases, for example, I'm going to have to make a point — a context data structure, and I'm not hiding away from you the context of the request data structure that is for the sake of the HTTP, and then I'm going to return a context back to you. To make a point: why are you not returning the actual data from the API? Well, sometimes you have a proxy, and with that proxy you do want the HTTP headers and stuff like that. Sometimes you don't. So that is where you have to deliberate. Say, hey, what am I going to optimize for? And sometimes it comes at the cost of verbosity, which I feel that especially now that we're not writing it, the cost is not there anymore. Especially given the explicitness of, like, okay, when time comes, I'm not shooting myself in the foot to the point that the codegen itself is the problem.
+
+**Bailey Hayes** [52:59](https://youtu.be/AKoD_Tz7wkE?t=3179)
+
+Yeah. Said differently, verbosity is not as much of an issue, since it's not necessarily humans reading and authoring the code, but correctness continues to be the most important thing, and soundness, robustness. I agree. I just wish I could convince Go people to agree with me — and also write Rust — but just even the Go part of it in general. Of all the people — I feel like TypeScript people, they're pretty mellow about what you give them. Rust people, they'll never agree on which one's the best version, but they're also totally okay with verbose APIs. But in Go, they can't hold their nose. They can't do it. They won't do it. And that's not me complaining about this. This is me trying to make other people happy.
+
+**Yordis Prieto** [53:57](https://youtu.be/AKoD_Tz7wkE?t=3237)
+
+Yeah. No, I get it. I want to push this out there, first of all, because it's WebAssembly, so this is going to be cool for everybody to even have codegen everywhere. Like, wasmCloud could — hell yeah — run it. But yeah, that verbosity stuff — there are definitely anti-patterns. Like, why are we dealing with this in 2026? Let's move on from it. You're not writing it manually anymore, and your takes, most of the time, were out of — not laziness, but — okay, why are you optimizing for your feeling versus the production software of tomorrow, and tomorrow, when you have to grade that code as well?
+
+**Bailey Hayes** [54:37](https://youtu.be/AKoD_Tz7wkE?t=3277)
+
+Or your agent that has to read that code and doesn't know why you're so particular?
+
+**Yordis Prieto** [54:43](https://youtu.be/AKoD_Tz7wkE?t=3283)
+
+Yep.
+
+**Bailey Hayes** [54:43](https://youtu.be/AKoD_Tz7wkE?t=3283)
+
+Yes, I agree. Actually, I would love to use your thing. I mean, just doing that live code review with y'all — I obviously backed that out late last night and kicked it a couple of times this morning, and now I'm looking at it. I'm like, you generated Python. You didn't do another component for surfacing the Data API. I have so many judgments there. But I think just being able to use your tool to produce a component that is my mock server immediately makes all that garbage way better. And I'm also really curious to see how you differ from me in opinions about WIT. I don't know which one of us has more opinions. I think we in this room have all the opinions in the world, probably, on WIT. I'm willing to bet. So the combination would be interesting.
+
+**Yordis Prieto** [55:32](https://youtu.be/AKoD_Tz7wkE?t=3332)
+
+Yeah, and with the codegen, which is related to the unit tests and stuff like that, take it all the way to the codegen in the Zod schemas, validation, and all the stuff as well.
+
+**Bailey Hayes** [55:46](https://youtu.be/AKoD_Tz7wkE?t=3346)
+
+I know what Zod is now, because Victor's been teaching me. It showed up, and I was like, "Hey, Victor, is this a real thing? Because Claude thinks it's a great thing." You're like, "Yeah, doing good."
+
+**Victor Adossi** [56:03](https://youtu.be/AKoD_Tz7wkE?t=3363)
+
+No, it's definitely a good thing. I mean, one thing I wonder is whether we should maybe have some sort of — I guess this is what Erik, I think was the name of it, is — but just a WIT-to-whatever, right? Like many, many WIT-to-X generators, and of course, them being WebAssembly is even better. But yeah, we need that, because WIT-to-Zod is also a thing. This is usually part of some other thing, but you can think of it as its own specific thing.
+
+**Yordis Prieto** [56:41](https://youtu.be/AKoD_Tz7wkE?t=3401)
+
+Yeah, one thing related to it, Victor, is the annotation stuff that I want to merge. That would allow you to get closer to actually having something that is mappable, because all these codegens, they only work as long as the semantics of the data structure are on both sides somehow, and then you can guarantee it through the data structure itself. But with the annotations, you can still, to some extent, have primitive obsessions, so you don't need to be adding data types all over the place, while the codegen could say, "No, actually, let me wrap it around. That is not just a string; it's a solid string — URL, whatever the heck." So that's why I want annotations as well, because at that point, like I said, you could take WIT and actually be the specification for the rest of the things.
+
+**Victor Adossi** [57:30](https://youtu.be/AKoD_Tz7wkE?t=3450)
+
+Yeah. No, I mean, I think everyone is excited about annotations, especially the people who want to use it, slash know how powerful it is. I mean, I think it is probably one of the last — I don't know — barriers, and maybe not expressivity, because we've got stuff like callbacks and stuff like that cooking. But definitely for bindgen, it's one of the biggest things. Like again, this came up in the component model meeting, which is, I guess, now going to be a SIG soon. But it is a backdoor to any generation, right? I don't know that it's Turing complete in a sense, but if you can add an arbitrary string as an annotation on an arbitrary object, I think you can just do anything. I don't think there's a limit on much of what you can do. Callbacks could be an annotation, right? You could literally write a callback as an annotation. You could stuff a WebAssembly module into an annotation. It's one of those things — this is why it's bad, and also why it's good. Because we will get an explosion of complexity.
+
+**Bailey Hayes** [58:57](https://youtu.be/AKoD_Tz7wkE?t=3537)
+
+That's what I started typing. I was like, and now you know what people are terrified of. Luke's giving us these escape hatches. Yeah, but it's time.
+
+**Victor Adossi** [59:04](https://youtu.be/AKoD_Tz7wkE?t=3544)
+
+Yeah, at some point, Java people will find this and will regret it. But it's just what happens.
+
+**Yordis Prieto** [59:12](https://youtu.be/AKoD_Tz7wkE?t=3552)
+
+Yeah, but the alternative is what is happening today: that everything is becoming a reserved word, and things are only applied in very specific scenarios. Like, why is this all the way down in this spec?
+
+**Victor Adossi** [59:26](https://youtu.be/AKoD_Tz7wkE?t=3566)
+
+I mean, without any escape hatch —
+
+**Yordis Prieto** [59:28](https://youtu.be/AKoD_Tz7wkE?t=3568)
+
+Escape hatch.
+
+**Victor Adossi** [59:30](https://youtu.be/AKoD_Tz7wkE?t=3570)
+
+But just wait till ten people vibe code a similar project to yours, and they all have their own annotations, and they're all trying to get people to use their own annotations or whatever, for some reason. And then people have a question, and he's like, "No, those ones are bad. Use this one," and they're going to be like, "But they look the same." But anyway, I mean, I think that's a success. That's suffering from success. So bring it on.
+
+**Yordis Prieto** [59:56](https://youtu.be/AKoD_Tz7wkE?t=3596)
+
+Yeah, Protobuf has been already there ahead of time for you, to see what's going to happen. To be honest, it is standardized eventually. If you look around Protobuf, like Google extensions, the Buf people that you're familiar with — extensions, because we know that we can trust them. That's it. Now, there are situations — for example, even like buf validate. I don't know if you came across buf validate. There are still anti-patterns and stuff like that. You definitely can shoot yourself in the foot. For example, if you use buf validate, because the data type is still a string, right? But that string has some semantic value. It's a UUID or whatever, right? They are doing primitive obsession all over the place. So what you find in production codebases is that you're passing strings all over the place, even though it's better to have a value object that represents something more than the primitive, and then you have to layer that on top as well. So even between annotations, they become dependent on each other sometimes. Yeah.
+
+All right, guys. I have to go. This was fun. I want to finish the linter, barely at the release, so you could lint your OpenAPIs. I can say, "Why this? I hate this."
+
+**Victor Adossi** [1:01:20](https://youtu.be/AKoD_Tz7wkE?t=3680)
+
+I think your mic went away, or you went to a different mic or something.
+
+**Bailey Hayes** [1:01:25](https://youtu.be/AKoD_Tz7wkE?t=3685)
+
+Yeah, it jumped around. But I'm interested in trying out Erik now. I'm pretty interested. I feel weird saying that. Actually, you should rename it. Now that I've said that, that was weird. Sorry, everybody. But I think that would be fun to use. I think I can definitely make my Couchbase thing better.
+
+**Yordis Prieto** [1:01:49](https://youtu.be/AKoD_Tz7wkE?t=3709)
+
+But that's why I don't want to rename it. It's called Erik, guys. Sorry, it will be called Erik. The funny thing is that I made Erik to be a verb — Eriking — and I can tell you later why. Are we recording?
+
+**Bailey Hayes** [1:02:04](https://youtu.be/AKoD_Tz7wkE?t=3724)
+
+I'm going to stop the recording. Thanks, everybody, for joining.
