@@ -1,0 +1,347 @@
+---
+date: '2026-09-09'
+title: 'Transcript: wasmCloud 2.9, Component Model 1.0, and Node.js APIs in JCO'
+description: 'Full transcript of the September 9, 2026 wasmCloud community call covering the 2.9 release, guest memory enforcement, Component Model 1.0, cooperative threading, and JCO.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly kubernetes
+  - wasmcloud 2.9
+  - wasmcloud nats
+  - guest memory enforcement
+  - cooperative threading
+  - component model 1.0
+  - jco
+  - nodejs webassembly
+  - wasm runtime autoscaling
+  - webassembly news
+image: https://i.ytimg.com/vi/1XwmyGuI2xk/maxresdefault.jpg
+showTitle: true
+slug: 2026-09-09-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - ComponentModel
+  - Kubernetes
+  - NATS
+  - WASIPreview3
+  - Wasmtime
+  - JCO
+  - JavaScript
+  - TypeScript
+  - denyByDefault
+  - OpenTelemetry
+  - BytecodeAlliance
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-09-09-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=1XwmyGuI2xk" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=1XwmyGuI2xk" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Eric Gregory** [0:09](https://youtu.be/1XwmyGuI2xk?t=9)
+
+Hey everyone! Welcome to wasmCloud Wednesday for September 9, 2026. Today we are going to dive into yesterday's wasmCloud 2.9.0 release, and then we'll have a little bit of an open floor for discussion. So I'll start us off by jumping to our brand new wasmCloud 2.9 release blog, and this is quite a meaty release. So I'm going to walk through some of the headline items, but there may be other pieces that we want to stop and pause and discuss. If anyone here present live has questions about them, please toss those out and we can pause and walk through them as we need.
+
+<img src="/img/community/2026-09-09/image001.webp" alt="The wasmCloud 2.9 release blog post open on the At a glance section" />
+
+So the big-picture items here: we've got a new `wasmcloud:nats` package that is going to give components ways to exercise core NATS semantics. We've got guest memory enforcement — so this is building on what we introduced in 2.8. Now a host can refuse guest memory growth past the budget instead of relying on the pod's OOM killer. And we've got some Kubernetes-grade lifecycle improvements. So host pods are now gaining real liveness and readiness endpoints. They're draining on termination instead of dropping requests. They can wait on a NATS server that isn't up yet, and survive operator control plane outages without losing workloads. Really making our pods work exactly as you'd expect for ordinary Kubernetes citizens.
+
+So at a glance, we've got those features that we just talked about there. We've also got a few more where the behavior is changing a little bit from 2.8 to 2.9. For our warm instance pools: now in 2.9 idle instances are reclaimed with `reclaimWindowSeconds`. For async messaging deliveries in 2.9, these are pooled under the same knobs as HTTP. For guest execution metrics, these are on by default now. And for plugin configuration — this is a good one to flag — we have one `plugins` block with bindings and config policy.
+
+<img src="/img/community/2026-09-09/image002.webp" alt="The at-a-glance table comparing wasmCloud 2.8.0 and 2.9.0 across NATS access, guest memory budget, warm instance pools, async messaging deliveries, host pod health, shutdown, metrics, and plugin configuration" />
+
+So let's talk through the big three, and then we'll see if there are any other spots that folks want to break down further.
+
+So, NATS-native workloads. This is a big piece. `wasmcloud:messaging`, by design, is abstracting the broker away — right, we're not assuming that you're using any particular messaging implementation. But sometimes you do need those specifics. So this is exactly what `wasmcloud:nats` is for. This is going to help you expose semantics for using things like JetStream, doing the different key-value operations that you're going to want to do in NATS specifically, and exercising core NATS functionality like publish, request, and queue group subscriptions.
+
+<img src="/img/community/2026-09-09/image003.webp" alt="The NATS-native workloads section of the release post describing JetStream, key-value, and core NATS capabilities in wasmcloud:nats" />
+
+Over in guest memory world — in 2.8 we introduced the guest memory budget that the host logged but didn't enforce. In 2.9, every Wasmtime store charges its memory growth against the budget in real time, and we have a new guest memory mode flag that's going to decide what happens at the line. So `count` records what enforcement would have refused and changes nothing else, so upgrading is a no-op. And `enforce` refuses the growth: the guest sees `memory.grow` fail, an ordinary outcome allocators already handle, rather than a trap.
+
+<img src="/img/community/2026-09-09/image004.webp" alt="The Guest memory: from advisory to enforced section explaining count and enforce modes" />
+
+One piece that we didn't speak to too specifically that's worth calling out here is we have two changes that make instance pooling both broader and cheaper. We've got idle reclaim, so a pooled component can now declare `reclaimWindowSeconds`, and the host retires warm instances the window's peak load didn't need, draining them without interrupting calls. We also have pooling everywhere. The pool now serves every call path uniformly. Async `wasmcloud:messaging@0.3.0` deliveries and `wasmcloud:nats` core and key-value deliveries run on warm instances under the same `poolSize` and `maxConcurrency` rules as HTTP, including overlapping deliveries on one instance. JetStream deliveries reuse warm instances one at a time.
+
+<img src="/img/community/2026-09-09/image005.webp" alt="The Pools that breathe section covering idle reclaim and pooling across every call path" />
+
+We mentioned acting like good and proper Kubernetes citizens for our host and operator pods, and this section breaks that down a little bit further. We've got real probes — host pods serving `/livez` and `/readyz` on a dedicated port. Readiness means no room. Liveness means restart me. Failure bodies name the condition in `kubectl describe pod`. And probe timings are chart values, per host group. We've got draining shutdown on SIGTERM.
+
+**Eric Gregory** [4:55](https://youtu.be/1XwmyGuI2xk?t=295)
+
+A host flips to draining, leaving Service endpoints while still serving, and it keeps serving for a configurable drain delay, then bounds in-flight work and plugin stops. The chart sets real `terminationGracePeriodSeconds` on every pod, where previous releases used zero.
+
+<img src="/img/community/2026-09-09/image006.webp" alt="The Kubernetes-grade lifecycle section listing real probes, draining shutdown, startup patience, bus-loss safeguard, and descriptor exhaustion fixes" />
+
+We've got startup patience, letting a starting host wait for NATS instead of burning pod restarts, and the operator's new startup probe covers its own connect window. We've got the bus-loss safeguard — an operator that loses its NATS connection no longer deletes silent hosts and their workloads. Hosts stay `Unknown` until the operator has heard the rest of the fleet continuously for the unreachable window, and a restarted operator waits for hosts to re-announce.
+
+And we've got no more descriptor exhaustion. The host raises its file descriptor limit at startup, backs off on accept failures, and bounds its HTTP listener with `--max-http-ingress-connections`, closing a failure mode where connection floods could take a host pod down with exit code 137.
+
+So we've got docs updates to go along with the 2.9.0 release, so we can get full details on these lifecycle changes and anything else here on the appropriate pages. For this one, we've got a lot of updates to our Helm values reference. So rather than reading through everything, I want to pause here and see — does anyone have any questions about what they're seeing so far? Or if you were a contributor or maintainer working on this release, anything you want to shout out?
+
+**Bailey Hayes** [6:16](https://youtu.be/1XwmyGuI2xk?t=376)
+
+I guess I would say the biggest thing is that wasmCloud now is the only open source, multi-tenanted WebAssembly platform. You can go look at some other awesome projects like Viceroy from Fastly, which is single tenant; Spin, single tenant; many, many others are out there that build on top of the same runtime we use, Wasmtime. But we're the only ones that do it multi-tenanted and open source, and also in a foundation, which is awesome.
+
+So with all of these changes, we're now at a point where we've got tight resource limit controls over everything these guests can build. So we're protecting the host from guests, because that's untrusted multi-tenanted code, and you don't want tenant A impacting tenant B's service. So at this point we've hardened that entire path all the way through, and that was one of the big pushes for 2.9 — to have tight limits and elastic limits. Right, the reclaim window is about being able to rapidly scale and then rapidly scale back down, and not go all the way down. Like if you've got a case where you always do want something to still be hot because it has intermittent bursts and you have a really tight SLA, you can set it to keep one or two instances around.
+
+So I'm really proud of this release, and I think when we think about what's next, it's a lot of improvements, but really one big feature remains for us, which is a precompilation cache — so taking advantage of Wasmtime's ability to take a precompiled artifact and instantly instantiate it. But in terms of other features, right? We have full WASI P3 support. We're on the latest component model spec. We have now plumbed through all of our different providers. I think with `wasmcloud:nats` specifically, you have basically everything you need to build an awesome serverless platform built into wasmCloud. So it's pretty exciting.
+
+**Eric Gregory** [8:37](https://youtu.be/1XwmyGuI2xk?t=517)
+
+I see Jeremy.
+
+**Jeremy Fleitz** [8:38](https://youtu.be/1XwmyGuI2xk?t=518)
+
+Yeah, I just want to add — I mean, I'm extremely happy about this release too. But the NATS native plugin, yes, this is the first release of it, so there will definitely be some additional improvements coming up on that.
+
+But the one thing — and I think it was in 2.6 when we really introduced host components versus native plugins — this last release, with the switch over to having the host plugin config the way it is, really opens up for not just us but also the community to start making additional plugins to further expand the wasmCloud cluster offering. And especially like in the awesome-wasmcloud repo, where we should start growing shared components so we can all contribute to the same type of plugins. So, very happy about that.
+
+**Eric Gregory** [9:32](https://youtu.be/1XwmyGuI2xk?t=572)
+
+Awesome call out.
+
+**Aditya Salunkhe** [9:35](https://youtu.be/1XwmyGuI2xk?t=575)
+
+I'm really happy about the Thundering Herd test suite, which is really awesome. I managed to take a look, but I saw it was approved. But yeah, that was awesome.
+
+**Jeremy Fleitz** [9:47](https://youtu.be/1XwmyGuI2xk?t=587)
+
+It's funny you say that, because we were talking to another customer earlier today that uses wasmCloud about the Thundering Herd test suite.
+
+**Bailey Hayes** [9:58](https://youtu.be/1XwmyGuI2xk?t=598)
+
+Yes, it does have a smoke test going now, and we do it both from the operator's perspective and from the host perspective. And so it was kind of interesting creating a test where I intentionally go past one of our stopgaps.
+
+So the fun thing about Thundering Herd — which is a classic computer science problem that could happen in a lot of different platforms and a lot of different layers — when you have a bunch of requests come in all at once, and when you fix the first part of it, there's always another one. Like you always have another backstop, basically, where all the different places you have to apply back pressure. And we got in a place for back pressure for just limiting the number of concurrent starts that we do, basically on the number of cores that we have available. But then I had to create the Thundering Herd test so that it went past that, so that I could get what's the next layer underneath, and what's the next layer underneath. And so we have many different layered fixes on top, basically, to have a defense in depth for a thundering herd of starting workloads, of stopping workloads, of compiling workloads. There are a lot of different places where you have different states, right? If you have a precompilation cache, all of a sudden you've got 50 workloads that are trying to start at the same time, which is its own unique set of complications.
+
+So yeah, we put in a ton of hardening there, and I think I've got just about everything through. Aditya and I were just talking at the beginning of the call that it would be nice to still have the ability to disable libunwind and disable backtraces. It's one of the things that showed up while we were doing and hitting the host with a thundering herd. And essentially that libunwind is what gives us backtraces for both guest calls and host calls. Disabling backtraces eliminates a ton of code, memory, and everything else, and so plenty of people are probably comfortable in release and prod running without backtraces, getting a perf boost, but also being able to handle a larger scale of components. And when you run into a case where instantiation is failing, we have libunwind running, and if that wasn't cached — which I think was happening in the other case — then you do that 50 times over all at the same time. Now it's cached. We have a couple different layers there as well that have been fixed. So yeah, thanks for calling it out. That was a fun one.
+
+**Eric Gregory** [12:54](https://youtu.be/1XwmyGuI2xk?t=774)
+
+Any other last questions or pieces we want to shout out about 2.9? I see in the chat, Aditya has asked a newer contributor, Shreya, if she'd like to introduce herself. Would you like to introduce yourself and tell us a little bit about your background coming into the project?
+
+**Shreya Deshannavar** [13:27](https://youtu.be/1XwmyGuI2xk?t=807)
+
+Yeah. So hey, I'm Shreya, and I'm from Mumbai, India. So I'm in my senior year of CS undergrad, and I've been learning distributed systems and also exploring wasmCloud, and I've also contributed in the last few months, and I'm really happy to be here. But right now I'm looking for internships, and yeah, that's all.
+
+**Eric Gregory** [13:56](https://youtu.be/1XwmyGuI2xk?t=836)
+
+Awesome! It's been great to work with you a little bit on the doc side, and I know several other people here have been working with you on wasmCloud.
+
+**Aditya Salunkhe** [14:08](https://youtu.be/1XwmyGuI2xk?t=848)
+
+Yeah, really happy to have you here, Shreya — working on the server side as well.
+
+**Eric Gregory** [14:16](https://youtu.be/1XwmyGuI2xk?t=856)
+
+Awesome. And we've got a pretty short agenda today. We were really walking through 2.9, so this is kind of the open floor section where, if we have any other issues we want to raise or talk through — especially looking forward — now's a good time to do that.
+
+**Aditya Salunkhe** [14:35](https://youtu.be/1XwmyGuI2xk?t=875)
+
+Are we going to have a big, huge milestone with a 3.0 release like we did with the v2 release?
+
+**Bailey Hayes** [14:43](https://youtu.be/1XwmyGuI2xk?t=883)
+
+Well, we've been doing an okay job not making breaking changes. I'm not going to say it's been a perfect job. We right now don't have to rev to a major three. I think, like I was saying, v2 feels completely feature complete, except the precompilation cache is a big one. And then from an extensibility perspective, we now have everything built in so that folks can expand it out with host components. I have that draft PR up on `wasi:cli` — being able to have a host component trigger a component's `wasi:cli/run` instead of just a regular export. So there's a few more smaller things that I want to get in for host components, and then we need to make that feature stable and enabled by default.
+
+I think what would trigger a wasmCloud v3 would probably be a Component Model 1.0. So in the component model there's a few features that I've been tracking and contributing to the design that I really want, but we've already created the abstractions for it in our workload definition. So sometimes I talk about runtime instantiation, but other people talk about that feature as callbacks, which doesn't quite give you a full perspective.
+
+Imagine the service inside our workload, where you have one service that acts kind of as your gateway, your API gateway, your front door — but also your back door into the workload. Imagine instead that you had actually one component that represented the entire workload, where you had one service and N number of components in it. If they were all composed together, now they all have the same lifetime. We want to be able to support elastic workloads that are able to burst and scale back down. But some folks still would want one place for that tenant — if you can imagine a workload being a single tenant, one place where you can cache certain things and have some state, like a cached client-side connection pool.
+
+Now imagine though, if the service instead was actually the root application component, and it had the ability to say, "All right, scale out this other component that's composed with me. I'm going to scale you out." I have basically a callback. I have a handle to that other component, a direct handle to that component. I pass it all my information. I know what it's up to, right? And I tightly control who it talks to and how and why, because I've got state. I know that I've got like an ETag cache for this whole request. Whereas this one component does one thing well and it manages its CRUD resource, but nothing else. And my top-level app service maybe is the one that actually very tightly decides who gets what secret when. There's just so many other architectures that you can do when you can compose an app into a micro monolith.
+
+But we're really going to hold on that until we can do runtime instantiation of components and have that root component be able to do all the things that we needed to do. Until then, I think we're going to stay stable on v2 for a long time. And there's not going to be a WASI P4. Darn it, will not allow it. So there's only WASI P3, and then later a 1.0.
+
+**Aditya Salunkhe** [18:20](https://youtu.be/1XwmyGuI2xk?t=1100)
+
+Yeah, that's awesome. Do we have a general timeline of when Component Model 1.0 goes out? Like, let's say next year or in the coming two years?
+
+**Bailey Hayes** [18:30](https://youtu.be/1XwmyGuI2xk?t=1110)
+
+Yeah, I think the best one is actually a blog post that Eric wrote. Let me grab a link to that. This is still the one that we mostly cite as our definition of what this march to 1.0 looks like — dropped a link in chat here.
+
+Essentially, Component Model 1.0 comes before WASI 1.0, because WASI depends on the component model. And the biggest motivation for why we need a Component Model 1.0 as soon as we can get it is so that browsers may adopt it. They need a stable spec that can be standardized within WebAssembly's W3C. And so what's happening right now is we're getting rapid feedback from the Mozilla folks working on Firefox, where they have a native implementation of the component model in Firefox, and they have feature requests like runtime instantiation that we need to land.
+
+But Luke Wagner — Luke is the main driving force behind the component model — Luke had already spec'd out and scoped basically a series of additive features that we can make to the component model. And so runtime instantiation, child handles, scoped callbacks, all of those kind of go together in a little bundle of a series of features that we want to land, but they're purely additive. So we can keep building on top of 0.3 and keep revving our minor as we add in those features, and those stabilize.
+
+Then there's going to be a series of things that we'll want to cull, right? Like warts that we just want to shave off. So the game plan for that is once we've added and we're feature complete for an MVP, we are going to create a release candidate where we just delete stuff. We delete the uglies, and that will be a breaking change intentionally — right, deleting the things that have been deprecated or we want removed. Everybody's going to work against the RC and be like, looks good to me. And once that happens, then that's the 1.0.
+
+**Aditya Salunkhe** [20:45](https://youtu.be/1XwmyGuI2xk?t=1245)
+
+So just a huge layer on top, and then we just cut off all the smaller branches, and we have a final release. Yeah, that's good.
+
+**Bailey Hayes** [20:56](https://youtu.be/1XwmyGuI2xk?t=1256)
+
+And so basically right now, WASI is already tracking stabilized component model features, and that's how, essentially, in the WASI subgroup we vote to adopt certain features and basically say, all right, at WASI 0.3.1, for example, we did this. We said 0.3.1 — Yordis's maps is now assumed to be allowed for anybody that's using a toolchain that says they're on 0.3.1, and they can also use the `implements` and external ID feature. And these are the two component model features that we added.
+
+0.3.2 — I don't think we're going to have a new component model feature there, but we have additions to the WASI specs. So 0.3.2 is just really going to be refinements around like `wasi:http`, `wasi:sockets`. I think `wasi:clocks` had one too. So just some small documentation spec stuff.
+
+And then 0.3.3, which is in December — our goal is to have stabilized cooperative threads, which is a huge feature. And going back a year ago now, Luke had already designed the ABI for this, and basically designed it so that WASI P3 0.3.0 is ABI compatible with what we're going to ship now in December, so that there are no breaking changes. That it's purely additive. So it required some 5D chess to get it to a point where basically we will not have to create a WASI P4, that we can just continuously do additive changes. And so essentially you can take a 0.3.0 component and, in future land, a 0.3.3 component that actually is taking advantage of cooperative threading, and compose them together, and they just work.
+
+**Aditya Salunkhe** [22:47](https://youtu.be/1XwmyGuI2xk?t=1367)
+
+Yeah, Luke is — he is something.
+
+**Bailey Hayes** [22:52](https://youtu.be/1XwmyGuI2xk?t=1372)
+
+Amazing.
+
+**Aditya Salunkhe** [22:53](https://youtu.be/1XwmyGuI2xk?t=1373)
+
+Yeah, he's amazing.
+
+**Community Participant** [23:00](https://youtu.be/1XwmyGuI2xk?t=1380)
+
+Do you mind explaining quickly what the cooperative threading is about?
+
+**Bailey Hayes** [23:08](https://youtu.be/1XwmyGuI2xk?t=1388)
+
+Yeah. So if you're familiar with cooperative threads — and a different way of saying that is if you're familiar with how coroutines work in a lot of programming languages — we essentially have support for that at the ABI level, where somebody can say `thread.spawn`, and then you can join threads, right? So there's ABIs for thread dot blah.
+
+Now, it still would be by default — like our game plan in Wasmtime, for example, is to still be taking one CPU core at a time. So it's not necessarily parallelism. So each of them can progress on work cooperatively. So they're sharing that one main process, and so as one releases, the other one takes on work, and so it's done via cooperative yields.
+
+It's designed so that we can do this both stackless and stackful, and what that really means is we had to do a whole lot of extra work to make it work well for goroutines, which are the weird odd one out. And what was easy, and what we got working right away, was coroutines in C++ and also emulation and virtualization of pthreads.
+
+So the first thing that Cybrand — who has done basically all this work, who is an engineer at Fastly — Cybrand ported the Open POSIX test suite to compile to WebAssembly, to compile against our branches for all the things that flip cooperative threading on. And so inside the Open POSIX test suite there's a full pthread suite, and we have full compliance for pthreads against that suite. You can see that up on the Bytecode Alliance Open POSIX test suite repo.
+
+And the desire for getting pthreads working is that a lot of people have legacy code. They have a ton of — people across the world depend on C and C++ libraries that rely on pthreads. And so having cooperative threading support, this means that software that was written with pthreads now just works against this new ABI.
+
+And to get all of this in, Cybrand put in a lot of work to add this new ABI inside LLVM. And so the most recent LLVM release — I think it's 23 — just went out, and it includes this ABI inside it. Now, you kind of have to flip on a flag to get the actual cooperative threading, but the ABI itself is aware of the thread ABI essentially, but it won't produce those symbols unless you opt into it, since it hasn't stabilized yet.
+
+So essentially, now that you've got a component that knows how to say `thread.spawn`, then you can do things like supporting green threads, or coroutines, or goroutines, and you can do that from your upstream language. So it's happening both inside the WebAssembly runtime — in that it knows what those ABIs mean and is managing all of the native asyncness effectively of how that works, the parallelism of it — and in the guest code, where I write "go, go do my thing, go func" for my goroutine. I can write idiomatic guest language bindings to that, because now the language that compiles down to WebAssembly knows how to natively support their language features, however they may do coroutines or cooperative threading.
+
+That wasn't very quick. You asked for quick, and I'm sorry, but hopefully comprehensive.
+
+**Community Participant** [27:08](https://youtu.be/1XwmyGuI2xk?t=1628)
+
+Oh, absolutely. And so this also helps in terms of taking advantage of multi-core infrastructure.
+
+**Bailey Hayes** [27:18](https://youtu.be/1XwmyGuI2xk?t=1638)
+
+Yeah. So essentially it is all generally speaking what the CDN providers wanted, right? And where we have engineers investing a lot of effort is making Wasmtime be the best possible runtime to be on the CDN edge. And where they want is to have gold-plated hardware where they say you get this core, and we're going to schedule the max to exactly that right thing. And — oh, thank you, Victor. I guess I got that wrong. It's — oh, you're right. Okay, so concurrent means they're both. Okay, thank you, thank you, Victor. If you want to chime in and say it so that I don't screw it up again.
+
+**Victor Adossi** [27:58](https://youtu.be/1XwmyGuI2xk?t=1678)
+
+No, no, no. I mean, everything you were saying was right. It was just like you switched the words. But yeah, it's — you're saying one core repeatedly, which is the point, is concurrent, right? Yeah, one core is the thing to keep in mind.
+
+**Bailey Hayes** [28:13](https://youtu.be/1XwmyGuI2xk?t=1693)
+
+Yeah. And so these CDN providers are basically trying to max out their hardware, and they know exactly, really tightly, what they can schedule. And so that's sort of the big effort — having just this maximum amount of density that you can aim for, both on the CDN edge, and, you know, what we're interested in with wasmCloud is also on the server-side datacenter edge.
+
+**Victor Adossi** [28:37](https://youtu.be/1XwmyGuI2xk?t=1717)
+
+And one thing to add there — like, it might seem like, oh, this is a little bit less convenient than being able to have, let's say, parallelism, in the case of going across one of the cores. But the ability to spawn separate components per core doesn't go away, right? So you just kind of move your coordination sort of a level up, or away from the code.
+
+Where, like in the past, let's say you would in the code spawn N threads, right, to have actual parallelism — you can think of it this way: the spawning now moves out of your component. And let's say your component was a web server, then the component doesn't spawn; it just handles a single web request. And then you spawn N components across N cores, and you give them requests as they come in. It kind of forces you into that paradigm, but usually that's the better paradigm. Assuming you're not doing some crazy shared memory thing or whatever.
+
+But it's not that you can't have parallelism in any way. It's just you have to think about it a little bit more. Parallelism with threads is also planned, but it's a long way away, essentially. So right now it's essentially a single core or single hyperthread — essentially concurrency inside. But again, the parallel pattern is possible, you just have to do it a little bit differently. But usually that's a good idea, basically.
+
+**Community Participant** [30:18](https://youtu.be/1XwmyGuI2xk?t=1818)
+
+Well, there's a lot of things that Wasmtime, the Wasm engine itself, needs to be able to handle to make all those things happen also.
+
+**Victor Adossi** [30:32](https://youtu.be/1XwmyGuI2xk?t=1832)
+
+Yeah, and that support is in there now. And generally, so when you make an engine instance, there's usually one per process — so I'm not sure if that's what you are pointing at, but yeah, there's usually one, and then you run instances. And where — I say where, but I mean like on what core and slash on what hyperthread — is essentially up to you. But yeah, it is flexible, except in the way that if you wanted to just write a program that was spawning threads and those threads would go to different cores, that's not how it works currently. You're going to spawn threads and they will act like they're on different cores, but you'll really be doing concurrency rather than parallelism. If that makes sense?
+
+**Community Participant** [31:21](https://youtu.be/1XwmyGuI2xk?t=1881)
+
+Okay. Yeah, it does.
+
+**Bailey Hayes** [31:24](https://youtu.be/1XwmyGuI2xk?t=1884)
+
+Yeah, and also part of being able to stabilize this ABI from the component — basically stabilizing our component model feature — this one's interesting in that we need, or we're looking for, basically two different guest languages to be able to adopt it and get to success. It doesn't mean that they have to ship. They can't really ship until it's kind of standardized, so they would be waiting for a stable release to depend on that. So that's from the guest toolchain perspective. And then we also want two different host runtimes to have successfully implemented this ABI, and Victor's working with Cybrand to land that inside JCO with the Node.js backend, which is what we've been using for a lot of our reference implementations.
+
+**Victor Adossi** [32:13](https://youtu.be/1XwmyGuI2xk?t=1933)
+
+Oh, I should probably also mention the Node.js support — actually that's landed.
+
+**Bailey Hayes** [32:20](https://youtu.be/1XwmyGuI2xk?t=1940)
+
+Oh heck yeah! Is that all you're gonna say?
+
+**Victor Adossi** [32:28](https://youtu.be/1XwmyGuI2xk?t=1948)
+
+No, no. Let me — yeah, I was trying to turn my camera on here. Yeah, so I guess I'll — I don't know if I'll be able to share my screen. Let's see. Okay, hopefully everyone's able to see the screen at this point.
+
+<img src="/img/community/2026-09-09/image007.webp" alt="The Bytecode Alliance JCO repository on GitHub" />
+
+So one thing that's landed recently: we have this package called `jco-std`, and this package originally had mostly — well, kind of only — a Hono adapter. Hono is a sort of recent, at least more recent than Express, right, and more recent than like Koa, for those who are familiar with the Node.js ecosystem — HTTP serving framework. And so up until now we had Hono as sort of the only adapter in here. And the idea of `jco-std` is to make regular JavaScript code, or regular code that's written against, let's say, Node.js or Deno — well, less so Deno and Bun and more so Node.js — to sort of work in a component context.
+
+Recently we've been landing changes that actually implement Node APIs. So this means that you can write code that looks just like regular Node.js code.
+
+<img src="/img/community/2026-09-09/image008.webp" alt="The Node.js platform capabilities README in the jco repository, marked experimental" />
+
+Let me see if I can — I think there's an example in here. So there are fixture examples that I can show y'all. Yeah. So here's an example. So we keep examples in the JCO repo. There will be more, but for now this is sort of like a large one that does basically a whole bunch of tests, and this one is a simple path — a test for the path API.
+
+<img src="/img/community/2026-09-09/image009.webp" alt="A component.js example importing node:path, node:path/posix, and node:path/win32 inside a WebAssembly component" />
+
+But imagine you have some, let's say, Node.js program that uses, let's say, `node:path` or `node:os`, or uses `node:net` for example, or `node:http`, and you write against those APIs. Up until now, basically you couldn't componentize that script, right, because you don't have access to Node APIs in a WebAssembly context — because you don't have access to anything in a WebAssembly context.
+
+The idea is to add support via shims for Node functionality usable from inside a component, and then we can take scripts that are written like this and written against these APIs and execute them in a component context as if they were just regular programs, right? So basically taking a program, componentizing it, and then executing it wherever it's executed, as long as that platform brings along the APIs necessary.
+
+So what this ends up looking like is that we have these exports in `jco-std` here. So like you see `assert`, right — assert like `node:assert` is a helper. You can write assert in regular code. Console, DNS is in here, HTTP2, HTTP. Anyway, it just goes on and on. But basically we're replicating the entire Node surface.
+
+Now, there's some parts of the Node surface that actually don't make sense or can't really work. Like for example, `wasi`, for example, doesn't really make sense to replicate. We currently don't have a way for you to run a WebAssembly component from inside a WebAssembly component. Now, the thing is, it's not that we can't; it's just that we don't have a way for that right now.
+
+Other things we basically pass through to the host. So this means that, like for example, we have FFI here, right? Like, how can WebAssembly implement FFI when WebAssembly can't dynamically link, right? So what happens is we actually pass through to the host for this. If the host is JCO, that means we can actually pass through straight to the Node.js implementation. So it's kind of like just doing what you would have regularly done on Node, with more steps. So you get this API that basically uses — you've got the Node code you started with, the program you started with, it calls Node FFI for example, that turns into a WebAssembly call.
+
+**Victor Adossi** [37:15](https://youtu.be/1XwmyGuI2xk?t=2235)
+
+There's a WIT interface backing that, and then you go out to the host, which in this case happens to be Node.js. It could actually be Rust as well, if you had a host plugin that would replicate that API. But in this case, let's say it's JS, and then it just ends up calling the host adapter — basically the host functionality that implements FFI, right? And of course, for that you can actually just use real Node FFI.
+
+This is like, why would you do this, right? Because it just seems like you would just introduce call latency. And the idea here is better control over sandboxing, right? So to give a quick example: if you were to write a GitHub Action, right, and it's a Node.js script, and you know that your GitHub Action might need to use Node streams, but it doesn't need to use like Node FS, for example — you can give it a Node FS adapter, right? You can take that program you had written before that sort of depended on all of Node.js monolithically, and you can compile it and then disallow access to FS, but allow access to, let's say, path or streams or whatever else needs to happen. You can sort of plug in your own adapter.
+
+One thing I can show is what these WITs look like. So if we look at — so inside `jco-std` there's like `node-0.1.0`. It's still a relatively young interface, but I can show — let's see. Child processes is interesting, because obviously WIT does not — like, you cannot — WASI does not have an interface or a contract for creating child processes. Right, the idea of a child process doesn't really make sense. But we can let the host do it, right? And so we basically write a contract, a WIT contract, a WIT interface — that in this case, like `jco:node/child-process` — that mimics what Node does give you. And if the host can implement this interface, then your component, which was written sort of like a regular Node.js component, can be compiled to a WebAssembly component, and it can run on top of a host that uses this API and can provide this API.
+
+<img src="/img/community/2026-09-09/image010.webp" alt="The child-process.wit interface in jco-std defining process-error and spawn-options records for node:child_process" />
+
+So the JCO 1.33.0 release contains an updated version of `jco-std`, and it will automatically detect which Node interfaces you use in the JS that you supply it. So if you do `jco componentize`, it will look through your imports, find any Node APIs that are being used, it'll add the imports and exports — sometimes you need exports because you have callbacks, for example, that need to get passed — add them to the WIT interface, and then build your component. So if that sounds like a lot, it is. But you can try it out, which I think is the easiest way to get a grasp of it.
+
+And there's also — I don't know what's happening here. Hold on, it's okay. Okay, oh, that's weird. So there are a few examples in here, like I just showed you the Node.js platform one. This one only has an example of path for now. I think actually the fixtures might be there, but it might be a good place to see this. But here, let me — let's do this again. Okay. As you can see, there's also different versions of Node, right? So like, there's 24.x, there's 26.x. But I'll just sort of jump forward here.
+
+**Victor Adossi** [41:55](https://youtu.be/1XwmyGuI2xk?t=2515)
+
+So we have fixtures here where I'll go into that child process example, just because we just saw the WIT interface. But we have tests that will compile some component, right, and just call APIs and make sure that they work. And what "work" means is different from time to time. But like if we look at console, we also have tests for that.
+
+<img src="/img/community/2026-09-09/image011.webp" alt="The jco-std test fixtures directory with per-API test components" />
+
+And let's see — see FFI, see if we have this one. Okay, so here's an example — and this will be the last one — this is an example of Node DNS, right? So this is a component. This is a WebAssembly component, right? It looks like just a regular Node.js program. You can compile this component to a WebAssembly component. You can patch in Node DNS support, and we provide an adapter that will put in the pass-through — like a pass-through to real Node DNS that will be called automatically for you from your component, right, from this file when it's compiled.
+
+So basically, yes, this is how we have Node API support implemented, and we're basically going through all of them. We have something like, I don't know, maybe seven or so APIs left, but a lot of the important ones are kind of through.
+
+We'll be doing some testing on popular libraries, right? Like so, stuff like Express. We're going to probably take a look at MCP. I'm probably also going to try and get a gRPC example up, so people can sort of see that and see that that works. But yeah, this has landed very, very recently — this week, essentially, in JCO 1.33.0 — and then `jco-std` has been getting updated along the way. Any questions?
+
+**Bailey Hayes** [44:47](https://youtu.be/1XwmyGuI2xk?t=2687)
+
+Is anybody thinking about using this? Well, if you do try it out, we would love feedback. We want to know if it's working for you, if it's ergonomic, et cetera, et cetera. I know there are wasmCloud users that have heavy use of JavaScript and TypeScript, so they're definitely out there in our community. I think this call is kind of late their time, so hear this as a call to action to please give this a try and let us know if it works for your Node apps.
+
+I noticed that you must be using Emacs or something to be able to navigate GitHub. Like, I think you were doing it with keyboard shortcuts, and I was like, that's the real perimeter there.
+
+**Victor Adossi** [45:47](https://youtu.be/1XwmyGuI2xk?t=2747)
+
+No, I wasn't. I was just using like T, because just a few of them. Like, I don't have like a Vimperator or whatever set up. It's just, if you just hit T you can search their files, which is convenient. But no, it's weird — it was actually a bug. So like on GitHub, if you hit T, sometimes if you hit T it won't focus the input box. So if you hit T then another letter, it just does something completely different in the UI. Usually you hit T, it focuses the box, you can just start typing. But anyway, that basically happened to me half the time. Sometimes it works, sometimes.
+
+**Bailey Hayes** [46:24](https://youtu.be/1XwmyGuI2xk?t=2784)
+
+Well, I enjoyed it. Thank you for taking us through. That actually answered a bunch of questions for me.
+
+**Community Participant** [46:31](https://youtu.be/1XwmyGuI2xk?t=2791)
+
+Yeah. Thanks, Victor. This was great.
+
+**Eric Gregory** [46:40](https://youtu.be/1XwmyGuI2xk?t=2800)
+
+We've got a few minutes left. Any last questions before we close out? All right.

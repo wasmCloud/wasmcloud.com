@@ -1,0 +1,256 @@
+---
+date: '2026-09-16'
+title: 'Native WASI P3 for Go, Node.js in JCO, and Couchbase Plugins'
+description: 'Go WebAssembly goes native on WASI P3 with cooperative threads, JCO runs Node.js gRPC and MCP servers as components, and two Couchbase plugins share one WIT.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - go webassembly
+  - golang wasm
+  - wasi p3
+  - cooperative threading
+  - componentize-go
+  - jco
+  - nodejs webassembly
+  - mcp server
+  - couchbase
+  - host components
+  - openapi
+  - wit annotations
+  - webassembly news
+chapters:
+  - { seconds: 8, label: "Welcome: wasmCloud 2.9 in the field, and the NATS-native plugin" }
+  - { seconds: 131, label: "Victor Adossi: Node.js SDK support in JCO" }
+  - { seconds: 190, label: "A gRPC server as a component: Buf tooling, node:http2, node:stream" }
+  - { seconds: 436, label: "The MCP server example: normal Node code plus a start/stop export" }
+  - { seconds: 505, label: "WIT interfaces for Node built-ins, and running on any host" }
+  - { seconds: 686, label: "What is left: nested instantiation, and a call for real Node apps" }
+  - { seconds: 750, label: "Bailey Hayes: two Couchbase host components behind one WIT interface" }
+  - { seconds: 920, label: "A mocked Data API server, 312K vs 6.3M, and 32 identical checks" }
+  - { seconds: 1044, label: "Why LLMs beat AutoStamp for OpenAPI-to-WIT; thanks to new contributors" }
+  - { seconds: 1145, label: "Native WASI P3 for Go: the all-nighter and why the P1 adapter hurts" }
+  - { seconds: 1339, label: "How the wasip1 adapter works today, and the GC reentrancy trap" }
+  - { seconds: 1552, label: "The Go fork: a wasip3 target threaded through componentize-go" }
+  - { seconds: 1617, label: "Terminal demo: adapter vs native vs cooperative threads" }
+  - { seconds: 1879, label: "Same code, three builds: when the fork can land, and a call for Go maintainers" }
+  - { seconds: 2076, label: "One all-nighter vs a six-month estimate; backporting fixes to today's approach" }
+  - { seconds: 2235, label: "Yordis Prieto on deterministic testing; AutoStamp and the Couchbase PR live" }
+  - { seconds: 2526, label: "Erik: a WebAssembly-only OpenAPI generator, linter, and contract tester" }
+  - { seconds: 2766, label: "Patches: overlaying fixes onto a vendor's OpenAPI spec" }
+  - { seconds: 2846, label: "Speakeasy, Stainless, and the ergonomics of generated Go" }
+  - { seconds: 3062, label: "Verbosity vs. correctness when agents write the code" }
+  - { seconds: 3363, label: "WIT-to-X generators and the case for WIT annotations" }
+  - { seconds: 3680, label: "Wrap-up: Erik stays Erik" }
+image: https://i.ytimg.com/vi/AKoD_Tz7wkE/maxresdefault.jpg
+duration: 3730
+showTitle: true
+slug: 2026-09-16-community-meeting
+speakers:
+  - bailey-hayes
+  - victor-adossi
+  - yordis-prieto
+about: wasmCloud
+mentions:
+  - ComponentModel
+  - WASIPreview3
+  - Go
+  - componentize-go
+  - JCO
+  - JavaScript
+  - TypeScript
+  - MCP
+  - NATS
+  - Wasmtime
+  - witBindgen
+  - OpenTelemetry
+  - BytecodeAlliance
+---
+
+import YouTube from 'react-player/youtube';
+
+{/* Video hero — the whole point of this page */}
+
+<YouTube url="https://www.youtube.com/watch?v=AKoD_Tz7wkE" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=AKoD_Tz7wkE" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The September 16, 2026 wasmCloud community call is three demos deep. Victor Adossi shows JCO's new **Node.js SDK support** running a gRPC server and an MCP server as WebAssembly components with one component-specific line each. Bailey Hayes builds two **Couchbase host components** — one embedding the vendor's Rust SDK, one speaking the HTTP Data API — behind a single WIT interface, and then shows the result of an all-nighter: a fork of Go that targets **WASI P3 natively** with component model cooperative threads, no wasip1 adapter, and no garbage-collector reentrancy trap. Yordis Prieto closes with Erik, a WebAssembly-only OpenAPI generator and linter, and a case for WIT annotations. If you care about **Go WebAssembly**, this is the call.
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **wasmCloud 2.9 is holding up in the field** — the thundering-herd work (schedule a pile of components at once *and* hit every one of their HTTP endpoints at the same instant) has resolved the problems people were hitting. The NATS-native plugin that first shipped in 2.9 got a documentation patch from a new contributor and has a key-selection performance improvement landing next; it is major version zero, so breaking changes remain on the table
+- **JCO can run the Node.js SDK inside a component** — import `node:http`, `node:http2`, `node:net`, `node:timers`, `node:buffer`, `node:stream` and the rest as if it were ordinary Node, and `jco componentize` shims them into something that works in a component context. Two new examples in the [JCO repo](https://github.com/bytecodealliance/jco): a gRPC server built with Buf's tooling and an MCP server using the official `@modelcontextprotocol` SDK and Zod
+- **The component-specific code is one export** — in both examples the only non-Node line is a `start` export that returns a promise the host waits on so the server does not shut down (a WASI P2 requirement that goes away in P3). Everything else is `server.listen` and upstream libraries, not a rebuilt world
+- **Node built-ins now have intermediate WIT interfaces** — `jco:node/http`, `jco:node/http-callbacks`, `jco:node/process`, added automatically at componentize time. That means a Node program compiled to a component can run on *any* host that implements those interfaces — Wasmtime, WasmEdge, or a Rust host — not only under JCO passing through to real Node, and each capability can be sandboxed or altered per host
+- **Two Couchbase host components, one WIT interface, identical behavior** — Bailey's draft implements `wasmcloud:couchbase` twice: `couchbase_kv_plugin.wasm` embeds the Couchbase Rust SDK and speaks the binary KV protocol (6.3 MB), while `couchbase_plugin.wasm` is generated from Couchbase's OpenAPI spec and speaks the HTTP Data API (312 KB). The same workload ran 32 checks — get, insert, upsert, compare-and-swap variants, touch, SQL++ — against each transport with 0 unexpected results
+- **Operators may prefer the Data API even with the SDK available** — layer-7 traffic means no extra sockets, observability comes for free, and Couchbase does connection pooling next to the database. The point of one interface is that the workload author never has to care which transport the operator picked
+- **The Data API is a paid Capella feature, so Bailey mocked it from the spec** — her trial expired with the implementation 99% done, and Couchbase's Docker image does not ship the Data API. An LLM-generated stateful mock built from the OpenAPI document (in Python, to her displeasure) stood in for the real server. She also found a case where Couchbase's published spec did not match the live cluster's behavior and had to pin the real version
+- **Native WASI P3 for Go works, and it is faster** — upstream Go only knows `GOOS=wasip1`; today [componentize-go](/docs/wash/developer-guide/language-support/go/) patches Big Go for async, builds for wasip1, and adapts the result to P2/P3. Bailey's fork of Go adds a `GOOS=wasip3` target with a `--wasip3` switch in componentize-go, drops the adapter and its 27 preview-1 imports, and maps goroutines onto **component model cooperative threads**. At 40,000–80,000 requests with sizable string payloads it ran 20–30% faster than the alternative she tried, before any optimization
+- **The bug that triggered the all-nighter is a reentrancy trap** — thousands of strings in one allocation pushed `cabi_realloc` into a garbage-collect; Go's GC first asks for the time, which is a component model import behind the synchronous P1 adapter, which switches stacks, which traps. The stopgap was a componentize-go PR telling Go's GC not to run during bulk allocation. The native build simply does not have the problem
+- **Landing it upstream is the long pole** — cooperative threads must stabilize first (targeted for WASI 0.3.3), Bailey wants a Go maintainer as a partner, and there are companion changes to wit-bindgen, Wasmtime, the Go packages, and componentize-go. Interim plan: publish the forks so people can experiment behind an experimental flag, and backport the fixes to today's wasip1-adapter path so users benefit now. Existing componentize-go users will not change their code, only their build command
+- **The estimate was three to six months; it took one AI-assisted night** — when the work was scoped a year ago the team pegged it at minimum three months for an expert, more likely six. Bailey's account of the session: the agent repeatedly argued that cooperative threads would not standardize until December and that the work had gone "too far" — and had to be overruled
+- **Erik is an OpenAPI toolchain where every generator and lint rule is a WebAssembly component** — Yordis Prieto's Rust-core CLI does SDK generation, linting, documentation, and contract testing, ships zero runtime dependencies, and runs generators in an untrusted sandbox, in CI or in the browser. A patches feature overlays fixes onto a vendor's spec without waiting for the vendor. First release target: the lint server
+- **WIT annotations are the escape hatch everyone wants and fears** — Yordis's motivation is mapping WIT to OpenAPI and Zod without primitive obsession (a `string` that is really a URL). Victor's assessment: annotations are a backdoor to arbitrary generation — you could stuff a callback or a whole module in one — which is both why they are bad and why they are good. Protobuf already ran this experiment; expect an explosion of competing annotations, then standardization
+
+## Chapters
+
+- [0:08 — Welcome: wasmCloud 2.9 in the field, and the NATS-native plugin](https://youtu.be/AKoD_Tz7wkE?t=8)
+- [2:11 — Victor Adossi: Node.js SDK support in JCO](https://youtu.be/AKoD_Tz7wkE?t=131)
+- [3:10 — A gRPC server as a component: Buf tooling, node:http2, node:stream](https://youtu.be/AKoD_Tz7wkE?t=190)
+- [7:16 — The MCP server example: normal Node code plus a start/stop export](https://youtu.be/AKoD_Tz7wkE?t=436)
+- [8:25 — WIT interfaces for Node built-ins, and running on any host](https://youtu.be/AKoD_Tz7wkE?t=505)
+- [11:26 — What is left: nested instantiation, and a call for real Node apps](https://youtu.be/AKoD_Tz7wkE?t=686)
+- [12:30 — Bailey Hayes: two Couchbase host components behind one WIT interface](https://youtu.be/AKoD_Tz7wkE?t=750)
+- [15:20 — A mocked Data API server, 312K vs 6.3M, and 32 identical checks](https://youtu.be/AKoD_Tz7wkE?t=920)
+- [17:24 — Why LLMs beat AutoStamp for OpenAPI-to-WIT; thanks to new contributors](https://youtu.be/AKoD_Tz7wkE?t=1044)
+- [19:05 — Native WASI P3 for Go: the all-nighter and why the P1 adapter hurts](https://youtu.be/AKoD_Tz7wkE?t=1145)
+- [22:19 — How the wasip1 adapter works today, and the GC reentrancy trap](https://youtu.be/AKoD_Tz7wkE?t=1339)
+- [25:52 — The Go fork: a wasip3 target threaded through componentize-go](https://youtu.be/AKoD_Tz7wkE?t=1552)
+- [26:57 — Terminal demo: adapter vs native vs cooperative threads](https://youtu.be/AKoD_Tz7wkE?t=1617)
+- [31:19 — Same code, three builds: when the fork can land, and a call for Go maintainers](https://youtu.be/AKoD_Tz7wkE?t=1879)
+- [34:36 — One all-nighter vs a six-month estimate; backporting fixes to today's approach](https://youtu.be/AKoD_Tz7wkE?t=2076)
+- [37:15 — Yordis Prieto on deterministic testing; AutoStamp and the Couchbase PR live](https://youtu.be/AKoD_Tz7wkE?t=2235)
+- [42:06 — Erik: a WebAssembly-only OpenAPI generator, linter, and contract tester](https://youtu.be/AKoD_Tz7wkE?t=2526)
+- [46:06 — Patches: overlaying fixes onto a vendor's OpenAPI spec](https://youtu.be/AKoD_Tz7wkE?t=2766)
+- [47:26 — Speakeasy, Stainless, and the ergonomics of generated Go](https://youtu.be/AKoD_Tz7wkE?t=2846)
+- [51:02 — Verbosity vs. correctness when agents write the code](https://youtu.be/AKoD_Tz7wkE?t=3062)
+- [56:03 — WIT-to-X generators and the case for WIT annotations](https://youtu.be/AKoD_Tz7wkE?t=3363)
+- [1:01:20 — Wrap-up: Erik stays Erik](https://youtu.be/AKoD_Tz7wkE?t=3680)
+
+## Meeting Notes
+
+### wasmCloud 2.9 in the Field
+
+Bailey Hayes opened with a status check on [wasmCloud 2.9](/blog/wasmcloud-2-9-release/), a week on. The release carried a large amount of **thundering herd** work — the test suite schedules a pile of components at the same instant and, at the same time, hits every one of their HTTP endpoints — and the report from the field is that it is working: a lot of the problems people were hitting have been resolved.
+
+The other moving piece is the **NATS-native plugin** (`wasmcloud:nats`), which Jeremy Fleitz built and which shipped for the first time in 2.9. A new contributor improved its documentation, and a patch release went out the day before the call. A second change — a performance improvement that lets you decide how keys are selected — is additive and will be another patch. Bailey was explicit about expectations: the plugin is at major version zero, and she is not promising no breaking changes. "Let's get this thing right."
+
+She also thanked Shreya Deshannavar, Steve Rogers, and (she believed) Ace as new contributors to [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud) whose PRs have been helping harden and fix things. A lot has landed in a short period largely because of community contributions; keep filing issues.
+
+### Node.js Servers as Components in JCO
+
+Victor Adossi picked up where [last week's demo](/community/2026-09-09-community-meeting/) left off. The precise framing is that JCO now supports the **Node.js SDK** — `node:timers`, `node:http`, `node:http2`, `node:net`, and so on — inside a component context. (`node:process` is one of the hard ones.) Write code as if it were ordinary Node, or take Node code that already exists, and for many cases — not every case — compile it to a component and run it in a JCO host.
+
+Two new examples in the [JCO repository](https://github.com/bytecodealliance/jco) make the point. The **gRPC server** uses Buf's tooling and pulls in `node:buffer`, `node:http2`, and `node:stream/consumers`; the rest is the gRPC library and ordinary dependencies. The server file is regular Node code with a `handleRequest` and a handler wired up, and Victor allowed that some of the ceremony could be laid out differently, but nothing in it is component-focused except the exports.
+
+That export is the one line that is component-specific: a `start` export that returns a promise the host can wait on, so the server does not shut down. That is a WASI P2 requirement; in P3 it goes away. Everything else — `server.listen` included — is a normal Node call. And because you are componentizing rather than rebuilding, you can also change the functionality of `node:http2` underneath the program: use the pass-through version, remove a function, or change what it returns.
+
+The **MCP server** example is the same shape. `src/server.js` uses `node:buffer`, `node:http`, and `node:path`, the official `@modelcontextprotocol/server` package, and Zod — create the `McpServer` object, register tools, and at the bottom the same `start`/`stop` pattern, in this case returning the port.
+
+The interesting part is the generated WIT. JCO now emits **intermediate WIT interfaces that represent Node built-ins** — namespace `jco`, package `node`, so `node:http` becomes `jco:node/http`. Because `node:http` takes callbacks, an extra `jco:node/http-callbacks` interface is added; `jco:node/process` is pulled in where used. All of it is added automatically at componentize time.
+
+Why that matters: the case JCO normally handles is "you wrote JavaScript, you componentize it, you run it under JCO," where the real Node implementations are passed in. But once the Node surface is a WIT contract, a Node program compiled to a component can run on **any host that implements those interfaces** — a host built on Wasmtime, on WasmEdge, in Rust, anything with component support. You can completely change the host the code runs on. And because the examples use upstream libraries, you are not rebuilding the world, which Victor contrasted with unikernel-style isolation.
+
+Asked what remains, Victor named a few bits of the API that cannot be covered — `wasi` is part of the Node SDK, and nested component instantiation is not something JCO is choosing to solve right now. Beyond that the missing input is **real usage**: rather than Victor downloading the thousand most popular packages and making them run, the team wants to know where people hit trouble porting an existing app. There is a sea of Node apps out there, almost all of them private. Bug reports and feature requests are the ask; the test suite is large but can always be larger.
+
+### Two Couchbase Host Components, One Interface
+
+Bailey's first demo was on the [host component](/docs/runtime/creating-host-component-plugins/) side. She has a use case for Couchbase; wasmCloud v1 had a Couchbase provider that exposed roughly a key-value interface, which she considered limited compared to what the native protocol can do. There are two ways to talk to Couchbase — the native socket connectivity via their SDK, and the **Data API** over HTTP — so she set out to get full support across the API stack: write the WIT definition, then implement it *both* ways and compare.
+
+The result is two host components, still poorly named and therefore still a draft PR. `couchbase_kv_plugin` embeds the **Couchbase Rust crate** directly and speaks the binary KV protocol — very much what the v1 provider did. `couchbase_plugin` is generated from Couchbase's OpenAPI spec and talks HTTP to the Data API. The demo script builds both: the SDK-embedding one is **6.3 MB**, the HTTP one **312 KB**, which is what you would expect from "generated from an OpenAPI spec and makes HTTP calls" versus "compiles in everything Couchbase ships."
+
+Both implement the same `wasmcloud:couchbase` WIT interface, and the same workload ran against each: **32 checks** across the transport and case matrix — `get-missing`, `insert`, `get`, `insert-duplicate`, `upsert`, `cas-changed`, `replace-stale-cas`, `replace-current-cas`, `replace-absent`, `touch`, `touch-zero`, `get-and-touch`, `upsert-with-expiry`, parameterized and null-parameter SQL++ — with **0 unexpected** on the Data API and 0 unexpected on KV. Identical on both transports.
+
+The reason to build both is that **operators may reasonably prefer the Data API** even though the SDK route exists: everything rides layer 7, so no extra sockets to open, observability comes with it, and Couchbase does connection pooling for you next to the database — one of the best shapes for serverless workloads. Someone who wants every possible API Couchbase offers will want the native client. The point of the shared WIT is that the person writing the workload says "I'm just doing Couchbase, make it work," and the same component works regardless of which transport the operator chose.
+
+There was a practical obstacle. The Data API is a **paid Capella feature**. Bailey had set up a Capella trial a month earlier and written 99% of the implementation against a real Data API and a real server — and then the trial ended. Couchbase's Docker container does not ship the Data API. So she had an LLM build a stateful mock of the Data API server from Couchbase's own OpenAPI document ("I don't care what language you use" — it chose Python, which she does care about) and dropped it in alongside the downloadable server. She also found a case where the published spec did not match how the live cluster behaved, and had to pin the contract to the version that actually shipped.
+
+Asked in chat by Aditya Salunkhe whether she had used **AutoStamp** — Yoshua Wuyts's [OpenAPI-to-WIT converter](https://github.com/autostamp/autostamp), which publishes generated components to the Wasm directory and which depends on wasmCloud secrets — Bailey said no, and explained why: LLM translation of OpenAPI to WIT is usually better than automated tooling because she can impose very specific rules, like every resource being a singular noun, where OpenAPI documents routinely use verbs or plurals. The automatic path misses the English translation of each endpoint; with tests and verification automated, an agent gets it right. "Not to disparage AutoStamp" — it is a neat project — but she is over there with all the agents doing most of her things. The plan is to rename, code-review, and push both components to awesome-wasmcloud.
+
+### Native WASI P3 for Go
+
+Then the main event. Bailey had pulled her first all-nighter in over a decade — because it was fun, and because she was angry — to see what it would take to give Go **full native support for WASI P3**.
+
+The starting point: upstream Go only knows about **wasip1**. It does not know P2 exists. What [componentize-go](/docs/wash/developer-guide/language-support/go/) does today is wrap the steps: patch Big Go so it can do async work for P3, build with `GOOS=wasip1`, and then adapt that output to work as a P2 or P3 component. That adapter has costs, and the demo script exists to show them side by side.
+
+At a high level, if you are using the wasip1 adapter — in Go or any language — then your syscalls, the WASI calls, are synchronous, written literally against P1. It does not matter that the outside of the component declares `wasi:cli/run` or `wasi:http` P3; somewhere inside, every call hits the P1 adapter and goes through a sync path. The way everyone made P1 and P2 work is the **asyncify transform**. Go does not use Binaryen's Asyncify; it has its own CPS-style transform — machine-code-generated stack switching, in memory, built into the binary rather than done by the runtime. Every goroutine switch is an in-memory operation the compiled program manages itself, alongside the whole garbage collector and the rest of the Go runtime.
+
+The bug that made her mad: sending thousands of strings in one big allocation pushed `cabi_realloc` into allocate-allocate-allocate-out-of-space, which triggers a **garbage collect**. The first thing Go's GC does is ask for the current time — which is a component model import, implemented by the WASI system interface. That goes through the sync path, switches stacks, and **traps**. The whole thing panics. The team had been playing whack-a-mole adapting the P1 adapter to each reentrancy path, and Bailey's stopgap was a PR to componentize-go telling Go's GC not to run during bulk allocation — the bit is already flipped, so it catches you next time. "We're having to do some weird stuff to make Go work right." The question was what it would look like if Go actually knew what was happening, natively, with no shim layers between a call to a clock and the clock.
+
+So she **forked Go** — about thirty commits — starting with a new `wasip3` target, threaded all the way up to componentize-go, which gets a `--wasip3` switch that points the build at the fork. After a false start (she had been narrating diagrams to a screen nobody could see, until Yordis spoke up), she ran the comparison in a terminal.
+
+Three builds of the same app: today's `componentize-go build` (`GOOS=wasip1` + adapter), native `componentize-go build --wasip3` (`GOOS=wasip3`), and native with `GOEXPERIMENT=nowasmcoopthreads`. The experiment she was really running is in that third variant. The component model has canonical ABIs that will eventually be standardized in the core spec, one of which is stack switching — the precursor to **cooperative threading** — and none of it is stabilized yet; she expects it in WASI 0.3.3. So she tried two ways of switching goroutines: core-WASM native stack switching, and component model cooperative threads, exercising the latter from a guest language in a very different way than other languages do.
+
+The micro-benchmark on her laptop showed little difference, and she noted the numbers were off from an earlier run — she had probably been compiling Rust in the background, which is why you don't benchmark on a laptop. But at a decent scale — **40,000 to 80,000 requests**, each pumping sizable strings, about forty goroutines per HTTP handler call — component model cooperative threads, entirely unoptimized ("we are in the get-it-working phase, not the make-it-fast phase"), were **20–30% faster** than the alternative. Core stack switching is faster at some things; across lots of goroutines, "the cooperative threads kick butt."
+
+The breakdown of what came out is instructive. Today's build still runs a wasip1 module: the adapter is a core module inside the component (26,610 bytes of `wasi_snapshot_preview1`) and the Go runtime's syscalls are **27 preview-1 imports**. The native build has neither. Both native variants still carry a few tiny core modules — one is 72 bytes — because Go has to start a runtime and have something that knows how to handle `cabi_realloc` before it can do anything, so the initialization and start path had to be shimmed. All three then ran in Wasmtime, serving HTTP.
+
+The best part, Bailey said, is that it is the **exact same Go code** for all three — the `wasihttp` module from the Go packages, an HTTP handler that reports what it was built with. She reproduced the error she had been angry about in the adapter build; the native build does not have it. "Native is faster, more robust, and avoids a lot of these existing problems. So that's why we should switch to it."
+
+When can the fork land? "It's gonna be a bit." Cooperative threads have to stabilize before anyone can depend on them. She had toyed with not requiring Big Go to depend on cooperative threads at all — it is possible, and she has it working — but supporting both paths adds real complexity to the Go SDK. Her conclusion is to remove that layer and have Go deal with one world for WASI P3, the one that uses cooperative threading: easier to review, easier to land, and faster in every dimension. It costs more memory, because a cooperative thread — with reserved address space — is created per goroutine, but that is why it is fast. There are companion changes to wit-bindgen, Wasmtime, the Go packages, and componentize-go. The longest pole is upstream Go, and she made a direct ask: **any Go maintainers, hit me up.** Landing is very different from making it work.
+
+In the interim she will push up all the forks so people can play, behind experimental flags in componentize-go — the same approach the componentize-py and other componentize SDKs take. Yordis's review: "Ship it." Bailey's: hyped-up Saturday night code probably needs some rounds of human review.
+
+The calibration point is worth recording. When this work was scoped a year ago, before LLMs were this capable, the team's estimate was a minimum of three months for an expert who knew the whole stack deeply, more likely six months of coding. It took one AI-assisted all-nighter — though she had to "take it to the mat": the agent kept objecting that she had said in the WASI subgroup meeting this would not standardize until December, and that the work was too experimental and had gone too far. "We haven't gone far enough. Get it working all the way."
+
+Two commitments to end on. Many of the bugs she found are in the **current** wasip1 approach, and she plans to backport those fixes so nobody waits on the fork. And for componentize-go and Go package users: your code does not change, only the build command. Expect no breaking changes — just things getting faster and better.
+
+### Erik: OpenAPI Tooling Built on WebAssembly
+
+Yordis Prieto's passion, he said, is **deterministic testing**: one shared specification that drives the unit tests for the server, is handed to the client, and doubles as the correctness check. He asked Bailey for the AutoStamp and Couchbase links live, so she did it live — showing the AutoStamp listing on the Wasm directory and her draft PR, then walking through how the mocked Data API server was produced. Yordis wanted the full context to learn how she works, and to know what to give her next time. Bailey's answer: don't give it to me, give it to BaileyBot — "give me a skill."
+
+Then Yordis showed his own project. It is called **Erik** — a joke about a colleague, and the name is staying. It is a WebAssembly-first-and-only OpenAPI toolchain: he had it working without WebAssembly, then told the AI to remove everything and make it WebAssembly only. The pieces are **generators**, **linters**, and — in progress — **contract testers**, all built on modules. Lint rules are WebAssembly components, so you can write your own ("this has to be singular"). Generators receive a bundle of metadata plus a file-system interface to fill, and because they are WebAssembly they can run in an untrusted sandbox — on a server, in CI, or in the browser. He is also wiring the spec through **wasi:otel** for OpenTelemetry, and admitted to getting lost in how far to vertically split things.
+
+Bailey asked about an escape hatch, since she had just hit a case where a vendor's spec was wrong. Erik has **patches**: an overlay applied on top of the original OpenAPI document — "for that operation at that path, merge this" — so you can correct a vendor's naming or a wrong contract without waiting on them. The same configuration layer handles the other trade-off: some languages don't want ahead-of-time codegen (Protobuf's argument), and often you don't want a hundred endpoints generated when you need two, so generation is selective.
+
+Bailey compared it to a more featureful Speakeasy; Yordis has a comparison table in the README against Spectral, OpenAPI Generator, and Speakeasy — Erik is the only column with linting, SDK generation, documentation, and contract testing all checked, no runtime dependencies, plugins in Rust today or any language that emits WebAssembly components, portable everywhere, Apache 2.0, and not commercial. He has written "far too many" OpenAPI generators and keeps an inspirations document to avoid six or seven years of his own anti-patterns.
+
+The Go ergonomics tangent is worth a listen. Bailey's problem with generated Go is that it is obvious it was generated — Rust can hide uglies behind a macro; Go cannot — and every OpenAPI generator she has used for Go produces something she declined to name on stream. She admired Stainless's approach of letting you edit the generated SDK directly and folding your edits back in on regeneration. Yordis pushed back on the premise: some verbosity is a deliberate trade-off — a wrapper struct that carries the request context exists because sometimes you are behind a proxy and want the HTTP headers back — and now that humans are neither writing nor mostly reading the code, the cost of explicitness has largely gone away while the cost of a codegen-induced outage has not. Bailey's restatement: verbosity matters less when agents author and read the code; correctness, soundness, and robustness matter as much as ever. She would love to use Erik to produce the mock server as a component instead of Python, and is curious how their WIT opinions differ — "I think we in this room have all the opinions in the world on WIT."
+
+### WIT Annotations
+
+Victor's suggestion from the Zod discussion was a family of **WIT-to-X generators** — WIT to Zod is its own thing, and they should be WebAssembly too. Yordis connected it to the **annotations** proposal he wants to merge: today codegens only work when the data structure semantics line up on both sides, which forces primitive obsession — a `string` that is really a URL or a UUID. With annotations, the type stays primitive but the generator can wrap it, and WIT becomes the specification for everything downstream.
+
+Victor's read, echoing the component model meeting (soon to be a SIG): everyone who knows what annotations unlock is excited, and it is probably the last barrier for bindgen. But an arbitrary string on an arbitrary object is a **backdoor to any generation** — a callback could be an annotation; a WebAssembly module could be stuffed into one. That is simultaneously why it is bad and why it is good; there will be an explosion of complexity, ten vibe-coded projects with their own annotation dialects, and "Java people will find this and regret it." Bailey's summary of the mood: this is what people are terrified of, Luke Wagner is giving us the escape hatch, and it is time. Yordis's rejoinder is that the alternative is what happens today — everything becomes a reserved word applied in narrow scenarios — and Protobuf already ran the experiment: extensions proliferated, then the ecosystem standardized on the ones it trusts (Google's, Buf's), and even those, like `buf validate`, still leave you passing semantically-typed strings around. Suffering from success; bring it on.
+
+Yordis signed off to go finish Erik's linter for release so people can lint their OpenAPI specs. Bailey is interested in trying it — and after a moment's regret about how that sentence sounded, suggested he rename it. He will not.
+
+## WebAssembly News and Updates
+
+This week in **webassembly news**: a fork of Go with a native `GOOS=wasip3` target, mapping goroutines onto [component model](https://component-model.bytecodealliance.org/) cooperative threads and dropping the wasip1 adapter entirely, is coming to public forks of Go, wit-bindgen, Wasmtime, and componentize-go for experimentation ahead of cooperative threads stabilizing in WASI 0.3.3; [JCO](https://github.com/bytecodealliance/jco) now compiles ordinary Node.js gRPC and MCP servers to components with per-built-in WIT contracts (`jco:node/http`, `jco:node/process`) that any component host can implement; [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud) is about to gain two Couchbase host components sharing one `wasmcloud:couchbase` interface; the `wasmcloud:nats` plugin shipped a documentation patch with a key-selection performance patch to follow; and WIT annotations are the next contested feature in the component model group, with Erik — a WebAssembly-only OpenAPI generator and linter — as one of the first consumers. Follow the [Bytecode Alliance](https://bytecodealliance.org/) and the [wasmCloud blog](/blog/) for what lands next.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell — build, run, deploy, debug — and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a production substrate for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: What Native WASI P3 Changes for Go WebAssembly
+
+Every **Go WebAssembly** component you build today with [componentize-go](/docs/wash/developer-guide/language-support/go/) is, underneath, a wasip1 module. Upstream Go's only WebAssembly system target is `GOOS=wasip1`, so the toolchain builds for that and then wraps the output in a `wasi_snapshot_preview1` adapter — a core module inside the component that translates 27 synchronous preview-1 imports into P2 and P3 interface calls. Your `wasi:http/handler@0.3.0` export is real; the path from it down to a clock read is not.
+
+That indirection is where the bugs live. Go's runtime — scheduler, goroutine switching, garbage collector — is compiled into the module and manages its own stack switching in memory. When the GC fires in the middle of a `cabi_realloc` and its first act is to read the time, that read is a component model import that must cross the synchronous adapter boundary from inside a stack switch, and the result is a trap. The fixes so far are stopgaps at each reentrancy path, including telling the GC to stand down during bulk allocation.
+
+Bailey Hayes's fork removes the layer. A native `GOOS=wasip3` target means the Go runtime's syscalls *are* P3 calls — async when you want async, sync when you want sync, under the runtime's control. Goroutines map onto **component model cooperative threads**: one cooperative thread per goroutine with reserved address space, which costs memory and is exactly why it is fast — 20–30% faster than the alternative at tens of thousands of requests, before any optimization. The output has no adapter and no preview-1 imports, only a couple of tiny start shims so the Go runtime can initialize before the first `cabi_realloc`.
+
+For a wasmCloud user the practical shape is this. The **[Wasm component model](/docs/overview/workloads/components/)** interface your Go component exports does not change, and neither does your code — the same `wasihttp` handler ran as all three builds in the demo. What changes is the build command, behind an experimental flag in componentize-go once the forks are published, and eventually nothing at all once cooperative threads stabilize in WASI 0.3.3 and upstream Go gains the target. In the meantime the fixes uncovered along the way are being backported to the adapter path, so components built today get more robust without waiting. If you write Go for wasmCloud, the [language guide](/docs/wash/developer-guide/language-support/go/) is where the flag will land, and the call for Go maintainers to help carry the target upstream is open.
+
+## Who Should Watch This
+
+**Go developers targeting WebAssembly** should watch from [19:05](https://youtu.be/AKoD_Tz7wkE?t=1145) through [34:36](https://youtu.be/AKoD_Tz7wkE?t=2076) — the clearest explanation yet of what the wasip1 adapter costs, the GC reentrancy bug, and what a native `GOOS=wasip3` build looks like side by side; the call for Go maintainers is at [31:19](https://youtu.be/AKoD_Tz7wkE?t=1879). **JavaScript and TypeScript teams with existing Node services** should watch Victor Adossi from [2:11](https://youtu.be/AKoD_Tz7wkE?t=131): the gRPC and MCP server examples show how little changes when you componentize, and [8:25](https://youtu.be/AKoD_Tz7wkE?t=505) explains why the generated `jco:node/*` WIT interfaces let the result run on hosts other than JCO. **Platform engineers writing host components** should watch the Couchbase segment at [12:30](https://youtu.be/AKoD_Tz7wkE?t=750) for the pattern of one WIT interface with transport-specific implementations the operator picks. And **anyone with opinions about API tooling** will enjoy Erik and the annotations debate from [42:06](https://youtu.be/AKoD_Tz7wkE?t=2526).
+
+## Up Next
+
+Bailey Hayes committed to publishing the Go, wit-bindgen, Wasmtime, Go packages, and componentize-go forks so others can try native WASI P3 behind an experimental flag, and to backporting the fixes she found to the current wasip1-adapter path. The Couchbase host components need names and a code review before they land in awesome-wasmcloud. A second `wasmcloud:nats` patch with key-selection performance improvements is queued. Victor Adossi wants real-world Node applications run through JCO's Node SDK support, with bug reports for whatever breaks. Yordis Prieto is finishing Erik's linter for a first release, and the WIT annotations proposal continues in the component model group. Cooperative threads remain targeted for WASI 0.3.3.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-09-16-community-meeting-transcript/)**
