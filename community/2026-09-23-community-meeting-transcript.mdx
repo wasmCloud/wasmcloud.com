@@ -1,0 +1,363 @@
+---
+date: '2026-09-23'
+title: 'Transcript: wasmCloud 2.10, S3 Blob Storage, and Wasm Component Model Design'
+description: 'Full transcript of the September 23, 2026 wasmCloud community call covering wasmCloud 2.10, the Q4 roadmap, S3/Azure/GCP for WASI Blobstore, WIT vs gRPC design, and AI sandboxing.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly news
+  - wasmcloud 2.10
+  - wasi blobstore
+  - s3 object storage
+  - object_store
+  - mutual tls
+  - client identity
+  - workload identity
+  - wasmtime 48
+  - host component plugins
+  - wit vs grpc
+  - webassembly kubernetes
+  - platform engineering
+  - ai sandbox
+  - capability-based security
+image: https://i.ytimg.com/vi/LO_T9gQO8bI/maxresdefault.jpg
+showTitle: true
+slug: 2026-09-23-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - ComponentModel
+  - WASIBlobstore
+  - WASIPreview3
+  - Wasmtime
+  - OpenTelemetry
+  - Python
+  - capabilityBasedSecurity
+  - AISandbox
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-09-23-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=LO_T9gQO8bI" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=LO_T9gQO8bI" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:09](https://youtu.be/LO_T9gQO8bI?t=9)
+
+Hello and welcome to our wasmCloud community call for September 23. We're gearing up and getting close to KubeCon North America, which is, I think — is it November 9? It's soon, and it's in November, the early part of November, not the later part. So it's coming in hot and fast. Yesterday we released wasmCloud 2.10. It included some new features, lots of hardening, and I figure I'll give a roundup of some of the highlights there. We'll talk a little bit about things that we want to make changes for in WASI Blobstore, and then I also wanted to call out a few things that are happening upstream in the Bytecode Alliance, just so folks are aware. So, pretty light agenda. If there's other things that folks want to talk about, please add them in the chat, and we should have time for them.
+
+So, I'm going to start with 2.10, and share my screen. Okay. So, we put out a published blog post after we cut releases. We haven't done it yet for this one. So if you're judging me for this not being readable — fair. We know, and that's why we make blog posts, so that it's readable and easy to consume. But we haven't gotten that one out yet, so I'm gonna start from this.
+
+<img src="/img/community/2026-09-23/image001.webp" alt="wasmCloud v2.10.0 GitHub release notes showing the What's Changed list" />
+
+I think the big things to be aware of that are now available: we basically support the full gamut of all the standardized environment variables that you pass in for OTel. We support them all now. Just made sure that we have full spec conformance. We have cancellable dispatch handles that you would have to opt into if you want to use them. So if you can see here, basically, if you are writing a plugin, and you need to be able to do cancellation like what I was doing — which was, I was actually creating a Kafka plugin, and I needed to make sure that I could safely clean up work and really tightly control connections and everything. For a lot of people, they actually don't necessarily care, right? It'll get cleaned up eventually. So if you don't need tight control, you don't have to call this API. And the important callout here is that there is bookkeeping that happens if you want to actually do a dispatch that is cancellable, so you don't pay for it unless you opt into it.
+
+<img src="/img/community/2026-09-23/image002.webp" alt="Pull request adding opt-in cancellable dispatch handles for wasmCloud plugins" />
+
+So that is that one. We've expanded out our binding schema. So again, this is actually more feature richness around being able to build plugins, both host component plugins and native plugins. For kind of the same plugin that we were building out, I ran into cases where the thing that I was representing had multiple aliases for the exact same config value, and there are some keys that were required configuration values that, if they're not there, should fail outright. And so the combination of these lets me support a lot of common SDKs that a lot of people have. You know, I shared last week — demoed building out a Couchbase plugin. I've also been building out a Kafka one, and both of these were really helpful for those.
+
+So that's those. And let's see, some other big features. We've got a tighter egress policy so that host plugins can make calls out over sockets. That's one big change. Again, you can guess Couchbase and Kafka is what I was playing around with there. Another big thing: we've upgraded now to Wasmtime 48. Why is that cool? Well, there's a lot of goodies in Wasmtime 48. The goodie I really wanted is that now I can use cooperative threads built from WASI SDK 34 components and run them, and so that's available behind a flag here. Then Jeremy's made fixes and improvements on top of the NATS plugin, the native plugin that we ship inside wasmCloud.
+
+And now another big feature that I think has been often requested is that we've got the start of our client identity story all the way through. So this one allows you to have host-wide client identities. So you configure, for the whole host, every outbound HTTPS request that you're making —
+
+**Bailey Hayes** [5:05](https://youtu.be/LO_T9gQO8bI?t=305)
+
+— we can add basically a client cert that says "this is our identity," and it allows you to authenticate with other servers that require mutual TLS. But this one is the most broad. This is the first level of this, and you would set it essentially if you wanted to do this for every client. It isn't based on the destination, so this is not what a lot of people also want, which is workload identity — basically mutual TLS for each service within a single workload, directly to the destinations they want to talk to. So this is the first step towards that. Here's the first base on that. But as a feature, it stands on its own. It's something that plenty of people will want, where they're just saying, "Hey, I'm making requests within my cluster. Talk to these things, make them available, make it work." And so that is now in.
+
+<img src="/img/community/2026-09-23/image003.webp" alt="Pull request adding host-wide client identity for outbound HTTPS with mutual TLS" />
+
+And if I jump back over here, we are now on Go 1.27. This one has my name behind it, but actually all the work was mainly Jeremy, both upstream and in the wasmCloud Go SDK that we have. So basically, componentize-go is now on Go 1.27. The Go packages are on Go 1.27. And once all of that landed, I felt safe to go ahead and wrap everything else in wasmCloud to it. Jeremy also — with the combination of all the things we just talked about — made it possible for us to publish, whenever we do a release, an all-features release. We have a lot of people starting to build on top of host component plugins, but I haven't felt ready to flip that flag to be on by default. So if you want features like that, and you want an easy way to experiment without having to build wasmCloud yourself, we now have an image that you can just consume.
+
+Let's see. I think that's the big stuff. If you were looking at the client identity work, just a heads up that we also support rotation, which is really nice. So you can just plug cert-manager into the chart, as a secret to the directory path — the volume that we use there — and it will just work and allow you to rotate, since hosts typically are going to live a lot longer than those certs if they're being rotated by a tool like that.
+
+I think that's basically the big stuff. One other shout-out here — this could have been a feature, honestly. It was a small amount of code churn, but what it allows is pretty cool. So Eric made it possible for components to depend on named bindings in a workload. Now you could create a component that's like an agent and have it have named bindings to other tools — literally tools, you know, like how agents load tools — but have them be named and reference them directly in the bindings for each component. So expanding out `implements` support has also landed, and then we also got a ton of different bug fixes in. And a special thank you to these folks — Yash, Steve Rogers, and Addu — for their first contributions to wasmCloud. You're making us a lot better. I did not go through all the different bug fixes, but there were a ton, and they're very much appreciated, and it's just making wasmCloud way, way better. Questions on wasmCloud 2.10? All righty. Well —
+
+**Liam Randall** [8:54](https://youtu.be/LO_T9gQO8bI?t=534)
+
+Bailey, can I ask? I know that we do an awesome job every quarter laying out the plan with the team and helping the community pull together that roadmap. And I'm honestly impressed at how accurate it has gotten — like, "hey, here's what I think we can do," and then us actually clearing it out. What are the big milestones up in the next few months? You mentioned you're landing mutual TLS — are there other big things that are on the roadmap here, or should we just wait for the next planning?
+
+**Bailey Hayes** [9:32](https://youtu.be/LO_T9gQO8bI?t=572)
+
+I mean, it's okay to start talking about it. Q3 ends next week, so it's probably time. But I honestly have been so heads down that I haven't really had a chance to start curating that. Here, I'll bring up our board. There's some things that haven't been done yet. I've teased this one a few times. I still want to do it; I just haven't had a chance to sit down and design it. So that's a big one. We have this one as a great place, honestly, for external contributors to come in and make things better. We've really made a lot of forward progress, even though it's not in this tracking issue, for Go, which is where we've been putting our effort, and then I would think next quarter it would be towards Python as another place — which is what I was talking about for updates that I was going to share about what's happening upstream in the Bytecode Alliance and WASI.
+
+<img src="/img/community/2026-09-23/image004.webp" alt="wasmCloud Roadmap project board, Q3 2026 view, showing triage, ready-for-work, and in-progress items" />
+
+I have these two, which are really small ones for me, so I'll knock these out before we close out this board, and then we've yet to do the K6 benchmarking, which we really want to do, and that hasn't been done. But otherwise, obviously, we've done a really solid job clearing out our project board here. So, moving to next: after this, workload identity is one that's come up in our project planning several times. It's a very commonly requested feature. It was commonly requested back in wasmCloud v1 days. So for me, that one's the one that I'm probably most interested in driving, since I also have custom requirements around that. So getting that through is important.
+
+I think what I've been seeding about Wasmtime 48, Python — all of those things were actually really dependent on getting cooperative threading through in the component model. So, not part of wasmCloud triage, but that's a big thing that I've been driving for months and months, and it is getting close. It's almost done, so that would be a huge thing. I think it would be reasonable to start bringing some of that stuff into scope, and I'm thinking December is probably the window when downstream consumer tools like wasmCloud could start messing around with things like Python without having to depend on feature flag after feature flag and all that kind of stuff. But that's — I wear many hats, and in this hat, I would say that's not on the wasmCloud board.
+
+So I think distributed cache, cooperative threading. I put a bunch of different issues of things that I would like to get out for benchmarking and performance stuff. I threw this out before in our roadmap, and we didn't take two things that I've thrown out. One was we could work towards exploded components, which would let us dedupe the runtime, which would be a handy thing for JavaScript and Python. So it would go in line with that as a sprint. The other set of things that I've thrown out before: making tooling around composition easier to use, and leaning in towards components with P3 — you can compose willy-nilly. Over the past quarter, really, the story's been getting things off of P2 to P3, and so that's the first step. Second step is: okay, now take advantage of some of the strengths P3 gives you. And over this past quarter, we added concurrency. If you're using P3, you get huge performance benefits. So that's been the carrot, not the stick, to change — because P2 is going to continue to be supported just fine, forever and ever. So nobody gets scared when I say that — I realized I should make sure I mention that. So there's a bunch more things that I could think of. One thing Aditya actually threw out earlier — oh, hey, Aditya.
+
+**Aditya Salunkhe** [14:04](https://youtu.be/LO_T9gQO8bI?t=844)
+
+Yeah. I think it would be better if we add the WASI Blobstore implementation to the Q4 roadmap as well.
+
+**Bailey Hayes** [14:13](https://youtu.be/LO_T9gQO8bI?t=853)
+
+Yeah.
+
+**Aditya Salunkhe** [14:13](https://youtu.be/LO_T9gQO8bI?t=853)
+
+So basically, right now there's the file store, the in-memory, as well as the NATS implementation of WASI Blobstore, but obviously there are customer needs, and quite a lot of requests are towards having S3, Azure, as well as GCP support. And to add that, it doesn't really make sense to individually depend on every single one of those Rust crates and maintain three different blob store implementations in our repository. So a smarter way to achieve that is to use a crate called object_store — I believe that's what it's called. It's Apache's object_store. But a problem with that is that it doesn't support bucket-scoped operations, which is why I'm taking a small detour to add upstream support for that, so that we can hopefully use it somewhere along the line and implement a multiplexed solution for WASI Blobstore.
+
+<img src="/img/community/2026-09-23/image005.webp" alt="wasmCloud issue 4977, Implement new WASI Blobstore plugin for S3, with a comment about adding a BucketStore trait upstream in object_store" />
+
+**Bailey Hayes** [15:16](https://youtu.be/LO_T9gQO8bI?t=916)
+
+Awesome, yeah. So for context for folks, this is another often-requested feature, and the reason why we as maintainers would like an object store is that — like we said — Google Cloud, Azure, everybody has their own S3-compatible API-ish, and they each have their own kind of "ish" differences. And where I didn't want to be as a maintainer is maintaining every single person's unique SDK across the whole stack for every single one of these plugins. And if that could be somebody else's problem — aka the object_store crate — that would be delightful.
+
+Now I will say that I actually vibed out an S3 host component plugin that just works too. So in the olden days, back in March, that wasn't a feature or an option that we had, and now we have it. So that is another thing there. I think where I'm at is that it's such a core interface that having a native plugin in wasmCloud — aka we are willing and able to do the auditing, the performance benchmarking, and the investment it takes to have a native plugin — so I'm game. And just so people are aware: give it 30 minutes, some tokens, you too can have an S3-compatible WASI Blobstore, and I can open source that in awesome-wasmcloud. What I was doing it for, I ended up not needing, so I never pushed it all the way through, but that's an easy option out there. Okay, so I saw lots of hands. I actually don't know who was first. So, Yordis, you're first on my screen.
+
+**Yordis Prieto** [17:13](https://youtu.be/LO_T9gQO8bI?t=1033)
+
+Maybe I missed it, but going back to — you know, yes, same interface, but what about the semantics expected behind the interface? Are you documenting that? Meaning, is this actually AWS S3, or RustFS S3, or NATS over S3? What are the semantics behind it, and are they documented?
+
+**Bailey Hayes** [17:35](https://youtu.be/LO_T9gQO8bI?t=1055)
+
+They're documented-ish — not probably to the degree that you would want, but all the semantics in WASI Blobstore do have WIT doc definitions that describe their expectation of how these things would behave. It's very much the common-denominator scenario, right? It is the tiny slice of S3 that's basically portable across all of these — that's sort of the TL;DR for WASI Blobstore — which for the most part actually is what people care about. Also, shout-out to RustFS. That is a freaking amazing project, and I think they said they're about to go to v2 now —
+
+**Yordis Prieto** [18:23](https://youtu.be/LO_T9gQO8bI?t=1103)
+
+v1.
+
+**Bailey Hayes** [18:24](https://youtu.be/LO_T9gQO8bI?t=1104)
+
+v1. Okay, okay. I just saw them in the news, and I'd already been playing with them forever. And yeah, they're awesome.
+
+**Yordis Prieto** [18:31](https://youtu.be/LO_T9gQO8bI?t=1111)
+
+I replaced my MinIO with it a long time ago.
+
+**Bailey Hayes** [18:35](https://youtu.be/LO_T9gQO8bI?t=1115)
+
+Yeah, yeah, exactly. Don't get rug-pulled, y'all. Just use RustFS if you're self-hosting. You heard it here. So WASI Blobstore is that tiny slice that's like S3-ish. But we ship, like Aditya was saying, an in-memory version and a file-system-backed version, which is the other thing that people really want: "I want to be able to do local dev and just use my file system. Browse there, nothing weird. Just make that a nice and easy developer environment, and then make it work in prod." And honestly, for the 95% case, it's good. It's when you want to use Glacier APIs and that kind of stuff that you would probably want to deviate out. Frank?
+
+**Frank Schaffa** [19:28](https://youtu.be/LO_T9gQO8bI?t=1168)
+
+So, probably on the same line. S3 has evolved — I mean, you can mount file systems and so forth. And I'm not sure if we're going to get there, or it will be just more of an object store.
+
+**Bailey Hayes** [19:47](https://youtu.be/LO_T9gQO8bI?t=1187)
+
+So WASI Blobstore is very much always gonna just be an object store, because those things aren't really portable. I don't like saying nice things about Amazon, generally speaking, because they're the ones that are winning right now, and they don't need me to give them props — the rest of us need props. But they're really doing an amazing job innovating on S3, and I think S3 Tables — or I don't think it's called S3 Tables, but their tables product is sick — they're doing a ton of product innovation that is also innovation in their space. And so for that reason, I would say WASI Blobstore is never going to necessarily solve that. But let me just show y'all something that I've been playing with, just to give you a taster for what I think is possible.
+
+**Frank Schaffa** [20:56](https://youtu.be/LO_T9gQO8bI?t=1256)
+
+Yeah, I was just thinking in terms of having — and this is probably the same thing that Kubernetes has for the interfaces, like CNIs and so forth — so that there's a document that you use in terms of creating the interface. And as Yordis said before, probably part of the semantics. So that helps in terms of having a very clear interface, and eventually people can plug in their own plugins and so forth. But to have this as part of the basic offering, I think that would be great.
+
+<img src="/img/community/2026-09-23/image006.webp" alt="Zoom gallery view with Yordis Prieto, Jeremy Fleitz, Bailey Hayes, Aditya Salunkhe, and Liam Randall" />
+
+**Bailey Hayes** [21:40](https://youtu.be/LO_T9gQO8bI?t=1300)
+
+Some main important things here before you go, Yordis. One: the AWS Rust SDK compiles to WASI. First callout. So you can use their SDK directly, and it's very feature rich. If you're targeting AWS, and you know you're only ever going to be there, I don't know that you necessarily need or want a WIT API there. Just use their SDK; it works great. The second part, though, is that it is so easy for you to build your own plugin with your own WIT definition now and make hay, that you should just do that. Okay, all right, go ahead, Yordis. I just had to get that out there, because people's perception of WebAssembly is that they have to do all this work — they must use a WASI API — and I'm trying to say no. Actually, bring your own. wasmCloud just lets you bring whatever interface you want: build your own, and make it semantic and correct for what you want. Two, people are like, "I have to use WIT because I can't do anything else." And I'm like, actually, no, we solved that. You can do gRPC, sockets, and HTTP just fine, just easily in your client. It will just work. Now, if you want something enriched and nice, like what Yordis provides — go, Yordis.
+
+**Yordis Prieto** [22:59](https://youtu.be/LO_T9gQO8bI?t=1379)
+
+No, no, it's just related to AWS. The reason I care about the semantics is because if people come with the expectation that AWS is the north star — yes, but there is an entire infrastructure in AWS too that only works there. Even if I give you the exact same SDK and somewhat the same semantics, even the server implementation, without the infrastructure that they have, it's not the same object storage. And that distinction, especially from being in WASI itself, is extremely critical, because this is where most people rely on the trust of, "hey, well, they say they support object storage, so I'm just gonna move on." I'm not gonna actually go all the way through and become an expert on it, right? But now they get into production and say, "Oh, wait, these details matter." For example, S3 now has strong consistency — I believe they moved off the eventual-consistency era, back like a year ago, whatever. And these things are the ones that backfire in production without any code breakage. It's literally, "Oh, I didn't know that there was a two-millisecond lag between these two things." So at least from the WASI perspective, for me, I would expect that — hey, this is not AWS. Yes, we are relying on all the APIs they have, because they obviously win the space, and we have SDKs and tools that just work. But be careful with assumptions in terms of what they're actually doing behind the thing — replication, read-after-write, and stuff like that — because that is what matters.
+
+**Bailey Hayes** [24:35](https://youtu.be/LO_T9gQO8bI?t=1475)
+
+And not only that — the WIT docs can tell you what the expectations are for implementers, but probably the place that is more canonical is actually the implementation side of a given thing, and not even the generic interface. The generic interface is so that you can make it work on microcontrollers and everywhere else, and you might have to make decisions like "this specific API is not supported here, because it can't be."
+
+**Yordis Prieto** [25:05](https://youtu.be/LO_T9gQO8bI?t=1505)
+
+Yep. I have a follow-up for you real quick about WIT and gRPC. Would you prefer — just to make a point, I don't know if it exists — TCP in WIT, so the abstraction is all the way down there? Or do you prefer that people put the layer at the same level as gRPC, where you don't know what is behind it — you don't know if it's HTTP/2, 3, or 4, it's just a gRPC interface between you and what is down there? The reason I say that is because I have this conundrum, this dilemma, because I'm using a lot of gRPC, and the situation becomes: okay, I'm okay going one level down, and that gRPC adapter, whatever you want to call it, deals with the WIT. But then what happens at the tooling level? Because now, if I use WIT, I take advantage of all the tooling around generating the types and so on. But if I use gRPC, then it's another tooling — which is exactly where I'm at right now. Like, okay, what should I do here? What should I go for to begin with?
+
+**Bailey Hayes** [26:22](https://youtu.be/LO_T9gQO8bI?t=1582)
+
+I actually explore a lot of that in this PR that I pulled up here. But the quick answer is: does it need to compose? That's my north star on most of these architecture design questions. So if I'm at the end of the train here and I am just the app that is making requests out, I maybe don't ever have the requirement to compose. But if I'm a tool or a library or a middleware, I have the requirement that I must compose, and that's where I would not use a gRPC client, for that reason. Now, the other part of it: when I ask "does it compose?", the other half of that is I'm thinking about whether it needs to be virtualized. When I say "does it need to compose," I'm either saying "does it have to act as part of a chain" — literal composition — or I'm saying "does it need to be virtualized or sandboxed in some kind of way?" It could be either of those, but they all fall under my "does it need to compose" umbrella.
+
+**Yordis Prieto** [27:33](https://youtu.be/LO_T9gQO8bI?t=1653)
+
+What about in between? Because my situation is that I have the WebAssembly domain level for the event sourcing and stuff, right? And I don't want to tell you how to use it. If you put an event bus on top of NATS that is following gRPC or whatever else, most likely that's the final artifact. But if you want to compose a bunch of middlewares that do event filtering before you get to that domain-level model, most likely you want to compose. But I don't know that.
+
+**Bailey Hayes** [28:01](https://youtu.be/LO_T9gQO8bI?t=1681)
+
+Yeah, one of the downsides of doing gRPC is that it's hard to be the man in the middle as middleware. So if you're in the in-between, I still would say you're in the "I need to compose" category. But yeah, it's definitely a choice, because when you're saying "I need to compose," that means I need to serialize at these boundaries, and that has its own cost. Frank?
+
+**Frank Schaffa** [28:37](https://youtu.be/LO_T9gQO8bI?t=1717)
+
+So you brought up a great point in terms of the way you make the decision. It would be great if this is documented somewhere — the priorities and the weight that you give. Does it have to be serializable? Is it going to be part of an integration process? All those things within this decision — it'd be great if there's a page or something showing, okay, this is how those decisions should be driven.
+
+**Bailey Hayes** [29:12](https://youtu.be/LO_T9gQO8bI?t=1752)
+
+Yeah, I've been wanting to write a blog post on this. I agree, it should also be a doc page, but I need the hot-takes blog post first before I can turn it into a doc page. So right now, I've been writing it in the back of my mind. We actually hit on some of these points in our last community call, where I was telling Yordis I'm angry at OpenAPI-to-WIT generators, basically because they don't follow all of my rules — where resources must always be singular instead of plural, stuff like that. And when to create a resource, when not to create a resource, I think is probably one of the biggest ones that people run into. For me, that's actually modeling the data in terms of ownership, which is a concept that a lot of developers aren't super familiar with.
+
+Yes, yes, hard agree, and I need to do that. I think me and Yordis should probably do that together. What I said last call was that between the people on this call right now — including Victor, Yordis — we maybe have all the opinions in the room on all the different ways to do this. So yeah, we need to curate that. Three years ago now, something like that, for WASI P2, I got so frustrated code-reviewing people's WIT definitions for WASI. I was like, these all suck, but it's really hard to explain why they suck. And I created a 12-factor app rule set for components, because it's not just the WIT, right? It's "does it need to compose," and they must be compositional — and when something must be compositional, there's actually a lot of transitive properties that build on top of that that are part of the actual API design. And that's so much more in depth than just "these are the rules for WIT." I can't write a linter for it. It's about how to make the right architecture choice.
+
+**Frank Schaffa** [31:10](https://youtu.be/LO_T9gQO8bI?t=1870)
+
+What I appreciate with this is the level of maturity, since you've been through so many of those decision processes so far. You have distilled the process behind this, and exposing this, I think, would be great.
+
+**Yordis Prieto** [31:26](https://youtu.be/LO_T9gQO8bI?t=1886)
+
+Yeah, and one word you used — I guarantee you there is a programmer out there thinking in two ways. As soon as you say, "Oh, you pay the cost of serialization," what they hear is, "I want to micro-optimize, therefore I will not reach for it." I guarantee you that. And this is where most people should probably test their assumptions, because to what extent does what you're saying even matter, when something like Wasmtime optimizes the heck out of it and you're effectively paying zero, technically? I don't know. But this is where it helps a ton.
+
+**Bailey Hayes** [32:06](https://youtu.be/LO_T9gQO8bI?t=1926)
+
+Yes. Well, and that's where composition is just going to get faster. We've done the low-hanging fruit at this point, but we haven't really done the next layer of performance optimization for that work. And there's another component model feature that's worth watching — I'm mentioning this mainly for Yordis — which is lazy lowering. We're going to use that to optimize the heck out of this at the runtime layer.
+
+**Yordis Prieto** [32:35](https://youtu.be/LO_T9gQO8bI?t=1955)
+
+Yeah, but this is where, personally, that page — I would like it to document, from your perspective, what is true today versus what will be true tomorrow. Because this is where, from the community perspective, we lose the opportunity to say, "Hey, do you really need the extra nanosecond, or can you just do it, because it's going to be optimized for you anyway?" Otherwise the tooling, the experiences, the experimentation, the composition that you couldn't have three years ago wouldn't be there, because people are like, "No, actually, I'm worried about this." And I'm saying this because this is exactly the situation that I'm in today. I am one of those that is putting WIT everywhere, although I know that sometimes a Node.js binding is most likely faster, but it's because I'm betting that they will make this faster. I do not need the extra nanoseconds or the extra two milliseconds. Obviously it cannot be 30 or 50 — then we're talking about stuff that I'm doing not being possible. But the Bytecode Alliance being clear on that, Bailey, I think is extremely helpful and valuable, so people know.
+
+**Bailey Hayes** [33:45](https://youtu.be/LO_T9gQO8bI?t=2025)
+
+Definitely. I mean, you can guess why it hasn't been created. It's hard, and anytime you make predictions publicly — especially when you're saying this thing is slow here, but we're gonna fix it — then you can point at my blog post in five years and be like, "Bailey, still not fixed," which is the classic thing that happens in software. And I'd like to be in that boat. I have plenty that I have written that I've been sent back plenty of times. But yeah, I need to do it.
+
+But this PR here that I have up is actually super relevant to this conversation. So let me dive in. I talked about this last week. I took what we had in wasmCloud v1 — it was a WIT definition at a 0.1.0 draft — and I updated it to be WASI P3. And updating to WASI P3 surfaced a number of things about how I would want the WIT design to be, and how I would want to implement this in a world where I have host component plugins, or where I could also do it just with a gRPC client. So here are three different host component plugins that are kind of interesting.
+
+<img src="/img/community/2026-09-23/image007.webp" alt="awesome-wasmcloud pull request 4 comparing three Couchbase host component plugins: Data API, KV SDK, and wasi:sockets P3" />
+
+The first one here is that they have a Data API, which most storage systems today have, because mostly all of them have added it to support serverless workloads. I added one at SingleStore, so I'm part of the gang. A lot of them call it a Data API, but what it really is, is just an HTTP endpoint. Now, something cool that Couchbase has been cooking is that they're also adding a gRPC endpoint, and I'll talk to that in a second. But point being, they've got HTTP-ish — it could be HTTP/1, it could be 3, could be 2 — but something called a Data API. This is cool. This is handy. When I demoed my hacktastic stuff on the call and Yordis was like, "Good Lord, Bailey, you should not be doing a Python mock server, what are you doing?" — I actually found that they do have a legit native gateway that surfaced that. It's a brand new thing that they've created, and it's really cool and awesome. And so I was able to drop that in and delete all my mock hackery. Thank goodness. So at least this PR has improved since last week.
+
+Some reasons why it's really powerful to do this: I can use the P3 API, which means I can take advantage of all the concurrency work that we've added and reentrancy in our hosts, so this is super performant. It doesn't open up sockets. It just makes layer-7 calls, which means you can do HTTP service chaining on top of this. And what's fun about this approach — you might be like, "Okay, well, why don't I just use this one?" Well, not everybody has access to the Data API, and not everybody's enabled it. So if you are in the land of "I can only use sockets, and I must use the old-school way of connecting to this thing over a socket," then I have a solution for you too. I actually have two.
+
+There's this one, which is the Couchbase key-value SDK. This one compiles in their Rust SDK, and I don't know the status of it — it wasn't on their web page when I looked, so that's why I'm saying unclear status. It doesn't require the gateway side of things, so that's kind of nice. It can talk to your Couchbase cluster directly. But here's the problem: I took their SDK from Rust and compiled it in with Tokio, because it requires that, and I also compiled in rustls, I think is how we say it. And so it's bigger by a lot — three megabytes larger, I think, versus this one being little kilobytes. But pro: hey, I was able to use an official SDK. I don't know how official it is, but bear with me. And it worked.
+
+**Bailey Hayes** [37:59](https://youtu.be/LO_T9gQO8bI?t=2279)
+
+And then when I did a performance benchmark between the two — because you should always test your assumptions — I found that it was faster than the HTTP Data API, but by just a little bit. Really super minor, not enough that I, as a platform person, would want to open up sockets for. So if I was the platform engineer here, for whoever's running on me, I would still say, "Thou must use this component to make it all work."
+
+The third one, which is kind of neat: the reason why this one didn't have the same throughput that I was able to get with this one is that it wasn't actually P3, because it was building with crates like an older version of getrandom — the newer version of getrandom actually supports WASI P3, but it had the older one in the dependency tree. Tokio and rustls actually had another thing that didn't compile to WASI P3 yet, so it pulled in WASI P2, and that meant the socket part was WASI P2, and so I couldn't do our cool concurrency tricks. So I said, "All right, let's see what it would take to make one that supports WASI P3 sockets," and just vibed out a client, made that work. And that worked great. I haven't done the TLS layer. That is not because it can't work; I just hadn't gotten to it yet. What I want to do there is basically a WASI TLS kind of solution, but I want to introduce a wasmCloud host TLS interface and have that basically be where the host gets the certs and does the work, and not the host component plugin, since that's more secure. Oh yeah, I'm triggering you guys so bad with my tabs — and what's worse, this is one of like eight windows. This is not even the one. Sorry, team.
+
+Anyways, so those are my three plugins. Now, I didn't just do a plugin. I also made a component, and this one is based on a component that Laurent sent me — he's one of the DevRel leads over at Couchbase — and he is championing and trying to get people interested in their new gRPC client endpoint support for their gateway. So I took basically what he was playing with, and I made a little thing that calls over gRPC. The code here is — it's whatever. It's a little too low level, I feel like, because the Rust SDK didn't do it, and so I had to roll my own little thing here, and that's why there's a lot of stuff that I otherwise would have put in utilities and things. But TL;DR, there's a little handler, and it can make requests out.
+
+<img src="/img/community/2026-09-23/image008.webp" alt="Source code of a Rust component that calls the Couchbase gateway gRPC endpoint" />
+
+That's nice, and their gRPC endpoint is nice if I'm doing something like streaming lots and lots of rows all the way through — this would win in that. But when I diffed the performance between gRPC and HTTP for not-super-large cardinality of data on my request for each row, the HTTP one actually won, because gRPC does frames. So people are always like, "gRPC faster." Not necessarily true. Test it with your data. So depending on which one you want to use, those are both there.
+
+So this immediately raises the question: now I need to come up with a way to explain to people which host component they would want to use and why, when they would want to build a client directly into their component code — into their workload code — or when they would want to use a host component and have it do this. Now, there's another stunt hack that I did that I actually ended up deleting and reverting out of this PR, which was the fourth derivation here — which is kind of what I think Yordis was asking me earlier, which is why I wanted to share. Okay, so I have a host component here that does the HTTP side. I was like, I could do one that does gRPC. I could also share the gRPC client across everybody. When I did the performance for that, gRPC introduced a lot of complexity —
+
+**Bailey Hayes** [42:17](https://youtu.be/LO_T9gQO8bI?t=2537)
+
+— and it wasn't much better, because I was doing essentially serialization over the boundary between my workload and my host component, and doing that and then also doing gRPC serialization made it a little bit slower than the HTTP one. I'm like, ah, I would rather just give them the HTTP one, which I know works basically everywhere.
+
+So the point is that I need to write up some of this too. That's also in the vein of all the things that we were just talking about: how do I choose which thing to build with? And the answer is, I would want the host component plugin so that I can pass in credentials and connection information, and my tenants never touch that. They don't know anything about that. They just get it. That is why I would do that. If my tenants own their own Couchbase and they own their own connectivity, then I would tell them to use a client directly. If I had a case where I didn't have access to the Data API, then I would do sockets. But generally speaking, I would say for serverless workloads, go this way, towards the Data API one. Anyways, it's kind of turtles all the way down in terms of the choices that you have to make for architectures. It's more than just "should I do a WIT definition" — I guess that's what was killing me earlier in our conversation. It's not just "should I do a WIT definition." It's what implementation should back that WIT definition, because there's a lot more choices even underneath that. All right, I hope I didn't bore everybody to death. Any questions about that?
+
+**Yordis Prieto** [44:04](https://youtu.be/LO_T9gQO8bI?t=2644)
+
+Do you have the actual data on the differences between them? Is it in the PR? I haven't looked at it end to end.
+
+**Bailey Hayes** [44:11](https://youtu.be/LO_T9gQO8bI?t=2651)
+
+Yeah, I dropped the most recent stuff. The ratios are what matter here, not the actual numbers. This was run on my MacBook with Spotify and me doing other things and all that jazz, because I only cared about orders of magnitude to make these choices.
+
+**Yordis Prieto** [44:41](https://youtu.be/LO_T9gQO8bI?t=2681)
+
+I see. Yeah, these dilemmas — the SDK type, all the stuff that they're doing. Does it come from WIT? Does it come from — this is exactly what I'm pulling my hair out over right now.
+
+**Bailey Hayes** [44:54](https://youtu.be/LO_T9gQO8bI?t=2694)
+
+Yep, I thought you'd be into it. I was like, I've got something super relevant for you. Oh, and the other part of the story here: in the past, in wasmCloud v1, we also had a WASI key-value implementation that pointed to Couchbase, so that was yet another host component I was going to make here. The reason why I want optional imports, gosh darn it, from the component model is so that I could have an optional import for WASI key-value if people want it. But what I'll do instead is have that be another exported interface on a host component. And if a component just has WASI key-value and they do a binding to multiplex to this key-value backend, then they get Couchbase as their KV store. I haven't made that component yet, but again, there's plenty of combinations here that are available.
+
+**Yordis Prieto** [45:48](https://youtu.be/LO_T9gQO8bI?t=2748)
+
+Yeah. Okay, hear me out on this one — I think it's for tomorrow's meeting, I don't know, maybe next week. What if there is a WIT file that allows you to do custom annotations, and then you can generate the WIT and the OpenAPI spec, and there's a key for both?
+
+**Bailey Hayes** [46:10](https://youtu.be/LO_T9gQO8bI?t=2770)
+
+Well, in that scenario, instead of doing what I'm doing, I would probably have kept Couchbase owning this, right? I would have wanted them to have it. But here I had to make enough decisions on the right way to write the WIT based on their Data API that I was like, I'd rather it be in our control, because I'm gonna have to iterate really quickly here.
+
+**Yordis Prieto** [46:31](https://youtu.be/LO_T9gQO8bI?t=2791)
+
+Yeah, because the custom annotation is effectively what Rust macros are, in a sense. So you can rename it for the sake of JSON marshalling and unmarshalling and stuff like that — resources or interfaces themselves could actually have the annotation for the endpoint itself. And there you go; you don't have to choose one over the other. You may be able to deprecate OpenAPI, AsyncAPI, all the stuff, and just have it become the file.
+
+**Bailey Hayes** [47:02](https://youtu.be/LO_T9gQO8bI?t=2822)
+
+Yeah, well, and again, I would want somebody else to own the file, and that's the big win here, right? Then you truly get SDKs for free. They would get every derivation they actually need, and then for the implementation side, I can just show them all the different ways, give them build flags, and that'd be the end of it. And then also the second host component that I made there, that was WASI P3 native — obviously, the other way I'm attacking it is I'm going upstream and making sure those dependencies can compile to WASI P3, and eventually that one wouldn't be needed.
+
+Well, do we have other stuff? I think that was it for my topics. You know, it's funny — I'm like, oh, we're not gonna have anything to talk about. Yeah, Aditya — Dan Phillips gave a talk on Boxer two years ago, maybe three. If you want to watch it, it hasn't changed since he talked about it back then, but he's just been tweeting about it more recently.
+
+**Aditya Salunkhe** [48:16](https://youtu.be/LO_T9gQO8bI?t=2896)
+
+I'll take a look.
+
+**Bailey Hayes** [48:21](https://youtu.be/LO_T9gQO8bI?t=2901)
+
+Hello, zoomed-in Liam. Did you have something you wanted to say?
+
+**Liam Randall** [48:26](https://youtu.be/LO_T9gQO8bI?t=2906)
+
+I want to — [inaudible].
+
+**Yordis Prieto** [48:30](https://youtu.be/LO_T9gQO8bI?t=2910)
+
+Maybe next week I'm gonna show you something amazing. I've been working my ass off on it — oops, sorry. I've been working a lot on it.
+
+**Bailey Hayes** [48:39](https://youtu.be/LO_T9gQO8bI?t=2919)
+
+I need to stop the recording! Don't worry, Liam already has a filter that I required because of me and my talking. So is it related to what you're going to talk about on Thursday, Yordis?
+
+**Yordis Prieto** [48:59](https://youtu.be/LO_T9gQO8bI?t=2939)
+
+No.
+
+**Bailey Hayes** [49:00](https://youtu.be/LO_T9gQO8bI?t=2940)
+
+Okay.
+
+**Yordis Prieto** [49:02](https://youtu.be/LO_T9gQO8bI?t=2942)
+
+Here's a teaser for you.
+
+**Bailey Hayes** [49:05](https://youtu.be/LO_T9gQO8bI?t=2945)
+
+Oh, hooks? Yes, webhooks, webhook all the things.
+
+**Yordis Prieto** [49:09](https://youtu.be/LO_T9gQO8bI?t=2949)
+
+Nope.
+
+**Bailey Hayes** [49:10](https://youtu.be/LO_T9gQO8bI?t=2950)
+
+Nope.
+
+**Yordis Prieto** [49:11](https://youtu.be/LO_T9gQO8bI?t=2951)
+
+It's a truly agentic framework that is WebAssembly first and only.
+
+**Bailey Hayes** [49:17](https://youtu.be/LO_T9gQO8bI?t=2957)
+
+Cool, cool. Yeah, there are several others out there that you might want to learn from. There's one I've played with some. It's interesting. It's a little too complicated for me. In today's world, I just want my own software that's all simplified, and I know it and trust it, versus some of these other projects that are bringing in the kitchen sink.
+
+**Yordis Prieto** [49:43](https://youtu.be/LO_T9gQO8bI?t=2983)
+
+Yep, yep, yep. Well, I am familiar with them, although I'm just focusing on what [inaudible] built, since that's actually in production. I know there are open source ones. And the intent is just: okay, you want your own way here? Here is a WIT for you. Inject it here. I'm not gonna do it for you. You want agents files instead of Claude files? There you go. Inject your own resolution here.
+
+**Bailey Hayes** [50:13](https://youtu.be/LO_T9gQO8bI?t=3013)
+
+Cool. Yeah, that's awesome. And also, shout-out to anybody who's building cool stuff with WebAssembly —
+
+**Frank Schaffa** [50:20](https://youtu.be/LO_T9gQO8bI?t=3020)
+
+Yep.
+
+**Bailey Hayes** [50:21](https://youtu.be/LO_T9gQO8bI?t=3021)
+
+— better than me ranting for, I don't know, 20 minutes about WIT design. Would love to see your demos.
+
+**Yordis Prieto** [50:27](https://youtu.be/LO_T9gQO8bI?t=3027)
+
+Yeah, I'm trying to finish. Here's the other thing: I want to use Liam's tool to begin with. Do you want to run this in wasmCloud and spawn the heck out of everything all over the place? Well, there you go. Because I do need it, Liam — I'm actually dealing with all the problems around sandboxing deployment. Oh my God, so many tools, all of them proprietary. It's really difficult. [inaudible] What I do want, all along, is just: wasmCloud, you deal with it.
+
+**Liam Randall** [51:00](https://youtu.be/LO_T9gQO8bI?t=3060)
+
+Well, I went to dinner last night with a bunch of interesting folks, and we ended up doing a napkin-sketch presentation, where you get a pen and hand-draw a slide. And so I'm taking my notes from last night, and I'm working on a series of blogs today. First is: what are capabilities? Because we get it on this call — that's what we're about. But most people don't really understand that when your iPhone says "this app wants to use your contacts, your microphone," or when your browser says "this app wants to use your camera or mic or location," those are just capabilities. And then once we explain that, we need to explain to people what it means to sandbox AI. And picking the right sandbox depends on what capabilities it needs. And the strategy is the principle of least authority: you want to configure your agent all the way down to the smallest, narrowest number of capabilities, in order to reduce its chance of doing harm.
+
+And Bailey has this banger tagline she came up with that I'm not going to use here, but you'll see it on our Instagram. I used it last night at dinner, Bailey — the one about locking somebody in a blank is like a blank in a blank. No way. It's way too good. We're gonna save that one for Twitter — or whatever they call it now. I dropped it last night very casually, and the whole table stopped, and they're like, "Put that on Twitter," and I was like, yeah, Twitter, you can do it.
+
+But I think, Yordis, we're spoiled for choice these days. What people think they want is Claude Code in a sandbox, but that's really hard, because why they like Claude Code is because it can do anything, and it's hard to sandbox everything. So the right strategy is to think about your builder toolboxes going into very large, permissive sandboxes that are as isolated with hardware as possible, and then when you move down to smaller, more fine-grained things where you can achieve higher density and multi-tenancy, that is where you would leverage things like Cosmonic or wasmCloud or WebAssembly components in order to get there. So I'm working on those right now. That's actually why I've been — I was just heads down, sketching graphics and stuff. So, maybe we'll meet next week, same time, same bat channel.
+
+**Bailey Hayes** [53:35](https://youtu.be/LO_T9gQO8bI?t=3215)
+
+Sounds good. Sounds good. I appreciate everybody joining the call. I'm gonna stop the recording now, and see everybody next week.
