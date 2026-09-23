@@ -71,13 +71,13 @@ wash-runtime = { version = "*", default-features = false, features = [
 | `wasi-keyvalue` | Yes | Key-value storage interface |
 | `wasmcloud-postgres` | Yes | Direct PostgreSQL access (queries and prepared statements) |
 | `wasmcloud-nats` | Yes (since 2.9.0) | NATS-native core, JetStream, and key-value access |
-| `wasm_component_model_implements` | Yes (since 2.7.0) | Multi-backend binding via the `implements` clause |
+| `wasm_component_model_implements` | Yes | Multi-backend binding via the `implements` clause |
 | `wasi-otel` | Yes | OpenTelemetry traces, metrics, and logs export |
 | `washlet` | Yes | Washlet support (depends on `oci`) |
 | `wasi-webgpu` | Yes | WebGPU interface |
 | `oci` | Yes (via `washlet`) | OCI registry integration for pulling components |
 | `wasi-tls` | No | TLS termination for `wasi:tls` components |
-| `host-component-plugins` | No | Host component plugin support |
+| `host-component-plugins` | No | Host component plugin support (included in the published `-all-features` image) |
 
 ## Architecture overview
 
@@ -224,9 +224,19 @@ Two embedder-facing changes in 2.8.0:
 - **Plugin dispatch** is public API: `engine::dispatch` lets a native plugin push calls into workload guest code through `ResolvedWorkload::dispatch_target` (see [Creating host plugins](./creating-host-plugins.mdx#dispatching-into-workloads)).
 - **Descriptor limits**: `wash host` raises the process's soft file-descriptor limit toward the hard limit at startup; library embedders should call `raise_descriptor_limit()` themselves if they serve ingress traffic.
 
+### Embedder changes at 2.10.0
+
+- **Wasmtime 48.** `OutgoingHandler::send_request`, `HostHandler::outgoing_request`, and `Router::allow_outgoing_request` are unified over `WasiBody`/`RequestOptions`; the `host::http_p3` types (`P3Body`, `P3SendFuture`, and friends) are removed; `wasmtime_wasi::FsPerms` replaces `DirPerms`/`FilePerms` in volume wiring. MSRV is 1.95.
+- **Observability**: `observability::install_providers()` returns a `Providers` handle (`logs_layer`, `tracing_layer`, `meter_provider`) for embedders that install their own subscriber; export activation is keyed on `OTEL_*` endpoint variables.
+- **Engine**: `with_native_unwind_info(bool)` (or `WASMTIME_NATIVE_UNWIND_INFO`) can turn off per-function unwind registration, which makes dropping components on busy hosts far cheaper under LLVM libunwind (macOS and musl builds); native DWARF profilers lose guest frames.
+- **Egress identity**: `ClientTlsOptions::with_client_identity` presents a client certificate; `ClientTlsConfigResolver` and `WorkloadClients::with_tls_config_resolver` select per-workload TLS configs; `RotatingClientIdentity` plus `spawn_refresh` rotate credentials without restart.
+- **Dispatch**: `DispatchTarget::start` returns a cancellable `DispatchHandle`, and dropping the `dispatch()` future now cancels the call.
+- **Plugins**: `BindingSchema::and_aliases` and `and_required_keys`; `HostPlugin::configure_egress_policy` (default rejects a declared ceiling).
+- **Lifecycle**: workloads hold the HTTP handler weakly, so dropping a `Host` releases its ingress; workloads with no outbound HTTP run without a live handler.
+
 ### Customizing outgoing HTTP requests
 
-By default, every outbound HTTP request from a component flows through `wasmtime-wasi-http`'s `default_send_request`. For most embedders that's the right behavior — but if you need to thread custom TLS configuration through outgoing calls, swap in an alternative transport (an internal RPC system, for example), or insert middleware-style policy at the egress boundary, `wash-runtime` 2.2 introduced the `OutgoingHandler` trait as a pluggable extension point on the HTTP server.
+By default, every outbound HTTP request from a component flows through the built-in client. Under Wasmtime 48 (since 2.10.0) there is a single `OutgoingHandler::send_request` over `WasiBody` serving both WASI 0.2 and 0.3 components; the earlier P3-specific types are gone. If you need to thread custom TLS configuration through outgoing calls, swap in an alternative transport, or insert middleware-style policy at the egress boundary, implement the `OutgoingHandler` trait as a pluggable extension point on the HTTP server.
 
 Implement `OutgoingHandler` on your own type, then supply it to `IngressBuilder::outgoing_handler` when constructing the ingress:
 
@@ -245,7 +255,6 @@ let http_handler = Ingress::builder(DevRouter::default(), "127.0.0.1:8080".parse
     .await?;
 ```
 
-The runtime calls into your handler for every outbound HTTP request from any component the host runs. If you don't register one, `DefaultOutgoingHandler` is used, which delegates to `wasmtime_wasi_http::p2::default_send_request` (or the P3 equivalent for P3 components).
 
 `OutgoingHandler` and `wasi:tls` are complementary: `wasi:tls` lets *components* own their TLS session, while `OutgoingHandler` lets the *host* shape egress uniformly across every component it runs.
 

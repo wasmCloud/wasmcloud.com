@@ -1,0 +1,60 @@
+---
+title: 'Host telemetry'
+sidebar_label: 'Host telemetry'
+sidebar_position: 6
+description: 'Configure the wasmCloud host to export traces, logs, and metrics over OTLP with standard OTEL_ environment variables.'
+proficiency: Intermediate
+# `about` (single primary topic) and `mentions` (secondary topics) reference
+# entity slugs in src/data/entities.json. At build time these expand into
+# schema.org JSON-LD nodes.
+about: wasmCloud
+mentions:
+  - Kubernetes
+platforms: [wasmCloud, Kubernetes]
+---
+
+# Host telemetry
+
+The wasmCloud host exports its own traces, logs, and metrics over OTLP, configured entirely through the standard [OpenTelemetry environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/). There are deliberately no `--otel-*` flags. This page covers the host's telemetry about itself and the workloads it runs; the separate `wasi:otel` interface, which lets guest code emit its own telemetry, is enabled with `--wasi-otel` and covered in the [Host Interface Configuration Reference](../host-interface-configuration.mdx#interfaces-with-no-configuration).
+
+## Export activates on an endpoint
+
+A signal (traces, logs, or metrics) is exported only when an endpoint is configured for it: its own `OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT` or the shared `OTEL_EXPORTER_OTLP_ENDPOINT` (since 2.10.0). Setting other `OTEL_*` variables alone, such as `OTEL_SERVICE_NAME`, no longer activates export.
+
+:::warning[Upgrading from 2.9.0]
+Before 2.10.0, any `OTEL_*` variable activated all three exporters against the SDK default (`localhost:4317`). A deployment that collected from that default without setting an endpoint stops exporting on upgrade: set `OTEL_EXPORTER_OTLP_ENDPOINT` explicitly. Dashboards keyed on `service.name` may also shift: the host previously forced `wash-runtime` and honors your `OTEL_SERVICE_NAME` since 2.10.0.
+:::
+
+Telemetry misconfiguration is never fatal: an invalid endpoint or protocol disables that signal with a warning and the host keeps running. Each enabled signal logs one startup line, `exporting telemetry over OTLP`, with its endpoint, protocol, and client auth mode.
+
+## Variables the host honors
+
+| Variable | Effect |
+| --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint for every signal; setting it is what activates export |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `..._LOGS_ENDPOINT`, `..._METRICS_ENDPOINT` | Per-signal endpoints, overriding the shared one |
+| `OTEL_TRACES_EXPORTER`, `OTEL_LOGS_EXPORTER`, `OTEL_METRICS_EXPORTER` | `otlp` (default) or `none` to turn one signal off |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` (and per-signal forms) | `grpc` (default, port 4317) or `http/protobuf` (port 4318); `http/json` is not supported |
+| `OTEL_EXPORTER_OTLP_TIMEOUT` (and per-signal forms) | Export timeout in milliseconds, default 10000 |
+| `OTEL_EXPORTER_OTLP_CERTIFICATE` | PEM CA bundle for a private-CA collector, layered onto the public roots |
+| `OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE`, `OTEL_EXPORTER_OTLP_CLIENT_KEY` | mTLS client identity for the collector; both required together |
+| `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | Resource identity; `service.name` defaults to `wash-runtime` when unset |
+| `OTEL_SDK_DISABLED` | `true` disables everything |
+
+The endpoint scheme decides transport security: `https://` endpoints use TLS (including over gRPC), `http://` endpoints export unencrypted with a warning. Per-signal certificate variables, `OTEL_EXPORTER_OTLP_HEADERS`, and samplers are not processed by the host.
+
+## Where to set the variables
+
+- **Kubernetes**: [`runtime.env`](./helm-values.mdx#runtimeenv-runtimeenvfrom-and-runtimeextraargs) for every host group, or `runtime.hostGroups[].env` per group; `operator.env` for the operator's own telemetry.
+- **`wash dev`**: `dev.environment` in `.wash/config.yaml`, which is applied before telemetry initializes and overrides the shell.
+- **`wash host`**: the process environment.
+
+## What the host emits
+
+Guest execution metrics (`guest.invocation.duration`, `fuel.consumption` under `--meters fuel`) and their bounded attribute set are documented under [metrics you can scale on](./autoscaling.mdx#metrics-you-can-scale-on); guest memory accounting metrics under [`guestMemoryMode`](./helm-values.mdx#runtimeresourcesguestmemorymode). Traces carry W3C `traceparent` propagation.
+
+## Related documentation
+
+- [Autoscaling](./autoscaling.mdx): scaling on the emitted metrics.
+- [Helm Values Reference](./helm-values.mdx): `runtime.env` and per-group environment plumbing.
+- [Host Interface Configuration Reference](../host-interface-configuration.mdx): the guest-facing `wasi:otel` interface.

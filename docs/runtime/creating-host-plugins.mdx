@@ -126,16 +126,19 @@ The `HostPlugin` trait uses several types from the `wash_runtime` crate:
 
 Since 2.9.0, operators can configure a plugin through a generic `plugins` declaration ([host config or Helm values](../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsplugins)) instead of ad hoc per-plugin settings. Four defaulted `HostPlugin` methods let a plugin participate:
 
-- **`binding_schema()`**: classify the plugin's config keys by ownership (host-owned, ceiling, or workload-owned). A plugin with a schema gets a closed key set: unknown keys are refused at deploy.
+- **`binding_schema()`**: classify the plugin's config keys by ownership (host-owned, ceiling, or workload-owned), and since 2.10.0 declare spelling aliases (two spellings resolved as one key, keeping the stricter ownership) and required keys (keys the fully resolved binding must carry under any policy). A plugin that declares workload-owned keys gets a closed key set: unknown keys are refused at deploy.
 - **`validate_bindings()`**: validate the operator's declaration at host startup, so a bad declaration fails the host rather than the first workload.
 - **`narrows()`**: define what it means for a workload to request a subset of a granted ceiling (for example, a narrower subject allowlist).
 - **`defers_unnamed_instances()`**: whether a plain, unlabeled import should be handed to a sibling plugin that serves it plainly rather than to this one. Defaults to `supports_named_instances()`, so a multiplexer yields plain imports to a single-backend plugin; a plugin serving both off one backend returns `false`.
+- **`configure_egress_policy()`** (since 2.10.0): receive the operator-declared egress ceiling (`allowedHosts`, `allowedIpNameLookups`) for enforcement. The default implementation rejects a declaration, so a ceiling on a plugin that cannot enforce it fails host startup instead of going silently unenforced.
 
 By the time `on_workload_item_bind` runs, each interface's `config` map is already merged and policy-checked; plugins never see the `workloadConfig` policy itself.
 
 ### Dispatching into workloads
 
 Since 2.9.0, a native plugin can push calls into guest code through a `DispatchTarget`, resolved once per workload item in `on_workload_resolved()` via `ResolvedWorkload::dispatch_target(item_id, plugin)` (the plugin id, as a `&'static str`). Dispatched component calls run on the component's warm instance pool (honoring `poolSize`, `maxConcurrency`, and `maxInvocations`) or one-shot stores; dispatched service calls land on the service's pinned instance. A service reached this way must target WASI P3, and it stays up after `wasi:cli/run` returns so it can keep receiving dispatches. The host arms deadlines, tracks abandonment, and records guest metrics under the plugin's id for every dispatched call. The `wasmcloud:nats` plugin shares this dispatch machinery while driving the pool itself, because a JetStream delivery's message handle is tied to the store that must run it.
+
+Dispatch is cancellable since 2.10.0. `DispatchTarget::start` returns a `DispatchHandle` with `cancel()` and `outcome()`, dropping the `dispatch()` future cancels the call, and a cloneable `CancelHandle` reports quiescence. A cancelled call that never entered the guest is dropped outright; one running on a dedicated store has the store dropped; a warm instance is retired and drained; a service call runs until the guest returns.
 
 ### Looking up other plugins
 

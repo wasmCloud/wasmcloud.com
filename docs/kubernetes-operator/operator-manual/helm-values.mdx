@@ -238,7 +238,7 @@ Three 2.9.0 values render host flags that a pre-2.9.0 host image refuses, crash-
 
 ### `runtime.env`, `runtime.envFrom`, and `runtime.extraArgs`
 
-Chart-wide host configuration applied to **every** host group's container. Per-host-group values (see [`runtime.hostGroups[].env`](#runtimehostgroupsenv-envfrom-and-extraargs) etc.) are appended after these, letting one group extend the chart-wide defaults without redefining them.
+Chart-wide host configuration applied to **every** host group's container. The host's own telemetry export is configured with `OTEL_*` environment variables set here; see [Host telemetry](./telemetry.mdx). Per-host-group values (see [`runtime.hostGroups[].env`](#runtimehostgroupsenv-envfrom-and-extraargs) etc.) are appended after these, letting one group extend the chart-wide defaults without redefining them.
 
 - `runtime.env` — additional environment variables applied to every host group container, appended after the chart-managed vars (`WASMCLOUD_HOST_IP`, `WASMCLOUD_HOST_ENVIRONMENT`) and before any per-host-group `env`.
 - `runtime.envFrom` — populate every host group container's environment from ConfigMaps or Secrets.
@@ -374,11 +374,19 @@ runtime:
         - gc
 ```
 
-Recognized values are `component-model-async`, `component-model-map` (added in 2.7.0), `gc`, `exception-handling`, `wide-arithmetic`, `threads`, and `tail-call`. WASI 0.3 always brings the `component-model-async` proposal along with it, and as of wasmCloud 2.7.0 the engine also enables the Component Model `map` type proposal unconditionally, so neither needs to be listed explicitly on 2.7.0-and-later hosts.
+Recognized values are `component-model-async`, `component-model-map`, `gc`, `exception-handling`, `wide-arithmetic`, `threads`, and `tail-call`. WASI 0.3 always brings the `component-model-async` proposal along with it, and as of wasmCloud 2.7.0 the engine also enables the Component Model `map` type proposal unconditionally, so neither needs to be listed explicitly on 2.7.0-and-later hosts.
 
 ### `runtime.hostGroups[].http.port`
 
 The port the host's HTTP server listens on inside the pod, and the port the operator populates into each managed EndpointSlice. The upstream chart default is `9191`; the [`values.local.yaml`](https://github.com/wasmCloud/wasmCloud/blob/main/charts/runtime-operator/values.local.yaml) overlay overrides it to `80` for local development.
+
+### `runtime.hostGroups[].http.localBypassRouting`
+
+Enables same-host local routing (since 2.10.0; default `false`, rendered as `--http-local-routing`): outgoing HTTP whose hostname matches a co-located workload's `localRoute` declaration is served in process instead of leaving the host. This is one of two keys: the target workload declares the names it serves with the [`localRoute` config key](../host-interface-configuration.mdx#wasihttp), and the caller's `allowedHosts` is still checked before the short-circuit.
+
+:::warning
+Local routing bypasses ingress auth, rate limits, mesh mTLS, and NetworkPolicy, and a `localRoute` claim is not proof of ownership: any workload on the host may claim any hostname, including one a neighbor calls over HTTPS, and receive that traffic in plaintext. Enable it only on host groups whose workloads trust each other, never on shared multi-tenant groups. See [Workload security](../workload-security.mdx#same-host-local-routing).
+:::
 
 ### `runtime.hostGroups[].webgpu.enabled`
 
@@ -386,7 +394,7 @@ Enables the WebGPU plugin on hosts in the group. Requires a host image built wit
 
 ### `runtime.ociCaPaths` and `runtime.hostGroups[].ociCaPaths`
 
-Introduced in 2.7.0. PEM bundles of additional CA certificates the host trusts when pulling artifacts (e.g., workload components, host component plugins, or washlet artifacts) from OCI registries. `runtime.ociCaPaths` applies chart-wide; the per-host-group form is additive. The chart renders entries as `--oci-ca-path` arguments (the paths must be mounted into the pod via `volumes`/`volumeMounts`).
+PEM bundles of additional CA certificates the host trusts when pulling artifacts (e.g., workload components, host component plugins, or washlet artifacts) from OCI registries. `runtime.ociCaPaths` applies chart-wide; the per-host-group form is additive. The chart renders entries as `--oci-ca-path` arguments (the paths must be mounted into the pod via `volumes`/`volumeMounts`).
 
 For an in-cluster registry signed by the chart's own CA (with `global.tls.enabled`), the CA bundle is already mounted:
 
@@ -398,7 +406,27 @@ runtime:
 
 Prefer this over `--allow-insecure-registries`, which switches every registry to plain HTTP. Credentials travel in the clear and no certificate is checked at all.
 
-For trusting private CAs on components' *outbound HTTPS* (a separate mechanism from OCI pulls), pass `--http-client-ca-path`/`--http-client-trust-roots` via [`runtime.hostGroups[].extraArgs`](#runtimehostgroupsenv-envfrom-and-extraargs) with the bundle mounted the same way.
+For trusting private CAs on components' *outbound HTTPS* (a separate mechanism from OCI pulls), use [`runtime.httpClientCaPaths`](#runtimehttpclientcapaths-and-runtimehttpclienttrustroots) below.
+
+### `runtime.httpClientCaPaths` and `runtime.httpClientTrustRoots`
+
+Trust configuration for components' outbound HTTPS, first-class since 2.10.0 (the flags date to 2.7.0; earlier charts passed them through `extraArgs`). `runtime.httpClientCaPaths` lists PEM bundles of additional CAs to trust, rendered as `--http-client-ca-path`; the per-host-group form is additive, and the paths must be mounted into the pod via `volumes`/`volumeMounts`. `runtime.httpClientTrustRoots` selects the base trust store, rendered as `--http-client-trust-roots`: `webpki` (the host default), `webpki-and-native`, `native`, or `extra-only`. Empty keeps the host default; a per-host-group value replaces the chart-wide one.
+
+### `runtime.clientIdentity`
+
+A client certificate the host presents on components' outbound HTTPS when a peer requests one (mTLS; since 2.10.0). Point `secretName` at a `kubernetes.io/tls` Secret in the host group's namespace; the chart mounts it read-only and renders `--http-client-cert-path` and `--http-client-key-path`:
+
+```yaml
+runtime:
+  clientIdentity:
+    secretName: egress-client-tls
+    certKey: tls.crt        # defaults match cert-manager output
+    keyKey: tls.key
+    mountPath: /client-identity
+    refreshInterval: 30s    # re-read for rotation; empty reads once
+```
+
+The identity is host-group-wide and destination-wide: every workload authenticates as it, and it is presented to any peer that asks. Pair it with narrow `allowedHosts`, and keep untrusted workloads on a host group without one. Rotation is a polling re-read (`refreshInterval`, default `30s`, rendered as `--http-client-identity-refresh`): new connections pick up the new credential, established connections keep what they negotiated, and a failed re-read keeps the current credential. Expiry is fail-closed: a host refuses to start with an already-expired identity, and a credential that expires while resident stops being presented, logged at error. A per-host-group `hostGroups[].clientIdentity` block overlays the chart-wide one field by field, like `probes`; an explicit empty `secretName` disables identity for that group.
 
 ### `runtime.resources.defaultHeapMemory` and `runtime.resources.coreInstances`
 
@@ -472,7 +500,7 @@ Liveness is deliberately slower than readiness: a restart loses every workload o
 
 Host pods drain on termination instead of exiting immediately (since 2.9.0):
 
-1. On SIGTERM the host reports `draining`: readiness fails and the pod leaves its Service endpoints while the host is still serving.
+1. On SIGTERM the host reports `draining`: readiness fails and the pod leaves its Service endpoints while the host is still serving. Requests arriving on already-established keep-alive connections are served through the drain rather than turned away (since 2.10.0).
 2. The host keeps serving for `runtime.drainDelaySeconds` (default `5`, rendered as `--drain-delay`).
 3. In-flight commands get 5 seconds to finish, and each plugin's stop is capped by `WASH_PLUGIN_STOP_TIMEOUT_SECS` (default 5 seconds) plus a 1 second grace.
 
@@ -496,17 +524,19 @@ Maps to the host's socket policy and connection quota flags. The chart renders t
 | `maxInboundSocketConnectionsPerWorkload` | `256` | `--max-inbound-socket-connections-per-workload` |
 | `maxHttpIngressConnections` | empty (a quarter of the descriptor limit, floor 256; since 2.9.0) | `--max-http-ingress-connections` |
 
-`allowHostLoopback` and `denyPrivateRanges` render as presence flags, so setting them to `false` is the same as omitting them; only `denySpecialRanges` renders an explicit value. See [Concurrency and connections](./concurrency-and-connections.mdx) and [Workload security](../workload-security.mdx) for what these bound. `publishPorts` and `publishPortRange` appear in the values file but are not yet wired to the host; setting them has no effect.
+`allowHostLoopback` and `denyPrivateRanges` render as presence flags, so setting them to `false` is the same as omitting them; only `denySpecialRanges` renders an explicit value. `socketEgress` also gates host plugins' `allowedHosts` and address-range refusals (since 2.10.0). See [Concurrency and connections](./concurrency-and-connections.mdx) and [Workload security](../workload-security.mdx) for what these bound. `publishPorts` and `publishPortRange` appear in the values file but are not yet wired to the host; setting them has no effect.
 
 ### `runtime.hostGroups[].plugins`
 
-One declaration block configures host plugins of both kinds (since 2.9.0): native plugins built into the host (an entry with only an `id`) and [host component plugins](../../runtime/creating-host-component-plugins.mdx) (an entry with an `image` or `file` source). A native entry, and any entry carrying config, secrets, allowlists, or binding fields, is rendered into the host's config file rather than CLI arguments, so credentials never appear in the pod spec; a bare component entry (`id` plus a source) still renders as a `--host-plugin` argument. Each entry accepts:
+One declaration block configures host plugins of both kinds (since 2.9.0): native plugins built into the host (an entry with only an `id`) and [host component plugins](../../runtime/creating-host-component-plugins.mdx) (an entry with an `image` or `file` source). A native entry, and any entry carrying config, secrets, allowlists, or binding fields, is rendered into the host's config file rather than CLI arguments, so credentials never appear in the pod spec; a bare component entry (`id` plus a source) still renders as a `--host-plugin` argument. (Before 2.10.0, egress lists on entries that took the CLI path were silently dropped; they are file-backed and enforced now.) Each entry accepts:
 
 - **`config` / `configFrom` / `secretFrom`**: entry-wide configuration, layered under each binding's own.
 - **`workloadConfig`**: `deny` (the default), `warn`, or `allow`. Under `deny`, host-owned keys (connection and credential settings) come only from this declaration: a workload manifest that sets one or widens a grant ceiling is refused at deploy, and once any binding is declared for a plugin, so is a manifest naming a binding the declaration does not carry. `warn` behaves like `allow` but logs everything `deny` would refuse, for rehearsing a lockdown.
 - **`hostOwnedKeys`**: additional keys to claim for the host under `deny`.
 - **`bindings`**: a map of label to `{config, configFrom, secretFrom}`. A component imports the plugin's interface under that label (the Component Model's `implements` clause), and the labeled import resolves against the binding's config layered over the entry's.
-- Component-plugin-only fields: `maxRestarts`, `digest` (an OCI digest pin), `allowedHosts`, `allowedIpNameLookups`. (A `ports` field appears in the values file but is not yet wired to the host.)
+- **`allowedHosts` / `allowedIpNameLookups` / `allowedHostLoopbackPorts`**: the plugin's own egress and loopback grants. Empty or omitted denies all. Since 2.10.0 the lists are valid on native and component entries alike (previously component-only, and raw sockets went ungated), a native plugin that never dials out refuses a declared ceiling at startup rather than ignoring it, and `allowedHosts` and address-range refusals follow the group's `networking.socketEgress` mode while loopback and port refusals are enforced in either mode.
+- **`ports`**: ports a plugin binds directly (`name` and `port`, optional `protocol` and `bind`), reserved in the host's port table at load (since 2.10.0). A `publish` field is not yet supported and is rejected.
+- Component-plugin-only fields: `maxRestarts`, `digest` (an OCI digest pin).
 
 ```yaml
 runtime:
@@ -530,7 +560,7 @@ The default NATS address for the [`wasmcloud:nats` plugin's](../host-interface-c
 
 ### `runtime.hostGroups[].http.tls.certificate.generate.ipAddresses`
 
-Introduced in 2.7.0. Additional IP SANs for the host group's generated TLS certificate; needed when clients reach the host group by IP rather than name. Note that the chart reuses an existing `hostgroup-<name>-http-tls` Secret if one exists, so adding `ipAddresses` to a live release takes effect only after that Secret is deleted and the certificate regenerated.
+Additional IP SANs for the host group's generated TLS certificate; needed when clients reach the host group by IP rather than name. Note that the chart reuses an existing `hostgroup-<name>-http-tls` Secret if one exists, so adding `ipAddresses` to a live release takes effect only after that Secret is deleted and the certificate regenerated.
 
 ### `runtime.image.tag`
 

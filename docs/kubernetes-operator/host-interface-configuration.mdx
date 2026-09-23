@@ -22,7 +22,7 @@ platforms: [wasmCloud, Kubernetes, wash]
 
 # Host Interface Configuration Reference
 
-This page is the complete reference for the configuration keys each built-in host interface reads, as of wasmCloud 2.9.0. For the structure of the `hostInterfaces` field itself (`namespace`, `package`, `interfaces`, `version`, `config`, `name`, and multi-backend binding), see [Host Interfaces in the CRD guide](./crds.mdx#host-interfaces).
+This page is the complete reference for the configuration keys each built-in host interface reads, as of wasmCloud 2.10.0. For the structure of the `hostInterfaces` field itself (`namespace`, `package`, `interfaces`, `version`, `config`, `name`, and multi-backend binding), see [Host Interfaces in the CRD guide](./crds.mdx#host-interfaces).
 
 ## How configuration reaches an interface
 
@@ -37,7 +37,7 @@ Some interfaces also read keys from the component's `localResources.config`, whi
 Two rules that apply across interfaces:
 
 - **Named vs. unnamed entries bind differently.** An entry with a `name` serves a labeled `(implements ..)` import and reads backend-selection keys (`backend`, `url`, and friends). An **unnamed** entry binds to the host's standalone plugin for that package, which on stock hosts means backend-selection keys on unnamed `wasi:keyvalue`, `wasi:blobstore`, and `wasmcloud:messaging` entries are ignored. Use a named entry (or the async `wasmcloud:keyvalue`/`wasmcloud:blobstore` packages) to select a backend per entry.
-- **A labeled import with no matching named entry is an error at workload start**, never a silent fallback to the default backend. Since 2.9.0 a labeled import can also be served by a plugin binding the operator declares in the host's [`plugins` block](./operator-manual/helm-values.mdx#runtimehostgroupsplugins).
+- **A labeled import never falls back silently to the default backend.** A label is served by a matching named entry, by a plugin binding the operator declares in the host's [`plugins` block](./operator-manual/helm-values.mdx#runtimehostgroupsplugins) (since 2.9.0), or by a sibling component whose `components[].name` matches (since 2.10.0; an operator-declared entry `name` wins over a same-named component). A label matching none of these fails the workload at start.
 
 ## `wasi:http`
 
@@ -47,6 +47,7 @@ Serves `wasi:http/incoming-handler` (components) and `wasi:http/handler` (servic
 | --- | --- |
 | `host` | Routing hostname for the workload, matched against the request's `Host` header. Required on Kubernetes. Must be a bare RFC 1123 hostname without a port; matching ignores ports on both sides. Multiple workloads registered under the same hostname are load balanced per request. |
 | `host-aliases` | Comma-separated additional hostnames. Invalid entries are dropped silently. When `spec.kubernetes.service` is set, the operator replaces this key with the Service's in-cluster names (`<svc>.<ns>`, `<svc>.<ns>.svc`), so user-supplied aliases do not survive alongside a Service. |
+| `localRoute` | Hostnames this workload serves for same-host callers (since 2.10.0), comma-separated, as `host` or `host/path`. Path prefixes match on `/` segment boundaries, and the longest match wins. No scheme, port, or bare path is allowed; an invalid entry fails the workload at start. Names declared here are never reachable from the network (declare a name under `host`/`host-aliases` too to serve both paths). Inert unless the host runs with [`--http-local-routing`](./operator-manual/helm-values.mdx#runtimehostgroupshttplocalbypassrouting), and callers must still list the hostname in their own `allowedHosts`. Under `wash dev` the key is accepted but ignored. |
 
 There is no `address` key: the listen address and port are host-level settings ([`runtime.hostGroups[].http.port`](./operator-manual/helm-values.mdx#runtimehostgroupshttpport) in Helm values, `dev.address` in [wash configuration](../wash/config.mdx)). Under `wash dev`, routing ignores hostnames entirely and sends every request to the current dev workload.
 
@@ -72,7 +73,7 @@ A **named** entry serving a labeled `consumer` import additionally reads:
 
 ## `wasmcloud:nats`
 
-Serves the async `wasmcloud:nats@0.1.0` package (since 2.9.0; plugin id `wasmcloud-nats`): `types`; `core` (publish, request); `jetstream` (acknowledged publish, stored-message reads, pull consumers, stream and consumer info, subject listings); `kv` (open a bucket, then get, put, create, compare-and-swap update, delete, purge, keys, history, status); and the handler exports the host drives (`core-handler`, `jetstream-handler`, `kv-handler`). Key-value watching arrives through `kv-handler` and the `kv-watches` key, not a `kv` call. Every operation that touches the wire is async. Connections are opened per workload under the workload's own credentials, never the host's control plane client. Stream and bucket administration is absent by design: the host creates JetStream consumers for declared subscriptions, but streams and buckets are provisioned out of band.
+Serves the async `wasmcloud:nats@0.1.2` package (since 2.9.0 at `0.1.0`; components built against an earlier `0.1.x` keep binding; plugin id `wasmcloud-nats`): `types`; `core` (publish, request); `jetstream` (acknowledged publish, stored-message reads, pull consumers, stream and consumer info, subject listings); `kv` (open a bucket, then get, put, create, compare-and-swap update, delete, purge, keys, history, status, and, since 2.10.0, `select`, which streams matching entries with their values and a terminal-status future; its options cover tombstones, keys-only listing, an entry cap, and a whole-drain deadline); and the handler exports the host drives (`core-handler`, `jetstream-handler`, `kv-handler`). Key-value watching arrives through `kv-handler` and the `kv-watches` key, not a `kv` call. Every operation that touches the wire is async. Connections are opened per workload under the workload's own credentials, never the host's control plane client. Stream and bucket administration is absent by design: the host creates JetStream consumers for declared subscriptions, but streams and buckets are provisioned out of band.
 
 Keys fall into three ownership classes, enforced by the plugin's declaration in the host's [`plugins` block](./operator-manual/helm-values.mdx#runtimehostgroupsplugins) (`workloadConfig: deny` by default on Kubernetes). Spellings are canonicalized (case-insensitive, `_` and `-` interchangeable) and unknown keys are refused. Configuration errors, unreachable servers, and out-of-grant subscriptions fail the deployment, not the first call.
 
@@ -111,7 +112,7 @@ Keys fall into three ownership classes, enforced by the plugin's declaration in 
 | `subscription-capacity` | Buffered messages per subscription | `1024` |
 | `subscription-capacity-bytes` | Buffered bytes per subscription | 32 MiB |
 
-The entry supports named bindings, so a component can import `wasmcloud:nats` under two labels to bridge two clusters. For choosing between packages: `wasmcloud:messaging` abstracts the broker away; `wasmcloud:nats` exposes NATS semantics, including explicit acknowledgement, redelivery, and revision-checked writes.
+The entry supports named bindings, so a component can import `wasmcloud:nats` under two labels to bridge two clusters. The plugin's `plugins` declaration can also carry its own egress grants (`allowedHosts`, `allowedIpNameLookups`; since 2.10.0): declared `servers` endpoints are checked at startup and at bind, and cluster-discovered peers are not followed under a ceiling, so list every failover member. For choosing between packages: `wasmcloud:messaging` abstracts the broker away; `wasmcloud:nats` exposes NATS semantics, including explicit acknowledgement, redelivery, and revision-checked writes.
 
 ## `wasi:keyvalue` and `wasmcloud:keyvalue`
 
@@ -173,7 +174,7 @@ Both URL forms honor two query parameters: `pool_size` (connection pool size, de
 ## Interfaces with no configuration
 
 - **`wasi:logging`**: structured logs flow to the host's logging pipeline; no keys.
-- **`wasi:otel`**: no per-workload keys; exporter endpoints come from standard `OTEL_*` environment variables on the host, and the plugin is active only on hosts started with `--wasi-otel`.
+- **`wasi:otel`**: no per-workload keys. The host's own export is configured with standard `OTEL_*` environment variables and activates only when an endpoint variable is set (see [Host telemetry](./operator-manual/telemetry.mdx)); the plugin is active only on hosts started with `--wasi-otel`.
 - **`wasi:webgpu`**: no keys; active only on hosts started with `--wasi-webgpu`.
 - The WASI P2 base (`wasi:io`, `wasi:clocks`, `wasi:random`, `wasi:filesystem`, `wasi:sockets`, `wasi:cli`) is always available and configured through [workload-level fields](./crds.mdx#component-resource-controls) rather than `hostInterfaces` entries.
 
