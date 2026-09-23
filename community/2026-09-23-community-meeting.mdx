@@ -1,0 +1,238 @@
+---
+date: '2026-09-23'
+title: 'wasmCloud 2.10, S3 Blob Storage, and Wasm Component Model Design'
+description: 'wasmCloud 2.10 adds mTLS client identity and Wasmtime 48, S3 and Azure come to WASI Blobstore, and one question settles WIT vs gRPC in the wasm component model.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - webassembly news
+  - wasmcloud 2.10
+  - wasi blobstore
+  - s3 object storage
+  - object_store
+  - mutual tls
+  - client identity
+  - workload identity
+  - wasmtime 48
+  - host component plugins
+  - wit vs grpc
+  - webassembly kubernetes
+  - platform engineering
+  - ai sandbox
+  - capability-based security
+chapters:
+  - { seconds: 9, label: "Welcome: KubeCon NA countdown, and wasmCloud 2.10 is out" }
+  - { seconds: 80, label: "2.10 release notes: spec-conformant OTel and opt-in cancellable dispatch" }
+  - { seconds: 180, label: "Expanded plugin binding schema: config aliases and required keys" }
+  - { seconds: 245, label: "Enforced plugin egress, Wasmtime 48, and WASI SDK cooperative threads" }
+  - { seconds: 292, label: "Host-wide mTLS client identity, the first step toward workload identity" }
+  - { seconds: 365, label: "Go 1.27, the all-features image, and cert rotation with cert-manager" }
+  - { seconds: 480, label: "Named bindings via implements, bug fixes, and first-time contributors" }
+  - { seconds: 534, label: "Liam Randall asks: what is on the Q4 roadmap?" }
+  - { seconds: 590, label: "Q3 board review: distributed cache, K6 benchmarking, and the Go push" }
+  - { seconds: 667, label: "Workload identity, cooperative threading, and Python by December" }
+  - { seconds: 770, label: "Exploded components, composition tooling, and leaning into P3" }
+  - { seconds: 844, label: "Aditya Salunkhe: S3, Azure, and GCP for WASI Blobstore via object_store" }
+  - { seconds: 916, label: "Why maintainers want object_store, and a vibe-coded S3 host component" }
+  - { seconds: 1033, label: "Yordis Prieto: are the semantics behind WASI Blobstore documented?" }
+  - { seconds: 1093, label: "RustFS, filesystem-backed local dev, and the 95% case" }
+  - { seconds: 1168, label: "Frank Schaffa: will the blob store follow S3 into file systems?" }
+  - { seconds: 1300, label: "Bring your own interface: the AWS Rust SDK, custom WIT, or gRPC" }
+  - { seconds: 1379, label: "Consistency assumptions that backfire in production" }
+  - { seconds: 1505, label: "WIT or gRPC? Does it need to compose?" }
+  - { seconds: 1717, label: "A documented decision guide, resource modeling, and 12-factor components" }
+  - { seconds: 1926, label: "Serialization costs, lazy lowering, and today vs. tomorrow" }
+  - { seconds: 2025, label: "Three Couchbase host components: Data API, KV SDK, and wasi:sockets P3" }
+  - { seconds: 2279, label: "Benchmarks: HTTP vs. SDK vs. gRPC, and why you test your assumptions" }
+  - { seconds: 2537, label: "The reverted fourth option, and choosing by who owns the credentials" }
+  - { seconds: 2694, label: "Couchbase as a key-value backend, and WIT annotations for OpenAPI" }
+  - { seconds: 2910, label: "Teaser: a WebAssembly-first agentic framework" }
+  - { seconds: 3060, label: "Liam Randall: capabilities, AI sandboxing, and least authority" }
+  - { seconds: 3215, label: "Wrap-up" }
+image: https://i.ytimg.com/vi/LO_T9gQO8bI/maxresdefault.jpg
+duration: 3229
+showTitle: true
+slug: 2026-09-23-community-meeting
+speakers:
+  - bailey-hayes
+  - liam-randall
+  - aditya-salunkhe
+  - yordis-prieto
+  - frank-schaffa
+about: wasmCloud
+mentions:
+  - ComponentModel
+  - WASIBlobstore
+  - WASIPreview3
+  - Wasmtime
+  - OpenTelemetry
+  - Python
+  - capabilityBasedSecurity
+  - AISandbox
+---
+
+import YouTube from 'react-player/youtube';
+
+{/* Video hero — the whole point of this page */}
+
+<YouTube url="https://www.youtube.com/watch?v=LO_T9gQO8bI" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=LO_T9gQO8bI" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The September 23, 2026 wasmCloud community call opens the day after **wasmCloud 2.10** shipped: Bailey Hayes walks the release (spec-conformant OpenTelemetry, host-wide mTLS client identity with rotation, enforced plugin egress, Wasmtime 48, Go 1.27, and a published all-features image) and sketches Q4. Aditya Salunkhe proposes S3, Azure, and GCP support for **WASI Blobstore** through Apache's `object_store` crate, and that turns into the call's real subject — a **wasm component model** design question: when do you write a WIT interface, when do you reach for gRPC or HTTP, and which implementation should back it? Bailey's answer is one question: does it need to compose?
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **wasmCloud 2.10 is out** — full OpenTelemetry environment-variable conformance, opt-in cancellable dispatch handles for plugin authors (you pay for the bookkeeping only if you use them), a richer binding schema with config aliases and required keys, egress policy enforced for host plugins that open sockets, and the move to **Wasmtime 48**. The written-up version is the [2.10 release blog](/blog/wasmcloud-2-10-release/)
+- **Host-wide mTLS client identity, with rotation** — every outbound HTTPS request from a host can now present a client certificate to servers that require mutual TLS. Point cert-manager at the chart and certs rotate without a restart. It is host-wide rather than per destination, and Bailey framed it as the first step toward **workload identity**, the feature she most wants to drive next
+- **Host component plugins are reachable without a custom build** — Jeremy Fleitz made each release publish an **all-features image**, so you can try host component plugins without compiling wasmCloud yourself while the feature stays off by default. Go moved to 1.27 across componentize-go and the Go packages, and Eric Gregory's change lets a component depend on **named bindings** to sibling components via `implements`
+- **Wasmtime 48 unlocks cooperative threads from WASI SDK 34** behind a flag — and cooperative threading in the component model is the upstream work that Python support depends on. Bailey expects December to be when downstream tools like wasmCloud can start trying Python without chaining feature flags
+- **Q4 candidates** — workload identity, distributed cache for precompiled artifacts, the still-undone K6 benchmarking, exploded components (deduplicating the runtime for JavaScript and Python), easier composition tooling, and broader P3 adoption. P2 stays supported "forever and ever"; P3's concurrency gains are the carrot, not a stick
+- **WASI Blobstore is heading to S3, Azure, and GCP** — wasmCloud ships filesystem, in-memory, and NATS backends today. Rather than maintain three vendor crates, Aditya is adding **bucket-scoped operations** upstream to Apache's [`object_store`](https://crates.io/crates/object_store) so one multiplexed implementation can cover all three ([issue #4977](https://github.com/wasmCloud/wasmCloud/issues/4977)). Bailey also has a working S3 host component plugin she could open-source
+- **The interface is the portable slice, not the semantics** — Yordis Prieto warned that consistency and replication assumptions are what backfire in production. Bailey agreed: WIT docs describe expectations for implementers, but the implementation is the canonical place for semantics, and the generic interface exists so it can also run on microcontrollers
+- **WIT, gRPC, or HTTP? Ask whether it needs to compose** — an app at the end of the chain can use a gRPC or HTTP client directly; a tool, library, or middleware must compose (or be virtualized and sandboxed), and that means WIT and serialization at each boundary. Frank Schaffa asked for the decision process to be documented; Bailey committed to a blog post first, then a doc page
+- **Test your assumptions** — in Bailey's Couchbase work the SDK-over-sockets plugin was only marginally faster than the HTTP Data API, and for modest row counts HTTP beat gRPC because gRPC frames. Her platform-engineer default: a host component plugin holds credentials so tenants never touch them
+- **Capabilities are the frame for AI sandboxing** — Liam Randall is writing a blog series: what capabilities are, what sandboxing AI means, and applying the principle of least authority so large permissive sandboxes hold builder tools while fine-grained, multi-tenant workloads run as WebAssembly components
+
+## Chapters
+
+- [0:09 — Welcome: KubeCon NA countdown, and wasmCloud 2.10 is out](https://youtu.be/LO_T9gQO8bI?t=9)
+- [1:20 — 2.10 release notes: spec-conformant OTel and opt-in cancellable dispatch](https://youtu.be/LO_T9gQO8bI?t=80)
+- [3:00 — Expanded plugin binding schema: config aliases and required keys](https://youtu.be/LO_T9gQO8bI?t=180)
+- [4:05 — Enforced plugin egress, Wasmtime 48, and WASI SDK cooperative threads](https://youtu.be/LO_T9gQO8bI?t=245)
+- [4:52 — Host-wide mTLS client identity, the first step toward workload identity](https://youtu.be/LO_T9gQO8bI?t=292)
+- [6:05 — Go 1.27, the all-features image, and cert rotation with cert-manager](https://youtu.be/LO_T9gQO8bI?t=365)
+- [8:00 — Named bindings via implements, bug fixes, and first-time contributors](https://youtu.be/LO_T9gQO8bI?t=480)
+- [8:54 — Liam Randall asks: what is on the Q4 roadmap?](https://youtu.be/LO_T9gQO8bI?t=534)
+- [9:50 — Q3 board review: distributed cache, K6 benchmarking, and the Go push](https://youtu.be/LO_T9gQO8bI?t=590)
+- [11:07 — Workload identity, cooperative threading, and Python by December](https://youtu.be/LO_T9gQO8bI?t=667)
+- [12:50 — Exploded components, composition tooling, and leaning into P3](https://youtu.be/LO_T9gQO8bI?t=770)
+- [14:04 — Aditya Salunkhe: S3, Azure, and GCP for WASI Blobstore via object_store](https://youtu.be/LO_T9gQO8bI?t=844)
+- [15:16 — Why maintainers want object_store, and a vibe-coded S3 host component](https://youtu.be/LO_T9gQO8bI?t=916)
+- [17:13 — Yordis Prieto: are the semantics behind WASI Blobstore documented?](https://youtu.be/LO_T9gQO8bI?t=1033)
+- [18:13 — RustFS, filesystem-backed local dev, and the 95% case](https://youtu.be/LO_T9gQO8bI?t=1093)
+- [19:28 — Frank Schaffa: will the blob store follow S3 into file systems?](https://youtu.be/LO_T9gQO8bI?t=1168)
+- [21:40 — Bring your own interface: the AWS Rust SDK, custom WIT, or gRPC](https://youtu.be/LO_T9gQO8bI?t=1300)
+- [22:59 — Consistency assumptions that backfire in production](https://youtu.be/LO_T9gQO8bI?t=1379)
+- [25:05 — WIT or gRPC? Does it need to compose?](https://youtu.be/LO_T9gQO8bI?t=1505)
+- [28:37 — A documented decision guide, resource modeling, and 12-factor components](https://youtu.be/LO_T9gQO8bI?t=1717)
+- [32:06 — Serialization costs, lazy lowering, and today vs. tomorrow](https://youtu.be/LO_T9gQO8bI?t=1926)
+- [33:45 — Three Couchbase host components: Data API, KV SDK, and wasi:sockets P3](https://youtu.be/LO_T9gQO8bI?t=2025)
+- [37:59 — Benchmarks: HTTP vs. SDK vs. gRPC, and why you test your assumptions](https://youtu.be/LO_T9gQO8bI?t=2279)
+- [42:17 — The reverted fourth option, and choosing by who owns the credentials](https://youtu.be/LO_T9gQO8bI?t=2537)
+- [44:54 — Couchbase as a key-value backend, and WIT annotations for OpenAPI](https://youtu.be/LO_T9gQO8bI?t=2694)
+- [48:30 — Teaser: a WebAssembly-first agentic framework](https://youtu.be/LO_T9gQO8bI?t=2910)
+- [51:00 — Liam Randall: capabilities, AI sandboxing, and least authority](https://youtu.be/LO_T9gQO8bI?t=3060)
+- [53:35 — Wrap-up](https://youtu.be/LO_T9gQO8bI?t=3215)
+
+## Meeting Notes
+
+### wasmCloud 2.10 Release Roundup
+
+Bailey Hayes opened with KubeCon + CloudNativeCon North America coming up fast (November 9–12) and wasmCloud 2.10, released the day before. The release blog had not been published by call time, so she walked the GitHub release notes directly; the polished version is now up as [wasmCloud 2.10: Same-host routing, outbound identity, and OpenTelemetry that follows the spec](/blog/wasmcloud-2-10-release/).
+
+First, **OpenTelemetry**: wasmCloud now supports the full set of standardized OTel environment variables, with spec conformance checked end to end ([host telemetry docs](/docs/kubernetes-operator/operator-manual/telemetry/)). Second, **cancellable dispatch handles** for plugin authors. Bailey needed them while building a Kafka plugin, where she had to clean up work safely and control connections tightly. Most people don't need that — work gets cleaned up eventually — so the API is opt-in, and the bookkeeping that makes a dispatch cancellable is only paid for if you call it.
+
+The **binding schema** grew too, for both host component plugins and native plugins: config values can have multiple aliases, and required keys fail outright when missing. Together those let a plugin mirror the conventions of common vendor SDKs; they came out of the Couchbase plugin demoed last week and the Kafka one. Egress policy is now **enforced for host plugins** that make calls out over sockets. And the engine moved to **Wasmtime 48**. The feature Bailey wanted from it is running components built with cooperative threads from WASI SDK 34, available behind a flag.
+
+Jeremy Fleitz landed fixes and improvements to the built-in NATS plugin. The long-requested **client identity** story also landed: a host-wide client certificate presented on every outbound HTTPS request, so workloads can authenticate to servers that require mutual TLS. It is not keyed on destination, so it is not yet what many people ultimately want, which is **workload identity** with per-service mTLS to specific destinations. Bailey called it the first step toward that, and a feature that stands on its own for "I'm making requests within my cluster, make it work." It supports **rotation**: plug cert-manager into the chart and mount the secret at the configured path, which matters because hosts live much longer than the certs rotating under them. See [outbound client identity (mTLS)](/docs/kubernetes-operator/workload-security/#outbound-client-identity-mtls).
+
+Go moved to **1.27** across componentize-go, the Go packages, and wasmCloud, with most of the upstream and SDK work done by Jeremy. Jeremy also made each release publish an **all-features image**, so people building on host component plugins can experiment without building wasmCloud themselves, while the feature stays off by default. Eric Gregory's small-but-powerful change lets components depend on **named bindings** in a workload. Picture a component that acts as an agent, with named bindings to other components that are literally its tools. Bailey closed with thanks to first-time contributors Yash, Steve Rogers, and Addu (@Yash121l, @steverogersX, and @addu2612 in the release notes).
+
+### The Q4 Roadmap Takes Shape
+
+Liam Randall asked what milestones are coming. Q3 ends next week, so Bailey pulled up the [wasmCloud Roadmap](https://github.com/orgs/wasmCloud/projects/7) board. Still open: "Are we componentized yet?", **distributed cache for precompiled component artifacts** (a good place for external contributors), a connection-pool example for a `wasi:sockets` host plugin, and **K6 benchmarking**, which the team still wants to do. Go got the effort this quarter even though it isn't all captured in the tracking issue; Python is the natural next language.
+
+Looking past Q3, **workload identity** is the feature Bailey most wants to drive. It has come up in planning repeatedly and was commonly requested back in wasmCloud v1. Separately, wearing a different hat, she has spent months driving **cooperative threading** in the component model, which Wasmtime 48 and Python both depend on. It is close, and she thinks December is when downstream tools like wasmCloud can start trying Python without depending on feature flag after feature flag.
+
+Two ideas she has floated before and would like to see picked up: **exploded components**, which let the runtime be deduplicated (handy for JavaScript and Python), and **easier composition tooling**. This past quarter was about moving from P2 to P3, and P3's concurrency support means big performance wins. The next step is taking advantage of P3's strengths — with P3 "you can compose willy-nilly." She also stressed that P2 will keep being supported.
+
+### WASI Blobstore: S3, Azure, and GCP via object_store
+
+Aditya Salunkhe asked for the **WASI Blobstore** work to be on the Q4 roadmap. wasmCloud has filesystem, in-memory, and NATS implementations today, and requests for S3, Azure, and GCP support are frequent. Depending on each vendor's Rust crate and maintaining three implementations in the repo doesn't make sense, so the smarter route is Apache's [`object_store`](https://crates.io/crates/object_store) crate. The catch is that it doesn't support **bucket-scoped operations**, so Aditya is taking a detour to add that upstream (a `BucketStore` trait, per his comment on [issue #4977](https://github.com/wasmCloud/wasmCloud/issues/4977)), with the goal of a multiplexed implementation that fits the `implements` mechanism.
+
+Bailey gave the maintainer's reasoning: every cloud has its own S3-compatible-ish API with its own differences, and she doesn't want wasmCloud maintaining every vendor SDK across the stack when `object_store` can own that. She also noted that she vibe-coded a working **S3 host component plugin** — an option that didn't exist back in March — and could open-source it in [awesome-wasmcloud](https://github.com/wasmCloud/awesome-wasmcloud). Because blob storage is such a core interface, she is also open to a native plugin, where maintainers take on the auditing, benchmarking, and investment.
+
+### What Does the Interface Actually Promise?
+
+Yordis Prieto asked whether the **semantics** behind the interface are documented, not just its shape. Bailey: "documented-ish." WASI Blobstore's WIT docs describe the expected behavior. It is deliberately the common-denominator slice of S3 that is portable across implementations, which is what most people care about. For local development, the filesystem backend means you browse your files with nothing weird, then run the same code in production. She estimated that covers about 95% of cases; Glacier-style APIs are where you'd deviate. Both she and Yordis endorsed [RustFS](https://github.com/rustfs/rustfs) for self-hosted object storage (Yordis replaced his MinIO with it long ago).
+
+Frank Schaffa asked whether it would follow S3 into mounting file systems. No: WASI Blobstore is always going to be an object store, because those extensions aren't portable. Frank suggested a Kubernetes CNI-style interface document that makes the contract and its semantics explicit, so people can plug in their own implementations.
+
+Bailey also pushed back on two common misperceptions. You don't have to use a WASI API: the AWS Rust SDK compiles to WASI and works well, and if you only target AWS you may not want a WIT interface at all. It is also now easy to write your own plugin with your own WIT. And you don't have to use WIT: gRPC, sockets, and HTTP clients just work from inside a component.
+
+Yordis's concern was production. People trust "supports object storage" and move on, then discover that consistency, replication, and read-after-write details matter, often without any code breaking. S3 itself moved from eventual to strong consistency. Bailey's addition: the WIT docs state expectations for implementers, but the canonical place for semantics is the **implementation**. The generic interface has to work on microcontrollers too, and some implementations will have to say "this API is not supported here."
+
+### WIT or gRPC? Does It Need to Compose?
+
+Yordis then brought his own dilemma. He uses a lot of gRPC; if he uses WIT he gets all the type-generation tooling, and if he uses gRPC it's another toolchain. Where should the abstraction sit? Bailey's north star for most architecture questions: **does it need to compose?** An app at the end of the chain that only makes outbound requests may never need to, and a gRPC client is fine there. A tool, library, or middleware must compose, and that's where she would not use a gRPC client. "Compose" also covers **virtualization**: does the thing need to be sandboxed or virtualized in some way? gRPC is also hard to put middleware between. The cost is real, though: composing means serializing at each boundary.
+
+Frank asked for the weighting behind these decisions to be documented as a page. Bailey agreed: she needs to write the "hot takes" blog post first, then turn it into a doc page, probably with Yordis and Victor Adossi, since "we maybe have all the opinions in the room." Some of it is in her frustration with OpenAPI-to-WIT generators that ignore rules like singular resource names. When to create a resource is the question people hit most, and it is really **modeling data in terms of ownership**. Three years ago, reviewing WASI P2 WIT definitions, she wrote a set of **12-factor rules for components**. The rules can't be a linter, because they are about architecture: if something must be compositional, a lot of transitive properties follow into the API design.
+
+Yordis cautioned that "you pay the cost of serialization" makes programmers micro-optimize, when the cost may be close to zero. He wants the guidance to say what is true **today** versus what will be true **tomorrow**, so people can decide whether they need the extra nanoseconds. Bailey agreed the composition path will get faster. The low-hanging fruit is done, and she pointed Yordis at **lazy lowering**, a component model feature that will let the runtime optimize this heavily.
+
+### Three Couchbase Host Components, Benchmarked
+
+To make it concrete, Bailey revisited her [Couchbase host component PR](https://github.com/wasmCloud/awesome-wasmcloud/pull/4), updated since last week's demo. She took the v1 Couchbase WIT (a `0.1.0` draft) and moved it to WASI P3. That surfaced design questions about how she wants the WIT to look, and how to implement it with host component plugins or just a gRPC client. The PR now carries three host components implementing `wasmcloud:couchbase@0.2.0`:
+
+- **`couchbase`**: the Data API over `wasi:http/client@0.3.0`. It needs a gateway in front of the cluster (Couchbase's new Cloud Native Gateway, which replaced her Python mock from last week, or Capella). It uses P3 concurrency and reentrancy, opens no sockets, and makes only layer-7 calls, so HTTP service chaining works on top
+- **`couchbase-kv-sdk`**: the KV protocol through the Couchbase Rust SDK, compiled in with Tokio and rustls. It talks to the cluster directly with no gateway, but it is about three megabytes larger and serializes concurrent calls. Its dependency tree pulls in crates that don't compile to WASI P3 yet (an older `getrandom`, for one), so its sockets are P2
+- **`couchbase-wasi-sockets-p3`**: the KV protocol spoken directly on `wasi:sockets@0.3.0`, with concurrency but no TLS yet. Bailey wants TLS to come from a proposed wasmCloud host TLS interface, so the host holds the certs and not the plugin
+
+Bailey tested her assumptions with a benchmark: the SDK plugin was faster than the HTTP Data API, but only slightly — not enough for a platform engineer to open up sockets for. She also built a gRPC component based on one from Laurent, a DevRel lead at Couchbase who is championing the gateway's new gRPC endpoint. gRPC wins for streaming lots of rows, but with modest data per request **HTTP beat gRPC**, because gRPC frames. "People are always like 'gRPC faster.' Not necessarily true. Test it with your data." A fourth variant, a host component sharing one gRPC client across tenants, added complexity and came out slightly slower than HTTP because of the double serialization, so she reverted it.
+
+Her decision rule: use a **host component plugin** when you want to pass in credentials and connection details that tenants never touch. If tenants own their own Couchbase and connectivity, they build a client into their workload. Use sockets if you can't get at the Data API. For serverless workloads, go with the Data API. "It's turtles all the way down." The choice isn't just whether to write a WIT definition, but which implementation backs it. Asked for the numbers, she said they're in the PR, and the ratios matter more than the absolute values, since she ran them on a busy laptop.
+
+Two more threads. wasmCloud v1 had a WASI key-value implementation backed by Couchbase; without optional imports in the component model, she would expose `wasi:keyvalue` as another exported interface on a host component, so a component with a key-value binding can multiplex to Couchbase. And Yordis floated a WIT file with **custom annotations** that could generate both the WIT and an OpenAPI spec, much like Rust macros for renames and marshalling. Bailey liked it, as long as the vendor owns the file, "then you truly get SDKs for free."
+
+### Agents, Capabilities, and Least Authority
+
+Bailey pointed Aditya to Dan Phillips's talk on Boxer. Yordis teased a demo, possibly next week: a truly agentic framework that is WebAssembly-first and only, where you inject your own WIT and your own resolution. He is also dealing with sandboxed deployment, where most tools are proprietary, and wants to run it on wasmCloud. Bailey asked anyone building cool things with WebAssembly to come demo.
+
+Liam Randall closed with a blog series he is writing after a napkin-sketch dinner conversation. First: **what capabilities are**. Most people don't realize that when an iPhone says an app wants your contacts or microphone, or a browser asks for your camera or location, those are capabilities. Then: what it means to **sandbox AI**, and why picking a sandbox depends on the capabilities the agent needs. The strategy is the **principle of least authority**: configure an agent down to the narrowest set of capabilities. People think they want a coding agent in a sandbox, but those agents are useful because they can do anything, which is hard to sandbox. His answer is to put builder toolboxes in large, permissive, hardware-isolated sandboxes, and run finer-grained workloads that need density and multi-tenancy as WebAssembly components on wasmCloud or Cosmonic.
+
+## WebAssembly News and Updates
+
+This week in **webassembly news**: [wasmCloud 2.10](/blog/wasmcloud-2-10-release/) shipped with host-wide mTLS client identity, spec-conformant OpenTelemetry, enforced plugin egress, and an upgrade to [Wasmtime 48](https://wasmtime.dev/), which can run components built with WASI SDK 34 cooperative threads behind a flag. Cooperative threading in the [component model](https://component-model.bytecodealliance.org/) is nearly done upstream in the [Bytecode Alliance](https://bytecodealliance.org/), and it gates Python support that Bailey Hayes expects downstream tools to start testing around December. [WASI Blobstore](https://github.com/WebAssembly/wasi-blobstore) is gaining a path to S3, Azure, and GCP through upstream bucket-scoped operations in Apache's `object_store`. Lazy lowering is the component model feature to watch for cheaper serialization across composed boundaries.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more, while the platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through [standard interfaces](/docs/overview/interfaces/) and a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell (build, run, deploy, debug), and the [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule container workloads, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. The result is a production substrate for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: Designing Interfaces in the Wasm Component Model
+
+Most of this call was about one design question in the **wasm component model**: once a component needs to talk to a database, an object store, or another service, what sits between them? There are more options than most people assume. A component can compile in a vendor SDK (the AWS Rust SDK builds for WASI), call an HTTP or gRPC endpoint directly, open sockets, or import a WIT interface that a [host component plugin](/docs/runtime/creating-host-component-plugins/) or native plugin implements. Bailey Hayes's filter is **does it need to compose?** An application at the end of the chain can use whatever client works. A library, tool, or middleware that sits in a chain, or anything that has to be virtualized or sandboxed, needs a WIT boundary. That boundary means serialization, and composition is where the runtime still has optimization headroom (lazy lowering among it).
+
+The second question is **which implementation backs the interface**, and that is an operator's decision more than a developer's. The Couchbase work shows why. One `wasmcloud:couchbase` interface has three implementations: an HTTP Data API client with no sockets, an SDK build that is marginally faster and much bigger, and a P3-sockets build with concurrency but no TLS yet. The workload can't tell them apart. A platform team that wants tenants to never see credentials puts them in a host component, and a team whose tenants own their own database lets them bring a client. The [plugin-or-service decision guide](/docs/recipes/plugin-or-service/) covers the adjacent choice. The [interfaces reference](/docs/overview/interfaces/) lists the standard WASI and wasmCloud packages, including `wasi:blobstore`, whose portable common-denominator design is exactly why its semantics live in each implementation. Bailey and Yordis Prieto's planned write-up (blog first, then docs) should capture what is true today versus after the next round of runtime optimization.
+
+## Who Should Watch This
+
+**Platform engineers running wasmCloud on Kubernetes** should start with the 2.10 roundup at [1:20](https://youtu.be/LO_T9gQO8bI?t=80), especially host-wide mTLS client identity and cert-manager rotation at [4:52](https://youtu.be/LO_T9gQO8bI?t=292), then Bailey's credential-ownership decision rule at [42:17](https://youtu.be/LO_T9gQO8bI?t=2537). **Developers designing WIT interfaces or weighing WIT against gRPC** should watch from [25:05](https://youtu.be/LO_T9gQO8bI?t=1505) through the Couchbase benchmarks at [37:59](https://youtu.be/LO_T9gQO8bI?t=2279). **Anyone who needs S3, Azure, or GCP blob storage from components** should watch Aditya Salunkhe's `object_store` plan at [14:04](https://youtu.be/LO_T9gQO8bI?t=844) and the semantics discussion that follows. **Teams evaluating an AI sandbox** will want Liam Randall's capabilities framing at [51:00](https://youtu.be/LO_T9gQO8bI?t=3060).
+
+## Up Next
+
+Q3 closes next week, so expect Q4 planning to firm up around workload identity, distributed cache, K6 benchmarking, composition tooling, and — once cooperative threading lands — Python. Aditya Salunkhe is adding bucket-scoped operation support upstream in `object_store` to unblock a multiplexed S3/Azure/GCP WASI Blobstore. Bailey Hayes owes a "hot takes" blog post (and then a doc page) on choosing between WIT, gRPC, direct clients, and host component plugins, likely with Yordis Prieto, and may open-source her S3 host component plugin. Yordis may demo his WebAssembly-first agentic framework next week, and Liam Randall's blog series on capabilities and AI sandboxing is in progress.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-09-23-community-meeting-transcript/)**
