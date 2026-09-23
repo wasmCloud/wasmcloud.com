@@ -77,7 +77,7 @@ hostInterfaces:
 
 ### Outbound HTTP call from a component is blocked
 
-A component that imports `wasi:http/outgoing-handler` and is bound to the corresponding host interface still cannot reach an external URL — the call fails or returns an error to the component, even though the network path appears clear.
+A component that imports `wasi:http/outgoing-handler` and is bound to the corresponding host interface still cannot reach an external URL — the call returns an error to the component, even though the network path appears clear.
 
 **Cause:** The host enforces a per-component allowlist of outbound destinations via `localResources.allowedHosts`, and the policy fails closed: any outbound HTTP request whose host doesn't match an entry is blocked at the wasmCloud layer before the request leaves the process — independently of any Kubernetes `NetworkPolicy`. A component with no `allowedHosts` list at all is denied every outbound call, so this is the expected first-run symptom for any component that makes outbound HTTP, not just a sign of a misconfigured list.
 
@@ -99,6 +99,8 @@ Entries are matched against the request's host (no scheme, no path) using case-i
 If `allowedHosts` is empty or the field is omitted, **all outbound HTTP requests are denied** — the policy fails closed. To allow unrestricted egress, set `allowedHosts: ["*"]` explicitly. (In local development, `wash dev` substitutes the allow-all policy when the field is omitted from `.wash/config.yaml`, which is why a component can work in the dev loop and then fail on Kubernetes.)
 
 **See also:** [Workload Security — Restricting outbound HTTP with `allowedHosts`](./kubernetes-operator/workload-security.mdx#restricting-outbound-http-with-allowedhosts). If outbound HTTP is blocked at the cluster level rather than the wasmCloud level, see the same page for [NetworkPolicy](./kubernetes-operator/workload-security.mdx#kubernetes-networkpolicy-for-host-pods) guidance.
+
+Since 2.10.0 the denial reaches the guest as a handleable `http-request-denied` error on both WASI 0.2 and 0.3; earlier releases trapped 0.2 guests, so the symptom was an instance fault rather than an error value.
 
 ### Workload image fails to pull from a private registry
 
@@ -145,6 +147,14 @@ A `WorkloadDeployment` never reaches its desired replica count, and either the u
 3. The Secret must live in the **same namespace** as the resource that references it.
 
 **See also:** [`ArtifactSpec`](./kubernetes-operator/api-reference.md#artifactspec) and the [CRDs guide](./kubernetes-operator/crds.mdx#artifact). For mirroring the wasmCloud chart's own images to a private registry (air-gapped installs), see [Private Registries and Air-Gapped Deployments](./kubernetes-operator/operator-manual/private-registries.mdx).
+
+### Requests to a workload return 400 with no application log line
+
+A request reaches the host but gets a `400` before any component runs, and nothing appears in the workload's logs.
+
+**Cause:** Since 2.10.0 the host normalizes the request scheme and authority before dispatch. A request with a missing or malformed `Host` header is rejected at the ingress with `400`. Guests behind a TLS listener also see `https` as the scheme, where earlier releases passed `http` through.
+
+**Fix:** Check the client or proxy that sets the `Host` header. If a component branches on the scheme it receives, note that a TLS-terminated request now reports `https`.
 
 ## Scheduling
 

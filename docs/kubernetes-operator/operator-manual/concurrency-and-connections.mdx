@@ -83,7 +83,7 @@ Every workload gets one connection quota across three surfaces. You set these on
 | --- | --- | --- | --- |
 | `maxOutboundHttpConnectionsPerWorkload` | `--max-outbound-http-connections-per-workload` | `128` | pooled outbound HTTP and gRPC connections a workload may hold (idle keep-alive connections count) |
 | `maxOutboundSocketConnectionsPerWorkload` | `--max-outbound-socket-connections-per-workload` | `256` | raw `wasi:sockets` outbound connections a workload may hold |
-| `maxInboundSocketConnectionsPerWorkload` | `--max-inbound-socket-connections-per-workload` | `256` | inbound published-port connections a workload serves at once |
+| `maxInboundSocketConnectionsPerWorkload` | `--max-inbound-socket-connections-per-workload` | `256` | inbound socket connections a workload serves at once; since 2.10.0 every accepted connection takes a slot |
 | `maxConnections` | `--max-connections` | derived from the process file-descriptor limit | host-wide ceiling across every workload |
 | `maxHttpIngressConnections` | `--max-http-ingress-connections` | a quarter of the descriptor limit, floor 256 | connections the host's own HTTP listener holds open, across every workload (since 2.9.0) |
 
@@ -92,6 +92,9 @@ The three per-workload surfaces behave differently when a workload reaches its l
 - **Outbound HTTP waits.** A request over the quota waits for a slot, up to `--http-connection-wait` (default `5s`), then fails. This is the surface most sensitive to instance concurrency, because the outbound pool is what warm, overlapping calls draw from.
 - **Raw sockets and inbound connections are refused immediately.** They do not wait, which avoids a guest deadlocking against its own quota.
 - **The host's ingress ceiling sheds.** Connections past `maxHttpIngressConnections` are accepted and immediately closed, so the host stays responsive rather than exhausting descriptors (since 2.9.0).
+- **Inbound traffic is screened (since 2.10.0).** Listens, accepts, and received datagrams go through the same address policy and `--socket-egress` mode as outbound connects.
+
+A single request body also has a deadline: `WASH_HTTP_REQUEST_BODY_TIMEOUT_SECS` (default 600 seconds) bounds how long the host waits for an inbound body to keep arriving before it abandons the request. Raise it for workloads that accept large uploads over slow links. `wash dev` applies the same per-workload quotas as a Kubernetes host and raises its own descriptor limit at startup (since 2.10.0), so the dev loop hits the same ceilings production does.
 
 The three per-workload quotas roll up into the host-wide `maxConnections` ceiling; `maxHttpIngressConnections` bounds the host's own listener separately, derived from the same descriptor budget. Since 2.9.0 the host raises its own soft file-descriptor limit toward the hard limit at startup, and an unlimited descriptor limit derives a large budget instead of a silent 512, so hosts running under `LimitNOFILE=infinity` permit far more concurrent connections after upgrading. The [workload security](/docs/kubernetes-operator/workload-security) page covers these quotas alongside the raw-socket egress policy they ship with.
 
@@ -118,7 +121,7 @@ These quotas are per host process. A workload scaled to several `replicas` gets 
 
 As of wasmCloud 2.8.0, messaging-triggered components have their own in-flight limit, applied before any instance work begins (trigger services are exempt). The `max_in_flight` config key on the component (default: the host's per-component ceiling) caps concurrent deliveries across the component's replicas on a host. A delivery over the limit waits up to `admission_wait` (default `30s`) for a slot, then is dropped with a warning.
 
-This limit is separate from `maxConcurrency`: `maxConcurrency` bounds calls on one warm instance, while `max_in_flight` bounds total messaging deliveries executing for the component. Since 2.9.0, async (`0.3.0`) deliveries to a pooled component run on its warm instances under the same `poolSize` and `maxConcurrency` rules as HTTP, so for messaging workloads, size `max_in_flight` first, then the instance limits beneath it. Sync (`0.2.0`) deliveries still run in a store per message regardless of `poolSize`. See [Messaging admission control](/docs/kubernetes-operator/crds#messaging-admission-control) for the config keys and host flags.
+This limit is separate from `maxConcurrency`: `maxConcurrency` bounds calls on one warm instance, while `max_in_flight` bounds total messaging deliveries executing for the component. Since 2.10.0 replicas of one deployment share that gate (earlier releases opened one per replica), and `admission_group` can rekey it. Since 2.9.0, async (`0.3.0`) deliveries to a pooled component run on its warm instances under the same `poolSize` and `maxConcurrency` rules as HTTP, so for messaging workloads, size `max_in_flight` first, then the instance limits beneath it. Sync (`0.2.0`) deliveries still run in a store per message regardless of `poolSize`. See [Messaging admission control](/docs/kubernetes-operator/crds#messaging-admission-control) for the config keys and host flags.
 
 ## Replicas
 
@@ -130,5 +133,5 @@ This limit is separate from `maxConcurrency`: `maxConcurrency` bounds calls on o
 - Instance concurrency sets connection demand; the per-workload quota sets the ceiling. Size them as a pair.
 - The keep-alive pool is sized automatically from declared concurrency, so you tune concurrency and the quota, not the pool directly.
 - Outbound HTTP over quota waits up to `--http-connection-wait` (default `5s`) then fails; raw sockets and inbound connections are refused immediately.
-- The connection quota applies once per replica, so scaling out multiplies the total connection budget.
+- The connection quota applies once per replica, so scaling out multiplies the total connection budget. The messaging admission gate does not: replicas of one deployment share it (since 2.10.0).
 - Messaging deliveries have their own admission limit (`max_in_flight`, as of 2.8.0), applied before instance limits come into play.
