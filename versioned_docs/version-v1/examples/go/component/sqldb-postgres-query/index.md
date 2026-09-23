@@ -45,9 +45,9 @@ Before starting, ensure that you have the following installed in addition to the
 - [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation/) for building and running the components and wasmCloud environment
 - [`docker`][docker] for easily running instances of [`postgres`]
 
-[wasmCloud]: https://wasmcloud.com/docs/v1/intro
+[wasmCloud]: https://wasmcloud.com/docs/v1/intro/
 [docker]: https://docs.docker.com
-[wash]: https://wasmcloud.com/docs/installation
+[wash]: https://wasmcloud.com/docs/installation/
 [wasm-tools]: https://github.com/bytecodealliance/wasm-tools#installation
 
 ## 🐘 Start a local Postgres cluster

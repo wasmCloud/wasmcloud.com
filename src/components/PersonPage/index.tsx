@@ -4,6 +4,8 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import styles from './styles.module.css';
+import { meetingStartIso } from '@theme/wasmcloud/community/meeting-time';
+import { withTrailingSlash } from '@theme/wasmcloud/structured-data/url';
 
 type WasmcloudRole = 'maintainer' | 'contributor' | 'community' | 'emeritus';
 type ExternalWorkType = 'writing' | 'talk' | 'podcast' | 'video';
@@ -115,7 +117,7 @@ function blogPostSubjectOf(
   siteUrl: string,
   organizationId: string,
 ): Record<string, unknown> {
-  const fullUrl = `${siteUrl}${a.url}`;
+  const fullUrl = withTrailingSlash(`${siteUrl}${a.url}`);
   const absImage = a.image
     ? a.image.startsWith('http')
       ? a.image
@@ -146,14 +148,15 @@ function communityMeetingSubjectOf(
   siteUrl: string,
   organizationId: string,
 ): Record<string, unknown> {
-  const fullUrl = `${siteUrl}${a.url}`;
+  const fullUrl = withTrailingSlash(`${siteUrl}${a.url}`);
   return {
     '@type': 'VideoObject',
     '@id': `${fullUrl}#video`,
     name: a.title,
     description: a.description ?? `wasmCloud community call — ${a.title}.`,
     url: fullUrl,
-    uploadDate: toIso8601Date(a.date),
+    // Community calls start at 1:00 PM America/New_York, not midnight UTC.
+    uploadDate: meetingStartIso(a.date) ?? toIso8601Date(a.date),
     publisher: { '@id': organizationId },
     ...(a.image && { thumbnailUrl: a.image }),
   };
@@ -188,17 +191,20 @@ function externalWorkSubjectOf(
         publisher: { '@type': 'Organization', name: w.venue },
       };
     case 'talk':
-      // Event requires name + startDate + location.
-      if (!yearDate || !w.venue) return null;
+      // Past conference talks are emitted as CreativeWork, not Event.
+      // Google's Event validator requires a real start date/time and, for
+      // an in-person event, a Place with a postal `address` — people.json
+      // only records a venue name and a year, so an Event node here was a
+      // guaranteed "Structured data has rich results validation error".
+      if (!w.venue) return null;
       return {
-        '@type': 'Event',
+        '@type': 'CreativeWork',
         name: w.title,
+        genre: 'Conference talk',
         ...(w.url && { url: w.url }),
-        startDate: yearDate,
-        location: { '@type': 'Place', name: w.venue },
-        organizer: { '@type': 'Organization', name: w.venue },
-        eventStatus: 'https://schema.org/EventScheduled',
-        performer: { '@id': personId },
+        ...(w.year && { dateCreated: String(w.year) }),
+        creator: { '@id': personId },
+        publisher: { '@type': 'Organization', name: w.venue },
       };
     case 'podcast':
       // PodcastEpisode requires name + url + partOfSeries.
@@ -286,7 +292,25 @@ function personJsonLd(data: PersonPageData, siteUrl: string) {
     ld.knowsAbout = person.knows_about;
   }
   if (subjectOf.length > 0) ld.subjectOf = subjectOf;
-  return ld;
+
+  // Google's profile-page rich result expects a ProfilePage whose
+  // mainEntity is the Person. dateModified = the person's most recent
+  // on-site appearance (blog post or community call).
+  const latest = [
+    ...blog_posts.map((a) => toIso8601Date(a.date)),
+    ...community_meetings.map((a) => meetingStartIso(a.date) ?? toIso8601Date(a.date)),
+  ].sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+  const { '@context': _ctx, ...personNode } = ld;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    '@id': pageUrl,
+    url: pageUrl,
+    name: `${person.name} | wasmCloud`,
+    ...(latest && { dateModified: latest }),
+    isPartOf: { '@id': `${siteUrl}/#website` },
+    mainEntity: personNode,
+  };
 }
 
 /** Pick the best label for an external link. Restricted to GitHub,
