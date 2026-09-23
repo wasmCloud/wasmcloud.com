@@ -29,7 +29,7 @@ wasmCloud workload security operates in two complementary layers:
 - **The WebAssembly sandbox** — enforced by the [Wasmtime](https://wasmtime.dev/) runtime, which provides strong isolation guarantees for every component by default
 - **Kubernetes controls** — NetworkPolicy for host pods, and RBAC for the operator and gateway ServiceAccounts
 
-This page covers the sandbox model, `allowedHosts`, `allowedIpNameLookups`, and NetworkPolicy. For RBAC configuration, see [Roles and Role Bindings](./operator-manual/roles-and-rolebindings.mdx).
+This page covers the sandbox model, `allowedHosts`, `allowedIpNameLookups`, raw-socket egress policy, outbound client identity, same-host local routing, and NetworkPolicy. For RBAC configuration, see [Roles and Role Bindings](./operator-manual/roles-and-rolebindings.mdx).
 
 ## The WebAssembly sandbox
 
@@ -60,7 +60,7 @@ components:
         - "*.s3.amazonaws.com"
 ```
 
-Entries are matched case-insensitively against the request's host (no scheme, no path). A leading wildcard like `*.example.com` matches any subdomain but not the bare `example.com` — list both if you need both. When `allowedHosts` is non-empty, any outbound HTTP request whose host doesn't match an entry is blocked by the host before it leaves the process. This is enforced at the wasmCloud level, independently of any Kubernetes NetworkPolicy.
+Entries are matched case-insensitively against the request's host (no scheme, no path). A leading wildcard like `*.example.com` matches any subdomain but not the bare `example.com` — list both if you need both. When `allowedHosts` is non-empty, any outbound HTTP request whose host doesn't match an entry is blocked by the host before it leaves the process. Since 2.10.0 the denial reaches the guest as a handleable `http-request-denied` error rather than a trap, for WASI 0.2 and 0.3 components alike. This is enforced at the wasmCloud level, independently of any Kubernetes NetworkPolicy.
 
 The policy fails closed: if `allowedHosts` is empty or the field is omitted, all outbound HTTP requests are denied. To allow unrestricted egress, set `allowedHosts: ["*"]` explicitly. (Local development behaves differently: when the field is omitted from `.wash/config.yaml`, `wash dev` substitutes the allow-all policy so dev-loop workloads have unrestricted egress.)
 
@@ -105,9 +105,13 @@ Guest UDP binds are loopback-confined like TCP binds, outbound HTTP connections 
 
 ## Outbound client identity (mTLS)
 
-Since 2.10.0 the host can present a client certificate on components' outbound HTTPS when a peer requests one: `--http-client-cert-path` and `--http-client-key-path` (PEM, both required together), or [`runtime.clientIdentity`](./operator-manual/helm-values.mdx#runtimeclientidentity) on Kubernetes, which mounts a `kubernetes.io/tls` Secret. `--http-client-identity-refresh` re-reads the pair on an interval for rotation: new connections pick up the new credential, and a failed re-read keeps the current one. Expiry is fail-closed: a host refuses to start with an expired identity, and a credential that expires while resident stops being presented rather than offered stale.
+Since 2.10.0 the host can present a client certificate on components' outbound HTTPS when a peer requests one: `--http-client-cert-path` and `--http-client-key-path` (PEM, both required together), or [`runtime.clientIdentity`](./operator-manual/helm-values.mdx#runtimeclientidentity) on Kubernetes, which mounts a `kubernetes.io/tls` Secret.
 
-The identity is host-wide and destination-wide. Every workload authenticates as it, and it is presented to any peer that asks, so a workload with broad `allowedHosts` can cause the host to disclose the certificate to an arbitrary endpoint. Pair it with narrow `allowedHosts`, and keep untrusted workloads on a host group without an identity.
+`--http-client-identity-refresh` re-reads the pair on an interval for rotation: new connections pick up the new credential, and a failed re-read keeps the current one. The flag is also what turns on expiry checking, and with it expiry is fail-closed: the host refuses to start with an already-expired chain, and a credential that expires while resident stops being presented rather than offered stale, logged at error. Without the flag the pair is read once and never re-validated, so set it (the chart does, at `30s`) whenever the identity has an expiry that matters.
+
+:::warning[The identity is presented to any peer that asks]
+The identity is host-wide, which on Kubernetes means host-group-wide, since a group's hosts share one configuration. Every workload authenticates as it, so a workload with broad `allowedHosts` can cause the host to disclose the certificate to an arbitrary endpoint. Pair it with narrow `allowedHosts`, and keep untrusted workloads on a host group without an identity.
+:::
 
 ## Same-host local routing
 
@@ -117,7 +121,7 @@ The trust model is the operator's to judge. A `localRoute` claim is not proof of
 
 ## Kubernetes NetworkPolicy for host pods
 
-The `runtime-operator` Helm chart ships default `NetworkPolicy` resources for the operator, NATS, and each host group pod. These are enabled by default (`networkPolicy.enabled: true`); set to `false` to disable them — for example, when a CNI without NetworkPolicy support or a service mesh is managing pod-to-pod traffic. For environments that need to further restrict or extend the policy, apply an additional `NetworkPolicy` manually; Kubernetes semantics are additive.
+The `runtime-operator` Helm chart ships default `NetworkPolicy` resources for the operator, NATS, and each host group pod. These are enabled by default (`networkPolicy.enabled: true`); set to `false` to disable them — for example, when a CNI without NetworkPolicy support or a service mesh is managing pod-to-pod traffic. For environments that need to further restrict or extend the policy, apply an additional `NetworkPolicy` manually; Kubernetes semantics are additive. Note that traffic served by [same-host local routing](#same-host-local-routing) never reaches the pod network, so no NetworkPolicy applies to it.
 
 The example below is a self-contained baseline for teams applying their own policy from scratch (for example, on an install where the chart-shipped policies are disabled).
 

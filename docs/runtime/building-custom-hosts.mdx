@@ -77,7 +77,7 @@ wash-runtime = { version = "*", default-features = false, features = [
 | `wasi-webgpu` | Yes | WebGPU interface |
 | `oci` | Yes (via `washlet`) | OCI registry integration for pulling components |
 | `wasi-tls` | No | TLS termination for `wasi:tls` components |
-| `host-component-plugins` | No | Host component plugin support (included in the published `-all-features` image) |
+| `host-component-plugins` | No | Host component plugin support (included in the published `-all-features` image since 2.10.0) |
 
 ## Architecture overview
 
@@ -231,12 +231,12 @@ Two embedder-facing changes in 2.8.0:
 - **Engine**: `with_native_unwind_info(bool)` (or `WASMTIME_NATIVE_UNWIND_INFO`) can turn off per-function unwind registration, which makes dropping components on busy hosts far cheaper under LLVM libunwind (macOS and musl builds); native DWARF profilers lose guest frames.
 - **Egress identity**: `ClientTlsOptions::with_client_identity` presents a client certificate; `ClientTlsConfigResolver` and `WorkloadClients::with_tls_config_resolver` select per-workload TLS configs; `RotatingClientIdentity` plus `spawn_refresh` rotate credentials without restart.
 - **Dispatch**: `DispatchTarget::start` returns a cancellable `DispatchHandle`, and dropping the `dispatch()` future now cancels the call.
-- **Plugins**: `BindingSchema::and_aliases` and `and_required_keys`; `HostPlugin::configure_egress_policy` (default rejects a declared ceiling).
+- **Plugins**: `BindingSchema` gains `and_aliases` and `and_required_keys` for declaring key spellings and required keys. `HostPlugin::configure_egress_policy` receives the operator-declared egress ceiling; its default implementation rejects one, so a plugin that cannot enforce a ceiling fails host startup.
 - **Lifecycle**: workloads hold the HTTP handler weakly, so dropping a `Host` releases its ingress; workloads with no outbound HTTP run without a live handler.
 
 ### Customizing outgoing HTTP requests
 
-By default, every outbound HTTP request from a component flows through the built-in client. Under Wasmtime 48 (since 2.10.0) there is a single `OutgoingHandler::send_request` over `WasiBody` serving both WASI 0.2 and 0.3 components; the earlier P3-specific types are gone. If you need to thread custom TLS configuration through outgoing calls, swap in an alternative transport, or insert middleware-style policy at the egress boundary, implement the `OutgoingHandler` trait as a pluggable extension point on the HTTP server.
+By default, every outbound HTTP request from a component flows through the built-in client. Under Wasmtime 48 (since 2.10.0) there is a single `OutgoingHandler::send_request` over `WasiBody` serving both WASI 0.2 and 0.3 components; the earlier P3-specific types are gone. If you need to thread custom TLS configuration through outgoing calls, swap in an alternative transport, or insert middleware-style policy at the egress boundary, implement the `OutgoingHandler` trait as a pluggable extension point on the HTTP server. If you register none, the runtime uses `DefaultOutgoingHandler`.
 
 Implement `OutgoingHandler` on your own type, then supply it to `IngressBuilder::outgoing_handler` when constructing the ingress:
 
@@ -254,7 +254,6 @@ let http_handler = Ingress::builder(DevRouter::default(), "127.0.0.1:8080".parse
     .build()
     .await?;
 ```
-
 
 `OutgoingHandler` and `wasi:tls` are complementary: `wasi:tls` lets *components* own their TLS session, while `OutgoingHandler` lets the *host* shape egress uniformly across every component it runs.
 

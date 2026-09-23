@@ -233,12 +233,12 @@ gateway:
 ## `runtime`
 
 :::warning[Pinning an older host image]
-Three 2.9.0 values render host flags that a pre-2.9.0 host image refuses, crash-looping the pod: `probes.endpoint.enabled` (`--probe-addr`), `runtime.drainDelaySeconds` (`--drain-delay`), and `runtime.natsConnectTimeoutSeconds` (`--nats-connect-timeout`). `probes.endpoint.enabled: false` can be set per host group, but the other two are chart-wide with no per-group override, so a release containing a pinned older host image must clear both for every group, or split the pinned hosts into their own release.
+Three 2.9.0 values render host flags that a pre-2.9.0 host image refuses, crash-looping the pod: `probes.endpoint.enabled` (`--probe-addr`), `runtime.drainDelaySeconds` (`--drain-delay`), and `runtime.natsConnectTimeoutSeconds` (`--nats-connect-timeout`). `probes.endpoint.enabled: false` can be set per host group, but the other two are chart-wide with no per-group override, so a release containing a pinned older host image must clear both for every group, or split the pinned hosts into their own release. The 2.10.0 values `runtime.hostGroups[].http.localBypassRouting` and `runtime.clientIdentity` render `--http-local-routing` and the `--http-client-*` flags the same way; both are off by default, so a pinned older image is safe until you set them.
 :::
 
 ### `runtime.env`, `runtime.envFrom`, and `runtime.extraArgs`
 
-Chart-wide host configuration applied to **every** host group's container. The host's own telemetry export is configured with `OTEL_*` environment variables set here; see [Host telemetry](./telemetry.mdx). Per-host-group values (see [`runtime.hostGroups[].env`](#runtimehostgroupsenv-envfrom-and-extraargs) etc.) are appended after these, letting one group extend the chart-wide defaults without redefining them.
+Chart-wide host configuration applied to **every** host group's container. The host's own telemetry export is configured with `OTEL_*` environment variables set here; see [Host telemetry](./telemetry.mdx). `WASMTIME_NATIVE_UNWIND_INFO=false` (since 2.10.0) disables per-function unwind registration, which makes component teardown far cheaper where LLVM libunwind is in play (macOS and musl builds); the published container image is unaffected, and native DWARF profilers lose guest frames. Per-host-group values (see [`runtime.hostGroups[].env`](#runtimehostgroupsenv-envfrom-and-extraargs) etc.) are appended after these, letting one group extend the chart-wide defaults without redefining them.
 
 - `runtime.env` — additional environment variables applied to every host group container, appended after the chart-managed vars (`WASMCLOUD_HOST_IP`, `WASMCLOUD_HOST_ENVIRONMENT`) and before any per-host-group `env`.
 - `runtime.envFrom` — populate every host group container's environment from ConfigMaps or Secrets.
@@ -374,7 +374,7 @@ runtime:
         - gc
 ```
 
-Recognized values are `component-model-async`, `component-model-map`, `gc`, `exception-handling`, `wide-arithmetic`, `threads`, and `tail-call`. WASI 0.3 always brings the `component-model-async` proposal along with it, and as of wasmCloud 2.7.0 the engine also enables the Component Model `map` type proposal unconditionally, so neither needs to be listed explicitly on 2.7.0-and-later hosts.
+Recognized values are `component-model-async`, `component-model-map`, `gc`, `exception-handling`, `wide-arithmetic`, `threads`, and `tail-call`. WASI 0.3 always brings the `component-model-async` proposal along with it, and the engine also enables the Component Model `map` type proposal unconditionally, so neither needs to be listed explicitly.
 
 ### `runtime.hostGroups[].http.port`
 
@@ -382,7 +382,7 @@ The port the host's HTTP server listens on inside the pod, and the port the oper
 
 ### `runtime.hostGroups[].http.localBypassRouting`
 
-Enables same-host local routing (since 2.10.0; default `false`, rendered as `--http-local-routing`): outgoing HTTP whose hostname matches a co-located workload's `localRoute` declaration is served in process instead of leaving the host. This is one of two keys: the target workload declares the names it serves with the [`localRoute` config key](../host-interface-configuration.mdx#wasihttp), and the caller's `allowedHosts` is still checked before the short-circuit.
+Enables same-host local routing (since 2.10.0; default `false`, rendered as `--http-local-routing`): outgoing HTTP whose hostname matches a co-located workload's `localRoute` declaration is served in process instead of leaving the host. This is one of two keys: the chart value is the host key, and the target workload supplies the other by declaring the names it serves with the [`localRoute` config key](../host-interface-configuration.mdx#wasihttp). Separately, the caller's `allowedHosts` is still checked before the short-circuit, so local routing never widens egress policy.
 
 :::warning
 Local routing bypasses ingress auth, rate limits, mesh mTLS, and NetworkPolicy, and a `localRoute` claim is not proof of ownership: any workload on the host may claim any hostname, including one a neighbor calls over HTTPS, and receive that traffic in plaintext. Enable it only on host groups whose workloads trust each other, never on shared multi-tenant groups. See [Workload security](../workload-security.mdx#same-host-local-routing).
@@ -454,7 +454,7 @@ These values size the engine for the whole host; they are not per-workload limit
 
 How the host treats the guest memory budget (since 2.9.0): `count`, the default when unset, records what enforcement would refuse without refusing anything; `enforce` refuses guest memory growth past the budget. Set inside the `resources` block like the sizing values above; passed to the host as the `WASH_GUEST_MEMORY_MODE` environment variable.
 
-Under `enforce`, a guest whose `memory.grow` would cross the budget sees the growth fail (the same result as hitting its own heap ceiling), not a trap. A refusal during instantiation surfaces as a workload start error. The host publishes `guest_memory.in_use`, `guest_memory.high_water`, `guest_memory.limit`, `guest_memory.refused`, and `guest_memory.would_refuse` metrics whenever an OpenTelemetry exporter is configured, so the intended rollout is: run in `count`, watch `high_water` and `would_refuse`, then switch to `enforce`. (See [metrics you can scale on](./autoscaling.mdx#metrics-you-can-scale-on) for the host's guest metrics generally.)
+Under `enforce`, a guest whose `memory.grow` would cross the budget sees the growth fail (the same result as hitting its own heap ceiling), not a trap. A refusal during instantiation surfaces as a workload start error. The host publishes `guest_memory.in_use`, `guest_memory.high_water`, `guest_memory.limit`, `guest_memory.refused`, and `guest_memory.would_refuse` metrics whenever an OpenTelemetry exporter is configured, meaning an `OTEL_EXPORTER_OTLP_ENDPOINT` is set on the host (see [Host telemetry](./telemetry.mdx)), so the intended rollout is: run in `count`, watch `high_water` and `would_refuse`, then switch to `enforce`. (See [metrics you can scale on](./autoscaling.mdx#metrics-you-can-scale-on) for the host's guest metrics generally.)
 
 Leave headroom. The chart forwards `resources.limits.memory` verbatim, so an enforced budget equal to the pod limit can be OOM-killed before a refusal ever fires; the host warns at startup when an enforced budget exceeds 90% of the detected memory limit. Set `limits.memory` above the guest budget you want, or set a lower budget explicitly with `WASH_HOST_MAX_GUEST_MEMORY` in `runtime.env`.
 
@@ -500,9 +500,12 @@ Liveness is deliberately slower than readiness: a restart loses every workload o
 
 Host pods drain on termination instead of exiting immediately (since 2.9.0):
 
-1. On SIGTERM the host reports `draining`: readiness fails and the pod leaves its Service endpoints while the host is still serving. Requests arriving on already-established keep-alive connections are served through the drain rather than turned away (since 2.10.0).
+1. On SIGTERM the host reports `draining`: readiness fails and the pod leaves its Service endpoints while the host is still serving, including requests arriving on already-established keep-alive connections.
 2. The host keeps serving for `runtime.drainDelaySeconds` (default `5`, rendered as `--drain-delay`).
-3. In-flight commands get 5 seconds to finish, and each plugin's stop is capped by `WASH_PLUGIN_STOP_TIMEOUT_SECS` (default 5 seconds) plus a 1 second grace.
+3. Remaining ingress connections get up to `WASH_INGRESS_DRAIN_TIMEOUT_SECS` (default 60 seconds; since 2.10.0) to finish before the listener lets go of its routes.
+4. In-flight commands get 5 seconds to finish, and each plugin's stop is capped by `WASH_PLUGIN_STOP_TIMEOUT_SECS` (default 5 seconds) plus a 1 second grace.
+
+If you expect to use the full ingress drain, raise `terminationGracePeriodSeconds` above the drain budget; the default `15` cuts a long drain short.
 
 The chart now sets `terminationGracePeriodSeconds` on every pod (previously hardcoded to `0`): `runtime: 15`, `operator: 45`, `gateway: 45`, `nats: 30`. Rendering fails if the runtime grace is less than `drainDelaySeconds + 5`. A second signal exits immediately rather than waiting out the drain.
 
@@ -524,18 +527,19 @@ Maps to the host's socket policy and connection quota flags. The chart renders t
 | `maxInboundSocketConnectionsPerWorkload` | `256` | `--max-inbound-socket-connections-per-workload` |
 | `maxHttpIngressConnections` | empty (a quarter of the descriptor limit, floor 256; since 2.9.0) | `--max-http-ingress-connections` |
 
-`allowHostLoopback` and `denyPrivateRanges` render as presence flags, so setting them to `false` is the same as omitting them; only `denySpecialRanges` renders an explicit value. `socketEgress` also gates host plugins' `allowedHosts` and address-range refusals (since 2.10.0). See [Concurrency and connections](./concurrency-and-connections.mdx) and [Workload security](../workload-security.mdx) for what these bound. `publishPorts` and `publishPortRange` appear in the values file but are not yet wired to the host; setting them has no effect.
+`allowHostLoopback` and `denyPrivateRanges` render as presence flags, so setting them to `false` is the same as omitting them; only `denySpecialRanges` renders an explicit value. `socketEgress` also gates host plugins' `allowedHosts` and address-range refusals (since 2.10.0). See [Concurrency and connections](./concurrency-and-connections.mdx) and [Workload security](../workload-security.mdx) for what these bound. `publishPorts` and `publishPortRange` (which would publish a workload's listening ports out of the pod) appear in the values file but are not yet wired to the host; setting them has no effect. They are distinct from [`runtime.hostGroups[].ports`](#runtimehostgroupsvolumes-volumemounts-and-ports) (pod container ports) and from a plugin's own [`ports`](#runtimehostgroupsplugins) reservations.
 
 ### `runtime.hostGroups[].plugins`
 
-One declaration block configures host plugins of both kinds (since 2.9.0): native plugins built into the host (an entry with only an `id`) and [host component plugins](../../runtime/creating-host-component-plugins.mdx) (an entry with an `image` or `file` source). A native entry, and any entry carrying config, secrets, allowlists, or binding fields, is rendered into the host's config file rather than CLI arguments, so credentials never appear in the pod spec; a bare component entry (`id` plus a source) still renders as a `--host-plugin` argument. (Before 2.10.0, egress lists on entries that took the CLI path were silently dropped; they are file-backed and enforced now.) Each entry accepts:
+One declaration block configures host plugins of both kinds (since 2.9.0): native plugins built into the host (an entry with only an `id`) and [host component plugins](../../runtime/creating-host-component-plugins.mdx) (an entry with an `image` or `file` source). A native entry, and any entry carrying config, secrets, allowlists, or binding fields, is rendered into the host's config file rather than CLI arguments, so credentials never appear in the pod spec; a bare component entry (`id` plus a source) still renders as a `--host-plugin` argument. Component plugin entries need a host image with the `host-component-plugins` feature; see [`runtime.image.tag`](#runtimeimagetag). (The 2.10.0 fields `allowedHostLoopbackPorts` and `ports` join the file-backed set, since a `--host-plugin` argument cannot carry a nested list.) Each entry accepts:
 
 - **`config` / `configFrom` / `secretFrom`**: entry-wide configuration, layered under each binding's own.
 - **`workloadConfig`**: `deny` (the default), `warn`, or `allow`. Under `deny`, host-owned keys (connection and credential settings) come only from this declaration: a workload manifest that sets one or widens a grant ceiling is refused at deploy, and once any binding is declared for a plugin, so is a manifest naming a binding the declaration does not carry. `warn` behaves like `allow` but logs everything `deny` would refuse, for rehearsing a lockdown.
 - **`hostOwnedKeys`**: additional keys to claim for the host under `deny`.
 - **`bindings`**: a map of label to `{config, configFrom, secretFrom}`. A component imports the plugin's interface under that label (the Component Model's `implements` clause), and the labeled import resolves against the binding's config layered over the entry's.
-- **`allowedHosts` / `allowedIpNameLookups` / `allowedHostLoopbackPorts`**: the plugin's own egress and loopback grants. Empty or omitted denies all. Since 2.10.0 the lists are valid on native and component entries alike (previously component-only, and raw sockets went ungated), a native plugin that never dials out refuses a declared ceiling at startup rather than ignoring it, and `allowedHosts` and address-range refusals follow the group's `networking.socketEgress` mode while loopback and port refusals are enforced in either mode.
-- **`ports`**: ports a plugin binds directly (`name` and `port`, optional `protocol` and `bind`), reserved in the host's port table at load (since 2.10.0). A `publish` field is not yet supported and is rejected.
+- **`allowedHosts` / `allowedIpNameLookups`**: the plugin's own HTTP, DNS, and raw-socket egress grants. Empty or omitted denies all. Since 2.10.0 they apply to native and component entries alike, and refusals follow the group's [`networking.socketEgress`](#runtimehostgroupsnetworking) mode. A native plugin that cannot enforce a declared ceiling fails host startup rather than ignoring it.
+- **`allowedHostLoopbackPorts`**: ports the plugin may reach on the machine's loopback through `host.wasmcloud.internal` (since 2.10.0). A two-key grant like the workload field of the same name: inert unless the host also runs with `--allow-host-loopback`. Enforced in either `socketEgress` mode.
+- **`ports`**: ports a plugin may bind (`name` and `port`, optional `protocol` and `bind`; since 2.10.0). Entries with a `bind` address are reserved in the host's port table at load, and unspecified or loopback `bind` addresses are rejected. The per-plugin `publish` field is not yet supported and is rejected. (Unrelated to [`runtime.hostGroups[].ports`](#runtimehostgroupsvolumes-volumemounts-and-ports), which are pod container ports.)
 - Component-plugin-only fields: `maxRestarts`, `digest` (an OCI digest pin).
 
 ```yaml
@@ -564,7 +568,7 @@ Additional IP SANs for the host group's generated TLS certificate; needed when c
 
 ### `runtime.image.tag`
 
-Defaults to the chart's `appVersion`; leave unset to track the chart release.
+Defaults to the chart's `appVersion`; leave unset to track the chart release. To run [host component plugins](../../runtime/creating-host-component-plugins.mdx), set it to the release's all-features tag (`{{WASMCLOUD_VERSION}}-all-features`, since 2.10.0), which carries the `host-component-plugins` feature; a per-host-group `hostGroups[].image` overrides it for one group, so only the group that needs plugins runs the larger image.
 
 ## Related documentation
 

@@ -182,7 +182,7 @@ Inside the guest, each label surfaces as its own import namespace: `cache::open(
 
 ![Multi-backend binding: a component world imports wasi:keyvalue/store twice under the labels cache and sessions; each labeled import routes by name to its own hostInterfaces entry, one selecting a NATS JetStream backend and the other a Redis backend](../images/multi-backend-binding.webp)
 
-Multi-backend binding ships for `wasi:keyvalue`, `wasi:blobstore`, `wasmcloud:keyvalue`, `wasmcloud:blobstore`, `wasmcloud:postgres`, and `wasmcloud:messaging/consumer`. Unlabeled imports of `wasmcloud:blobstore` and `wasmcloud:keyvalue/store` also work: they bind to the workload's default (unnamed) backend, so a component that needs only one backend can drop the `(implements ..)` label and still get a working binding.
+Multi-backend binding ships for `wasi:keyvalue`, `wasi:blobstore`, `wasmcloud:keyvalue`, `wasmcloud:blobstore`, `wasmcloud:postgres`, and `wasmcloud:messaging/consumer`. That list bounds host-backed binding; a label naming a sibling component (since 2.10.0, below) works for any interface. Unlabeled imports of `wasmcloud:blobstore` and `wasmcloud:keyvalue/store` also work: they bind to the workload's default (unnamed) backend, so a component that needs only one backend can drop the `(implements ..)` label and still get a working binding.
 
 ```yaml
 hostInterfaces:
@@ -215,6 +215,7 @@ Naming rules:
 - When two or more entries share the same `namespace`+`package`, **all** of them must have a non-empty `name`.
 - Names must be unique within a workload's `hostInterfaces` for the same `namespace`+`package`.
 - Names must match `[a-z0-9][a-z0-9-]*` (DNS label style).
+- A name declared here takes precedence over a component of the same name in the same workload (since 2.10.0).
 
 Since 2.9.0 a labeled import can also be served by a plugin binding the operator declares in the host's [`plugins` block](./operator-manual/helm-values.mdx#runtimehostgroupsplugins): the label resolves against the binding's config, and the workload's entry may then omit `config`, carrying `name` alongside the required `namespace`, `package`, and `interfaces`. Under the default `workloadConfig: deny` policy, once the operator has declared any binding for a plugin, a manifest naming one it did not declare is refused at deploy; a plugin with no declared bindings serves every label, which is what makes `deny` safe as the default.
 
@@ -230,7 +231,7 @@ The built-in NATS `wasmcloud:messaging` plugin reads its config keys from the co
 - **`consumer_group`**: Controls delivery when a component runs with multiple replicas. When omitted, replicas join a consumer group derived from the workload namespace, workload name, and component name, so exactly one replica handles each message. Set it to the special value `broadcast` to deliver every message to every replica (useful for cache invalidation), or to any other NATS-safe name (no whitespace, `*`, or `>`) to place subscribers in an explicitly named group (e.g., to share one group across components).
 - **`max_in_flight`** (as of wasmCloud 2.8.0): Caps how many deliveries to the component may be in flight at once on a host, counted across the component's replicas on that host. Since 2.10.0 the gate is keyed by a stable identity the operator stamps on replicas, so replicas of one deployment share a single gate; earlier releases opened one gate per replica at the full ceiling. When omitted, the host's per-component ceiling applies. The key can only lower a component below that ceiling; a value above it is clamped to it with a warning. Raising a component past the stock ceiling requires raising the host's per-component flag. See [Messaging admission control](#messaging-admission-control) below.
 - **`admission_wait`** (as of wasmCloud 2.8.0): How long a delivery waits for an in-flight slot before it is dropped. Accepts values like `45s`, `2m`, or bare seconds. Default `30s`, maximum `600s`.
-- **`admission_group`** (since 2.10.0): Overrides the name replicas are grouped under for the admission gate, letting several components share one gate. Empty or whitespace values are ignored. The NATS backend reads `localResources.config` first and then the entry config; the in-memory `wash dev` backend reads `localResources.config` only.
+- **`admission_group`** (since 2.10.0): Replaces the workload name in the admission gate's key. The gate is keyed by namespace, this name, and the component's own name, so setting the same `admission_group` on same-named components in different workloads puts them on one gate; components with different names never share one. Empty or whitespace values are ignored. The NATS backend reads `localResources.config` first and then the entry config; the in-memory `wash dev` backend reads `localResources.config` only.
 
 ```yaml
 spec:
@@ -251,7 +252,7 @@ spec:
 
 #### Messaging admission control
 
-As of wasmCloud 2.8.0, the host admits messaging deliveries to components through an in-flight limit, applied before any instance work begins (trigger services are exempt). The limit covers pooled and per-message components alike. When a component is at its limit, further deliveries wait up to `admission_wait` for a slot; a delivery that cannot be admitted in time is dropped with a warning. There is no negative acknowledgment on core NATS, so size the limit for peak load rather than relying on redelivery.
+As of wasmCloud 2.8.0, the host admits messaging deliveries to components through an in-flight limit, applied before any instance work begins (trigger services are exempt). The limit covers pooled and per-message components alike. Since 2.10.0 the gate is keyed by a stable identity the operator stamps on each replica, so every replica of one `WorkloadDeployment` draws on a single shared allowance; before 2.10.0 each replica's uniquely named `Workload` resource opened its own gate at the full ceiling, making a deployment's effective concurrency `replicas × max_in_flight`. If throughput drops after upgrading, raise `max_in_flight` (and the host ceiling if needed) to the intended aggregate. When a component is at its limit, further deliveries wait up to `admission_wait` for a slot; a delivery that cannot be admitted in time is dropped with a warning. There is no negative acknowledgment on core NATS, so size the limit for peak load rather than relying on redelivery.
 
 Two host-level ceilings back the per-component limit, set as flags or environment variables on the host (on Kubernetes, via [`runtime.hostGroups[].env`](./operator-manual/helm-values.mdx#runtimehostgroupsenv-envfrom-and-extraargs)):
 
