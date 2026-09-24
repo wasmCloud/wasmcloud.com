@@ -11,6 +11,8 @@ import transcriptInheritance from '@site/src/data/transcript-inheritance.json';
 import JsonLd from '@theme/wasmcloud/json-ld';
 import { buildEntityRefs } from '@theme/wasmcloud/structured-data/entities';
 import { isTranscriptPermalink } from './utils';
+import { addSecondsIso, meetingStartIso } from './meeting-time';
+import { withTrailingSlash } from '@theme/wasmcloud/structured-data/url';
 
 type InheritedRefs = { about?: string; mentions?: string[] };
 const TRANSCRIPT_INHERITANCE: Record<string, InheritedRefs> =
@@ -42,6 +44,15 @@ const PEOPLE = peopleData as PeopleJson;
 const VIDEO_LANGUAGE = 'en';
 const PROJECT_ORG_ID = 'https://wasmcloud.com/#organization';
 const VIDEO_PUBLISHER = { '@id': PROJECT_ORG_ID } as const;
+// Inlined (not just an @id ref) because Google's Event validator reads
+// organizer.name / organizer.url from the Event node itself and does not
+// resolve @id references across separate JSON-LD payloads.
+const EVENT_ORGANIZER = {
+  '@type': 'Organization',
+  '@id': PROJECT_ORG_ID,
+  name: 'wasmCloud',
+  url: 'https://wasmcloud.com/',
+} as const;
 const VIDEO_GENRE = 'Technology';
 const VIDEO_CATEGORY = 'Community Calls';
 // YouTube's maxresdefault thumbnails are 1280×720
@@ -54,12 +65,6 @@ function extractYouTubeId(image: unknown): string | null {
   if (typeof image !== 'string') return null;
   const m = image.match(YOUTUBE_THUMBNAIL_RE);
   return m ? m[1] : null;
-}
-
-function asIsoDate(date: unknown): string | undefined {
-  if (date instanceof Date) return date.toISOString();
-  if (typeof date === 'string') return date;
-  return undefined;
 }
 
 function getChapters(frontMatter: Record<string, unknown>): Chapter[] {
@@ -190,10 +195,14 @@ export default function VideoSEO({
   const watchUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
   const embedUrl = `https://www.youtube.com/embed/${youtubeId}`;
   const thumbnailUrl = `https://i.ytimg.com/vi/${youtubeId}/maxresdefault.jpg`;
-  const uploadDate = asIsoDate(date);
+  // Calls start at 1:00 PM America/New_York; the frontmatter only carries a
+  // calendar date (which Docusaurus turns into midnight UTC — the previous
+  // evening in Eastern time). Anchor every community timestamp at the real
+  // start, with an explicit offset. See ./meeting-time.ts.
+  const uploadDate = meetingStartIso(date, frontMatter.start_time);
   const isTranscript = isTranscriptPermalink(permalink);
   const siteUrl = siteConfig.url.replace(/\/$/, '');
-  const canonicalUrl = `${siteUrl}${permalink}`;
+  const canonicalUrl = withTrailingSlash(`${siteUrl}${permalink}`);
 
   const chapters = getChapters(frontMatter);
   // Total video length in seconds, from the landing page's `duration:`
@@ -306,15 +315,13 @@ export default function VideoSEO({
   // virtual events lost SERP rich-result eligibility in June 2025; this
   // emission is for parser ingestion + Person performer[] entity-graph
   // density (M11 Risk #13 in the spike).
-  let eventEndDate: string | undefined;
-  if (uploadDate && durationSeconds !== undefined) {
-    try {
-      const startMs = new Date(uploadDate).getTime();
-      eventEndDate = new Date(startMs + durationSeconds * 1000).toISOString();
-    } catch {
-      eventEndDate = undefined;
-    }
-  }
+  const eventEndDate =
+    uploadDate && durationSeconds !== undefined
+      ? addSecondsIso(uploadDate, durationSeconds)
+      : undefined;
+  // The call is always free and open; `validFrom` is the start of the
+  // meeting day (agenda stubs are posted that morning).
+  const offerValidFrom = uploadDate?.replace(/T\d{2}:\d{2}:\d{2}/, 'T00:00:00');
 
   const event = !isTranscript && uploadDate
     ? {
@@ -332,11 +339,23 @@ export default function VideoSEO({
         // past-dated `endDate` is what marks the event as having occurred.
         eventStatus: 'https://schema.org/EventScheduled',
         eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
+        // Online-event shape per schema.org/Event and Google's Event docs:
+        // VirtualLocation + OnlineEventAttendanceMode, plus the recommended
+        // image, offers, organizer, and performer fields.
         location: {
           '@type': 'VirtualLocation',
           url: watchUrl,
         },
-        organizer: VIDEO_PUBLISHER,
+        image: [thumbnailUrl],
+        offers: {
+          '@type': 'Offer',
+          url: canonicalUrl,
+          price: '0',
+          priceCurrency: 'USD',
+          availability: 'https://schema.org/InStock',
+          ...(offerValidFrom && { validFrom: offerValidFrom }),
+        },
+        organizer: EVENT_ORGANIZER,
         ...(speakers && { performer: speakers }),
         inLanguage: VIDEO_LANGUAGE,
         isAccessibleForFree: true,

@@ -52,4 +52,4 @@ HELLLLOOOOOO
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities/?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/add-features/?lang=rust) section of the wasmCloud documentation.

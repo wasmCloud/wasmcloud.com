@@ -8,7 +8,10 @@ import SearchMetadata from '@theme/SearchMetadata';
 import type { Props } from '@theme/BlogListPage';
 import BlogPostItems from '@theme/BlogPostItems';
 import CommunitySidebar from '../sidebar';
-import BlogListPageStructuredData from '@theme/BlogListPage/StructuredData';
+import Head from '@docusaurus/Head';
+import { useBlogListPageStructuredData } from '@docusaurus/plugin-content-blog/client';
+import { meetingStartIso } from '../meeting-time';
+import { normalizeBlogListLd } from '../../structured-data/blog-list';
 import styles from './styles.module.css';
 import BlogPostListItem from '../list-item';
 import Layout from '@theme/Layout';
@@ -19,6 +22,27 @@ import { isTranscriptPermalink } from '../utils';
 import SvgZoom from '@site/static/pages/home/icon/zoom.svg';
 import SvgYoutube from '@site/static/pages/home/icon/youtube.svg';
 import SvgCalendar from '@site/static/pages/home/icon/calendar.svg';
+
+/**
+ * Docusaurus's default Blog list JSON-LD, corrected for community calls:
+ * canonical trailing-slash URLs, each BlogPosting dated at the meeting's
+ * real start (1:00 PM Eastern, not midnight UTC), and the wasmCloud
+ * project credited instead of an empty `author: []`.
+ */
+function CommunityListStructuredData(props: Props): JSX.Element {
+  const data = useBlogListPageStructuredData(props) as unknown as Record<string, unknown>;
+  const fixed = normalizeBlogListLd(data, (post, i) =>
+    meetingStartIso(
+      post.datePublished,
+      (props.items[i]?.content?.frontMatter as { start_time?: unknown } | undefined)?.start_time,
+    ),
+  );
+  return (
+    <Head>
+      <script type="application/ld+json">{JSON.stringify(fixed)}</script>
+    </Head>
+  );
+}
 
 function BlogListPageMetadata(props: Props): JSX.Element {
   const { metadata } = props;
@@ -127,7 +151,7 @@ export default function BlogListPage(props: Props): JSX.Element {
       className={clsx(ThemeClassNames.wrapper.blogPages, ThemeClassNames.page.blogListPage)}
     >
       <BlogListPageMetadata {...props} />
-      <BlogListPageStructuredData {...props} />
+      <CommunityListStructuredData {...props} />
       <BlogListPageContent {...props} />
     </HtmlClassNameProvider>
   );
