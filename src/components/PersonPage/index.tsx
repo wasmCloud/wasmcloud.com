@@ -40,6 +40,7 @@ type Appearance = {
   date: string;
   image?: string;
   description?: string;
+  duration?: number;
 };
 
 type PersonPageData = {
@@ -92,6 +93,14 @@ function hostnameOf(url: string): string {
  *  carry a `T` (assumed already-formatted ISO 8601). */
 function toIso8601Date(date: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00Z` : date;
+}
+
+/** 3229 → "PT53M49S" (ISO 8601 duration for VideoObject.duration). */
+function secondsToIsoDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const sec = seconds % 60;
+  return `PT${h ? `${h}H` : ''}${m ? `${m}M` : ''}${sec || (!h && !m) ? `${sec}S` : ''}`;
 }
 
 /** Two-letter initials from the person's name. Falls back to one
@@ -149,8 +158,16 @@ function communityMeetingSubjectOf(
   organizationId: string,
 ): Record<string, unknown> {
   const fullUrl = withTrailingSlash(`${siteUrl}${a.url}`);
+  // Google's Video rich result wants contentUrl or embedUrl; every
+  // meeting's thumbnail is YouTube's, so derive both from its video id.
+  const youtubeId = a.image?.match(/i\.ytimg\.com\/vi\/([^/]+)\//)?.[1];
   return {
     '@type': 'VideoObject',
+    ...(youtubeId && {
+      contentUrl: `https://www.youtube.com/watch?v=${youtubeId}`,
+      embedUrl: `https://www.youtube.com/embed/${youtubeId}`,
+    }),
+    ...(a.duration !== undefined && { duration: secondsToIsoDuration(a.duration) }),
     '@id': `${fullUrl}#video`,
     name: a.title,
     description: a.description ?? `wasmCloud community call — ${a.title}.`,
