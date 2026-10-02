@@ -19,12 +19,18 @@ export default async function githubStars(
         return;
       }
       const [owner, repo] = options.preloadRepo.split('/');
-      const octokit = new Octokit();
-      const response = await octokit.repos.get({ owner, repo });
-      if (response.status !== 200) {
-        logger.report('throw')(`Failed to fetch repo data for ${options.preloadRepo}`);
+      // Authenticate when a token is available: anonymous requests share a
+      // 60/hour limit per IP, which CI and Netlify build machines exhaust.
+      const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+      try {
+        const response = await octokit.repos.get({ owner, repo });
+        return response.data;
+      } catch (err) {
+        // Star counts are cosmetic: the client fetches them at runtime when
+        // nothing was preloaded, so a GitHub failure shouldn't fail the build.
+        logger.warn(`Failed to preload repo data for ${options.preloadRepo}: ${err}`);
+        return undefined;
       }
-      return response.data;
     },
     injectHtmlTags: ({ content }) => {
       if (!content) return {};
