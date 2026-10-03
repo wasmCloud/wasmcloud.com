@@ -135,7 +135,7 @@ wash dev
 
 This will start a local wasmCloud host, build your project, and react to changes to local code, redeploying your project as necessary.
 
-[wash-dev]: https://wasmcloud.com/docs/v1/cli/wash#wash-dev
+[wash-dev]: https://wasmcloud.com/docs/v1/cli/wash/#wash-dev
 
 #### Other ways to deploy a manually (deprecated)
 

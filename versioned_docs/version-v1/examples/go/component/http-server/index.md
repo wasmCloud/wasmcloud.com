@@ -31,7 +31,7 @@ The application...
 
 [wasi-http]: https://github.com/WebAssembly/wasi-http
 [httpserver-provider]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-http-server
-[wasmCloud]: https://wasmcloud.com/docs/v1/intro
+[wasmCloud]: https://wasmcloud.com/docs/v1/intro/
 [tinygo]: https://tinygo.org/getting-started/install/
 [wash]:  https://wasmcloud.com/docs/v1/ecosystem/wash/
 [wasm-tools]: https://github.com/bytecodealliance/wasm-tools#installation
@@ -237,6 +237,6 @@ pgrep -la ghcr_io
 
 ## 📖 Further reading
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities/?lang=rust) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/add-features/?lang=rust) section of the wasmCloud documentation.
 
 For more on building components, see the [Component Developer Guide](https://wasmcloud.com/docs/v1/developer/components/) in the wasmCloud documentation. 

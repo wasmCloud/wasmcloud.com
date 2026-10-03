@@ -2,6 +2,7 @@ import React from 'react';
 import { useDoc } from '@docusaurus/plugin-content-docs/client';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import JsonLd from '@theme/wasmcloud/json-ld';
+import { withTrailingSlash } from '@theme/wasmcloud/structured-data/url';
 
 /**
  * M7 — Course + LearningResource schema for the Quickstart series.
@@ -95,7 +96,7 @@ export default function CourseSchema(): JSX.Element | null {
     const steps = QUICKSTART_STEPS.filter((s) => !s.isIndex).map((s) => ({
       '@type': 'LearningResource',
       name: s.name,
-      url: `${siteUrl}${s.permalink}`,
+      url: withTrailingSlash(`${siteUrl}${s.permalink}`),
       learningResourceType: 'Tutorial',
     }));
     const course = {
@@ -134,7 +135,7 @@ export default function CourseSchema(): JSX.Element | null {
     '@type': 'LearningResource',
     name: metadata.title,
     description: metadata.description,
-    url: `${siteUrl}${path}`,
+    url: withTrailingSlash(`${siteUrl}${path}`),
     learningResourceType: 'Tutorial',
     educationalLevel: proficiencyFrom(fm),
     teaches,

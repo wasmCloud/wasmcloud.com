@@ -119,4 +119,4 @@ Configuration for `wash` is stored in `wasmcloud.toml`. While template projects 
 
 See [the `wasmcloud.toml` config reference][reference-toml-config] for more information.
 
-[reference-toml-config]: /docs/v1/reference/config
+[reference-toml-config]: /docs/v1/reference/config/
