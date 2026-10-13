@@ -158,12 +158,14 @@ A request reaches the host but gets a `400` before any component runs, and nothi
 
 ### P3 component traps with `waitable cannot be used synchronously while added to a waitable set`
 
-A WASI P3 component (one that exports the async WASI 0.3 interfaces, such as `wasi:http/handler@0.3.0`) worked before an upgrade to 2.10.0 and now fails on the first request that suspends. That is often a request body read, but it can also happen after the response is sent. HTTP callers get a `500`, and the host logs:
+A WASI P3 component (one that exports the async WASI 0.3 interfaces, such as `wasi:http/handler@0.3.0`) worked before an upgrade to 2.10.0 and now fails on the first request that waits on I/O, such as reading the request body. HTTP callers get a `500`, or a truncated response if the trap fires after the response starts. The host logs:
 
 ```
 wasm trap: waitable cannot be used synchronously while added to a waitable set
 failed to invoke component: pooled instance dropped the request
 ```
+
+The second line appears only for components that use an instance pool (`poolSize`).
 
 **Cause:** Since 2.10.0 the host runs on Wasmtime 48, which traps a synchronous stream or future cancel, or a `subtask.cancel`, on a waitable that is still in a waitable set (the group of handles an async component waits on together). The component model spec requires this ([component-model#647](https://github.com/WebAssembly/component-model/pull/647), [wasmtime#13708](https://github.com/bytecodealliance/wasmtime/pull/13708)). The async runtime in wit-bindgen 0.58 and earlier does exactly that when its `inter-task-wakeup` feature is enabled; wit-bindgen 0.59.0 fixed it ([wit-bindgen#1638](https://github.com/bytecodealliance/wit-bindgen/pull/1638)). A common affected stack is `wasip3` 0.7.x with `http-compat` plus a direct `wit-bindgen = "0.57.1"` dependency with `inter-task-wakeup`. WASI P2 components, P3 components on wit-bindgen 0.59 or later, and P3 components without `inter-task-wakeup` are not affected.
 
@@ -175,7 +177,7 @@ cargo tree --target all -e features -i wit-bindgen
 
 The component is affected if this lists wit-bindgen 0.58 or earlier with the feature `inter-task-wakeup`. If the lockfile carries more than one wit-bindgen, name the version (`-i wit-bindgen@0.57.1`).
 
-**Fix:** Rebuild on `wasip3` 0.9.0 and wit-bindgen 0.62.0. Keep a direct `wit-bindgen` dependency at the same version `wasip3` uses, so the features unify onto one runtime:
+**Fix:** Rebuild on `wasip3` 0.9.0 and wit-bindgen 0.62.0. Keep a direct `wit-bindgen` dependency at the same version `wasip3` uses, so Cargo builds one runtime with those features:
 
 ```toml
 wasip3 = { version = "0.9.0", features = ["http-compat"] }
@@ -186,7 +188,7 @@ wit-bindgen = { version = "0.62.0", default-features = false, features = [
 ] }
 ```
 
-`wit_bindgen::spawn` is renamed `spawn_local`. A rebuilt component also runs on hosts before 2.10.0, so you can redeploy it before upgrading. For a published component, use a release rebuilt this way: for example, `ghcr.io/wasmcloud/components/oci-registry:0.1.0` is affected and `0.2.0` is fixed.
+Coming from wit-bindgen 0.57, rename `wit_bindgen::spawn` to `spawn_local`. A rebuilt component also runs on 2.6.0 through 2.9.x (Wasmtime 47), so you can redeploy it before upgrading. For a published component, use a release rebuilt this way: for example, `ghcr.io/wasmcloud/components/oci-registry:0.1.0` is affected and `0.2.0` is fixed.
 
 ## Scheduling
 
