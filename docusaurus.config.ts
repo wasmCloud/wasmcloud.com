@@ -576,7 +576,7 @@ const config = (async (): Promise<Config> => {
             '@type': 'SearchAction',
             target: {
               '@type': 'EntryPoint',
-              urlTemplate: `${siteBaseUrl()}/search?q={search_term_string}`,
+              urlTemplate: `${siteBaseUrl()}/search/?q={search_term_string}`,
             },
             'query-input': 'required name=search_term_string',
           },

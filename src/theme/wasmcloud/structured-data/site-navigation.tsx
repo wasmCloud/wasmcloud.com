@@ -2,6 +2,7 @@ import React from 'react';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import type { ThemeConfig } from '@docusaurus/preset-classic';
 import JsonLd from '../json-ld';
+import { withTrailingSlash } from './url';
 
 /**
  * Emit a `SiteNavigationElement` JSON-LD listing the top-level navbar
@@ -35,7 +36,7 @@ export default function SiteNavigationSchema(): JSX.Element | null {
     if (typeof href === 'string') {
       url = href;
     } else if (typeof to === 'string') {
-      url = `${baseUrl}${to.startsWith('/') ? to : '/' + to}`;
+      url = withTrailingSlash(`${baseUrl}${to.startsWith('/') ? to : '/' + to}`);
     }
     if (!url) continue;
     elements.push({

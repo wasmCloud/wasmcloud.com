@@ -1,6 +1,7 @@
 import React from 'react';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import JsonLd from '../json-ld';
+import { withTrailingSlash } from '@theme/wasmcloud/structured-data/url';
 
 /**
  * Per M9 — emit `CollectionPage` JSON-LD on list pages (`/blog/`, `/community/`).
@@ -30,7 +31,7 @@ export default function CollectionPageSchema({
 }: CollectionPageProps): JSX.Element {
   const { siteConfig } = useDocusaurusContext();
   const siteUrl = siteConfig.url.replace(/\/$/, '');
-  const url = `${siteUrl}${permalink}`;
+  const url = withTrailingSlash(`${siteUrl}${permalink}`);
   const payload: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
