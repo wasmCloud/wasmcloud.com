@@ -104,16 +104,24 @@ If `allowedHosts` is empty or the field is omitted, **all outbound HTTP requests
 
 Since 2.10.0 the denial reaches the guest as a handleable `http-request-denied` error on both WASI 0.2 and 0.3; earlier releases trapped 0.2 guests, so the symptom was an instance fault rather than an error value.
 
-### A raw socket or DNS lookup is denied with nothing in the host log
+### A raw socket is denied with nothing in the host log
 
-A component using `wasi:sockets` gets `access-denied` on connect, or `permanent-resolver-failure` on a name lookup, and the host logs say nothing about it at any level.
+A component using `wasi:sockets` gets `access-denied` on connect or bind, and the host logs say nothing about it at any level.
 
-**Cause:** Since 2.11.0 the socket address policy runs in `enforce` mode by default. The refusal path is deliberately silent: only `count` mode logs what it *would* refuse, and it logs at debug. So the mode that allows traffic is observable and the mode that blocks it is not.
+**Cause:** Since 2.11.0 the socket address policy runs in `enforce` mode by default. For a connect or bind the refusal path is silent: only `count` mode logs what it *would* refuse, and it logs at debug. So for this one decision, the mode that allows traffic is observable and the mode that blocks it is not.
 
 **How to confirm it:** two ways, neither of which is grepping the log.
 
 1. **Read the metric.** The host increments `socket_policy.denied` with a `reason` label — `not_permitted`, `bind_not_permitted`, `host_loopback_not_permitted`, `host_owned_port`, `blocked_range`, or `no_capacity`. This needs an OpenTelemetry exporter, meaning `OTEL_EXPORTER_OTLP_ENDPOINT` set on the host. Note that the meters are only installed by `wash host`: under `wash dev` and in embedded hosts, refusals are enforced but not counted.
 2. **Reproduce under `--socket-egress count`.** The connection is then allowed and a debug line names the address and reason. Run with `RUST_LOG=wash_runtime=debug`.
+
+:::tip[A denied *name lookup* is logged, and names the fix]
+This silence applies only to connects and binds. A refused `wasi:sockets` name lookup reaches the guest as `permanent-resolver-failure` and the host logs it at **warn**, naming what to add. The wildcard case even has its own message:
+
+> lookup of `api.internal` denied: allowedHosts has `*`, which permits connections but opens no name lookup. Add `api.internal`, or `*`, to allowedIpNameLookups
+
+Lookup denials are not governed by `--socket-egress`, so reproducing under `count` changes nothing for them, and they have no `socket_policy.denied` reason. If the symptom is a failed lookup rather than a failed connect, read the host log first.
+:::
 
 **Fix:** Add the destination to the component's `allowedHosts`, and, for a connection made by hostname, grant the lookup — either an `allowedIpNameLookups` entry or an `allowedHosts` entry naming that host. Remember that `allowedHosts: ["*"]` permits connections but opens no lookup. A quota exhaustion reports `out-of-memory` rather than `access-denied`, deliberately, so you are not hunting for a policy that is not the cause.
 
@@ -193,11 +201,11 @@ After upgrading, hosts re-download images they had cached, disk usage roughly do
 
 **Cause:** 2.11.0 changed the OCI disk cache layout. Entries are now scoped by the resolved registry **user**, the HTTP or HTTPS transport, and the CA snapshot used to fetch the artifact, and each entry stores its digest and component bytes together in one file. Older entries do not carry that scope and are ignored, so every image is fetched once more. `Never` returns a cached artifact only inside the same scope, so it fails until the image has been pulled once under the credentials, transport, and trust the host will actually use.
 
-**Fix:** Let the hosts re-pull once. On Kubernetes the washlet sweeps the old directories automatically within about five minutes of startup. For workloads pinned to `Never`, pull once with `IfNotPresent` under the credentials they will use, then switch back.
+**Fix:** Let the hosts re-pull once. On Kubernetes the washlet removes the old directories on its first control-loop turn, with no age check, and sweeps again every five minutes after. For workloads pinned to `Never`, pull once with `IfNotPresent` under the credentials they will use, then switch back.
 
 Related behavior worth knowing:
 
-- **A password or token rotation does not invalidate the cache.** Scoping is by registry *user*, not password. One pull under a non-`Never` policy revalidates each entry's manifest with the new password without downloading it again, after which `Never` accepts it. A different username, anonymous access, or a new bearer token *is* a new scope and re-fetches.
+- **A password rotation does not invalidate the cache.** Scoping is by registry *user*, not password. One pull under a non-`Never` policy revalidates each entry's manifest with the new password without downloading it again, after which `Never` accepts it. A different username, anonymous access, or a new bearer token *is* a new scope and re-fetches — a bearer token names no user, so each token is its own scope.
 - **`IfNotPresent` now revalidates with the registry even for a digest-pinned reference**, so that a reused disk entry has to pass the caller's current authorization and TLS policy rather than being treated as fresh authorization by virtue of being on disk. Expect slightly more registry traffic than 2.10.x for digest-pinned workloads. `Never` is the policy that stays offline.
 - **Keep `cache.key` with the cache.** Entry names are keyed with a secret the cache creates once in its root. Deleting it, or copying a cache without it, orphans every entry.
 - **A re-pushed tag can take up to five seconds to be seen** under `IfNotPresent` and `Never`, which reuse a completed identical pull for that long. `Always` resolves the registry afresh once any prior pull has finished.
@@ -253,9 +261,9 @@ The hint is keyed on the trap type rather than its message text, so a linked cal
 
 ### A call between sibling components returns HTTP 500 with an empty body
 
-A multi-component workload returns a `500` with no body and no application log line, on a request path where one component passes a resource handle it obtained from a sibling to another sibling. The host logs a trap reading `borrow handles still remain at the end of the call`.
+A multi-component workload returns a `500` with no body and no application log line, on a request path where one component passes a resource handle it obtained from a sibling to another sibling. The host logs either a trap reading `borrow handles still remain at the end of the call` or a type mismatch on the linked call.
 
-**Cause:** A bug in how the dynamic linker passed resource handles between components sharing a store. A borrowed handle lifted into the host was never released back, so the caller trapped when its call scope closed. It affected both the WASI 0.2 and WASI 0.3 call paths, and — the broader half — fired not only on a bare `borrow<T>` parameter but on a handle nested inside a record, tuple, list, option, variant, or result, which is the far more idiomatic shape. A middleware or decorator chain is the usual topology: an auth component borrowing a session resource produced by a session component and handing it to a handler.
+**Cause:** Two related bugs in how the dynamic linker passed resource handles between components sharing a store, both fixed in 2.11.0. A borrowed handle lifted into the host was never released back, so the caller trapped when its call scope closed — that is the `borrow handles still remain` signature. Separately, a handle nested inside a record, tuple, list, option, variant, or result fell through to a path that re-marshalled it, so the callee received something that no longer matched the type it declared; that one surfaces as a type mismatch rather than the borrow trap. The nested case is the broader of the two, since nesting a handle in a record is far more idiomatic WIT than a bare `borrow<T>` parameter. Both affected the WASI 0.2 and WASI 0.3 call paths. A middleware or decorator chain is the usual topology: an auth component borrowing a session resource produced by a session component and handing it to a handler.
 
 **Fix:** Upgrade to 2.11.0. The bug was present from 2.5.0 through 2.10.3 and is not fixed in any 2.10.x patch release. No component change is needed.
 
@@ -387,7 +395,7 @@ A Workload reports `Error` with a message naming `max-process-memory`, such as:
 
 Guests on the same host may also see memory growth fail.
 
-**Cause:** Since 2.11.0 the host bounds its whole process footprint, defaulting to 90% of the cgroup memory limit. Past the limit it refuses guest memory growth and new workload starts, which is deliberately a visible failure rather than waiting for the kernel to OOM-kill the pod. Refusals lift once the footprint falls back under 95% of the limit, or after a full minute below it without growth.
+**Cause:** Since 2.11.0 the host bounds its whole process footprint, defaulting to 90% of the cgroup memory limit. Past the limit it refuses guest memory growth and new workload starts, which is deliberately a visible failure rather than waiting for the kernel to OOM-kill the pod. Refusals lift once the footprint falls back under 95% of the limit, after a full minute below it without growth, or after five consecutive failed footprint reads.
 
 **Fix:** Raise the pod's `resources.limits.memory`, reduce what the host is being asked to hold (`replicas`, `poolSize`, or workloads per host), or raise `--max-process-memory` explicitly. `--max-process-memory off` disables it. Watch the `process_memory.footprint`, `process_memory.high_water`, and `process_memory.limit` gauges and the `process_memory.refused` counter, which is kept separate from the guest budget's `guest_memory.refused` so you can tell the two limits apart.
 

@@ -105,7 +105,7 @@ runtime:
 
 Declare the address under `bindings.<label>` rather than the entry's own `config` when workloads must stay apart: a `root` or `prefix` on the entry's `config` is shared by **every** workload binding that label, which is one store for all of them. Per-label `bindings` is what isolates them.
 
-The alternative, where a workload legitimately owns its address, is `workloadConfig: allow` on that plugin entry paired with an `allowedHosts` ceiling: the workload names the url and the ceiling bounds which endpoints it may name.
+The alternative, where a workload legitimately owns its address, is `workloadConfig: allow` on that plugin entry paired with an `allowedHosts` ceiling: the workload names the url and the ceiling bounds which endpoints it may name. That pairing only works for a url-based backend — a `filesystem` backend's owned key is `root`, a path, which no `allowedHosts` ceiling bounds.
 
 ### Plugin egress ceilings on multiplexed plugins
 
@@ -270,14 +270,15 @@ runtime:
 
 A `deny` host that serves the unnamed import must carry such a declaration — without one, a workload setting `database` is refused, because a grant the operator never declared cannot be narrowed into. A workload naming a database outside the ceiling is refused too, naming the value and the ceiling. When the ceiling lists several databases and the workload names none, the workload fails at start with a message listing them, since the host cannot choose on its behalf. A single-database ceiling is the simplest shape: the workload may then omit the key.
 
-The host also checks its own `--postgres-url` against the plugin's `allowedHosts` when that ceiling is installed, so a base URL outside the list fails host startup rather than being discovered at first query.
+Separately from the `database` ceiling: when the plugin entry declares an **`allowedHosts`** ceiling, the host checks its own `--postgres-url` against it at startup, so a base URL outside the list fails host startup rather than being discovered at first query.
 
 ## Interfaces with no configuration
 
 - **`wasi:logging`**: structured logs flow to the host's logging pipeline; no keys.
 - **`wasi:otel`**: no per-workload keys. The host's own export is configured with standard `OTEL_*` environment variables and activates only when an endpoint variable is set (see [Host telemetry](./operator-manual/telemetry.mdx)); the plugin is active only on hosts started with `--wasi-otel`.
 - **`wasi:webgpu`**: no keys; active only on hosts started with `--wasi-webgpu`.
-- The WASI base (`wasi:io`, `wasi:clocks`, `wasi:random`, `wasi:filesystem`, `wasi:sockets`, `wasi:cli`, `wasi:http`) is always available and configured through [workload-level fields](./crds.mdx#component-resource-controls) rather than `hostInterfaces` entries. Since 2.11.0 a plugin can replace functions in one of these interfaces for workloads that opt in, which is a [custom-host capability](../runtime/creating-host-plugins.mdx#overriding-wasi-builtin-interfaces) rather than something a `plugins` entry can request.
+- The WASI base (`wasi:io`, `wasi:clocks`, `wasi:random`, `wasi:filesystem`, `wasi:sockets`, `wasi:cli`) is always available and reads no `hostInterfaces` config. Where these are configurable at all it is through workload-level fields: the egress and loopback allowlists under [component resource controls](./crds.mdx#component-resource-controls) for `wasi:sockets`, and [volumes](./crds.mdx#volumes) for `wasi:filesystem`. `wasi:io`, `wasi:clocks`, `wasi:random`, and `wasi:cli` have no settings at all.
+- Since 2.11.0 a plugin can replace functions in a host-linked WASI interface — the base above plus `wasi:http` — for workloads that opt in. That is a [custom-host capability](../runtime/creating-host-plugins.mdx#overriding-wasi-builtin-interfaces) rather than something a `plugins` entry can request.
 
 ## `wash dev` differences
 
