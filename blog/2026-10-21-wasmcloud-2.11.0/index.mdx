@@ -1,0 +1,226 @@
+---
+title: 'wasmCloud 2.11: Policy that enforces, backends the operator owns, and a host that bounds itself'
+authors: [ericgregory]
+date: '2026-10-21'
+description: 'wasmCloud 2.11 turns raw-socket egress and guest memory enforcement on by default, moves multiplexed backend addresses under operator control, gates hostPath volumes, bounds the host process footprint, and fixes resource handles passed between sibling components.'
+slug: wasmcloud-2-11-release
+about: wasmCloud
+image: './images/2.11-blog-header.webp'
+mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS, OCIRegistry]
+---
+
+![wasmCloud 2.11 release banner](./images/2.11-blog-header.webp)
+
+[wasmCloud 2.11.0](https://github.com/wasmCloud/wasmCloud/releases/tag/v2.11.0) is now available! Past releases built out the host's policy surfaces. This one makes them take effect:
+
+- **Enforcement by default**: raw-socket egress policy and the guest memory budget both move from counting violations to refusing them
+- **Operator-owned backend addresses**: the multiplexed keyvalue, blobstore, messaging, and postgres plugins no longer let a workload choose where its backend lives
+- **A host that bounds itself**: a process-memory limit refuses guest growth and new workload starts before the kernel resorts to an OOM kill
+
+2.11 also grants DNS lookups through `allowedHosts`, gates `hostPath` volumes behind a host allowlist, lets plugins override WASI builtins, fixes resource handles passed between sibling components, and clears a critical Wasmtime miscompile on arm64.
+
+{/* truncate */}
+
+## At a glance
+
+| Area | 2.10.3 | 2.11.0 |
+|---|---|---|
+| Raw-socket egress policy | `count`: violations recorded | `enforce`: violations refused |
+| Guest memory budget | `count`: refusals recorded | `enforce`: growth refused |
+| Backend `url` / `root` / `prefix` | the workload's to set | the operator's to declare |
+| DNS lookup for an `allowedHosts` name | needs its own `allowedIpNameLookups` entry | granted by the `allowedHosts` entry |
+| `hostPath` volumes | any path the host can read | only paths the host allows |
+| Host process footprint | unbounded | 90% of the cgroup limit |
+| Egress ceilings on multiplexed plugins | failed host startup | accepted, checked per backend |
+| Chart host memory limit | `512Mi` | `768Mi` |
+| Engine | Wasmtime 48.0.3 | Wasmtime 48.0.7 |
+
+## Enforcement by default
+
+Two policies shipped in `count` mode so that upgrading to the release that introduced them blocked nothing: the host recorded what enforcement *would* have refused and left the traffic or the allocation alone. That was the right default for one release. It is the wrong default to keep, because a policy nobody has switched on is a policy that is not protecting anything.
+
+In 2.11.0 both default to `enforce`:
+
+- **`--socket-egress`** refuses a raw `wasi:sockets` connection that falls outside the workload's `allowedHosts` and the address policy, rather than counting it.
+- **`--guest-memory-mode`** refuses guest memory growth past the budget. A guest sees `memory.grow` fail, the same result it already gets from its own heap ceiling, rather than a trap.
+
+`count` remains available for both, and it is still the right way to size a policy before committing to it: run in `count`, watch `guest_memory.would_refuse` or the `socket_policy.denied` counters, then put the default back.
+
+One sharp edge to know about: a **blank** value reads as unset and therefore enforces. An empty ConfigMap key or a `value: ""` in a pod spec delivers one, so if you intend to count, set `count` explicitly rather than clearing the variable.
+
+:::warning[A refused socket connection is not logged]
+Confirming a refused *connect or bind* is harder than it should be in this release. That path returns the error without logging, while only `count` mode logs what it would refuse, and at debug level. The guest sees `access-denied`, and the host increments `socket_policy.denied` with a reason label, but that metric needs an OpenTelemetry exporter and is only installed by `wash host` — under `wash dev` and in embedded hosts, refusals are enforced but not counted. To confirm one, read the metric or reproduce under `--socket-egress count`; grepping host logs will not find it.
+
+A refused *name lookup* is the opposite, and is the better-behaved half: it logs at warn and names what to add to `allowedIpNameLookups`, including a dedicated message for the `allowedHosts: ["*"]` case. See the [troubleshooting entry](/docs/troubleshooting/#a-raw-socket-is-denied-with-nothing-in-the-host-log) for both.
+:::
+
+## Operator-owned backend addresses
+
+This is the release's most consequential change, and the one most likely to refuse a manifest that worked yesterday.
+
+The `workloadConfig: deny` policy has been the default since 2.10, but it only refuses the configuration keys a plugin actually claims — and through 2.10.x the multiplexed keyvalue, blobstore, messaging, and postgres plugins claimed none. `deny` was therefore refusing nothing on them, and a workload manifest could name its own backend address: a filesystem `root` pointing at any directory the host could read, a redis or NATS `url` pointing at any server the host could reach, or a redis `prefix` overlapping another workload's keyspace.
+
+In 2.11.0 those plugins declare their address keys as the operator's:
+
+| Plugin | Keys the operator owns |
+|---|---|
+| `wasi-keyvalue-multiplexed`, `wasmcloud-keyvalue-multiplexed` | `url`, `root`, `prefix` |
+| `wasi-blobstore-multiplexed`, `wasmcloud-blobstore-multiplexed` | `url`, `root` |
+| `wasmcloud-messaging-multiplexed`, `wasmcloud-messaging-async-multiplexed` | `url` |
+| `wasmcloud-postgres` | `url` on a named entry; `database` becomes a ceiling |
+
+The split is between *which kind* of backend and *where* it is. `backend` stays the workload's: it still asks for filesystem, redis, NATS, or in-memory. The address comes from the host group.
+
+```yaml
+# The workload keeps `backend` and drops the address
+hostInterfaces:
+  - name: cache
+    namespace: wasi
+    package: keyvalue
+    interfaces: [store]
+    config:
+      backend: filesystem
+```
+
+```yaml
+# The operator declares where it lives
+runtime:
+  hostGroups:
+    - name: default
+      plugins:
+        - id: wasi-keyvalue-multiplexed
+          bindings:
+            cache:
+              config:
+                root: /data/cache
+```
+
+Declare the address under `bindings.<label>` rather than the entry's own `config` whenever workloads must stay apart: a `root` or `prefix` on the entry's `config` is one store shared by every workload that binds that label.
+
+Two things make this worth reading carefully before you upgrade. It fires on a chart install that declares **no** `plugins` block at all, because `deny` is the default either way. And the refusal names only the key, so the first signal is a workload that will not deploy. Set `workloadConfig: warn` on the plugin entry first: it permits the workloads and logs exactly what `deny` would refuse, which turns the migration into a list instead of an outage. Where a workload legitimately owns its address, `workloadConfig: allow` paired with an `allowedHosts` ceiling keeps it bounded. Full migration in [Operator-owned backend addresses](/docs/kubernetes-operator/host-interface-configuration/#operator-owned-backend-addresses).
+
+Relatedly, those same plugins now **accept** an egress ceiling. Declaring `allowedHosts` on one of them previously failed host startup, because they did not report that they dial out; now the ceiling is checked per backend at every bind, before any pooled connection is reused. Omitting the field installs no ceiling, so this is additive rather than a second upgrade hazard.
+
+## Name grants on raw sockets
+
+`allowedHosts` and `allowedIpNameLookups` used to be independent lists, which produced a papercut: a component permitted to reach `api.internal` over a raw socket still could not resolve `api.internal` unless you listed it twice.
+
+Since 2.11.0 an `allowedHosts` entry naming a host grants the lookup for that host as well, and `allowedIpNameLookups` covers names *beyond* those. A component whose destinations are all in `allowedHosts` needs no name entries at all.
+
+The subtle part is what a name grant means for a socket. A raw socket carries only an address, never a hostname, so the host cannot check a name at connect time the way it checks an HTTP request's `Host` header. Instead it grants the **address the lookup returned**, on the entry's port, for a window after the lookup. `--ip-name-lookup-grant-lifetime` bounds that window; unset, the default, the address stays connectable for as long as the workload's store remembers the lookup. Set a lifetime where addresses get recycled, as pod IPs do.
+
+Two caveats that deserve to be stated plainly rather than discovered:
+
+- **The lifetime is not a DNS TTL.** The resolver does not report one, so the host cannot honor it.
+- **The grant is the address, not the server.** Two names behind one address are indistinguishable to the policy, so resolving a name that points at another in-cluster service grants that service too, unless `--deny-private-ranges` screens it.
+
+And one asymmetry: `allowedHosts: ["*"]` permits connections but opens **no** lookup. That matters in the dev loop, where `wash dev` substitutes an allow-all policy when `allowedHosts` is omitted and, since 2.11.0, enforces the socket policy with no flag to relax it. A dev-loop component that opens a raw socket to a hostname now needs a name entry. Components that only make outbound HTTP are unaffected.
+
+## Gated `hostPath` volumes and a managed scratch root
+
+A `hostPath` volume was previously whatever path the workload asked for. In 2.11.0 it must lie inside a directory the host allows:
+
+```yaml
+runtime:
+  hostGroups:
+    - name: default
+      hostPaths:
+        allowed:
+          - /var/data
+```
+
+With nothing listed, no `hostPath` volume is permitted, so this is fail-closed like the egress lists. The host judges canonical paths, so `..` segments and symlinks cannot escape an allowed directory, and it keeps refusing its own credential, CA, cache, and config paths, plus kernel filesystems and the scratch root, even inside one.
+
+It is worth being precise about what this buys: it is a host-wide guardrail, **not** a tenancy boundary. Every workload on the host may mount any directory the host allows. It keeps workloads off the host's own secrets and out of the rest of the filesystem; it does not separate workloads from each other. Directories that must not be shared belong on different host groups.
+
+Ephemeral volumes gained a managed home at the same time. They live under `--scratch-root`, a workload's scratch is removed when it stops, and a starting host now clears what dead hosts left behind, which earlier releases accumulated. `wash dev` configures both settings from the session, so the dev loop needs neither.
+
+## A host that bounds itself
+
+Instance pools and connection quotas bound what one workload asks for. Nothing bounded the host process as a whole, so the failure mode for a host under memory pressure was the kernel OOM-killing the pod.
+
+`--max-process-memory` defaults to 90% of the cgroup memory limit. Past it, the host refuses guest memory growth and refuses to start new workloads, and a queued start that arrives over the limit reports `Error` on the Workload naming `max-process-memory`. A failed start you can see beats a pod that disappears. Refusals lift once the footprint drops back under 95% of the limit, or after a full minute below it without growth.
+
+Two properties to design around. It is enforced **even when `guestMemoryMode` is `count`** — `count` governs the guest budget only, and is not a global observe-only switch. And it is sampled admission control rather than a hard cap: it cannot stop allocations already in flight, writes into memory a guest has already committed, or arbitrary plugin buffers. Leave headroom and keep the container limit as the real boundary.
+
+Related sizing change: the chart's default host memory limit moves from `512Mi` to `768Mi`, and the chart no longer forwards `limits.memory` to the host as its guest budget. Forwarding it made the budget the whole pod's memory, which the kernel kills the pod for crossing before the host can refuse a guest. The host now derives three quarters of its cgroup limit instead, so `768Mi` yields a 576 MiB budget — slightly above what hosts were effectively counting against before. Because the derivation has a 256 MiB floor, a `limits.memory` below roughly `342Mi` stops scaling the budget down with the pod.
+
+Pool exhaustion also stopped being cryptic. It used to surface as a bare Wasmtime message while the workload still reported healthy; now the instantiation error names the knob to raise. The pool is sized by `--core-instances`, not `--default-heap-memory`: every slot reserves Wasmtime's 4 GiB reservation plus a 32 MiB guard regardless of the heap ceiling, so lowering the ceiling caps guest growth without shrinking the reservation, and raising it above 4 GiB now fails startup rather than being quietly ignored.
+
+## For embedders and plugin authors
+
+- **Plugins can override WASI builtins.** A plugin acting as a sandboxer can now replace functions in a host-linked WASI interface (`wasi:io`, `filesystem`, `clocks`, `random`, `cli`, `sockets`, `http`) for workloads that opt in. Use `wasi_override_instance` rather than opening the linker instance by hand: `Linker::instance` matches names exactly, so a hand-opened instance neither overrides the host's registration nor inherits the rest of its functions. Two plugins overriding one interface is refused at build rather than resolved by bind order. This is a `wash-runtime` library capability; a `host.plugins` entry cannot request it.
+- **Control can attach to a host you already own.** `AttachedHostControl` serves the operator's NATS control API for a host you built and started, where `ClusterHostBuilder` insists on constructing the host itself. With a `HostCommandHandler` you can refuse, rewrite, or delegate each remote `start`, `stop`, and `status`, which makes one host able to serve both local and operator-originated workloads while your code decides what the control plane may touch.
+- **Components can run as one-shot commands.** `ResolvedWorkload::run_command` runs a component's `wasi:cli/run` export once in a fresh store, under the workload's grants, plugins, environment, and volumes — `wasmtime run` with wash-runtime's sandboxing around it.
+- **Structured payloads cross the plugin boundary.** A `stream<T>` or `future<T>` moving between a workload and a component plugin had to carry a scalar or string. Register the generated binding type with `Engine::stream_payloads().register::<T>(ty)` and records, variants, lists, options, and results work too. Native Rust plugins need no registration.
+- **Source-breaking changes:** `ResolvedWorkload::component_count()` is synchronous, component membership is fixed once a workload resolves, and `host::http::WorkloadHandles` stores `Arc<ComponentHandle>` with private fields. Full list in [Embedder changes at 2.11.0](/docs/runtime/building-custom-hosts/#embedder-changes-at-2110).
+- **Quieter logs.** Per-request, per-call, and per-binding lines moved from `INFO` to `DEBUG`; `RUST_LOG=wash_runtime=debug` brings them back. HTTP ingress warnings are rate-limited to once per 10 seconds each with a `suppressed` count. "Starting workload" and "Stopping workload" stay at `INFO`.
+
+## Other notable changes
+
+- **[Resource handles passed between sibling components no longer 500](https://github.com/wasmCloud/wasmCloud/pull/5639).** Two related linker bugs, both surfacing as an HTTP 500 with an empty body when a component obtained a resource from one sibling and passed it to another. A borrowed handle lifted into the host was never released back, trapping the caller with `borrow handles still remain at the end of the call`; separately, a handle nested in a record, tuple, list, option, variant, or result was re-marshalled into something the callee's declared type no longer matched. The nested case is the broader one, since nesting a handle in a record is far more idiomatic than a bare `borrow<T>` parameter — a middleware chain borrowing a session resource and handing it on is the usual shape. Present from 2.5.0 through 2.10.3 and fixed first here, in no 2.10.x patch. Thanks to [@Mees-Molenaar](https://github.com/Mees-Molenaar) for the report and [the first of the two fixes](https://github.com/wasmCloud/wasmCloud/pull/5638).
+- **[The OCI disk cache is scoped by credentials, transport, and trust](https://github.com/wasmCloud/wasmCloud/pull/5704)**, and concurrent identical pulls are folded into one. Expect every image to be pulled once more after upgrading; see the upgrade notes below. A password rotation is *not* a scope change, and `IfNotPresent` now revalidates a cached entry's manifest with the registry even for a digest-pinned reference, so reusing bytes from disk still requires passing the caller's current authorization.
+- **[Workload ids cannot collide with plugin ids](https://github.com/wasmCloud/wasmCloud/pull/5700).** A host binds a component plugin's native imports as a synthetic workload named for the plugin, so a workload with the same id could share — and on stop destroy — that plugin's own configuration and secrets. Kubernetes users are unaffected, since the operator sends each workload's resource UID; this matters for custom hosts and direct API callers that choose their own ids.
+- **[Connection quotas are validated at startup](https://github.com/wasmCloud/wasmCloud/pull/5661).** An out-of-range per-workload quota used to let the host boot, report its quotas, pass its readiness probe, and then panic on the first workload to claim one. Now it fails at startup. Thanks to **János Angyal** ([@angyaljanos](https://github.com/angyaljanos)), making his first contribution to wasmCloud.
+- **[The cancel trap diagnoses itself](https://github.com/wasmCloud/wasmCloud/pull/5671).** The Wasmtime 48 `waitable cannot be used synchronously` trap now logs the toolchain that causes it and the fix, once per workload deploy, keyed on the trap type so a linked call does not misattribute it to the caller.
+- **[`cosmonic` resolves as a WIT namespace](https://github.com/wasmCloud/wasmCloud/pull/5662)** with no configuration, joining `wasi`, `wasmcloud`, `wrpc`, and `ba`.
+- **[`wash` runs on an 8 MiB stack on every platform](https://github.com/wasmCloud/wasmCloud/pull/5702)**, removing a stack-size cliff on Windows, whose 1 MiB default a debug build could overrun.
+- **A k6 load-test harness** lands in [`scripts/k6bench/`](https://github.com/wasmCloud/wasmCloud/tree/main/scripts/k6bench) for measuring what a deployed cluster sustains end to end. It is contributor tooling, but `run.sh --target kube` will point it at a cluster of your own.
+
+## Security
+
+2.11.0 moves to **Wasmtime 48.0.7** from 48.0.3, a patch-level bump inside the 48 line that clears nineteen RustSec advisories across `wasmtime`, `wasmtime-wasi`, and `wasmtime-wasi-http`, plus three more in `rustls-webpki` and the webpki root bundles. The ones worth naming:
+
+- **[RUSTSEC-2026-0379](https://rustsec.org/advisories/RUSTSEC-2026-0379) (critical)**: Cranelift could compile a large Wasm `br_table` into a jump to an incorrect target on **aarch64** — Graviton, Ampere, and Apple Silicon hosts.
+- **[RUSTSEC-2026-0352](https://rustsec.org/advisories/RUSTSEC-2026-0352)**: a `wasi:filesystem` sandbox escape when renaming symlinks with trailing slashes.
+- Three `wasi-http` conformance fixes covering incorrect content-length on spliced response bodies, conflicting content lengths, and forwarded trailers bypassing the forbidden-header hook.
+
+MSRV is unchanged at 1.95.0.
+
+## What to check before you upgrade
+
+- **Socket egress and guest memory now enforce.** If you have never run with `--socket-egress enforce`, your counters are the forecast: review `socket_policy.denied` and `guest_memory.would_refuse` before upgrading, not after. Set `count` explicitly to keep the old behavior, and remember a blank value enforces.
+- **Move backend addresses to the host group.** Any manifest setting `url`, `root`, or `prefix` on a multiplexed keyvalue, blobstore, messaging, or postgres entry is refused under the default `deny`. Set `workloadConfig: warn` first to enumerate them.
+- **Declare your `hostPath` directories.** With `hostPaths.allowed` unset, every `hostPath` volume is refused.
+- **Expect one full re-pull of every image.** The OCI cache layout changed, so existing entries are ignored and disk usage roughly doubles until the sweep runs, within about five minutes of host startup. Workloads pinned to `pullPolicy: Never` **fail until the image has been pulled once** under the credentials, transport, and trust the host will use — pull once with `IfNotPresent`, then switch back. `wash dev` and `wash oci` never sweep, so clear their cache directories by hand.
+- **Raise `limits.memory` if you pinned it low.** The guest budget is now derived as three quarters of the pod limit with a 256 MiB floor, so anything under roughly `342Mi` leaves the host no headroom. The chart default moved to `768Mi`.
+- **Raw sockets to hostnames need a name grant**, including in the dev loop. `allowedHosts: ["*"]` is not one.
+- **Restrictive NATS authorization needs one more permission.** A host now proves its control subscription is live by publishing a marker to `runtime.host.<host_id>.__control.ready` and reading it back, so that connection must be allowed to publish there and must not use `no_echo`. The chart's bundled NATS applies no subject-level permissions, so a stock install is unaffected.
+- **Embedders:** the process-memory limit is on by default for every `EngineBuilder`, not only `wash host`, and several APIs are source-breaking.
+
+## What's coming
+
+Enforcement landing by default is the end of a sequence that began with counting, and the pattern is worth noting for the policies still in `count`-shaped rollouts: ship the accounting, let operators size against real numbers, then flip the default. Multi-tenancy is the open question underneath several of this release's changes — `hostPaths.allowed` and the `localRoute` trust model from 2.10 are both explicitly host-wide guardrails rather than boundaries between workloads, and host groups remain the unit of separation. The [roadmap](https://github.com/orgs/wasmCloud/projects/7) has what's in progress, and [wasmCloud Wednesday](/community/) is the place to weigh in.
+
+## Get started with wasmCloud 2.11
+
+Install or upgrade `wash`.
+
+On macOS or Linux via install script:
+
+```bash
+curl -fsSL https://wasmcloud.com/sh | bash
+```
+
+With Homebrew:
+
+```bash
+brew install wasmcloud/wasmcloud/wash
+```
+
+On Windows with [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+
+```shell
+winget install wasmCloud.wash
+```
+
+For new users, the [quickstart](/docs/quickstart/) gets you from installation to a running component on Kubernetes in a few minutes.
+
+Full changelog: [v2.10.3...v2.11.0](https://github.com/wasmCloud/wasmCloud/compare/v2.10.3...v2.11.0)
+
+## Join the community
+
+- [wasmCloud Slack](https://slack.wasmcloud.com/): Questions, announcements, and #wasmcloud-dev
+- [wasmCloud Wednesday](/community/): Weekly community call, Wednesdays at 1PM ET
+- [wasmCloud Roadmap](https://github.com/orgs/wasmCloud/projects/7): What's in progress and what's ready for contributors to pick up
+- Good first issues: [github.com/wasmCloud/wasmCloud/issues](https://github.com/wasmCloud/wasmCloud/issues?q=label%3A%22good+first+issue%22+is%3Aopen)
