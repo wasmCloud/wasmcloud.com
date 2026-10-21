@@ -273,7 +273,7 @@ runtime:
           memory: "64Mi"
           cpu: "250m"
         limits:
-          memory: "512Mi"
+          memory: "768Mi"
           cpu: "500m"
     - name: gpu
       replicas: 1
@@ -358,6 +358,25 @@ runtime:
 ```
 
 All three fields render unconditionally, so they survive a `global.tls.enabled: false` install. **Do not re-list the HTTP port in `ports`** — the chart already renders it from `.http.port`, and a duplicate `containerPort` fails Deployment validation. See [Filesystems and Volumes](./filesystems-and-volumes.mdx) for the broader volume story.
+
+### `runtime.hostGroups[].hostPaths`
+
+Directories a workload's `hostPath` volume may lie within (since 2.11.0). Each entry under `allowed` renders as an `--allowed-host-path` argument.
+
+```yaml
+runtime:
+  hostGroups:
+    - name: default
+      hostPaths:
+        allowed:
+          - /var/data
+```
+
+`allowed` defaults to `[]`, which **permits no `hostPath` volume at all** — a fail-closed grant like a plugin's `allowedHosts`. The host judges canonical paths, so `..` segments and symlinks cannot escape an allowed directory, and it refuses its own credential, CA, cache, and config paths, kernel filesystems, and the scratch root even inside one. Every workload on the host may mount any allowed directory, so this bounds the host's exposure rather than separating workloads; see [Host filesystem access](../workload-security.mdx#host-filesystem-access). The chart does not expose `--reserved-host-path`; set it through [`extraArgs`](#runtimehostgroupsenv-envfrom-and-extraargs) if you need to reserve more.
+
+### `runtime.hostGroups[].scratchRoot`
+
+Where ephemeral (`emptyDir`-style) volumes live (since 2.11.0), rendered as `--scratch-root`. Empty, the default, puts them in `wasmcloud-scratch` under the container's temp directory. A workload's scratch is removed when it stops, and a starting host clears what dead hosts left behind.
 
 ### `runtime.hostGroups[].wasmProposals`
 
@@ -446,17 +465,23 @@ runtime:
     coreInstances: "500"
 ```
 
-The chart also forwards `resources.limits.memory` to the host as its guest memory budget, set as the `WASH_HOST_MAX_GUEST_MEMORY` environment variable rather than the `--max-guest-memory` flag so an older host image ignores it (since 2.8.0). When no limit is set, the host derives the budget as three quarters of the cgroup or physical memory limit, clamped between 256 MiB and 1 TiB. Since 2.9.0 the host counts guest memory use against the budget and can enforce it; see [`guestMemoryMode`](#runtimeresourcesguestmemorymode) below.
+The host's guest memory budget is derived from its cgroup rather than set by the chart (since 2.11.0): **three quarters of `resources.limits.memory`, never less than 256 MiB**. Before 2.11.0 the chart forwarded `limits.memory` verbatim as `WASH_HOST_MAX_GUEST_MEMORY`, which made the budget the whole pod's memory — a budget the kernel OOM-kills the pod for crossing before the host can refuse a guest. The chart no longer sets that variable; override the derivation by setting `WASH_HOST_MAX_GUEST_MEMORY` in [`runtime.env`](#runtimehostgroupsenv-envfrom-and-extraargs) if you need an explicit budget. Since 2.9.0 the host counts guest memory against the budget and since 2.11.0 enforces it by default; see [`guestMemoryMode`](#runtimeresourcesguestmemorymode) below.
+
+Two sizing consequences follow from the derivation. The chart's default `limits.memory` rose from `512Mi` to **`768Mi`** in 2.11.0, which puts the derived guest budget at 576 MiB — a little above the 512 MiB that hosts were effectively counting against before. And because of the 256 MiB floor, a `limits.memory` below roughly `342Mi` leaves the host no headroom at all: the floor exceeds three quarters of the pod limit, so the budget stops scaling down with the pod. The same derived budget also sizes the `wasmcloud:nats` backlog ceiling.
 
 These values size the engine for the whole host; they are not per-workload limits. A host group with its own `resources` block replaces the chart-wide `runtime.resources` wholesale, so repeat these keys per group if you use both.
 
 ### `runtime.resources.guestMemoryMode`
 
-How the host treats the guest memory budget (since 2.9.0): `count`, the default when unset, records what enforcement would refuse without refusing anything; `enforce` refuses guest memory growth past the budget. Set inside the `resources` block like the sizing values above; passed to the host as the `WASH_GUEST_MEMORY_MODE` environment variable.
+How the host treats the guest memory budget (since 2.9.0): `enforce`, the default since 2.11.0, refuses guest memory growth past the budget; `count` records what enforcement would refuse without refusing anything. Set inside the `resources` block like the sizing values above; passed to the host as the `WASH_GUEST_MEMORY_MODE` environment variable, which the chart now renders unconditionally so the budget is enforced whatever the paired host image defaults to.
 
-Under `enforce`, a guest whose `memory.grow` would cross the budget sees the growth fail (the same result as hitting its own heap ceiling), not a trap. A refusal during instantiation surfaces as a workload start error. The host publishes `guest_memory.in_use`, `guest_memory.high_water`, `guest_memory.limit`, `guest_memory.refused`, and `guest_memory.would_refuse` metrics whenever an OpenTelemetry exporter is configured, meaning an `OTEL_EXPORTER_OTLP_ENDPOINT` is set on the host (see [Host telemetry](./telemetry.mdx)), so the intended rollout is: run in `count`, watch `high_water` and `would_refuse`, then switch to `enforce`. (See [metrics you can scale on](./autoscaling.mdx#metrics-you-can-scale-on) for the host's guest metrics generally.)
+A blank value reads as unset and therefore enforces, which is worth knowing because an empty ConfigMap key or `value: ""` delivers one. To get counting behavior, set `count` explicitly.
 
-Leave headroom. The chart forwards `resources.limits.memory` verbatim, so an enforced budget equal to the pod limit can be OOM-killed before a refusal ever fires; the host warns at startup when an enforced budget exceeds 90% of the detected memory limit. Set `limits.memory` above the guest budget you want, or set a lower budget explicitly with `WASH_HOST_MAX_GUEST_MEMORY` in `runtime.env`.
+Under `enforce`, a guest whose `memory.grow` would cross the budget sees the growth fail (the same result as hitting its own heap ceiling), not a trap. A refusal during instantiation surfaces as a workload start error. The host publishes `guest_memory.in_use`, `guest_memory.high_water`, `guest_memory.limit`, `guest_memory.refused`, and `guest_memory.would_refuse` metrics whenever an OpenTelemetry exporter is configured, meaning an `OTEL_EXPORTER_OTLP_ENDPOINT` is set on the host (see [Host telemetry](./telemetry.mdx)), so `count` remains the way to size a budget before committing to it: watch `high_water` and `would_refuse`, then leave the default in place. (See [metrics you can scale on](./autoscaling.mdx#metrics-you-can-scale-on) for the host's guest metrics generally.)
+
+The host warns at startup when an enforced budget exceeds 90% of the detected memory limit. Since the budget is now derived as three quarters of `limits.memory` rather than forwarded from it, the default leaves that headroom on its own; raise `limits.memory` to raise the budget with it.
+
+A second, independent limit bounds the whole host process rather than its guests: `--max-process-memory`, which defaults to 90% of the cgroup limit and is enforced **even when `guestMemoryMode` is `count`**. See [host process memory](./concurrency-and-connections.mdx#host-process-memory) for what it refuses and why `count` is not a global observe-only switch.
 
 ### `runtime.resources.maxConcurrentStarts`
 
@@ -518,29 +543,34 @@ Maps to the host's socket policy and connection quota flags. The chart renders t
 | Key | Default | Host flag |
 | --- | --- | --- |
 | `allowHostLoopback` | `false` | `--allow-host-loopback` |
-| `socketEgress` | `count` | `--socket-egress` |
+| `socketEgress` | `enforce` (`count` before 2.11.0) | `--socket-egress` |
 | `denySpecialRanges` | `true` | `--deny-special-ranges` |
 | `denyPrivateRanges` | `false` | `--deny-private-ranges` |
+| `ipNameLookupGrantLifetime` | empty (a resolved address stays connectable while the store remembers the lookup; since 2.11.0) | `--ip-name-lookup-grant-lifetime` |
 | `maxConnections` | empty (derived from the descriptor limit) | `--max-connections` |
 | `maxOutboundHttpConnectionsPerWorkload` | `128` | `--max-outbound-http-connections-per-workload` |
 | `maxOutboundSocketConnectionsPerWorkload` | `256` | `--max-outbound-socket-connections-per-workload` |
 | `maxInboundSocketConnectionsPerWorkload` | `256` | `--max-inbound-socket-connections-per-workload` |
 | `maxHttpIngressConnections` | empty (a quarter of the descriptor limit, floor 256; since 2.9.0) | `--max-http-ingress-connections` |
 
-`allowHostLoopback` and `denyPrivateRanges` render as presence flags, so setting them to `false` is the same as omitting them; only `denySpecialRanges` renders an explicit value. `socketEgress` also gates host plugins' `allowedHosts` and address-range refusals (since 2.10.0). See [Concurrency and connections](./concurrency-and-connections.mdx) and [Workload security](../workload-security.mdx) for what these bound. `publishPorts` and `publishPortRange` (which would publish a workload's listening ports out of the pod) appear in the values file but are not yet wired to the host; setting them has no effect. They are distinct from [`runtime.hostGroups[].ports`](#runtimehostgroupsvolumes-volumemounts-and-ports) (pod container ports) and from a plugin's own [`ports`](#runtimehostgroupsplugins) reservations.
+`allowHostLoopback` and `denyPrivateRanges` render as presence flags, so setting them to `false` is the same as omitting them; only `denySpecialRanges` renders an explicit value. `socketEgress` also gates host plugins' `allowedHosts` and address-range refusals (since 2.10.0). Since 2.11.0 it defaults to `enforce`, so a raw-socket connection outside the policy is refused rather than counted; set `count` while sizing a policy. `ipNameLookupGrantLifetime` bounds how long an address a workload resolved stays connectable — see [Name grants on raw sockets](../workload-security.mdx#name-grants-on-raw-sockets), which also covers why it is not a DNS TTL. See [Concurrency and connections](./concurrency-and-connections.mdx) and [Workload security](../workload-security.mdx) for what these bound. `publishPorts` and `publishPortRange` (which would publish a workload's listening ports out of the pod) appear in the values file but are not yet wired to the host; setting them has no effect. They are distinct from [`runtime.hostGroups[].ports`](#runtimehostgroupsvolumes-volumemounts-and-ports) (pod container ports) and from a plugin's own [`ports`](#runtimehostgroupsplugins) reservations.
 
 ### `runtime.hostGroups[].plugins`
 
 One declaration block configures host plugins of both kinds (since 2.9.0): native plugins built into the host (an entry with only an `id`) and [host component plugins](../../runtime/creating-host-component-plugins.mdx) (an entry with an `image` or `file` source). A native entry, and any entry carrying config, secrets, allowlists, or binding fields, is rendered into the host's config file rather than CLI arguments, so credentials never appear in the pod spec; a bare component entry (`id` plus a source) still renders as a `--host-plugin` argument. Component plugin entries need a host image with the `host-component-plugins` feature; see [`runtime.image.tag`](#runtimeimagetag). (The 2.10.0 fields `allowedHostLoopbackPorts` and `ports` join the file-backed set, since a `--host-plugin` argument cannot carry a nested list.) Each entry accepts:
 
 - **`config` / `configFrom` / `secretFrom`**: entry-wide configuration, layered under each binding's own.
-- **`workloadConfig`**: `deny` (the default), `warn`, or `allow`. Under `deny`, host-owned keys (connection and credential settings) come only from this declaration: a workload manifest that sets one or widens a grant ceiling is refused at deploy, and once any binding is declared for a plugin, so is a manifest naming a binding the declaration does not carry. `warn` behaves like `allow` but logs everything `deny` would refuse, for rehearsing a lockdown.
+- **`workloadConfig`**: `deny` (the default), `warn`, or `allow`. Under `deny`, host-owned keys (connection, credential, and since 2.11.0 backend-address settings) come only from this declaration: a workload manifest that sets one or widens a grant ceiling is refused at deploy, and once any binding is declared for a plugin, so is a manifest naming a binding the declaration does not carry. `warn` behaves like `allow` but logs everything `deny` would refuse, for rehearsing a lockdown. `deny` refuses the keys a plugin claims or this entry sets, so what it covers grew in 2.11.0 when the multiplexed plugins began claiming their address keys — see the warning below.
 - **`hostOwnedKeys`**: additional keys to claim for the host under `deny`.
 - **`bindings`**: a map of label to `{config, configFrom, secretFrom}`. A component imports the plugin's interface under that label (the Component Model's `implements` clause), and the labeled import resolves against the binding's config layered over the entry's.
-- **`allowedHosts` / `allowedIpNameLookups`**: the plugin's own HTTP, DNS, and raw-socket egress grants. Empty or omitted denies all. Since 2.10.0 they apply to native and component entries alike, and refusals follow the group's [`networking.socketEgress`](#runtimehostgroupsnetworking) mode. A native plugin that cannot enforce a declared ceiling fails host startup rather than ignoring it.
+- **`allowedHosts` / `allowedIpNameLookups`**: the plugin's own HTTP, DNS, and raw-socket egress grants. **Omitting both installs no ceiling**, so the plugin dials wherever its configuration points; declaring either one as an empty list denies everything. Since 2.10.0 they apply to native and component entries alike, and refusals follow the group's [`networking.socketEgress`](#runtimehostgroupsnetworking) mode. A native plugin that cannot enforce a declared ceiling fails host startup rather than ignoring it. Since 2.11.0 the multiplexed keyvalue, blobstore, messaging, and postgres plugins accept a ceiling too (declaring one on them previously failed host startup), checked per backend at every bind before any pooled connection is reused. Three details when writing one: `postgres`/`postgresql`, `redis`/`valkey`, and `rediss`/`valkeys` match as one scheme; a plaintext entry also admits its TLS form at the same endpoint (`nats://` admits `tls://`) but never the reverse; and a port-less entry means that client's default port (`redis` 6379, `postgres` 5432, `nats` 4222) rather than any port. A url naming a hostname is matched by name only, since the plugin's client resolves it itself, so `denySpecialRanges` and `denyPrivateRanges` constrain only a url naming a literal address.
 - **`allowedHostLoopbackPorts`**: ports the plugin may reach on the machine's loopback through `host.wasmcloud.internal` (since 2.10.0). A two-key grant like the workload field of the same name: inert unless the host also runs with `--allow-host-loopback`. Enforced in either `socketEgress` mode.
 - **`ports`**: ports a plugin may bind (`name` and `port`, optional `protocol` and `bind`; since 2.10.0). Entries with a `bind` address are reserved in the host's port table at load, and unspecified or loopback `bind` addresses are rejected. The per-plugin `publish` field is not yet supported and is rejected. (Unrelated to [`runtime.hostGroups[].ports`](#runtimehostgroupsvolumes-volumemounts-and-ports), which are pod container ports.)
 - Component-plugin-only fields: `maxRestarts`, `digest` (an OCI digest pin).
+
+:::warning[Backend addresses belong here as of 2.11.0]
+The multiplexed keyvalue, blobstore, messaging, and postgres plugins now claim their address keys — `url`, `root`, `prefix` for keyvalue, `url` and `root` for blobstore, `url` for messaging, `url` for a named postgres entry — so under the default `workloadConfig: deny` a workload manifest that sets one is refused at deploy. Declare them here instead. Put them under `bindings.<label>.config` rather than the entry's own `config` when workloads must stay apart: a `root` or `prefix` on the entry's `config` is one store shared by every workload binding that label. [Operator-owned backend addresses](../host-interface-configuration.mdx#operator-owned-backend-addresses) has the full migration.
+:::
 
 ```yaml
 runtime:

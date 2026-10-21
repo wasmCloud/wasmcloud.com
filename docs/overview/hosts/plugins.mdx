@@ -138,6 +138,14 @@ wash-runtime = { git = "https://github.com/wasmCloud/wasmCloud", tag = "v{{WASMC
 
 To build your own image instead, the source [Dockerfile](https://github.com/wasmCloud/wasmCloud/blob/main/Dockerfile) takes `CARGO_FEATURES=host-component-plugins` as a build arg; point the Helm chart at it via the `runtime.image` values (`registry`, `repository`, and [`tag`](../../kubernetes-operator/operator-manual/helm-values.mdx#runtimeimagetag)).
 
+## Plugin ids are reserved
+
+Since 2.11.0 a host refuses to start a workload whose id matches a registered plugin id, with `Workload ID [<id>] is reserved by host plugin [<id>]`. A host binds a component plugin's own native imports as a synthetic workload named for the plugin, and native plugins key their per-workload state by workload id, so a collision let a workload share — and on stop destroy — a plugin's own configuration and secrets.
+
+This does not affect Kubernetes users: the operator sends each workload's resource **UID** rather than its name, and a UID can never collide with a plugin id, so a `Workload` named `wasmcloud-nats` is still fine. `wash dev` generates a UUID too. The reservation matters for callers that choose their own workload ids: custom hosts built on `wash-runtime`, direct washlet and NATS API clients, and `wash` CLI invocations.
+
+One caveat if you hit it on Kubernetes anyway through a custom path: the refusal message is not surfaced on the resource. It appears only in the host's log, as a warning keyed `refused to start workload`.
+
 ## Configuring plugins
 
 Plugins of both kinds are declared in one block: `plugins` in host configuration (`host.plugins`, `dev.plugins`) or in Helm values under [`runtime.hostGroups[].plugins`](../../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsplugins) (since 2.9.0). Each entry names a plugin by `id` (with an `image` or `file` source for component plugins), carries its configuration and secrets, and can declare named `bindings` that components import under `implements` labels.

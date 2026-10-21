@@ -158,6 +158,42 @@ let kv = ctx.get_plugin::<InMemoryKeyValue>("wasi-keyvalue");
 
 The type parameter is the concrete backend your host registered for the looked-up plugin. The built-in `wasi:keyvalue` plugin ships four interchangeable backends — `InMemoryKeyValue`, `FilesystemKeyValue`, `NatsKeyValue`, and `RedisKeyValue` — all under the same plugin ID `"wasi-keyvalue"`; substitute whichever your `HostBuilder::with_plugin()` call registered. A type mismatch surfaces through the descriptive error from `try_get_plugin`.
 
+### Overriding WASI builtin interfaces
+
+Since 2.11.0 a native plugin can replace functions in a WASI interface the host normally serves, which is what a plugin acting as a sandboxer needs. This is a `wash-runtime` library capability: there is no WIT export a component plugin can use to declare one, and no Helm value or CRD field that requests it.
+
+Overridable interfaces are the host-linked WASI base — `wasi:io`, `wasi:filesystem`, `wasi:clocks`, `wasi:random`, `wasi:cli`, `wasi:sockets`, and `wasi:http` — at `0.2.0` or `0.3.0` (`wasi:io` at `0.2.0` only, since WASI 0.3 folds it into the component model). Interfaces the host does not link as builtins, such as `wasi:keyvalue` or `wasi:logging`, are served by a plugin the ordinary way rather than overridden.
+
+Declaring one takes two steps. First return the interfaces from `wasi_overrides`:
+
+```rust
+fn wasi_overrides(&self) -> WitWorld {
+    WitWorld::from(["wasi:clocks/monotonic-clock@0.2.0"])
+}
+```
+
+Then, inside `on_workload_item_bind`, reopen the instance through the helper and redefine the functions you are replacing:
+
+```rust
+let mut instance = item.wasi_override_instance("wasi:clocks/monotonic-clock@0.2.0")?;
+instance.func_wrap("now", |_, ()| Ok((4242u64,)))?;
+```
+
+Use `wasi_override_instance` rather than `linker().instance(..)` directly. `Linker::instance` matches names exactly, so opening `"...@0.2.0"` by hand creates a *separate, incomplete* instance that neither overrides the host's registration nor inherits the rest of its functions. The helper resolves the request against the versions the linker actually registered and reopens that exact instance, so a partial override leaves every function you did not redefine as the host's.
+
+Four rules govern the result:
+
+- **An explicit version is required**, because it selects WASIp2 or WASIp3. A bare interface name is an error.
+- **Version matching is the same rule as [host interface matching](../kubernetes-operator/crds.mdx#host-interfaces)**: semver-compatible, so a request for `@0.2.0` resolves against the host's registered `0.2.x`. A version compatible with nothing the linker registered is an error.
+- **The workload opts in** through a `hostInterfaces` entry naming a non-WASI interface the plugin serves, exactly as for any plugin. A workload that never names the plugin is untouched, even if its components import the overridden interface. A service that imports only WASI still receives the override once its workload opts in.
+- **Two plugins cannot override one interface.** The host refuses to build rather than letting whichever binds last win, naming both plugin ids. One plugin may declare overlapping entries of its own, and `@0.2.0` versus `@0.3.0` of the same interface do not conflict, because WASIp2 and WASIp3 are different interfaces.
+
+Overriding plugins bind after non-overriding ones so nothing binds over a redefinition, and shadowing is enabled only for the duration of each overriding plugin's bind hook.
+
+### What a bind hook receives
+
+A plugin's `on_workload_bind` receives exactly the `hostInterfaces` entries routed to **that** plugin, never the whole workload's interface config. A workload carrying an HTTP ingress entry, a `wasi:config` entry, and two entries for different keyvalue plugins delivers each plugin only its own, so one plugin's config — which on Kubernetes may come from a `secretFrom` Secret — is not visible to the others bound to the same workload. Inside a lifecycle hook, `get-workload-id` names the workload the hook concerns and `get-component-id` reports nothing, since a hook is delivered about a whole workload rather than on behalf of any one of its items.
+
 ### Example: Custom logging plugin
 
 Here's a simplified example of a custom plugin that implements logging:
