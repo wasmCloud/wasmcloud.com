@@ -34,6 +34,31 @@ In this section of the Operator Manual, you'll learn how to:
 * Deploy volumes that provide filesystem resources to the wasmCloud host
 * Create a `WorkloadDeployment` manifest for a component that preopens filesystem resources
 
+## The host must allow the path first
+
+Since 2.11.0 a `hostPath` volume is permitted only when its canonical path lies within a directory the host allows, listed in `runtime.hostGroups[].hostPaths.allowed` (host flag `--allowed-host-path`, `WASH_ALLOWED_HOST_PATHS`):
+
+```yaml
+runtime:
+  hostGroups:
+    - name: default
+      hostPaths:
+        allowed:
+          - /var/data
+```
+
+**With no directories listed, no `hostPath` volume is permitted**, so this grant is fail-closed like the egress allowlists. A workload whose volume falls outside every allowed directory is refused rather than silently given nothing. Canonical paths are what get judged, so `..` segments and symlinks cannot reach outside an allowed directory.
+
+Some paths stay refused even inside an allowed directory: the host reserves the credential and CA files its own flags name, its OCI cache, its config files, its `configs:`/`secrets:` catalog sources, and component-plugin Wasm files, and it refuses kernel filesystems (`/proc`, `/sys`, `/dev`) and the scratch root. `--reserved-host-path` adds more.
+
+Ephemeral volumes (`ephemeral: {}`) need no grant. They live under the scratch root, `runtime.hostGroups[].scratchRoot` (`--scratch-root`, `WASH_SCRATCH_ROOT`), which defaults to `wasmcloud-scratch` in the system temp directory. A workload's scratch is removed when it stops, and a starting host clears what dead hosts left behind.
+
+:::note[`wash dev` configures both for you]
+A dev session derives its allowed paths from the volumes the project declares and moves its scratch root under the `wash` cache directory, so the dev loop does not need either setting and a session mounting `/tmp` is not refused. The grant is a Kubernetes concern.
+:::
+
+This is a host-wide guardrail, not a tenancy boundary: every workload on the host may mount any directory the host allows. See [Workload Security](../workload-security.mdx#host-filesystem-access) for that distinction.
+
 ## Deploying volumes with wasmCloud hosts
 
 When deploying components that require filesystem resources, you first need to create the volume and make the volume available to the wasmCloud host. 
@@ -137,7 +162,7 @@ spec:
             host: localhost
 ```
 
-* The workload must be assigned to a host with the named volume.
+* The workload must be assigned to a host with the named volume, and (since 2.11.0) the host must allow the `hostPath` directory as described [above](#the-host-must-allow-the-path-first).
 * Resources defined under the `localResources` field are made available to the component.
 * The `volumeMounts.name` field specifies the volume to use.
 * The `volumeMounts.mountPath` field specifies the path where the data from the volume should be made available within the component.
