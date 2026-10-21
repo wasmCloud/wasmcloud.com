@@ -186,7 +186,9 @@ impl HostCommandHandler for MyPolicy {
 }
 ```
 
-A workload started locally through `host.workload_start(..)` cannot be disturbed by a remote stop, and only one attachment may be active at a time — a second is refused rather than silently layered over the first, which makes the handler's policy a boundary rather than a suggestion. Note that `with_host_group` sets the host group label in heartbeats only; it does not add a `hostgroup` label to the host itself. `ClusterHostBuilder` has no `with_handler`, so command interception means moving onto this path.
+Nothing in the runtime distinguishes a locally-started workload from an operator-started one, so protecting one is the handler's job: `HostControlDefaults::stop` stops whatever `workload_id` it is given. Refuse a `stop` or `status` whose id your own code owns, as the example above refuses a `start`. What the runtime does guarantee is that only one attachment may be active at a time — a second is refused rather than silently layered over the first, so a handler's policy cannot be bypassed by attaching again.
+
+Note that `with_host_group` sets the host group label in heartbeats only; it does not add a `hostgroup` label to the host itself. `ClusterHostBuilder` has no `with_handler`, so command interception means moving onto this path.
 
 :::note[A new NATS permission, for restrictive auth only]
 Since 2.11.0 a host proves its control subscription is live before reporting started: it subscribes, publishes a marker to `runtime.host.<host_id>.__control.ready`, and waits to receive its own message back. The connection must therefore be allowed to **publish** to that subject and must not use `no_echo`. Failing either, startup fails after 10 seconds with a message naming the subjects, instead of a host that starts cleanly and silently serves no commands. The chart's bundled NATS applies no subject-level permissions, so a stock install is unaffected; this matters only where you have hand-rolled restrictive NATS authorization.

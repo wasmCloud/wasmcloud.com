@@ -168,7 +168,10 @@ Declaring one takes two steps. First return the interfaces from `wasi_overrides`
 
 ```rust
 fn wasi_overrides(&self) -> WitWorld {
-    WitWorld::from(["wasi:clocks/monotonic-clock@0.2.0"])
+    WitWorld {
+        imports: HashSet::from([WitInterface::from("wasi:clocks/monotonic-clock@0.2.0")]),
+        ..Default::default()
+    }
 }
 ```
 
@@ -176,17 +179,17 @@ Then, inside `on_workload_item_bind`, reopen the instance through the helper and
 
 ```rust
 let mut instance = item.wasi_override_instance("wasi:clocks/monotonic-clock@0.2.0")?;
-instance.func_wrap("now", |_, ()| Ok((4242u64,)))?;
+instance.func_wrap("now", |_, (): ()| Ok((4242u64,)))?;
 ```
 
 Use `wasi_override_instance` rather than `linker().instance(..)` directly. `Linker::instance` matches names exactly, so opening `"...@0.2.0"` by hand creates a *separate, incomplete* instance that neither overrides the host's registration nor inherits the rest of its functions. The helper resolves the request against the versions the linker actually registered and reopens that exact instance, so a partial override leaves every function you did not redefine as the host's.
 
 Four rules govern the result:
 
-- **An explicit version is required**, because it selects WASIp2 or WASIp3. A bare interface name is an error.
-- **Version matching is the same rule as [host interface matching](../kubernetes-operator/crds.mdx#host-interfaces)**: semver-compatible, so a request for `@0.2.0` resolves against the host's registered `0.2.x`. A version compatible with nothing the linker registered is an error.
+- **An explicit version is required**, because it selects WASI 0.2 or WASI 0.3. A bare interface name is an error.
+- **Version matching is semver-compatible**, not exact: a request for `@0.2.0` resolves against the host's registered `0.2.x`, matching on equal major, or equal minor when major is `0`. A version compatible with nothing the linker registered is an error. (This is the same rule the host applies to `hostInterfaces` entries and `(implements ..)` labels, which is looser than the exact revision selection `wasmcloud:messaging` does through its `version` key.)
 - **The workload opts in** through a `hostInterfaces` entry naming a non-WASI interface the plugin serves, exactly as for any plugin. A workload that never names the plugin is untouched, even if its components import the overridden interface. A service that imports only WASI still receives the override once its workload opts in.
-- **Two plugins cannot override one interface.** The host refuses to build rather than letting whichever binds last win, naming both plugin ids. One plugin may declare overlapping entries of its own, and `@0.2.0` versus `@0.3.0` of the same interface do not conflict, because WASIp2 and WASIp3 are different interfaces.
+- **Two plugins cannot override one interface.** The host refuses to build rather than letting whichever binds last win, naming both plugin ids. One plugin may declare overlapping entries of its own, and `@0.2.0` versus `@0.3.0` of the same interface do not conflict, because WASI 0.2 and WASI 0.3 are different interfaces.
 
 Overriding plugins bind after non-overriding ones so nothing binds over a redefinition, and shadowing is enabled only for the duration of each overriding plugin's bind hook.
 
