@@ -1,0 +1,217 @@
+---
+date: '2026-10-14'
+title: 'Transcript: Deny-by-Default Hosts, a Rust WebAssembly Toolchain Trap, and a RISC-V Sandbox'
+description: 'Full transcript of the October 14, 2026 wasmCloud community call covering deny-by-default breaking changes, a Rust WASI P3 guest-toolchain bug, awesome-wasmcloud plugin ideas, and RISC-V Linux sandboxes.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - rust webassembly
+  - webassembly news
+  - wasi p3
+  - wit-bindgen
+  - wasmtime 48
+  - breaking changes
+  - deny by default
+  - host component plugin
+  - awesome-wasmcloud
+  - temporal activity worker
+  - risc-v
+  - vpod
+  - linux sandbox
+  - bytecode alliance plumber summit
+  - python sdk
+image: https://i.ytimg.com/vi/l9Kcuf-YOg4/maxresdefault.jpg
+showTitle: true
+slug: 2026-10-14-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - denyByDefault
+  - Rust
+  - witBindgen
+  - WASIPreview3
+  - Wasmtime
+  - NATS
+  - BytecodeAlliance
+  - Python
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-10-14-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=l9Kcuf-YOg4" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=l9Kcuf-YOg4" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:09](https://youtu.be/l9Kcuf-YOg4?t=9)
+
+Hello and welcome to wasmCloud's community call. It is wasmCloud Wednesday. We've got a fairly light agenda, but last week we did our collaborative roadmap planning session, and I've also added a couple more issues to it. So I just wanted to walk through some of those and show the status of where we are on our roadmap. There are heads-up breaking changes incoming, so we're going to talk through some of those, and maybe some more opportunities that are around in the wasmCloud ecosystem. If folks have other things they want to talk about, just drop it in the chat or raise your hand, and I think we'll have plenty of time for open floor.
+
+So I'm going to start with going through our project board. A special thank you to Mike in our Slack, who put in some really great ideas for things he wanted to see. I converted a couple of those to GitHub issues and went ahead and added them to our roadmap. Some of the ones that I've heard requested many times now. I think we should definitely do this, because it's fairly common that when enterprises are using wasmCloud they don't feel super comfortable posting in the help channel inside wasmCloud Slack, but they'll DM me. So this is one of the fairly common questions that I get, and I think we should definitely have a nice wasmcloud.com page on this. But I also kept it in the wasmCloud repo as an issue, because we do have a deploy folder, which is a great place for us to collect infrastructure scripts and that kind of stuff.
+
+<img src="/img/community/2026-10-14/image001.webp" alt="Issue #5676 on the wasmCloud Roadmap: Docs, an example of using an external NATS, self-hosted NATS via the Helm chart and/or Synadia NGS, for wasmcloud.com and the repo's deploy/ folder" />
+
+So this is just a call-out for that, and I would say most of the enterprises that I talk to do just go ahead and opt into using a product from a company called Synadia. They're the ones that actually contributed NATS to the CNCF and are the core maintainers. So tossed on that one. Right now we haven't done anything on our roadmap yet, but we have done a lot of things. So again, it's at the roadmap level. I'm trying to call out the more medium to larger size tasks, and the smaller things we knock out as they come.
+
+<img src="/img/community/2026-10-14/image002.webp" alt="The wasmCloud Roadmap project board filtered to Q4 2026, with Triage and Ready for Work columns holding issues for the Python SDK spike, k6 benchmarking, workload identity, WIT design docs, and CONTRIBUTING for LLMs" />
+
+We really want to, over this next quarter, iterate on the Python SDK and template. If you're not aware, the Bytecode Alliance is going to have a Plumber Summit. I think it's the 29th. No, I'll get you the right dates for that. I'm about to publish the blog post for it, and I'll post the links in wasmCloud Slack. But basically, in about two weeks, at the end of the month, we're going to have a virtual, online-only, four-hour session. When we call it a plumber summit, what we mean is the people behind the scenes doing all the maintainership, doing a lot of the work, and getting them a chance to give some project updates: where things are with the component model, where we are with some of the other efforts like the debugging effort. We've done a bunch on debugging with GDB, but there's actually some really cool things that are coming down the pipe, and also project updates like newer versions of things like StarlingMonkey. So we'll get the agenda out for that and all that published. I know it's fairly short notice, but we're also keeping it tight to four hours, and then we're also going to have a gaming component to it at the end, where we're just going to hang out and play games. Because guess what? If you're contributing and collaborating on this stuff, we're same team, same dream, componentizing the world. So one of those updates is also likely going to include componentize-py and the work that's been happening there. We're also considering talking about componentize-go, because there's been quite a bit of activity in that space as well.
+
+**Bailey Hayes** [4:20](https://youtu.be/l9Kcuf-YOg4?t=260)
+
+But kind of a shout-out that a lot of the progress, basically getting to be in a place where it's ready for work, is going to be a lot sooner than I originally said when we did our roadmapping session even just a week ago. So all good news there. I think those are some of the big ones. The other ones I just put directly in the wasmCloud TypeScript repo, like this issue I filed this morning, which was, hey, a lot of people want to know how to use Postgres and TypeScript. So there are plenty of opportunities which are good first-time contributor type stuff. I probably could just go ahead and label this; I need more information for first-time contributors. But essentially, we always want to have good parity between our examples in the wasmCloud Rust project and the same ones in all the other ones like TypeScript, Go, and then eventually Python once we get started on that. So that's my project board update.
+
+Now let's talk about breaking changes, just so everybody is aware. I've called it out before we've cut a release. If you want to find them, I denote breaking changes with an exclamation mark. That's following the conventional commit style. On a call, maybe it was even just as early as last week, but maybe two weeks ago, I had shown working on a threat model and some of the security auditing work that I've been doing behind the scenes. I am getting things in place where I can publish that threat model straight to the wasmCloud repo, so that other people can plot against us. But also, when you're adding new features, that reference markdown will be right there, so that your LLM does exactly what we expect it to, and it still follows and enforces the security boundaries that we have in place inside the wash runtime.
+
+<img src="/img/community/2026-10-14/image003.webp" alt="wasmCloud commit history on main with breaking changes marked by an exclamation mark, including feat(wash-runtime)!: refuse hostPath volumes outside the allowlist and feat(runtime)!: enforce guest memory and socket egress by default" />
+
+And so these breaking changes are turning on new capability controls that we had added into enforce by default. So when you upgrade your host, things are going to get stricter. Be ready for that. But that is our goal as a project: to always be deny-by-default security. We just had new layers that we could add it to. So I started it with count mode, because I wanted to have a release out where you could experiment with it first, and then opt into locking it down yourself, and now it's locked down by default. It's on some of our memory settings, our socket egress settings, and also on how we do host path volumes. I don't think I have any more that are incoming, but that's an FYI. You should get a really good error message for each of these. Part of our unit testing for these was to make sure we said that's denied, essentially. So you should know if you get errors on top of your upgrade.
+
+There's another essentially breaking change that came in that I wanted to speak to a little. When the community released WASI P3, the only feature that we added was basically adding native async to the component model and then rebasing all the WASI APIs to be async-native APIs. So the WIT definitions in a lot of places got async in them. That was a huge amount of work that we did, and a lot of it happened before LLMs got good. Think a year ago. It's kind of hard to think that far back in time, but bear with me. A whole year ago, the world was different, and the ability to find correctness and soundness bugs basically required a human to actually go through the binary output and validate that that output is what we expected and is correct, and we created a bunch of different binary tests.
+
+**Bailey Hayes** [8:44](https://youtu.be/l9Kcuf-YOg4?t=524)
+
+But what we didn't have was a lot of binary-level tests against the guest toolchain that produced the bytecode. So there was a bug that came through on the Rust side, released in our WASI P3 crate in the Bytecode Alliance, and it had this bytecode order which is incorrect and invalid component model ABI code. Upstream, both in wit-bindgen and in Wasmtime, they reject this now correctly. So that's a correctness and soundness fix that happened inside Wasmtime's runtime. I didn't catch this inside wasmCloud when I revved us to Wasmtime 48 for our last minor release.
+
+The way that we test all of our components is we have a bunch of test fixtures. I didn't want to deal with lots of different versions, and especially in today's world, didn't want to deal with any versions that were out of date, because so many of these things have new updated fixes for CVEs. So our test fixtures are the latest and greatest, and we rebuild them so that I can easily add a new test fixture and, atomically in the same commit, test it and make sure that my host supports it. That introduced the gap of not using older tools against a newer runtime that might have a greater level of strictness on the guest toolchain's ABI.
+
+<img src="/img/community/2026-10-14/image004.webp" alt="Closed PR #5669, fix(wash-runtime): repair legacy wit-bindgen async guests at load, explaining that wit-bindgen before 0.59 cancels a read while the stream is still in a waitable set and Wasmtime 48 traps on it" />
+
+So, if you are building with wit-bindgen and WASI P3 and HTTP compat all at the same time, which none of our examples actually were, but if you are and you get an error, good news is that Eric actually put in a really great fix this morning to catch this and let people know about it. We log a remediation for you. In your host log, you'll see this when you're running a workload and then it's going to trap. We will tell you, hey, we've detected an error that we know about that has some steps for fixing. So, if you upgrade to the latest release of wasmCloud... and earlier I was talking about breaking changes that are coming in the next release; this is actually in the release that's already out. So if you start seeing traps when you're trying to do asynchronous code, and you know that you built a Rust component that includes WASI P3 and wit-bindgen combined, and you're using HTTP compat, you may run into this issue, and that's all from a guest toolchain bug. So hopefully we've got it signposted enough in a lot of places. Eric has gone and updated our release notes to call those out, put it in the FAQ, that kind of thing.
+
+Now, you probably saw that I closed that PR where I was like, "Let me see what it would take to fix it automatically for people," and essentially we determined that that's maybe not a good idea. That's not super safe. It can be very brittle. And ultimately, the decision is: let's not do bytecode rewriting for guest toolchain bugs. Not in our runtime. So our choice here is to just clearly signpost it and let people know that that's out there and that you have this problem. And the remediation is not so bad. Upgrade your tools, recompile. You'll be good again. It's just not amazing. I don't love when a component used to work and stops working. But I think this is the best we can do as a project right now. Any questions on that?
+
+Well, that's basically all the content I wanted to run through. Is there anything else folks would like to talk about today? We can also dive into any of the issues that we filed. Also happy to talk about any of the goings-on upstream. It's not often I get to see Colin on our call.
+
+**Colin Murphy** [13:22](https://youtu.be/l9Kcuf-YOg4?t=802)
+
+I call in. I'm just not always on camera. I think in my own defense, maybe I'm misremembering. Last week I've been at conferences. Sorry.
+
+**Aditya Salunkhe** [13:38](https://youtu.be/l9Kcuf-YOg4?t=818)
+
+So, I filed quite a few issues on the awesome-wasmcloud repository, and if people are open to contribute, they may take a look at those. But just a fair warning: those issues aren't completely vetted by me, because I used Claude to help me through testing them in the Wasm environment, and they're partially all right. I would say they work, but they're not as detailed as I'd like them to be. But the idea is there, so if I can just present them.
+
+**Bailey Hayes** [14:17](https://youtu.be/l9Kcuf-YOg4?t=857)
+
+Yeah, that would be great. Would you like me to share my screen, or you got it?
+
+**Aditya Salunkhe** [14:21](https://youtu.be/l9Kcuf-YOg4?t=861)
+
+I don't have access, so.
+
+**Bailey Hayes** [14:24](https://youtu.be/l9Kcuf-YOg4?t=864)
+
+Oh, hang on, I'm making you a co-host now. Okay, you should be good to go.
+
+**Aditya Salunkhe** [14:33](https://youtu.be/l9Kcuf-YOg4?t=873)
+
+Yep. Okay, I hope you can see this. So this is our awesome-wasmcloud issue panel, and as you can see, I've added five issues. I had added a Kafka support one, but I was reminded that there's awesome-cosmonic, which already has a host component plugin for Kafka and the whole setup, which is really well maintained and really well made, so we can just link that reference in awesome-wasmcloud.
+
+<img src="/img/community/2026-10-14/image005.webp" alt="Open issues on wasmCloud/awesome-wasmcloud filed by Aditya: Linux sandbox, Temporal activity worker, Sentry error-reporting, MQTT, and AMQP 0-9-1 (RabbitMQ) host component plugins" />
+
+But for the rest of those, they are pretty standard, except for two that I'm really excited for. It's these two. The first one is the Temporal activity worker. It's to give a gRPC layer that we as wasmCloud will provide, so that the SDKs get compiling and we're able to run Temporal SDK code inside a wasmCloud workload, which is pretty cool. The scope of that is pretty straightforward and standard. The plugin only needs four calls from Temporal's gRPC API to get modded and run on either WASI HTTP... I don't know if WASI HTTP is the right one for gRPC, or is it WASI sockets?
+
+<img src="/img/community/2026-10-14/image006.webp" alt="awesome-wasmcloud issue #10, Build a Temporal activity worker host component plugin, describing the gRPC client calls the plugin needs and how a workload exports activities" />
+
+**Bailey Hayes** [15:55](https://youtu.be/l9Kcuf-YOg4?t=955)
+
+WASI HTTP is the right one for gRPC. And the other call-out about WASI HTTP is that it's compatible with HTTP/1, 2, and 3. So you, as a component, can just get the best network protocol for whatever you're trying to talk to.
+
+**Aditya Salunkhe** [16:10](https://youtu.be/l9Kcuf-YOg4?t=970)
+
+Yeah, and that's really awesome. And yeah, I've mentioned quite a bit of the things. Not me, but Claude. But I did vet it, although partially. There's a good correctness index here, and oh, Shreya is already working on it now. Excited to see it come to fruition.
+
+And the other one is a Linux sandbox host component plugin, which, okay, this is a bit of a curveball, because there's this project called Vpod, which basically gives you a RISC-V system completely emulated and runnable on Wasm. It compiles to WASI P2, so it gives you a complete kernel, a complete computer-like experience on WebAssembly. And my idea was to have a sandbox for our sandbox.
+
+<img src="/img/community/2026-10-14/image007.webp" alt="awesome-wasmcloud issue #11, Build a Linux sandbox host component plugin: a sandbox for your sandbox, using Vpod to run a RISC-V Linux system inside one WASI 0.2 component, with a prerequisite on wasmCloud#5674" />
+
+Oh, RISC-V. Yeah, I'm not really learned about the whole architecture thing, but thanks, Victor. Yeah, the CPU architecture. That's cool. I should know this, but I don't. Okay. The whole concept is a sandbox for your sandbox. Vpod provisions RISC-V Linux systems on the fly, and it drops them. So they're completely sandboxed, and you can even install packages on it, Linux-compatible, RISC-V-architecture-compatible images inside that sandbox, which is really awesome, and I thought this would be a really cool integration point. Vpod already provides a Wasm image for that, so all we need to do is create a P3 async wrapper that backs them together with the Vpod image, and that should give us a host plugin experience where your workloads can instantiate their own individual sandboxes per request. I just wanted people's thoughts on this. I thought it was really cool.
+
+**Bailey Hayes** [19:02](https://youtu.be/l9Kcuf-YOg4?t=1142)
+
+It's cool. It's super cool. I didn't even know this existed. Some early thoughts are, I wonder if we could upstream WASI P3 to them. Just make it WASI P3, and that might be nice. The other thought is you don't necessarily have to actually do wrappers for upgrading P2 to P3. If you do `wasm-tools component`... is it adapt? Yeah, `wasm-tools component new` and pass it the P3 adapter. It'll take the P2 component and turn it into a P3 one. So that's also just right there. But of course, I'm team make it all P3-native, then everything is async natively, and you get cancellation and back pressure and all kinds of other benefits if you do it that way.
+
+**Aditya Salunkhe** [19:56](https://youtu.be/l9Kcuf-YOg4?t=1196)
+
+Okay, yeah. Although there's a bit of interfacing required for this; that's why we need a wrapper, to get those other requirements done. Sorry, somebody was saying something.
+
+**Victor Adossi** [20:10](https://youtu.be/l9Kcuf-YOg4?t=1210)
+
+Yeah, I was gonna say, oh yeah, that's a good point by Colin. RISC-V has been around for a long time, but it hasn't been real until, I think, within the last five years or something. They basically have an emulator, right? The difference between RISC-V and everything else is that it's an open architecture, which is why it's going to be very, very popular and probably the way a lot of people are going to go. One of the big proof points is that the company that makes ESP32s, Espressif: all their little MCUs used to be Xtensa, which is kind of a lesser-known MCU architecture or chipset, and they're going all RISC-V. And of course a lot of companies that don't want to pay for Arm and don't want to pay for x86 or any of the other options are going RISC-V.
+
+Since RISC-V is open, first of all, it's bogged down a little bit more by standards, because it's a standards body and it moves a little bit slower than Intel can or Arm can. But that means it's going to get put in a whole lot more places once things are stable, and that's happening now, and everyone can make reference implementations and their own extensions. QEMU support is obviously there. There's actually an emulator, essentially, that is pretty faithful to the implementation. So this makes a ton of sense. I didn't know this project existed, but this is actually pretty amazing, because it's hard to replicate x86 and Arm faithfully. Some of that is on purpose, because there's secret stuff that CPUs do that you can't really perfectly replicate. But this is a perfect use case for RISC-V, and getting a full kernel and everything in there is pretty cool. And again, it took us a long time to get from the world being all x86 to the world being x86 and Arm, and I think the move from x86 and Arm to x86, Arm, and RISC-V is going to be even faster. It's not going to take the same amount of time.
+
+**Aditya Salunkhe** [23:15](https://youtu.be/l9Kcuf-YOg4?t=1395)
+
+Thanks, Victor. Really good to know.
+
+**Bailey Hayes** [23:22](https://youtu.be/l9Kcuf-YOg4?t=1402)
+
+I just want to say it's such a cool idea, because why is this safe, right? Why can you do this? Because you're going to put it in a host component plugin that is already isolated from the workloads themselves, and then workloads are now going to be able to run in that sandbox. It's so good. It's so great. I love it. It just shows one of the powers of some of the things we've been building for the year, and it's nice to see some of these things come to fruition.
+
+**Aditya Salunkhe** [23:53](https://youtu.be/l9Kcuf-YOg4?t=1433)
+
+Yeah, I was super glad to see host component plugins, because I was like, we need this inside a Wasm-extensible thing, and then, we do have that. It just connected straight out of the way. But we do need a simple addition. I believe that's volume mounts inside host component plugins.
+
+**Bailey Hayes** [24:17](https://youtu.be/l9Kcuf-YOg4?t=1457)
+
+I saw your draft for that. Makes a ton of sense. It should just be volume mounts on the bindings, the bindings API. So hopefully, okay, good. Let me know whenever you're ready for a review on that, and it makes a ton of sense to me. Thanks. Victor, do you want to say some of the things you're saying in chat?
+
+**Victor Adossi** [25:24](https://youtu.be/l9Kcuf-YOg4?t=1524)
+
+Oh, yeah. Just to piggyback on what was just said: the open standard bit is a blessing and a curse, but mostly a blessing, because they are very, very determined to not have one company, and there are obviously a whole bunch of companies that would very much like to steer the project. Oh, see you, Colin. So that actually gives it a whole lot of staying power. And then of course there are a lot of places that make low-power MCUs that absolutely do not want to pay the rights holders to Arm or x86 for the base stuff and then to do custom stuff. So it's clearly going to be the cheapest thing, and the cheapest thing is just going to go everywhere. And it being in Switzerland and being very intentionally not controlled by any one org is a huge benefit.
+
+But what I was saying in chat was basically that this is a great way to get all programs to compile to WebAssembly. Up until now, it was like, okay, we're going to have to put WebAssembly in all the toolchains, and then all the toolchains will have to be used to rebuild all the programs, and then all the programs will eventually be WebAssembly components, right? Eventually. But if RISC-V gets adopted, let's say, twice as fast as Arm, within less than 10 years we might get a world where... obviously Linux compiles to RISC-V. Two years is very optimistic, and 10 years is probably too conservative, but lots of things make that true, because obviously AI is here, and the cost of supporting stuff is getting close to zero. This would be an amazing way to say, oh hey, you don't have to build something like Docker. Docker and all of that just goes away if the OS itself was WebAssembly in the first place. Now obviously you're going to have to virtualize the VM extensions, but performance and whether it's possible are two different questions. Right now RISC-V doesn't have the same performance, because the extensions that other things have make them faster and give you specialized stuff. If I remember correctly, RISC-V does have VM extensions. But that would be a really amazing way to have every single program compiled to WebAssembly, by every single program getting support for compiling to RISC-V, which other people are going to push forward, which is awesome.
+
+**Bailey Hayes** [28:59](https://youtu.be/l9Kcuf-YOg4?t=1739)
+
+I did not expect something so awesome to happen today. So thank you.
+
+**Aditya Salunkhe** [29:05](https://youtu.be/l9Kcuf-YOg4?t=1745)
+
+Well, that's why it's in awesome-wasmcloud.
+
+**Liam Randall** [29:17](https://youtu.be/l9Kcuf-YOg4?t=1757)
+
+You're like a culture king. I love it. You have all the ideal characteristics we want in a community member: kind, caring, respectful, and an amazing sense of humor. I love it. Thank you so much for being here.
+
+**Bailey Hayes** [29:37](https://youtu.be/l9Kcuf-YOg4?t=1777)
+
+Yep. So I think that part's really exciting. The other thing I hear is, when you work on something, you see all the same problems in other things, right? Everything we're saying about it's an open standard, it goes a little slow, but then everybody's going to adopt it, it's going to be in every toolchain... and I'm over here like, yep, I've been seeing that, right? I see a million and one approaches to, why not just make a WebAssembly target for every Linux command? Those approaches crop up all the time, and the answer is nobody's going to standardize that, because nobody wants that, because everybody wants the sandbox thing. And then people are like, standards are too slow, I don't want to do that. But you do the standard because then it can be in everything, and everybody would be willing to build on it. And once you start that flywheel, there's no stopping it. That's why RISC-V is really showing up hard right now, and it's going to keep rolling, but so is WebAssembly, right? And WASI. So pretty excited to see all that. Well, I don't have anything to top that. So anybody else have other things they want to talk about?
+
+**Victor Adossi** [31:04](https://youtu.be/l9Kcuf-YOg4?t=1864)
+
+This is not really a different thing, but I actually have a little RISC-V machine. There aren't that many super powerful ones. I'm trying to remember; I think it's Milk-V. There's a company that makes them, and they get faster a little bit every time. The SpacemiT one is, I think, the one I have. I might have the K3 actually, I'm not sure. But anyway, it is real now. The one I bought is kind of silly, because it has 32 gigs of LPDDR5 RAM. They're trying to pivot for the AI use case. You don't need a RISC-V machine, because you can emulate it, but that's basically why I got it: it's RISC-V hardware with enough memory to run a very, very small model. That's not going to stop, and they're going to chase matrix multiplication as well. So it's quite interesting.
+
+**Bailey Hayes** [32:39](https://youtu.be/l9Kcuf-YOg4?t=1959)
+
+Have you tried running llama.cpp with Vulkan? It looks like that's what you'd use for that.
+
+**Victor Adossi** [32:47](https://youtu.be/l9Kcuf-YOg4?t=1967)
+
+Yeah, it's running right now. I don't use it that often, that's the problem. You actually need their build of llama.cpp. They have a special fork, so that's a little unfortunate, but basically, people are going for it.
+
+**Bailey Hayes** [33:07](https://youtu.be/l9Kcuf-YOg4?t=1987)
+
+I will say, it's been super cool that llama.cpp has been merging our stuff to compile straight to WASI WebGPU and WebAssembly. So if you know the people who are maintaining that other port, encourage them to try and make a PR. Sometimes people are like, "Ah, they'll never take this." I'm having a good experience with those folks, so it's worth a shot.
+
+**Liam Randall** [33:40](https://youtu.be/l9Kcuf-YOg4?t=2020)
+
+Well, Bailey, we've got a meeting coming up here. I don't know if you had a chance to eat any lunch yet, but you may want to pop off, get ready, stretch. You're about to go talk for like two hours.
+
+**Bailey Hayes** [33:55](https://youtu.be/l9Kcuf-YOg4?t=2035)
+
+All right. Well, I've already been talking for hours, which is great. So thanks, everybody. I'm going to hop off. I'm going to transfer it to Liam, and I'll see you next week. Have an awesome wasmCloud Wednesday.
+
+**Liam Randall** [34:10](https://youtu.be/l9Kcuf-YOg4?t=2050)
+
+Thank you, Bailey. Bye. Great. Now that Bailey's gone, we can have fun. I think that actually wraps up the meeting. I don't know if anybody had anything else that they wanted to add. If not, we can draw this to a close. I will drop a pull request for last week's meeting notes in a minute here; just wrapping it up right now. I try to knock it out the same week, but I'm running a little bit behind on this one.
