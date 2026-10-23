@@ -29,7 +29,7 @@ wasmCloud workload security operates in two complementary layers:
 - **The WebAssembly sandbox** — enforced by the [Wasmtime](https://wasmtime.dev/) runtime, which provides strong isolation guarantees for every component by default
 - **Kubernetes controls** — NetworkPolicy for host pods, and RBAC for the operator and gateway ServiceAccounts
 
-This page covers the sandbox model, `allowedHosts`, `allowedIpNameLookups`, raw-socket egress policy, outbound client identity, same-host local routing, and NetworkPolicy. For RBAC configuration, see [Roles and Role Bindings](./operator-manual/roles-and-rolebindings.mdx).
+This page covers the sandbox model, `allowedHosts`, `allowedIpNameLookups`, raw-socket egress policy, host filesystem access, outbound client identity, same-host local routing, and NetworkPolicy. For RBAC configuration, see [Roles and Role Bindings](./operator-manual/roles-and-rolebindings.mdx).
 
 ## The WebAssembly sandbox
 
@@ -62,7 +62,9 @@ components:
 
 Entries are matched case-insensitively against the request's host (no scheme, no path). A leading wildcard like `*.example.com` matches any subdomain but not the bare `example.com` — list both if you need both. When `allowedHosts` is non-empty, any outbound HTTP request whose host doesn't match an entry is blocked by the host before it leaves the process. Since 2.10.0 the denial reaches the guest as a handleable `http-request-denied` error rather than a trap, for WASI 0.2 and 0.3 components alike. This is enforced at the wasmCloud level, independently of any Kubernetes NetworkPolicy.
 
-The policy fails closed: if `allowedHosts` is empty or the field is omitted, all outbound HTTP requests are denied. To allow unrestricted egress, set `allowedHosts: ["*"]` explicitly. (Local development behaves differently: when the field is omitted from `.wash/config.yaml`, `wash dev` substitutes the allow-all policy so dev-loop workloads have unrestricted egress.)
+The policy fails closed: if `allowedHosts` is empty or the field is omitted, all outbound HTTP requests are denied. To allow unrestricted outbound HTTP, set `allowedHosts: ["*"]` explicitly. (Local development behaves differently: when the field is omitted from `.wash/config.yaml`, `wash dev` substitutes the allow-all policy, so dev-loop workloads make outbound HTTP freely.)
+
+Note that `*` covers HTTP egress only. It opens no `wasi:sockets` name lookup, and since 2.11.0 `wash dev` enforces the socket address policy with no flag to relax it, so a dev-loop component that opens a **raw socket to a hostname** needs an `allowedIpNameLookups` entry even under an allow-all `allowedHosts`. Components that only make outbound HTTP are unaffected.
 
 :::note
 `allowedHosts` controls outbound HTTP calls made via `wasi:http/outgoing-handler`. It does not restrict network access that may be available through other host interfaces that are explicitly bound to the component.
@@ -70,7 +72,7 @@ The policy fails closed: if `allowedHosts` is empty or the field is omitted, all
 
 ## Allowing DNS name lookups with `allowedIpNameLookups`
 
-DNS name resolution via `wasi:sockets` is denied by default: a component with no `allowedIpNameLookups` list (or an empty one) cannot resolve any hostname and must connect by IP address. Starting in wasmCloud 2.6.1, a component can opt in with a per-component allowlist:
+DNS name resolution via `wasi:sockets` is denied unless something grants it. Two fields can, since 2.11.0: a name listed in the component's `allowedHosts` is resolvable on its own, and `allowedIpNameLookups` covers names beyond those. A component whose lists name neither cannot resolve any hostname and must connect by IP address. Starting in wasmCloud 2.6.1, a component can opt in with a per-component allowlist:
 
 ```yaml
 components:
@@ -82,7 +84,19 @@ components:
         - "*.internal.example.com"
 ```
 
-Entries may be exact hostnames, `*.suffix` wildcards, `*` (any name), or literal IPs. Like `allowedHosts`, `allowedIpNameLookups` fails closed: resolution is denied unless a matching entry is present. The restriction is enforced by the wasmCloud host for both WASI 0.2 and 0.3 resolvers, independently of any Kubernetes NetworkPolicy.
+Entries may be exact hostnames, `*.suffix` wildcards, `*` (any name), or literal IPs. The policy fails closed: resolution is denied unless a matching entry is present here or in `allowedHosts`. The restriction is enforced by the wasmCloud host for both WASI 0.2 and 0.3 resolvers, independently of any Kubernetes NetworkPolicy. One asymmetry to know: `allowedHosts: ["*"]` permits connections but opens no lookup, so a component that connects by name under a wildcard egress policy still needs a name entry.
+
+### Name grants on raw sockets
+
+A raw socket carries only an address, never a hostname, so a name in `allowedHosts` cannot be checked at connect time the way an HTTP request's `Host` header can. Since 2.11.0 the host bridges that gap by granting the address a name resolved into: an `allowedHosts` entry naming a host permits a `wasi:sockets` connection to an address the component resolved that name into, on the entry's port, for a window after the lookup. The entry permits the lookup itself as well.
+
+For a workload's own raw sockets, an entry carrying a scheme but no port constrains the port only when that scheme has a known URL default (`https` 443, `http` 80, `ws`, `wss`, `ftp`); a scheme with no URL default, such as `redis://`, `postgres://`, or `nats://`, leaves the port open. The familiar client defaults for those schemes (`redis` 6379, `postgres` 5432, `nats` 4222) apply to a *plugin's* own [`allowedHosts` ceiling](./host-interface-configuration.mdx#plugin-egress-ceilings-on-multiplexed-plugins), where the plugin dials the endpoint itself, not to a workload's sockets.
+
+[`runtime.hostGroups[].networking.ipNameLookupGrantLifetime`](./operator-manual/helm-values.mdx#runtimehostgroupsnetworking) (host flag `--ip-name-lookup-grant-lifetime`, `WASH_IP_NAME_LOOKUP_GRANT_LIFETIME`) bounds that window. Unset, the default, a resolved address stays connectable for as long as the workload's store remembers the lookup, even after the name has moved off it. Set a lifetime (`60s`, `5m`) where addresses are recycled, as pod IPs are. `0s` turns name entries off for sockets entirely, leaving only literal addresses.
+
+:::note[The grant is the address, not the server]
+The lifetime is not a DNS TTL — the resolver does not report one, so the host cannot honor it. And because the grant attaches to the resolved address, two names sharing one address are indistinguishable to the policy: resolving a name that points at another in-cluster service grants that service too, unless `--deny-private-ranges` screens it.
+:::
 
 :::note[Check your installed CRDs]
 The capability shipped in wasmCloud 2.6.0 under the name `allowIpNameLookup` and was renamed to `allowedIpNameLookups` in 2.6.1. On a 2.6.0 host, use the old name. The CRDs bundled with the 2.6.x Helm charts predate the field entirely: if your installed `Workload`/`WorkloadDeployment` CRDs don't include `allowedIpNameLookups` under `localResources`, the Kubernetes API server silently prunes it from applied manifests. The 2.7.0 chart bundles up-to-date CRDs (and upstream CI now checks chart CRDs against the operator's definitions), but note that Helm only installs the `crds/` directory on `helm install`, never on `helm upgrade`, so clusters upgrading from a 2.6.x chart still need to apply the updated CRDs manually.
@@ -94,14 +108,26 @@ Note that `allowedIpNameLookups` governs the `wasi:sockets` name-lookup interfac
 
 The host consolidates every socket decision into one per-workload policy, backed by connection quotas:
 
-- **Raw-socket egress policy.** Raw `wasi:sockets` connections are evaluated against the workload's `allowedHosts` and an address policy that screens special ranges (link-local including cloud metadata endpoints, multicast, and documentation ranges; optionally private ranges). Because raw-socket connects were never gated before, enforcement is **opt-in**: the host's `--socket-egress` flag defaults to `count` mode, which only records would-deny counters. Run in `count`, watch the counters, then switch to `enforce`. Companion flags: `--deny-special-ranges` (default on) and `--deny-private-ranges` (default off; reaching a sibling service on a private address is the ordinary in-cluster case). Since 2.10.0 the policy also screens inbound traffic (listens, accepts, and received datagrams), and host plugins carry their own egress ceiling of the same shape, declared on the plugin's [`plugins` entry](./operator-manual/helm-values.mdx#runtimehostgroupsplugins).
+- **Raw-socket egress policy.** Raw `wasi:sockets` connections are evaluated against the workload's `allowedHosts` and an address policy that screens special ranges (link-local including cloud metadata endpoints, multicast, and documentation ranges; optionally private ranges). The host's `--socket-egress` flag decides what a violation costs: `enforce`, the default since 2.11.0, refuses the connection; `count` records would-deny counters without refusing anything. Use `count` to size a policy before committing to it. Companion flags: `--deny-special-ranges` (default on) and `--deny-private-ranges` (default off; reaching a sibling service on a private address is the ordinary in-cluster case). Since 2.10.0 the policy also screens inbound traffic (listens, accepts, and received datagrams), and host plugins carry their own egress ceiling of the same shape, declared on the plugin's [`plugins` entry](./operator-manual/helm-values.mdx#runtimehostgroupsplugins). Since 2.11.0 the unspecified addresses `0.0.0.0` and `::` resolve to the workload's own virtual loopback rather than being admitted as ordinary destinations.
 - **Connection quotas.** Each workload gets one connection quota across three surfaces: pooled outbound HTTP/gRPC connections (default 128 per workload; a request over quota waits up to `--http-connection-wait`, default 5s), raw `wasi:sockets` connections (default 256; refused immediately rather than waiting, to avoid self-deadlock), and inbound connections (default 256). Per-surface flags (`--max-outbound-http-connections-per-workload`, `--max-outbound-socket-connections-per-workload`, `--max-inbound-socket-connections-per-workload`) and a host-wide ceiling (`--max-connections`; when unset, derived from the process's file-descriptor limit) tune these.
 - **Host ingress ceiling.** Since 2.9.0 the host also bounds its own HTTP listener with `--max-http-ingress-connections` (default: a quarter of the descriptor limit, floor 256). Connections past the ceiling are accepted and immediately closed, so the host stays responsive, and the host raises its soft file-descriptor limit toward the hard limit at startup.
 - **Host loopback access.** The reserved name `host.wasmcloud.internal` is the one sanctioned path from a workload to the machine's loopback, gated by the per-component [`allowedHostLoopbackPorts`](./crds.mdx#component-resource-controls) list *and* the host-level `--allow-host-loopback` flag (off by default), a two-key grant. `127.0.0.1` continues to mean the workload's own virtual loopback.
 
-![Two decision paths for outbound connections from a component. Outbound HTTP: the allowedHosts check is fail closed and always enforced, then the connection quota, where a request over quota waits for a slot (default 5s) before failing. Raw sockets: the destination is checked against allowedHosts and the address policy; a violation goes through the egress mode gate, where count mode (the default) records it and allows the connection while enforce mode denies it; connections over the raw-socket quota are refused immediately](../images/egress-decision-path.webp)
+![Two decision paths for outbound connections from a component. Outbound HTTP: the allowedHosts check is fail closed and always enforced, then the connection quota, where a request over quota waits for a slot (default 5s) before failing. Raw sockets: the destination is checked against allowedHosts and the address policy; a violation goes through the egress mode gate, where enforce mode (the default) denies the connection while count mode records the violation and allows it; connections over the raw-socket quota are refused immediately](../images/egress-decision-path.webp)
 
 Guest UDP binds are loopback-confined like TCP binds, outbound HTTP connections are pooled per workload with keep-alive (workloads never share a TCP connection, and TLS session resumption is isolated per workload), and outbound HTTPS trust roots are configurable for private-CA environments (`--http-client-ca-path`, `--http-client-trust-roots`).
+
+## Host filesystem access
+
+A workload reaches the host's filesystem through a `hostPath` volume, which the host gates since 2.11.0. A `hostPath` volume is permitted only when its canonical path lies within a directory the host lists in [`runtime.hostGroups[].hostPaths.allowed`](./operator-manual/helm-values.mdx#runtimehostgroupshostpaths) (host flag `--allowed-host-path`). **With no directories listed, no `hostPath` volume is permitted**, so this is a fail-closed grant like the egress lists. Canonical paths are what is judged, so `..` segments and symlinks cannot escape an allowed directory.
+
+Some paths stay refused inside an allowed directory. The host reserves every credential and CA file its own flags name, its OCI cache, its config files, its `configs:`/`secrets:` catalog sources, and any component-plugin Wasm files, and refuses kernel filesystems (`/proc`, `/sys`, `/dev`) and the scratch root. `--reserved-host-path` (`WASH_RESERVED_HOST_PATHS`) adds more.
+
+:::warning[A host-wide guardrail, not a tenancy boundary]
+Every workload on the host may mount any directory the host allows. `hostPaths.allowed` keeps workloads off the host's own secrets and out of the rest of the filesystem; it does not separate workloads from each other. Workloads that must not share a directory belong on different host groups.
+:::
+
+Ephemeral (`emptyDir`-style) volumes live under the scratch root, [`runtime.hostGroups[].scratchRoot`](./operator-manual/helm-values.mdx#runtimehostgroupsscratchroot) (`--scratch-root`, `WASH_SCRATCH_ROOT`), which defaults to `wasmcloud-scratch` under the system temp directory. A workload's scratch is removed when it stops, and a starting host clears what dead hosts left behind. Under `wash dev` both settings are derived from the session: the project's declared volumes become the allowed paths, and the scratch root moves under the `wash` cache directory, so a dev session that mounts `/tmp` is not refused.
 
 ## Outbound client identity (mTLS)
 

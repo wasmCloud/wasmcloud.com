@@ -22,7 +22,7 @@ platforms: [wasmCloud, Kubernetes, wash]
 
 # Host Interface Configuration Reference
 
-This page is the complete reference for the configuration keys each built-in host interface reads, as of wasmCloud 2.10.0. For the structure of the `hostInterfaces` field itself (`namespace`, `package`, `interfaces`, `version`, `config`, `name`, and multi-backend binding), see [Host Interfaces in the CRD guide](./crds.mdx#host-interfaces).
+This page is the complete reference for the configuration keys each built-in host interface reads, as of wasmCloud 2.11.0. For the structure of the `hostInterfaces` field itself (`namespace`, `package`, `interfaces`, `version`, `config`, `name`, and multi-backend binding), see [Host Interfaces in the CRD guide](./crds.mdx#host-interfaces).
 
 ## How configuration reaches an interface
 
@@ -34,10 +34,92 @@ Each `hostInterfaces` entry carries a string-to-string config map assembled from
 
 Some interfaces also read keys from the component's `localResources.config`, which is passed through as written. Where an interface reads from both, the tables below say so and give the precedence.
 
-Two rules that apply across interfaces:
+Three rules that apply across interfaces:
 
 - **Named vs. unnamed entries bind differently.** An entry with a `name` serves a labeled `(implements ..)` import and reads backend-selection keys (`backend`, `url`, and friends). An **unnamed** entry binds to the host's standalone plugin for that package, which on stock hosts means backend-selection keys on unnamed `wasi:keyvalue`, `wasi:blobstore`, and `wasmcloud:messaging` entries are ignored. Use a named entry (or the async `wasmcloud:keyvalue`/`wasmcloud:blobstore` packages) to select a backend per entry.
 - **A labeled import never falls back silently to the default backend.** A label is served by a matching named entry, by a plugin binding the operator declares in the host's [`plugins` block](./operator-manual/helm-values.mdx#runtimehostgroupsplugins) (since 2.9.0), or by a sibling component whose `components[].name` matches (since 2.10.0; an operator-declared entry `name` wins over a same-named component). A label matching none of these fails the workload at start.
+- **Backend addresses belong to the operator (since 2.11.0).** Under the default `workloadConfig: deny`, the keys that say *where* a backend lives come only from the host's `plugins` declaration: `url`, `root`, and `prefix` for keyvalue, `url` and `root` for blobstore, `url` for messaging, and `url` for a named `wasmcloud:postgres` entry. A manifest that sets one is refused at deploy. The workload keeps `backend`, which says *which kind* of backend it wants. See [Operator-owned backend addresses](#operator-owned-backend-addresses) for the reasoning and the migration.
+
+## Operator-owned backend addresses
+
+Before 2.11.0 the multiplexed keyvalue, blobstore, messaging, and postgres plugins claimed no keys, so `workloadConfig: deny` had nothing to refuse on them and a workload manifest could name its own backend address. That let a workload point a filesystem backend at any directory the host could read, a redis or NATS backend at any server the host could reach, or a redis `prefix` at another workload's keyspace.
+
+Since 2.11.0 each of those plugins declares its address keys host-owned:
+
+| Plugin `id` | Interface | Keys the operator owns |
+| --- | --- | --- |
+| `wasi-keyvalue-multiplexed`, `wasmcloud-keyvalue-multiplexed` | `wasi:keyvalue`, `wasmcloud:keyvalue` | `url`, `root`, `prefix` |
+| `wasi-blobstore-multiplexed`, `wasmcloud-blobstore-multiplexed` | `wasi:blobstore`, `wasmcloud:blobstore` | `url`, `root` |
+| `wasmcloud-messaging-multiplexed`, `wasmcloud-messaging-async-multiplexed` | `wasmcloud:messaging` | `url` |
+| `wasmcloud-postgres` | `wasmcloud:postgres` | `url` (named entries); `database` is a ceiling |
+
+`backend` stays the workload's, so a manifest still chooses *which kind* of backend it wants while the operator says *where* that backend is. An operator who wants to pin the kind too adds `backend` to the entry's `hostOwnedKeys`.
+
+:::warning[This refuses existing manifests with no operator action]
+`workloadConfig` defaults to `deny` even when `runtime.hostGroups[].plugins` is empty, which is the chart default. A workload that sets `root`, `url`, or `prefix` on one of these entries is refused at deploy after upgrading, with a message naming the key:
+
+> it sets `root`, which belong to the operator; a manifest that set them could point itself at another backend or widen its own grant. Ask the operator to declare them under `host.plugins`
+
+Set `workloadConfig: warn` on the plugin entry first to find affected workloads: it permits them and logs what `deny` would refuse.
+:::
+
+The migration moves the address from the workload to the host group. A workload that previously carried its own `root`:
+
+```yaml
+# Before 2.11.0 — refused under `deny` from 2.11.0 on
+hostInterfaces:
+  - name: cache
+    namespace: wasi
+    package: keyvalue
+    interfaces: [store]
+    config:
+      backend: filesystem
+      root: /data/cache
+```
+
+keeps only `backend`, and the operator declares the address:
+
+```yaml
+# Workload
+hostInterfaces:
+  - name: cache
+    namespace: wasi
+    package: keyvalue
+    interfaces: [store]
+    config:
+      backend: filesystem
+```
+
+```yaml
+# Helm values
+runtime:
+  hostGroups:
+    - name: default
+      plugins:
+        - id: wasi-keyvalue-multiplexed
+          bindings:
+            cache:
+              config:
+                root: /data/cache
+```
+
+Declare the address under `bindings.<label>` rather than the entry's own `config` when workloads must stay apart: a `root` or `prefix` on the entry's `config` is shared by **every** workload binding that label, which is one store for all of them. Per-label `bindings` is what isolates them.
+
+The alternative, where a workload legitimately owns its address, is `workloadConfig: allow` on that plugin entry paired with an `allowedHosts` ceiling: the workload names the url and the ceiling bounds which endpoints it may name. That pairing only works for a url-based backend — a `filesystem` backend's owned key is `root`, a path, which no `allowedHosts` ceiling bounds.
+
+### Plugin egress ceilings on multiplexed plugins
+
+Declaring `allowedHosts` on one of these plugin entries previously failed host startup, because the plugins did not report that they dial out. Since 2.11.0 all of them accept a ceiling, checked per backend at every bind, before any connection is reused:
+
+> `wasi:keyvalue` binding `cache` (backend 'redis') is refused by the egress policy declared for this plugin
+
+The ceiling is one list per plugin entry; there is no per-binding `allowedHosts`. Three details matter when writing one:
+
+- **Scheme aliases.** `postgres`/`postgresql`, `redis`/`valkey`, and `rediss`/`valkeys` match as one scheme.
+- **TLS upgrades are one-way.** A plaintext entry also admits its TLS form at the same endpoint (`nats://` admits `tls://`, `redis://` admits `rediss://`), but a TLS entry never admits plaintext.
+- **A port-less entry means the client's default port**, not any port, when a native plugin dials it: `redis` 6379, `postgres` 5432, `nats` 4222. The same entry still leaves the port open for a workload's own raw sockets.
+
+A url naming a *hostname* is matched by name only, because the plugin's own client resolves it. `denySpecialRanges` and `denyPrivateRanges` therefore constrain only a url that names a literal address. Credentials in a url are redacted from refusal messages.
 
 ## `wasi:http`
 
@@ -72,7 +154,7 @@ A **named** entry serving a labeled `consumer` import additionally reads:
 | Key | Description |
 | --- | --- |
 | `backend` | `nats` or `in-memory`. Default `in-memory`. |
-| `url` | NATS server URL. Required when `backend: nats`; the workload fails to start without it. |
+| `url` | NATS server URL. Required when `backend: nats`; the workload fails to start without it. Since 2.11.0 this is [the operator's to declare](#operator-owned-backend-addresses) under the default `workloadConfig: deny`. |
 
 ## `wasmcloud:nats`
 
@@ -130,7 +212,7 @@ An **unnamed** `wasi:keyvalue` entry binds the host's standalone backend and rea
 | `nats` | `url` (required) | JetStream key-value; the bucket named by `open()` must already exist |
 | `filesystem` | `root` (required) | Buckets are subdirectories of `root` |
 
-A missing required key fails the workload at start with an error naming the key.
+A missing required key fails the workload at start with an error naming the key. Since 2.11.0 `url`, `root`, and `prefix` are [the operator's to declare](#operator-owned-backend-addresses) under the default `workloadConfig: deny`, so on Kubernetes they belong on the plugin entry (per label, under `bindings`) rather than in the manifest. `in-memory` needs no address and so needs no declaration.
 
 ## `wasi:blobstore` and `wasmcloud:blobstore`
 
@@ -144,7 +226,7 @@ An **unnamed** `wasi:blobstore` entry binds the standalone NATS backend on a pro
 
 The filesystem and in-memory backends used by `wash dev` read no keys and apply no allowlist, so a workload that works in the dev loop still needs `buckets` set for Kubernetes.
 
-**Named** entries (and all `wasmcloud:blobstore` entries) select a backend per entry: `in-memory` (default), `filesystem` (requires `root`), or `nats` (requires `url`). Named entries do not read `buckets`.
+**Named** entries (and all `wasmcloud:blobstore` entries) select a backend per entry: `in-memory` (default), `filesystem` (requires `root`), or `nats` (requires `url`). Named entries do not read `buckets`. Since 2.11.0 `root` and `url` are [the operator's to declare](#operator-owned-backend-addresses) under the default `workloadConfig: deny`.
 
 ## `wasi:config`
 
@@ -170,16 +252,33 @@ See [Workload Security](./workload-security.mdx) for the delivery model and [Int
 Serves `query`, `prepared`, and `types` at `0.1.1-draft` (sync) and `0.2.0` (async); the entry's `version` selects the revision.
 
 - An **unnamed** entry requires the host to be started with a base connection URL (`wash host --postgres-url` or `dev.postgres_url`) and reads one key: `database` (required; the workload fails to start without it). Credentials, host, and TLS come from the host-level URL.
-- A **named** entry reads `url` (required): a full Postgres connection string.
+- A **named** entry reads `url` (required): a full Postgres connection string. Since 2.11.0 this is [the operator's to declare](#operator-owned-backend-addresses) under the default `workloadConfig: deny`, per label under `bindings`.
 
 Both URL forms honor two query parameters: `pool_size` (connection pool size, default 10) and `sslmode` (`require`, `verify-ca`, or `verify-full` to enable TLS).
+
+Since 2.11.0 `database` on an unnamed entry is a **grant ceiling** rather than a free-form key: the operator lists the databases a workload may select, comma-separated, and the workload names one of them.
+
+```yaml
+runtime:
+  hostGroups:
+    - name: default
+      plugins:
+        - id: wasmcloud-postgres
+          config:
+            database: app, reports
+```
+
+A `deny` host that serves the unnamed import must carry such a declaration — without one, a workload setting `database` is refused, because a grant the operator never declared cannot be narrowed into. A workload naming a database outside the ceiling is refused too, naming the value and the ceiling. When the ceiling lists several databases and the workload names none, the workload fails at start with a message listing them, since the host cannot choose on its behalf. A single-database ceiling is the simplest shape: the workload may then omit the key.
+
+Separately from the `database` ceiling: when the plugin entry declares an **`allowedHosts`** ceiling, the host checks its own `--postgres-url` against it at startup, so a base URL outside the list fails host startup rather than being discovered at first query.
 
 ## Interfaces with no configuration
 
 - **`wasi:logging`**: structured logs flow to the host's logging pipeline; no keys.
 - **`wasi:otel`**: no per-workload keys. The host's own export is configured with standard `OTEL_*` environment variables and activates only when an endpoint variable is set (see [Host telemetry](./operator-manual/telemetry.mdx)); the plugin is active only on hosts started with `--wasi-otel`.
 - **`wasi:webgpu`**: no keys; active only on hosts started with `--wasi-webgpu`.
-- The WASI P2 base (`wasi:io`, `wasi:clocks`, `wasi:random`, `wasi:filesystem`, `wasi:sockets`, `wasi:cli`) is always available and configured through [workload-level fields](./crds.mdx#component-resource-controls) rather than `hostInterfaces` entries.
+- The WASI base (`wasi:io`, `wasi:clocks`, `wasi:random`, `wasi:filesystem`, `wasi:sockets`, `wasi:cli`) is always available and reads no `hostInterfaces` config. Where these are configurable at all it is through workload-level fields: the egress and loopback allowlists under [component resource controls](./crds.mdx#component-resource-controls) for `wasi:sockets`, and [volumes](./crds.mdx#volumes) for `wasi:filesystem`. `wasi:io`, `wasi:clocks`, `wasi:random`, and `wasi:cli` have no settings at all.
+- Since 2.11.0 a plugin can replace functions in a host-linked WASI interface — the base above plus `wasi:http` — for workloads that opt in. That is a [custom-host capability](../runtime/creating-host-plugins.mdx#overriding-wasi-builtin-interfaces) rather than something a `plugins` entry can request.
 
 ## `wash dev` differences
 

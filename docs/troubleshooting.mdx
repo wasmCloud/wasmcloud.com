@@ -96,11 +96,58 @@ components:
 
 Entries are matched against the request's host (no scheme, no path) using case-insensitive comparison. A leading wildcard like `*.example.com` matches any subdomain but **not** the bare `example.com` — list both if you need both.
 
-If `allowedHosts` is empty or the field is omitted, **all outbound HTTP requests are denied** — the policy fails closed. To allow unrestricted egress, set `allowedHosts: ["*"]` explicitly. (In local development, `wash dev` substitutes the allow-all policy when the field is omitted from `.wash/config.yaml`, which is why a component can work in the dev loop and then fail on Kubernetes.)
+If `allowedHosts` is empty or the field is omitted, **all outbound HTTP requests are denied** — the policy fails closed. To allow unrestricted outbound HTTP, set `allowedHosts: ["*"]` explicitly. (In local development, `wash dev` substitutes the allow-all policy when the field is omitted from `.wash/config.yaml`, which is why a component can work in the dev loop and then fail on Kubernetes.)
+
+`*` grants HTTP egress only: it opens no `wasi:sockets` name lookup. A component that opens a raw socket to a hostname needs an `allowedIpNameLookups` entry, or an `allowedHosts` entry naming that host, even under `allowedHosts: ["*"]`. Since 2.11.0 this applies in the dev loop too, which enforces the socket policy with no opt-out.
 
 **See also:** [Workload Security — Restricting outbound HTTP with `allowedHosts`](./kubernetes-operator/workload-security.mdx#restricting-outbound-http-with-allowedhosts). If outbound HTTP is blocked at the cluster level rather than the wasmCloud level, see the same page for [NetworkPolicy](./kubernetes-operator/workload-security.mdx#kubernetes-networkpolicy-for-host-pods) guidance.
 
 Since 2.10.0 the denial reaches the guest as a handleable `http-request-denied` error on both WASI 0.2 and 0.3; earlier releases trapped 0.2 guests, so the symptom was an instance fault rather than an error value.
+
+### A raw socket is denied with nothing in the host log
+
+A component using `wasi:sockets` gets `access-denied` on connect or bind, and the host logs say nothing about it at any level.
+
+**Cause:** Since 2.11.0 the socket address policy runs in `enforce` mode by default. For a connect or bind the refusal path is silent: only `count` mode logs what it *would* refuse, and it logs at debug. So for this one decision, the mode that allows traffic is observable and the mode that blocks it is not.
+
+**How to confirm it:** two ways, neither of which is grepping the log.
+
+1. **Read the metric.** The host increments `socket_policy.denied` with a `reason` label — `not_permitted`, `bind_not_permitted`, `host_loopback_not_permitted`, `host_owned_port`, `blocked_range`, or `no_capacity`. This needs an OpenTelemetry exporter, meaning `OTEL_EXPORTER_OTLP_ENDPOINT` set on the host. Note that the meters are only installed by `wash host`: under `wash dev` and in embedded hosts, refusals are enforced but not counted.
+2. **Reproduce under `--socket-egress count`.** The connection is then allowed and a debug line names the address and reason. Run with `RUST_LOG=wash_runtime=debug`.
+
+:::tip[A denied *name lookup* is logged, and names the fix]
+This silence applies only to connects and binds. A refused `wasi:sockets` name lookup reaches the guest as `permanent-resolver-failure` and the host logs it at **warn**, naming what to add. The wildcard case even has its own message:
+
+> lookup of `api.internal` denied: allowedHosts has `*`, which permits connections but opens no name lookup. Add `api.internal`, or `*`, to allowedIpNameLookups
+
+Lookup denials are not governed by `--socket-egress`, so reproducing under `count` changes nothing for them, and they have no `socket_policy.denied` reason. If the symptom is a failed lookup rather than a failed connect, read the host log first.
+:::
+
+**Fix:** Add the destination to the component's `allowedHosts`, and, for a connection made by hostname, grant the lookup — either an `allowedIpNameLookups` entry or an `allowedHosts` entry naming that host. Remember that `allowedHosts: ["*"]` permits connections but opens no lookup. A quota exhaustion reports `out-of-memory` rather than `access-denied`, deliberately, so you are not hunting for a policy that is not the cause.
+
+**See also:** [Raw-socket egress policy and connection quotas](./kubernetes-operator/workload-security.mdx#raw-socket-egress-policy-and-connection-quotas) and [Name grants on raw sockets](./kubernetes-operator/workload-security.mdx#name-grants-on-raw-sockets).
+
+### Workload is refused for setting a backend `url`, `root`, or `prefix`
+
+A workload that deployed cleanly on 2.10.x is refused at deploy on 2.11.0, with a message like:
+
+> it sets `root`, which belong to the operator; a manifest that set them could point itself at another backend or widen its own grant. Ask the operator to declare them under `host.plugins`
+
+**Cause:** Through 2.10.x the multiplexed keyvalue, blobstore, messaging, and postgres plugins claimed no configuration keys, so the default `workloadConfig: deny` refused nothing on them and a manifest could name its own backend address. Since 2.11.0 those address keys belong to the operator. This fires even on a chart install that declares no `plugins` block, because `deny` is the default either way.
+
+**Fix:** Move the address from the workload manifest to the host group's `plugins` entry, keeping `backend` on the workload. Declare it under `bindings.<label>.config` rather than the entry's own `config` when workloads must not share a store. To find every affected workload before committing, set `workloadConfig: warn` on the plugin entry: it permits them and logs exactly what `deny` would refuse.
+
+**See also:** [Operator-owned backend addresses](./kubernetes-operator/host-interface-configuration.mdx#operator-owned-backend-addresses) for the full migration.
+
+### A `hostPath` volume is refused
+
+A workload with a `hostPath` volume fails to start, and the host warns that it `refused a hostPath volume outside the host paths this host permits`, or names a matched `mount` or `reserved` path.
+
+**Cause:** Since 2.11.0 a `hostPath` volume is permitted only inside a directory the host allows, and **no directories are allowed by default**. Unlike a socket refusal, this one is logged per refusal with the canonical path and also reaches the Workload's `Sync` condition, so `kubectl describe workload <name>` shows it.
+
+**Fix:** List the parent directory under `runtime.hostGroups[].hostPaths.allowed` (host flag `--allowed-host-path`). If the path is inside an allowed directory and still refused, it is hitting a reserved path: the host reserves its own credential, CA, cache, and config paths, and refuses kernel filesystems (`/proc`, `/sys`, `/dev`) and the scratch root.
+
+**See also:** [Host filesystem access](./kubernetes-operator/workload-security.mdx#host-filesystem-access).
 
 ### Workload image fails to pull from a private registry
 
@@ -148,6 +195,22 @@ A `WorkloadDeployment` never reaches its desired replica count, and either the u
 
 **See also:** [`ArtifactSpec`](./kubernetes-operator/api-reference.md#artifactspec) and the [CRDs guide](./kubernetes-operator/crds.mdx#artifact). For mirroring the wasmCloud chart's own images to a private registry (air-gapped installs), see [Private Registries and Air-Gapped Deployments](./kubernetes-operator/operator-manual/private-registries.mdx).
 
+### Every image is pulled again, or `pullPolicy: Never` fails, after upgrading to 2.11.0
+
+After upgrading, hosts re-download images they had cached, disk usage roughly doubles for a while, and workloads using `pullPolicy: Never` fail to start.
+
+**Cause:** 2.11.0 changed the OCI disk cache layout. Entries are now scoped by the resolved registry **user**, the HTTP or HTTPS transport, and the CA snapshot used to fetch the artifact, and each entry stores its digest and component bytes together in one file. Older entries do not carry that scope and are ignored, so every image is fetched once more. `Never` returns a cached artifact only inside the same scope, so it fails until the image has been pulled once under the credentials, transport, and trust the host will actually use.
+
+**Fix:** Let the hosts re-pull once. On Kubernetes the washlet removes the old directories on its first control-loop turn, with no age check, and sweeps again every five minutes after. For workloads pinned to `Never`, pull once with `IfNotPresent` under the credentials they will use, then switch back.
+
+Related behavior worth knowing:
+
+- **A password rotation does not invalidate the cache.** Scoping is by registry *user*, not password. One pull under a non-`Never` policy revalidates each entry's manifest with the new password without downloading it again, after which `Never` accepts it. A different username, anonymous access, or a new bearer token *is* a new scope and re-fetches — a bearer token names no user, so each token is its own scope.
+- **`IfNotPresent` now revalidates with the registry even for a digest-pinned reference**, so that a reused disk entry has to pass the caller's current authorization and TLS policy rather than being treated as fresh authorization by virtue of being on disk. Expect slightly more registry traffic than 2.10.x for digest-pinned workloads. `Never` is the policy that stays offline.
+- **Keep `cache.key` with the cache.** Entry names are keyed with a secret the cache creates once in its root. Deleting it, or copying a cache without it, orphans every entry.
+- **A re-pushed tag can take up to five seconds to be seen** under `IfNotPresent` and `Never`, which reuse a completed identical pull for that long. `Always` resolves the registry afresh once any prior pull has finished.
+- **`wash dev` and `wash oci` never sweep their cache**, so remove the old `<reference>_<hash>` directories under the `wash` cache directory by hand.
+
 ### Requests to a workload return 400 with no application log line
 
 A request reaches the host but gets a `400` before any component runs, and nothing appears in the workload's logs.
@@ -188,7 +251,21 @@ wit-bindgen = { version = "0.62.0", default-features = false, features = [
 ] }
 ```
 
-Coming from wit-bindgen 0.57, rename `wit_bindgen::spawn` to `spawn_local`. A rebuilt component also runs on 2.6.0 through 2.9.x (Wasmtime 47), so you can redeploy it before upgrading. For a published component, use a release rebuilt this way: for example, `ghcr.io/wasmcloud/components/oci-registry:0.1.0` is affected and `0.2.0` is fixed.
+Coming from wit-bindgen 0.57, rename `wit_bindgen::spawn` to `spawn_local`. A rebuilt component also runs on 2.6.0 through 2.9.x (Wasmtime 47), so you can redeploy it before upgrading. For a published component, use a release rebuilt this way: for example, `ghcr.io/wasmcloud/components/oci-registry:0.1.0` is affected, and `0.1.1` is the same credential-free source rebuilt on wit-bindgen 0.62. Stay on the `0.1.x` line for the [local-ingress example](https://github.com/wasmCloud/wasmCloud/tree/main/examples/local-ingress), which serves the registry over plain HTTP with no credentials; `0.2.0` and later require HTTP Basic authentication.
+
+Since 2.11.0 the host diagnoses this itself. Alongside the fault it logs, once per workload deploy:
+
+> guest trapped using a waitable synchronously while it was in a waitable set. This is the known signature of wit-bindgen's async runtime at 0.58 or older with `inter-task-wakeup` (usually wasip3 0.7.x with `http-compat`), which Wasmtime 48 and later rejects. If this component, or a component linked into it, uses that runtime, rebuild it on wasip3 0.9 or wit-bindgen 0.59 or newer
+
+The hint is keyed on the trap type rather than its message text, so a linked call that flattens a callee's trap into a plain string does not mislead you into blaming the caller.
+
+### A call between sibling components returns HTTP 500 with an empty body
+
+A multi-component workload returns a `500` with no body and no application log line, on a request path where one component passes a resource handle it obtained from a sibling to another sibling. The host logs either a trap reading `borrow handles still remain at the end of the call` or a type mismatch on the linked call.
+
+**Cause:** Two related bugs in how the dynamic linker passed resource handles between components sharing a store, both fixed in 2.11.0. A borrowed handle lifted into the host was never released back, so the caller trapped when its call scope closed — that is the `borrow handles still remain` signature. Separately, a handle nested inside a record, tuple, list, option, variant, or result fell through to a path that re-marshalled it, so the callee received something that no longer matched the type it declared; that one surfaces as a type mismatch rather than the borrow trap. The nested case is the broader of the two, since nesting a handle in a record is far more idiomatic WIT than a bare `borrow<T>` parameter. Both affected the WASI 0.2 and WASI 0.3 call paths. A middleware or decorator chain is the usual topology: an auth component borrowing a session resource produced by a session component and handing it to a handler.
+
+**Fix:** Upgrade to 2.11.0. The bug was present from 2.5.0 through 2.10.3 and is not fixed in any 2.10.x patch release. No component change is needed.
 
 ## Scheduling
 
@@ -309,6 +386,20 @@ A host pod restarts with exit code 137 and no `OOMKilled` event after a period o
 **Cause:** On releases before 2.9.0, a host that ran out of file descriptors could spin on a failing accept loop, flood its logs, and miss its liveness probe until the kubelet killed it.
 
 **Fix:** Upgrade to 2.9.0 or later. The host raises its own descriptor limit at startup, backs off on repeated accept failures, and bounds its listener with [`maxHttpIngressConnections`](./kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupsnetworking).
+
+### Workloads stop starting with a `max-process-memory` error
+
+A Workload reports `Error` with a message naming `max-process-memory`, such as:
+
+> this host is past max-process-memory (…) and accepts no new workloads until it falls back below 95% of it
+
+Guests on the same host may also see memory growth fail.
+
+**Cause:** Since 2.11.0 the host bounds its whole process footprint, defaulting to 90% of the cgroup memory limit. Past the limit it refuses guest memory growth and new workload starts, which is deliberately a visible failure rather than waiting for the kernel to OOM-kill the pod. Refusals lift once the footprint falls back under 95% of the limit, after a full minute below it without growth, or after five consecutive failed footprint reads.
+
+**Fix:** Raise the pod's `resources.limits.memory`, reduce what the host is being asked to hold (`replicas`, `poolSize`, or workloads per host), or raise `--max-process-memory` explicitly. `--max-process-memory off` disables it. Watch the `process_memory.footprint`, `process_memory.high_water`, and `process_memory.limit` gauges and the `process_memory.refused` counter, which is kept separate from the guest budget's `guest_memory.refused` so you can tell the two limits apart.
+
+Note that this limit is enforced **even when `guestMemoryMode` is `count`** — `count` governs the guest budget only, so if you are running in `count` to avoid refusals, this one still applies. See [host process memory](./kubernetes-operator/operator-manual/concurrency-and-connections.mdx#host-process-memory).
 
 ### A host pod is Running but not Ready
 

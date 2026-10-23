@@ -131,7 +131,8 @@ let engine = Engine::builder()
 | `with_pooling_allocator(bool)` | Enable/disable instance pooling for better performance with many short-lived instances |
 | `with_config(wasmtime::Config)` | Provide a fully custom Wasmtime configuration for advanced use cases |
 | `with_host_memory(HostMemoryBudgets)` | Set the guest memory budget, per-memory heap ceiling, and pool instance slots (since 2.9.0). `HostMemoryBudgets::resolve_strs` and `parse_bytes` turn textual config (Kubernetes quantity grammar) into budgets |
-| `with_guest_memory_mode(GuestMemoryMode)` | `Count` (default) records what enforcement would refuse; `Enforce` refuses guest memory growth past the budget (since 2.9.0) |
+| `with_guest_memory_mode(GuestMemoryMode)` | `Enforce` (the default since 2.11.0) refuses guest memory growth past the budget; `Count` records what enforcement would refuse (since 2.9.0) |
+| `without_max_process_memory()` | Turn off the host-process memory limit, which is on by default for every embedder since 2.11.0. `with_max_process_memory_bytes` sets a limit of your own instead of the derived one |
 | `with_fuel_consumption(bool)` | Compile fuel counters into guest code, required for `--meters fuel`-style exact execution metering (predates 2.9.0) |
 
 :::info[Pooling allocator]
@@ -233,6 +234,22 @@ Two embedder-facing changes in 2.8.0:
 - **Dispatch**: `DispatchTarget::start` returns a cancellable `DispatchHandle`, and dropping the `dispatch()` future now cancels the call.
 - **Plugins**: `BindingSchema` gains `and_aliases` and `and_required_keys` for declaring key spellings and required keys. `HostPlugin::configure_egress_policy` receives the operator-declared egress ceiling; its default implementation rejects one, so a plugin that cannot enforce a ceiling fails host startup.
 - **Lifecycle**: workloads hold the HTTP handler weakly, so dropping a `Host` releases its ingress; workloads with no outbound HTTP run without a live handler.
+
+### Embedder changes at 2.11.0
+
+- **The host-process memory limit is on by default**, for every `EngineBuilder` embedder rather than only `wash host`. Unset, it is 90% of the cgroup memory limit, or of physical memory where there is no cgroup; past it, guest memory growth and new workload starts are refused. `EngineBuilder::without_max_process_memory()` turns it off, and `with_max_process_memory_bytes` sets your own. It is enforced even when guest memory is in `Count` mode, and it is sampled admission control rather than a hard cap, so keep an OS or container limit as the real boundary.
+- **Guest memory enforces by default.** `GuestMemoryMode::Enforce` is the new default; pass `Count` explicitly to keep the counting-only behavior.
+- **Source-breaking API changes.** `ResolvedWorkload::component_count()` is synchronous, so drop the `.await`. Adding or removing components after a workload resolves is unsupported, because the cached count and bindings would stop describing the same workload; resolve a new workload to change membership. `host::http::WorkloadHandles` now stores `Arc<ComponentHandle>` values whose fields are private, so code that populated that map directly must move registration into the `Ingress`/`HttpHandler` binding lifecycle — prefer `HostBuilder::with_http_handler`.
+- **Pool diagnostics.** `Engine::pool_usage()` reports used and total slots per pool kind, `pool_usage::pool_refusals()` counts refusals process-wide, and instantiation errors now name the setting to raise. Every pool slot reserves Wasmtime's 4 GiB memory reservation plus a 32 MiB guard regardless of `--default-heap-memory`, and a heap ceiling above 4 GiB now fails host startup; reduce the slot count to reduce address-space use.
+- **Running a workload component as a one-shot command.** `ResolvedWorkload::run_command(component_id, CommandOptions)` runs a component's `wasi:cli/run` export once in a fresh store, under the resolved workload's grants, plugins, environment, and volumes, and returns a `CommandOutcome` carrying the exit code. `CommandOptions` supplies `args` (including `argv[0]`), and optional `stdin`, `stdout`, and `stderr` streams. A component exporting both revisions runs as WASI 0.3, selected by the `run` export rather than by its imports. It does not start the workload's services or ingresses.
+- **Structured payloads across the plugin store boundary.** A `stream<T>` or `future<T>` crossing between a workload and a **component** plugin previously had to carry a scalar or string. Register the generated Wasmtime binding type with `Engine::stream_payloads().register::<T>(ty)` — before loading plugins or resolving workloads — and records, variants, lists, options, and results work too. Payloads carrying resources, nested streams or futures, or error contexts are still refused, since those handles belong to the source store. Native Rust plugins need no registration.
+- **Plugins can override WASI builtins.** See [Overriding WASI builtin interfaces](./creating-host-plugins.mdx#overriding-wasi-builtin-interfaces).
+- **Attaching control to a running host.** `AttachedHostControl` serves the operator's NATS control API for a host you built and own; see [Cluster Hosts](./washlet.mdx#attaching-control-to-a-host-you-own).
+- **Quieter logs.** Per-request, per-call, and per-binding log lines moved from `INFO` to `DEBUG`; run with `RUST_LOG=wash_runtime=debug` to see them again. `wasi_otel` bind/unbind and per-call summaries, `wasmcloud:nats` connection open lines, and the messaging subscriber span are all affected. HTTP ingress warnings for an invalid `Host`, a routing failure, or a `Host` with no bound workload are rate-limited to once every 10 seconds each, with a `suppressed` count. "Starting workload" and "Stopping workload" stay at `INFO`.
+
+:::warning[Volume mounts in a custom host are trusted]
+The `hostPath` allowlist described in [Workload Security](../kubernetes-operator/workload-security.mdx#host-filesystem-access) governs workloads the engine resolves from manifests. The public `WorkloadService::new` and `WorkloadComponent::new` constructors bypass it: mounts are opened as given, refusing only kernel filesystems. A custom host that accepts mount paths from anywhere untrusted must validate them itself.
+:::
 
 ### Customizing outgoing HTTP requests
 

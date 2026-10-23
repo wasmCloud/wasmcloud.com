@@ -59,13 +59,13 @@ wash host --host-group my-cluster --scheduler-nats-url nats://nats:4222
 | `--data-nats-url` | `nats://localhost:4222` | NATS URL for the data plane (plugin backends) |
 | `--http-addr` | (disabled) | If set, enables the HTTP handler on this address |
 | `--postgres-url` | (disabled) | If set, enables the `wasmcloud:postgres` plugin (direct queries and prepared statements) |
-
-This table covers the core cluster flags; for the full and current flag surface, including the 2.9.0 probe, drain, memory, and `wasmcloud:nats` flags, see the [`wash host` command reference](../wash/commands.mdx#wash-host).
 | `--wasi-webgpu` | false | Enable the WebGPU interface |
 | `--allow-insecure-registries` | false | Allow pulling from insecure OCI registries |
 | `--registry-pull-timeout` | `30s` | Timeout for OCI pulls |
 | `--scheduler-tls-ca` | — | TLS CA for scheduler NATS |
 | `--data-tls-ca` | — | TLS CA for data plane NATS |
+
+This table covers the core cluster flags; for the full and current flag surface, including the probe, drain, and memory flags and the socket and filesystem policy flags, see the [`wash host` command reference](../wash/commands.mdx#wash-host).
 
 ### Environment variables
 
@@ -151,6 +151,48 @@ In cluster mode, use NATS-backed plugin implementations so that workloads can ac
 | Key-value | `NatsKeyValue::new(&nats_client)` | NATS-backed key-value store |
 | Blobstore | `NatsBlobstore::new(&nats_client)` | NATS-backed blob storage |
 | Messaging | `NatsMessaging::new(nats_client)` | NATS pub/sub messaging |
+
+## Attaching control to a host you own
+
+`ClusterHostBuilder` owns host construction: you hand it a `HostBuilder`, plugins, and an HTTP handler, and it builds, starts, and owns the `Host`. Since 2.11.0 `AttachedHostControl` inverts that, serving the same NATS control API for a host **you** built, started, and keep owning.
+
+```rust
+use wash_runtime::washlet::{AttachedHostControl, HostCommandHandler, HostControlDefaults};
+
+let control = AttachedHostControl::builder(host.clone(), nats_client)
+    .with_host_group("my-cluster")
+    .with_handler(Arc::new(MyPolicy))
+    .attach()
+    .await?;
+
+// ... later, stop serving control while the host keeps running
+control.shutdown().await?;
+```
+
+The builder also takes `with_heartbeat_interval` (zero means 15s), `with_max_concurrent_starts`, `with_artifact_cleaner(frequency, max_age)`, and `with_liveness`. Dropping the `AttachedHostControl` aborts the loop.
+
+What this makes possible is **one host serving both locally-originated and operator-originated workloads**, with your code arbitrating which workloads the control plane may see or touch. A `HostCommandHandler` intercepts every remote `start`, `stop`, and `status`, and can refuse it, rewrite it, or delegate to `HostControlDefaults` for stock behavior:
+
+```rust
+#[async_trait]
+impl HostCommandHandler for MyPolicy {
+    async fn start(&self, defaults: &HostControlDefaults, req: WorkloadStartRequest)
+        -> anyhow::Result<WorkloadStartResponse> {
+        if !req.workload_id.starts_with("owned-") {
+            anyhow::bail!("admission denied");
+        }
+        defaults.start(req).await
+    }
+}
+```
+
+Nothing in the runtime distinguishes a locally-started workload from an operator-started one, so protecting one is the handler's job: `HostControlDefaults::stop` stops whatever `workload_id` it is given. Refuse a `stop` or `status` whose id your own code owns, as the example above refuses a `start`. What the runtime does guarantee is that only one attachment may be active at a time — a second is refused rather than silently layered over the first, so a handler's policy cannot be bypassed by attaching again.
+
+Note that `with_host_group` sets the host group label in heartbeats only; it does not add a `hostgroup` label to the host itself. `ClusterHostBuilder` has no `with_handler`, so command interception means moving onto this path.
+
+:::note[A new NATS permission, for restrictive auth only]
+Since 2.11.0 a host proves its control subscription is live before reporting started: it subscribes, publishes a marker to `runtime.host.<host_id>.__control.ready`, and waits to receive its own message back. The connection must therefore be allowed to **publish** to that subject and must not use `no_echo`. Failing either, startup fails after 10 seconds with a message naming the subjects, instead of a host that starts cleanly and silently serves no commands. The chart's bundled NATS applies no subject-level permissions, so a stock install is unaffected; this matters only where you have hand-rolled restrictive NATS authorization.
+:::
 
 ## How the operator communicates with washlets
 
