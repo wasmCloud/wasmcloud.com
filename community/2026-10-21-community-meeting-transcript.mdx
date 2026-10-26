@@ -1,0 +1,397 @@
+---
+date: '2026-10-21'
+title: 'Transcript: wasmCloud 2.11: Wasm Runtime Autoscaling at 42,000 Workloads per Core, and TypeScript via Perry'
+description: 'Full transcript of the October 21, 2026 wasmCloud community call covering the 2.11 release, a threat model and the CNCF Security Slam, host density benchmarks, and Perry-compiled TypeScript components in JCO.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm runtime autoscaling
+  - webassembly kubernetes
+  - webassembly news
+  - wasmcloud 2.11
+  - scale to zero
+  - host density benchmark
+  - deny by default
+  - threat model
+  - security slam
+  - jco
+  - perry
+  - typescript webassembly
+  - porffor
+  - starlingmonkey
+  - wasm vs microvms
+image: https://i.ytimg.com/vi/gCxwAVqhky0/maxresdefault.jpg
+showTitle: true
+slug: 2026-10-21-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - denyByDefault
+  - CNCF
+  - Kubernetes
+  - KEDA
+  - k6
+  - JCO
+  - TypeScript
+  - Perry
+  - Porffor
+  - StarlingMonkey
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-10-21-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=gCxwAVqhky0" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=gCxwAVqhky0" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:10](https://youtu.be/gCxwAVqhky0?t=10)
+
+Hello and welcome to our wasmCloud community call for October 21. We are in the lineup towards KubeCon, so two weeks left, a lot of things going in, and we cut a pretty humongous release yesterday with all kinds of great stuff. I'd like to go through some of that today. We've already talked through some of the new policy enforcement points in detail, so I'm not going to drive that home too much. But essentially, we now have our release blog that's ready to land. Let me just see where we're at on that one. If it hasn't merged yet, I will hit the merge button. Yep. Okay, I'm hitting the merge button right now. I'll share my screen so y'all can see what I'm doing. So, Eric, are you on the call right now? Do you want to talk to the blog that we just published?
+
+**Bailey Hayes** [1:13](https://youtu.be/gCxwAVqhky0?t=73)
+
+All right, it's going to take a minute to percolate through, I think. Yeah, look at this. So, if you're not already aware, we regularly do release blogs that keep a curation of all the things that landed, plus some good tips on how to upgrade. And the 2.11 one will be incoming shortly. I don't have the Netlify link from your PR handy, but it was in here somewhere at one point. But because I merged it, it is now gone.
+
+<img src="/img/community/2026-10-21/image001.webp" alt="wasmcloud.com PR #1307, blog: wasmCloud 2.11.0 release announcement, merged on the call" />
+
+**Liam Randall** [1:55](https://youtu.be/gCxwAVqhky0?t=115)
+
+I bet it'll be there in a moment.
+
+**Bailey Hayes** [2:06](https://youtu.be/gCxwAVqhky0?t=126)
+
+I don't know. Maybe not that fast. But if you want to get a feel for what those changes were, brace yourself. We know this isn't a readable set. It's why we create release blogs. But this was our set that was in this past release, and I want to highlight that Eric and Victor outpaced me this time. We had a regular contributor who's been awesome coming in, Junjie. He's been doing a really great job here. We've got really good bug fixes and reports from some of the organizations that have been regular contributors for a long time, Betty Blocks. So really, really appreciate all the effort that went into this minor release. We also got a new contributor here with a nice enhancement that I built on top of yesterday as well, to take the pattern that they established and roll it out to a couple of other places, so that we can have a really nice, easy way to prevent panics across the various different kinds of permits that we have in the system. And all of that was collected up into 2.11, which is maybe on... nope, it's not on the page. So, Eric, I don't think I'm going to wait on it. I guess I'll just say, hey, Eric wrote a great blog post. It collects all of it in there.
+
+The main point is that we've turned a lot of the new policy enforcement points that we introduced in the last couple of releases... they were all at count. We've now changed them to enforce and to be deny by default. And one of the big motivators for that is that, as part of our roadmap, there's a couple of things. One of the ones that we decided to add is introducing a threat model, and so I've got this PR up that collects a lot of that, and now it's a short document that hopefully, if you read through it, you'll know essentially what is in scope for a potential vulnerability for wasmCloud, what is out of scope, some of the things that you need to be aware of, like what boundaries we actually protect against. It actually has a much better diagram than one that I showed on a call a couple weeks back, that's a little bit easier to understand, and our various goals, and ways that you can relax some of the settings that we have and reduce enforcement, including a lot of these. Like I just said, we just changed the default from counting to enforcement; you can always change it back to counting. So that is one big bit of it.
+
+<img src="/img/community/2026-10-21/image002.webp" alt="PR #5685, docs: add a threat model, showing the THREAT_MODEL.md trust diagram with a trusted operator, control plane, and host process, and untrusted workloads and clients" />
+
+Something else that we've been working on: I registered our project for the Security Slam for this fall, and note that it's about to end, right before KubeCon, and if we want to get all the badges, you've got to merge my PRs. But basically, this PR is one of them that came out of the Security Slam. A bunch of fall cleaning that I've been doing, retiring wasmCloud repos that have existed, some of them even before wasmCloud 1.0. So, going through curating that whole list. There's a bunch of new ways to report CNCF metadata, so I've gone through and updated all of those.
+
+<img src="/img/community/2026-10-21/image003.webp" alt="Issue #5692, Archive retired wasmCloud repositories, a checklist of repos to archive and the supporting cleanup steps" />
+
+And also in the Security Slam, something else that we ran into: we needed to get in some license exceptions. So there's the Mozilla license, which is really common and used in a lot of different projects. We needed to put in an exception for this. Basically, TL;DR, if it's not in this small list, the CNCF wants you to put in a specific exception for each of those, and so now we have all of these, making sure we tracked all of that. So that's one of our Security Slam wins, but there have actually been several now. I'm working on adding a Security Insights file that builds on the threat model PR, but it shows all the different things that we've been doing as a project.
+
+**Bailey Hayes** [6:49](https://youtu.be/gCxwAVqhky0?t=409)
+
+I feel like our big security CI sprint was in Q2, where we added attestations and signing, producing SBOMs, adding cargo audit and Go vet, and all of those kinds of things throughout our repos. So we highlight what we've been doing and how we've been doing those assessments in here. CodeQL, cargo audit, Dependabot. We run zizmor on all our GitHub Actions, et cetera, et cetera. So this is one of the items that's required to get one of our early badges. Once we land that threat model, we'll also look to land this one as well.
+
+<img src="/img/community/2026-10-21/image004.webp" alt="Draft PR #5724, docs: add a Security Insights file, listing security-insights.yml entries for Trivy, Checkov, and OpenSSF Scorecard" />
+
+We also now in the CNCF have... they're using YAML rather than Markdown for keeping track of who's a maintainer, who's not active, that kind of thing. So generally I'm running through a lot of our CNCF governance docs, so you'll see different updates for that throughout our repos. Oh yeah, "and then we're just done with security altogether, right?" I'm reading Victor's chat. We will never be done, but we will certainly have a really strong and well documented posture that we will be able to continue working on.
+
+One of the things that I wanted to give a shout-out for is all of the changes that we landed for 2.11 that came from Victor. Victor, would you be game to share some of those findings?
+
+**Victor Adossi** [8:51](https://youtu.be/gCxwAVqhky0?t=531)
+
+Yeah, yeah. We started taking some looks at scale, basically, exploring just how many components and stuff we can run locally. It's been kind of obvious, and part of how we've talked about Wasm for a long time, that scale is one of the benefits, right? Rather than running a VM, where you can only run, let's say, tens of those on a machine, or a container, where generally you can only run hundreds of those on a machine unless you really push it. Even frameworks like Kubernetes have per-node limits that people run into pretty quickly when they try to actually run a lot of workloads on a Kubernetes node. One of the things about Wasm is that every program or app that you run fits and packs much tighter. It's like an in-process virtual machine: one virtual machine and lots of programs running on it. So, basically, trying to improve the code base with respect to performance and with respect to scale, and checking for scale. So I'm going to show something real quick. After I put in a whole bunch of these PRs... I'm going to share my screen here. Oh, I need host-enabled screen sharing, as always. But basically a bunch of PRs that are labeled test and fix and perf made their way into wasmCloud lately, and y'all should be able to see my screen at this point.
+
+**Bailey Hayes** [10:59](https://youtu.be/gCxwAVqhky0?t=659)
+
+Looks good.
+
+**Victor Adossi** [11:00](https://youtu.be/gCxwAVqhky0?t=660)
+
+Yeah, I'm zooming in the wrong screen, but yeah, a whole bunch of these fixes. A lot of them are for performance, and a lot of them are for scale. But some of them are for when you run on macOS. I don't know if anyone's run into this, but you run into this very fast if you try to do, let's say, LM Studio or llama.cpp or anything on a Mac. Macs will just let you use all the memory and crash. They will just freeze. The OOM killer just isn't there to save you. So one of the really important changes, I think, was that we now have detection for this, and a switch to set max memory, and some more reasonable limits by default on how much memory the process is allowed to use. We have focused a lot on the Kubernetes workflow, and of course Linux workflows, and things just kind of work there generally, or they fail more gracefully, at the very least. I'm surprised it's taken us this long. But obviously if you're testing for scale, you're going to try and max everything out, and make sure things don't fall over. Those changes went in, which is nice.
+
+<img src="/img/community/2026-10-21/image005.webp" alt="wasmCloud commits on main from vados-cosmonic: share the base WASI linker across components, derive memory limits from cgroup ancestors, cap a cgroup memory limit at physical memory, and related runtime fixes" />
+
+But what I want to show are the numbers I got. So I'm going to go up here to my Claude Code window and what I was able to get to. One of the things we want to do when we're testing scale is to actually limit to a certain number of CPUs, right? Because there are a lot of things that change when you go cross-CPU. It's hard to get really, really consistent testing. We used to have maybe something like 300 components on one CPU, I think, but now with warm (and this is warm, so components are loaded and they stay loaded the whole time; they don't scale to zero) we can fit about 4,000 of the basic WASI HTTP component on one core. So if you think of each WASI HTTP component as a single agent, or a single web page, or whatever, the idea is that you can pack these really tightly on just one core. Now, how fast a single core will go if you try to do 4,000 requests to 4,000 components at the same time is a different question. But they'll at least stay in memory, and if you have the compute, you can utilize this.
+
+Now, what's really interesting is scale to zero. Scale to zero at one CPU is actually 42K. So if you have the kind of workload where you don't need the scale most of the time... you have a whole bunch of websites or a whole bunch of workloads that actually don't do anything most of the time, and they just sometimes need to get triggered, this is obviously a huge step up over VMs or over containers. This is something I think we can improve upon more. There is maybe another order of magnitude in here for warm and scale to zero. But right now, with the changes we have so far, it should be relatively easy to reproduce this. And we've actually also added a scale bench, so that'll be much easier to run as well, and it'll produce a table, which is nice. Sorry, Frank.
+
+**Frank Schaffa** [15:22](https://youtu.be/gCxwAVqhky0?t=922)
+
+Yeah, that's incredible. Looks wonderful. One thing I'm wondering: you're packing 4,000 active things into one CPU. Have you tried to see what the response time will be if those are, let's say, an HTTP server, going from 10 to 100 to 4,000?
+
+**Victor Adossi** [15:54](https://youtu.be/gCxwAVqhky0?t=954)
+
+I just highlighted one of the lines in this table here. It's not the greatest, but basically you've got less than a millisecond. Again, sorry, this is local, so obviously it's much faster than when you have actual speed-of-light issues and actual networks to traverse. But the p50 for the warm one-CPU 4K is half a millisecond, and we have the p99 here as well. So everything is still pretty fast as far as getting the request to one of the components.
+
+<img src="/img/community/2026-10-21/image006.webp" alt="Host density results at a 512 MiB process-memory budget: 4,000 warm and 42,000 scale-to-zero workloads on one pinned core, p50/p99 of 0.5/0.8 ms warm and 1.2/1.9 ms scale-to-zero, and per-workload cost down from about 197 KiB to 11.9 KiB" />
+
+I think another interesting thing is probably the footprints. The component that we're using to test is built in Rust, and we're using the latest P3 stuff, which is the streaming and all this other stuff that makes things a lot more asynchronous. It doesn't help as much in terms of performance, because I think P2 is still a little bit faster than P3, but there is still plenty of performance for this many components and for having requests hit them relatively quickly. Oh, and sorry, for scale to zero, you can see the difference here, right? You can back out the amount of time we are taking to scale up something that was scaled to zero, and it's on the order of milliseconds. Single-digit milliseconds.
+
+This bench is not yet in wasmCloud, because there's a PR that is open. But if you go to that PR, you should be able to run this against your own system and get some results. If people would love to do that, I would greatly appreciate it, because I'd love to get some more numbers. I had the PR in here. This one, yes. So there is now a host density benchmark, and thanks to Bailey, who called out that the first version of this could get way simpler, because we already had a lot of bench infrastructure. Once this merges, you should be able to very easily run this benchmark against your own system and get some numbers. And I would love it if people would do this and give us some numbers that are not from our machines.
+
+<img src="/img/community/2026-10-21/image007.webp" alt="PR #5708, feat(bench): add host density benchmarks, adding bench-scale driven over the NATS host API, a wash-runtime scale_density bench, and shared memory-budget helpers" />
+
+**Bailey Hayes** [19:09](https://youtu.be/gCxwAVqhky0?t=1149)
+
+Once we merge this, I'm going to trigger it against our bench host, which is an AMD Ryzen with six cores and the governor set to performance. I know I have those published in there. So we've got a bench box that's very tuned to try not to have too much noise introduced. So we'll have that number. But if you're not on that machine, we'd be interested.
+
+**Victor Adossi** [19:45](https://youtu.be/gCxwAVqhky0?t=1185)
+
+Yes, yes. If you have some big iron that you've been looking to... yeah, an M5 Pro is awesome. We would definitely love to have numbers across architectures as well. And if anyone has any big servers sitting around, or even if they're not big, because a lot of consumer hardware is quite beefy these days.
+
+**Frank Schaffa** [20:14](https://youtu.be/gCxwAVqhky0?t=1214)
+
+M5s will do okay.
+
+**Victor Adossi** [20:16](https://youtu.be/gCxwAVqhky0?t=1216)
+
+Oh yeah, M5 is going to do great. Even better if it's an M5 Ultra. But yeah, I'd love to see numbers that reflect this. And also, if you want to push it to the limit, feel free to do that. I was just showing one-core or two-core numbers, but use all the cores. And also, if you use the newer configuration knobs, your Mac should not crash. If your Mac crashes, it's a bug, because by default it shouldn't take 100% of the memory anyway. If you're running other stuff, maybe it'll crash, but in general it shouldn't. We actually added some dynamic code to check memory as we go and try to back off, and essentially fail launching components if you're running out of memory.
+
+**Frank Schaffa** [21:11](https://youtu.be/gCxwAVqhky0?t=1271)
+
+And Bailey, when you run your stuff, you'll be able to show also the impact of OTel on this.
+
+**Bailey Hayes** [21:21](https://youtu.be/gCxwAVqhky0?t=1281)
+
+Yeah, so Jeremy's PR has k6 benchmarking, which is the right place to also throw down some OTel to see the differences. The shape of our benchmarks: this introduces a new shape. Density testing is different than some of the other ones that we have for RPS and k6. If you ever see the word k6, think end to end, very close to what it would look like if I'm actually running against a cluster. Each of them serves different purposes. And if you see Criterion or Gungraun, know that we're doing micro-benchmarking, very close-to-the-metal measurements, literally instruction counting in that scenario, and mostly we're looking at things like, are we getting hit by too many allocations? So there are a lot of different dimensions here. If there is a benchmark that exposes interesting stuff like this one, we want to land it. This one hasn't merged just because I did a review last night, and now I owe him a review today. So the goal is to get that done, merged today, and get some more numbers.
+
+**Frank Schaffa** [22:45](https://youtu.be/gCxwAVqhky0?t=1365)
+
+Just a quick question: is there any other framework that we can compare to? Because those are incredible results. I'm just wondering if you're running, let's say, pure Rust or something.
+
+**Victor Adossi** [22:58](https://youtu.be/gCxwAVqhky0?t=1378)
+
+A single CPU, or one or two or whatever, is fine, as long as you match them. And then Axum is probably not bad. If you want to go lower, maybe Tower or whatever. But I think Rust is probably the best thing to compare against.
+
+**Jeremy Fleitz** [23:21](https://youtu.be/gCxwAVqhky0?t=1401)
+
+Yeah, and Frank, if you're talking about benchmarking a Wasm-based deployment versus a containerized deployment, that's one thing I'm working on right now: comparing a traditional scratch container Go application, or a minimized Go container application, going through KEDA autoscaling, obviously using Kubernetes. This is not just using straight wash, but wasmCloud inside a Kubernetes environment using KEDA as well, and then using tuned Rust components that do very similar things, and then also comparing OTel on and OTel off.
+
+**Liam Randall** [23:59](https://youtu.be/gCxwAVqhky0?t=1439)
+
+I think that Jeremy and Victor both surfaced a really nuanced point here, in that we're not necessarily comparing like things. Below us, at a different layer of abstraction, you have containers and microVMs, which, on the biggest iron hardware you can get, something like E2B, claim that they'll hit like 900 microVMs, but you're still looking at a per-microVM footprint of like 512 megabytes of memory. Adjacent to us, Wasmtime is probably the right choice. Some of the things that Victor mentioned are maybe a little bit smaller than us, like Akka, where you have functions. But what you don't have is the story that we have around the six key things you need around sandboxing, around isolation: in process, in resources, so thundering herds, and in time, right? Reinvocations. Skipping around a bit, the policy enforcement points that Bailey's talking about turning on for files, for network, for secrets, config, and other things.
+
+At Cosmonic, we've tried to document a lot of this. Philosophically, Cosmonic embeds wasmCloud and then adds some enterprise integrations and things like that, but I think a lot of it is very applicable to the design philosophy that we're driving here in wasmCloud. I don't think that anything has that unique set of isolation and sandbox type constraints around it, and many of the things that go below us, while they do offer strong isolation, do it at the operating system layer. Yes, hardware isolation in E2B is great, but that's hard isolation for the whole virtual machine. Then at the process layer, or at the per-invocation layer, you still need to be thinking about bringing in another whole set of tools in order to enforce that isolation: seccomp for system calls, eBPF for network, maybe Landlock or Bubblewrap for processes, depending on what OS you're running on. I'll drop a link. You can find the Cosmonic stuff if you just go to the Learning Hub on there. This is open source; I don't want to be putting commercial stuff in here. But I have spent a lot of time documenting this and trying to give people some straightforward comparisons. Frank, if you want to take a peek at it.
+
+**Frank Schaffa** [26:38](https://youtu.be/gCxwAVqhky0?t=1598)
+
+Yeah, that'd be great.
+
+**Liam Randall** [26:46](https://youtu.be/gCxwAVqhky0?t=1606)
+
+Maybe the last thing I'd add: Victor alluded that if you tune a little bit more, you can get even beyond the numbers that he's putting out here. Experimenting with those flags, I was able to crash my Mac before Victor put in the guardrails, but it didn't crash until I hit 500K, and it crashed for an unrelated test I was doing. So I think that, especially on the scale-to-zero use case, potentially the sky's the limit as far as how high we can go. I think that would be a fun hackathon: to see, can we run a million? Can we run more on a single piece of hardware? I think that would be super fascinating.
+
+**Bailey Hayes** [27:36](https://youtu.be/gCxwAVqhky0?t=1656)
+
+Any other questions on what we're doing there? I think the short answer I'll say is that everything we've done is in the wasmCloud repo. We're definitely doing all of this data driven and super open, and welcome anybody else trying this out. With AI nowadays, you can do some really nice things. AI obviously is great at doing security analysis and fuzzing, which I've obviously been spending a lot of time with. But Liam and Victor and Jeremy have been making hay with AI-driven performance testing and tuning and improvements. So I think this is a great area for anybody to try out our latest and give us more feedback. Specifically our latest, because a lot of those changes landed yesterday, so any feedback we get throughout the week will be very valuable. Any more questions on that topic? Aditya in the comment section says, "Hackathon, I hear." Hey, we're kind of in a hackathon. If anybody wants to join me in the Security Slam, because security's super fun. Also, don't feel obligated. We are making progress. I'm after all those badges for wasmCloud right now. But I think there's probably a lot more to add. I feel like every AI-driven campaign I do, I get at least one or two hits that we then patch. So just let me know. Without further ado, Victor, do you want to share some of the updates you've been landing in JCO?
+
+**Victor Adossi** [29:35](https://youtu.be/gCxwAVqhky0?t=1775)
+
+Yeah, a lot of stuff has landed in JCO, but maybe one of the more interesting things right now: there's been a lot of discussion around different JS engines. Most people generally go with QuickJS. QuickJS is basically being rediscovered by a lot of people who are trying to compile JavaScript to WebAssembly. There are also a whole bunch of new options that have come around recently. Porffor is one of them, and Porffor actually did a big rewrite which changed how it worked, to now compile JS to C and then compile C to whatever, right? So technically you could say it transpiles to C and then compiles to whatever. But this actually means that if they transpile to C first, we can build that C into a WebAssembly component really easily with WASI SDK. So this is one option, and you can think of it as a kind of JS AOT compiler. Of course, they do it for separate reasons, and they actually have a WASI build as well, thanks to a contributor for staying on that and getting it merged.
+
+But another project that does this is Perry. Perry starts from TypeScript and compiles TypeScript straight to native, and it works a little bit differently, because they go to LLVM IR and then from there to whatever. This means that they can obviously do the TypeScript parsing and type checking, and go straight from LLVM, which supports WebAssembly, to WebAssembly. Perry is an ambitious project, I think is how to put it, because they look to implement a ton of stuff, like running on tons of platforms. They run natively on all the natives. watchOS is in here, Android, HarmonyOS, Windows, Linux. They're trying to build a lot, and they also have their own standard library, and they support stuff like GTK. So they have some native UI here, so you can build with Perry and build an app that turns into a GTK app. You can build with JavaScript, but it's not the usual Electron thing. And they have helpers for stuff like CSS, essentially, and React hooks, things that you would use in React but wouldn't necessarily use in a native app.
+
+<img src="/img/community/2026-10-21/image008.webp" alt="Perry's docs/WASI_SUPPORT.md, Standalone WASI support (#11375): Perry's experimental --target wasi produces a WASIp2 component, tested on Wasmtime 48.0.0 with WASI SDK 34" />
+
+So they have all these features, but what we really care about is WebAssembly support. Perry supports WebAssembly because of the codegen they can do, and because of how they're built, going to LLVM. So let me pull this up here. This is their WASI support, and they actually support WASI P2. Most places get to WASI P1 and stop there, because that was the first one. But they actually have P2, and they know about P3, which is really interesting. So there is a path, I think, to them eventually having P3. This page is definitely LLM-written, but it still has the information we need. I added support for Perry to JCO. At this point you still need a custom build of Perry, because Perry hasn't made a release with WASI support yet, so you have to build Perry yourself; you can't just use the npm package that's out there. But really super simple code that looks like this, where you just pretend you're in Node land, will compile and run in JCO right now.
+
+**Victor Adossi** [34:30](https://youtu.be/gCxwAVqhky0?t=2070)
+
+Normally you would write this kind of code and use Perry to turn it into a binary, right? So in this case you'd go from TypeScript to a binary, and then run the binary natively on your system. Here we can actually compile this to a WebAssembly binary with Perry, and then we can run it in, let's say, Node or the browser via `jco transpile`. So again, the code looks super normal, right? We're not using any WASI-specific stuff here. `readFileSync` just goes down to WASI interfaces, and here is the example component, and this component is going to be tested against basically every release of JCO from now on. It all works.
+
+<img src="/img/community/2026-10-21/image009.webp" alt="The JCO perry-filesystem example README: a TypeScript guest uses readFileSync and statSync from node:fs, Perry compiles the calls to WASI P2, and jco transpile runs the component on Node.js" />
+
+The reason the script is so long is because you need a custom Perry build for now, and again, that's because the WASI stuff is not released yet. But once it is, we can just switch to using the npm package, and then you don't have to do the Perry build, which is much nicer. And Perry right now makes WASI CLI components, so we basically just make a WASI CLI component, and you can run it, and that's it.
+
+**Bailey Hayes** [36:04](https://youtu.be/gCxwAVqhky0?t=2164)
+
+So, in the component that you make, does it have StarlingMonkey or something else in it?
+
+**Victor Adossi** [36:11](https://youtu.be/gCxwAVqhky0?t=2171)
+
+No. The component is just... I'd call it an engineless JS WebAssembly component.
+
+**Bailey Hayes** [36:24](https://youtu.be/gCxwAVqhky0?t=2184)
+
+How big is it?
+
+**Victor Adossi** [36:26](https://youtu.be/gCxwAVqhky0?t=2186)
+
+It's actually very small, and I do not have a number for you for just how small it is. Hold on.
+
+**Bailey Hayes** [36:35](https://youtu.be/gCxwAVqhky0?t=2195)
+
+Would you guess kilobytes, up to five megabytes, somewhere between that?
+
+**Victor Adossi** [36:39](https://youtu.be/gCxwAVqhky0?t=2199)
+
+Kilobytes. Yes, kilobytes. I don't normally commit the Wasm files in here, but yes, on the order of kilobytes, because again, it goes from TypeScript to LLVM IR and then down to WebAssembly.
+
+**Bailey Hayes** [37:04](https://youtu.be/gCxwAVqhky0?t=2224)
+
+Now compare that to something like a StarlingMonkey, JCO-produced component. How big would you say that's typically?
+
+**Victor Adossi** [37:12](https://youtu.be/gCxwAVqhky0?t=2232)
+
+Yeah. ComponentizeJS is going to use the current version of StarlingMonkey, and you basically start from seven megabytes, and normally what they end up being is 10 megabytes for the JS WebAssembly components. That's huge for a component, when normally a Rust component will be on the order of hundreds of kilobytes. So the JS is much bigger, normally. And the one that transpiles to C is Porffor.
+
+**Liam Randall** [37:51](https://youtu.be/gCxwAVqhky0?t=2271)
+
+Victor, that's incredible. So does this work for all TypeScript, or is this only a subset of TypeScript?
+
+**Victor Adossi** [38:00](https://youtu.be/gCxwAVqhky0?t=2280)
+
+Well, it's hard to claim something works for all of TypeScript, because maybe there is a very, very niche corner case that it doesn't run on. But they didn't build their own TypeScript type checker or compiler. They're reusing SWC, which is well known and already used in the community. So it's got good TypeScript support. The TypeScript support is pretty solid. Maybe there are some edge cases with very new features from TS Go, the now-official one, that might be missed. But I don't think most programs will run into that.
+
+**Liam Randall** [38:44](https://youtu.be/gCxwAVqhky0?t=2324)
+
+Wow. And you recently spiked and got some of the Node.js bindings working in JCO, right? So those would still work for the subset of Node.js bindings that you did, in this path, right?
+
+**Victor Adossi** [38:59](https://youtu.be/gCxwAVqhky0?t=2339)
+
+Yep. It's actually really interesting, because I can now compare: you can turn the Node SDK support on and off for `jco transpile`, so I can actually test doing it in the host versus doing it in the guest, if that makes sense. The way the Node SDK support works is we grab this Node FS and we stick our own host magic in there, and obviously if I don't do that, Perry is going to pick this up and turn it into its own built-in functionality. So this is really interesting, because you can do that measurement. I actually haven't yet, because this is also something I'm going to end up doing for StarlingMonkey, because StarlingMonkey also has some burgeoning Node support, and I'd like to know, is there any benefit from doing it all in the host versus doing it in the component? But yeah, this is another super interesting thing. There are angles here.
+
+**Liam Randall** [40:06](https://youtu.be/gCxwAVqhky0?t=2406)
+
+Mind blown. This is what I was asking about yesterday.
+
+**Victor Adossi** [40:10](https://youtu.be/gCxwAVqhky0?t=2410)
+
+Yeah. The next step for this is writing a version of wit-bindgen that works for Perry. Right now, what we don't have is arbitrary WIT interfaces, right? If you want to generate Perry bindings for an arbitrary WIT interface, you need code that is going to hook into Perry, and essentially you need to create imports like this that Perry can use, and that is something that I still haven't done. But it's just a prompt away.
+
+**Bailey Hayes** [40:53](https://youtu.be/gCxwAVqhky0?t=2453)
+
+With your Node.js support, though, right? You do give it WASI, basically.
+
+**Victor Adossi** [40:59](https://youtu.be/gCxwAVqhky0?t=2459)
+
+Ah, yes. So with Node.js support, it will have WASI. No, sorry, sorry. No, it will not have WASI, because if you try to import from, let's say, WASI filesystem here, you would need a shim on the component itself. ComponentizeJS has a thing called the embedding splicer that takes the WIT interface and turns it into, honestly, C++ glue. That part is written in C++, it gets glommed onto the component, and then it fills in the interfaces, right? So you can do the import and do the call. Perry doesn't have that, so if you try to import from WASI filesystem, it wouldn't know what WASI filesystem was.
+
+**Bailey Hayes** [41:59](https://youtu.be/gCxwAVqhky0?t=2519)
+
+Well, I guess what I was imagining in my mind is that my flow would be: I would produce a P2 component from Perry, and what I don't have a picture of is, did Perry just swap in their own Node implementation inside it, or are those imports still exposed, and therefore I can use a shim from Node.js to JavaScript and use your JavaScript shim?
+
+**Victor Adossi** [42:29](https://youtu.be/gCxwAVqhky0?t=2549)
+
+Ah, so if you try to do that today and you try to import WASI filesystem, Perry wouldn't build your...
+
+**Bailey Hayes** [42:37](https://youtu.be/gCxwAVqhky0?t=2557)
+
+I'm not trying to import WASI filesystem. I'm trying to import Node FS.
+
+**Victor Adossi** [42:41](https://youtu.be/gCxwAVqhky0?t=2561)
+
+Okay, if you're doing that, like what's on screen right now, the way that works is that Perry does have their own Node implementation. Their Node implementation boils down to Rust code, and then that Rust code gets turned into WASI, because Rust, right? So that all gets linked together.
+
+**Bailey Hayes** [43:05](https://youtu.be/gCxwAVqhky0?t=2585)
+
+Got it. Okay.
+
+**Victor Adossi** [43:06](https://youtu.be/gCxwAVqhky0?t=2586)
+
+Yep. So that's why we can easily run a P2 CLI component. It turns out that's actually the same thing for Porffor, right? Because they transpile to C, and then C goes to Wasm via WASI SDK and stuff, and they're going to use all those interfaces in the exact same way. I don't remember exactly what their filesystem support looks like, but if you do filesystem stuff there, you technically will get the usual WASI CLI interfaces, so it should be possible to do this with Porffor as well.
+
+**Bailey Hayes** [43:50](https://youtu.be/gCxwAVqhky0?t=2630)
+
+But I think this seems to have many net benefits over Porffor, in that I take lots of existing programs and they Just Work™.
+
+**Victor Adossi** [44:00](https://youtu.be/gCxwAVqhky0?t=2640)
+
+Yeah, and I think honestly TypeScript is the better place to start these days. I think people should just be defaulting to TypeScript, basically. JavaScript is great, but TypeScript is generally better. So I like a thing that is TypeScript-first. But then again, Porffor does really focus on staying close to standards, which is nice.
+
+<img src="/img/community/2026-10-21/image010.webp" alt="The Porffor README: a 100% ahead-of-time compiled JavaScript engine that compiles JavaScript to C, with an example compiling hello.js to a 33.7 KB binary" />
+
+**Bailey Hayes** [44:26](https://youtu.be/gCxwAVqhky0?t=2666)
+
+I guess my next question is really about wasmCloud TypeScript, right? We have plenty of examples and templates. At what point should we switch over to something like this as our default for how to produce TypeScript components?
+
+**Victor Adossi** [44:42](https://youtu.be/gCxwAVqhky0?t=2682)
+
+As soon as we have arbitrary WIT support, I think this will be really interesting. What might be a gap is web built-ins. Right now, for example, Perry has Node.js built-ins, like Node FS. There are a bunch of web built-ins that people might expect to be present. Some people might not actually expect them, but some people might, and they may not be fully available in Perry, because Perry is focused on this other use case. Now, I think they have support for most web built-ins, but I think that would be the only thing. And of course we need arbitrary WIT interfaces. But there is a place for both engines, like StarlingMonkey or QuickJS, and ahead-of-time compiled options like Porffor or Perry. What's holding back Porffor and Perry is lack of support for arbitrary WIT interfaces.
+
+**Bailey Hayes** [45:56](https://youtu.be/gCxwAVqhky0?t=2756)
+
+That's just a prompt away, isn't it?
+
+**Victor Adossi** [45:58](https://youtu.be/gCxwAVqhky0?t=2758)
+
+Yep, basically. At this point, there are enough examples out there, and the LLMs know about wit-bindgen and what that takes.
+
+**Bailey Hayes** [46:11](https://youtu.be/gCxwAVqhky0?t=2771)
+
+Really good, yeah. Every change I've made to wit-bindgen lately has been completely automatic, easy.
+
+**Victor Adossi** [46:18](https://youtu.be/gCxwAVqhky0?t=2778)
+
+Yeah. I don't know how it could possibly be represented so well in the training data, but it just is.
+
+**Bailey Hayes** [46:29](https://youtu.be/gCxwAVqhky0?t=2789)
+
+Anybody interested in working on that? Let us know. I don't want us to compete. I'd hate to waste those tokens, even though they're getting pretty efficient nowadays. This is awesome, Victor. This is what I've been watching for a while. I was following Porffor. Perry's new to me, but I think it's much better than the other approaches that I've seen, which forked the TypeScript language in some cases. Other people obviously made their own forked compilers, with all the caveats under the sun for what could and couldn't work. On your note about the web built-ins, there's such a huge subset of the ecosystem that is intended to be back end that I think that's going to be a completely fine thing too. But I think the point here is: make it all work, give lots of options, and then people can choose.
+
+**Victor Adossi** [47:32](https://youtu.be/gCxwAVqhky0?t=2852)
+
+Yeah, it's not like they don't have it. It's just that I don't know that that's their focus, and I haven't gone through the list and checked that they have all the WinterTC things and all the other stuff. I haven't looked at their fetch implementation or whatever. But I think that's not really a problem for a lot of people.
+
+**Bailey Hayes** [48:00](https://youtu.be/gCxwAVqhky0?t=2880)
+
+I don't think so. So the roadmap would look like: wit-bindgen Perry support, an update to the wasmCloud TypeScript SDK to include Perry as an option, or maybe the default, and then I would love to update our density test to show off-the-shelf StarlingMonkey, or a QuickJS approach, versus this, right? And all of that is on our roadmap for the "Are we componentized yet?" goal that we had, right? We want to provide the information for everybody to make the right choices for the things they're building, and this would be a sweet subset: hey, you like TypeScript? What about this TypeScript? That would be pretty nice. And you're doing it right now, Victor? Unless you're super into it...
+
+**Victor Adossi** [48:59](https://youtu.be/gCxwAVqhky0?t=2939)
+
+No, no, I'm not doing it. I'm just trying to remember and write it down. But there's another angle to the StarlingMonkey and engine tests, because there's also QuickJS. There's component size with QuickJS, and you can actually just bundle the script. One of the nice parts about engines is that you can take the script and reuse the engine. So that's another isolation-versus-density trade-off, right? Lots of StarlingMonkey engines or lots of QuickJS engines is obviously pretty heavy. Lots of, let's say, Perry components is pretty light. But one StarlingMonkey engine, or a pool of them, and a ton of scripts sitting in components is even cheaper.
+
+**Bailey Hayes** [50:01](https://youtu.be/gCxwAVqhky0?t=3001)
+
+Let's build on that. This could be a terrible idea, and you can tell me that. What if we compiled Perry to its own host component, so the compiling side of it is a component, and then people shipped scripts, so they still had the little bitty thing, but what comes out is a scheduled workload with something that's actually itty bitty?
+
+**Victor Adossi** [50:26](https://youtu.be/gCxwAVqhky0?t=3026)
+
+Oh yeah, that is definitely possible. I can't think of any reason Perry would not compile down, especially since it's Rust.
+
+**Bailey Hayes** [50:35](https://youtu.be/gCxwAVqhky0?t=3035)
+
+The magic word.
+
+**Victor Adossi** [50:38](https://youtu.be/gCxwAVqhky0?t=3038)
+
+Well, there's LLVM, right? But there is a build of LLVM that compiles to Wasm, so it's actually possible. I know there are people out there who have this technology, and I don't think they've shared it yet. But there is an LLVM Wasm build, so it is definitely possible. I think before we did that, we should get the other...
+
+**Bailey Hayes** [51:07](https://youtu.be/gCxwAVqhky0?t=3067)
+
+Do the other little things. Yes, yes.
+
+**Victor Adossi** [51:09](https://youtu.be/gCxwAVqhky0?t=3069)
+
+Yes, yes. But I like dreaming big every once in a while. This would be great, because even just the type-checking part is pretty useful, right? You catch so many bugs there in the first place. And being able to also get a component out at the end... basically all compilers should be able to compile to WebAssembly very easily. They just take text in and put binaries out. Of course, the reality is that macros and other things get complicated. But that's another huge area of sandboxing that I think not enough people have explored.
+
+**Bailey Hayes** [51:54](https://youtu.be/gCxwAVqhky0?t=3114)
+
+I mean, in my book, what I'm thinking a lot about is that there's now a huge gap in the ecosystem, with Bun and Deno getting slurped up by people. Rest in peace. So what we just talked about there is potentially a really good answer. That's why I liked Deno: I liked writing real, normal TypeScript and having a really nice runtime attached to it that wasn't always, let's just make it all JavaScript, a lowest-common-denominator solution.
+
+**Liam Randall** [52:27](https://youtu.be/gCxwAVqhky0?t=3147)
+
+It combines our previous discussion, because before, we were talking about isolates, and this gives you isolates done in Wasm. I mean, it's just Wasm, but yeah, this is amazing.
+
+**Bailey Hayes** [52:43](https://youtu.be/gCxwAVqhky0?t=3163)
+
+Yeah, where other people in the ecosystem are trying to still make things work with Wasm, Bun, and JavaScript shimming and glue, and making large things, we're over here in the future land where everything's bytecode, and it's great. Come join our bytecode. All right, Victor, that was awesome. Thanks.
+
+**Victor Adossi** [53:09](https://youtu.be/gCxwAVqhky0?t=3189)
+
+Yeah, no worries.
+
+**Bailey Hayes** [53:11](https://youtu.be/gCxwAVqhky0?t=3191)
+
+All right. I think that's it for today. Thank you, everybody, for joining. If you haven't booked your trip to KubeCon, you should, and come say hi to all of us. I think for the next community call, I'm going to hopefully have at least the outline for the wasmCloud workshop we're going to be running, and I'd love feedback from the community on certain things that you think we should hit, certain docs that should exist that maybe don't already exist, if you were to go through the workshop that we're going to run. So I'm going to set that goal for us, and hopefully we'll hit it. Oh, hey, Aditya has got questions in chat. I don't want to close it out until we answer those. Would Perry enable the usage of the Node.js ecosystem? Do you want to say?
+
+**Victor Adossi** [54:03](https://youtu.be/gCxwAVqhky0?t=3243)
+
+So yeah, I answered in the chat: basically yes, especially for packages in Node that just depend on the Node SDK rather than trying to build native C++. That's basically what you find the most in Node, because obviously V8 is a C++ project, so there are easy bindings for building Node packages in C++. But also, I want to point out that you can actually try Node ecosystem support right now in JCO. The host can do it, and you can try that out and use it right now. But you can also do it via Perry. I have not checked whether they have support for building a native Node.js package into a native binary easily, because they have to bundle that build too, right? You have to build the other thing and build your code and then link them together. I don't know if they support that super easily, but it is possible. It's just a matter of whether it's implemented or not. I can drop a link to the example real quick, because I think that's probably the easiest way to start. Just run through it. Again, you have to do the Perry build, unfortunately, because it's not released yet. The WASI support went in relatively recently, but it should be all right there.
+
+**Aditya Salunkhe** [55:46](https://youtu.be/gCxwAVqhky0?t=3346)
+
+Sounds good. Thanks.
+
+**Victor Adossi** [55:51](https://youtu.be/gCxwAVqhky0?t=3351)
+
+Aditya.
+
+**Bailey Hayes** [55:52](https://youtu.be/gCxwAVqhky0?t=3352)
+
+Well, thank you, everybody. I hope you have a good rest of your wasmCloud Wednesday.
