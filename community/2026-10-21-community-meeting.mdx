@@ -1,0 +1,224 @@
+---
+date: '2026-10-21'
+title: 'wasmCloud 2.11: Wasm Runtime Autoscaling at 42,000 Workloads per Core, and TypeScript via Perry'
+description: 'wasmCloud 2.11 enforces policy by default, Wasm runtime autoscaling reaches 42,000 scale-to-zero workloads per core, and JCO runs Perry-built TypeScript.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm runtime autoscaling
+  - webassembly kubernetes
+  - webassembly news
+  - wasmcloud 2.11
+  - scale to zero
+  - host density benchmark
+  - deny by default
+  - threat model
+  - security slam
+  - jco
+  - perry
+  - typescript webassembly
+  - porffor
+  - starlingmonkey
+  - wasm vs microvms
+chapters:
+  - { seconds: 10, label: "Welcome: two weeks to KubeCon and a big release" }
+  - { seconds: 126, label: "The wasmCloud 2.11 release and its contributors" }
+  - { seconds: 218, label: "Policy enforcement points move from count to enforce" }
+  - { seconds: 248, label: "A threat model: what wasmCloud protects against" }
+  - { seconds: 313, label: "Security Slam: retired repos, CNCF metadata, license exceptions" }
+  - { seconds: 396, label: "A Security Insights file" }
+  - { seconds: 510, label: "Victor Adossi: how many components fit on one core?" }
+  - { seconds: 676, label: "Memory guardrails so macOS doesn't freeze" }
+  - { seconds: 752, label: "4,000 warm components on one core" }
+  - { seconds: 851, label: "42,000 scale-to-zero components" }
+  - { seconds: 922, label: "Frank Schaffa: what is the latency at 4,000?" }
+  - { seconds: 1113, label: "The host density benchmark PR" }
+  - { seconds: 1149, label: "Run it on your own hardware" }
+  - { seconds: 1281, label: "Density vs. k6 vs. micro-benchmarks, and OTel" }
+  - { seconds: 1365, label: "What should Wasm density be compared against?" }
+  - { seconds: 1401, label: "Jeremy Fleitz: Go containers vs. Wasm with KEDA" }
+  - { seconds: 1439, label: "Liam Randall: isolation at every layer vs. microVMs" }
+  - { seconds: 1606, label: "Can one host run a million workloads?" }
+  - { seconds: 1656, label: "AI-driven security and performance work" }
+  - { seconds: 1775, label: "JavaScript engines vs. ahead-of-time compilers" }
+  - { seconds: 1870, label: "Perry: TypeScript to WebAssembly through LLVM" }
+  - { seconds: 2036, label: "Perry support lands in JCO" }
+  - { seconds: 2164, label: "No engine inside: kilobytes instead of ~10 MB" }
+  - { seconds: 2271, label: "How much TypeScript works?" }
+  - { seconds: 2338, label: "Node.js built-ins in the host or the guest" }
+  - { seconds: 2412, label: "Next step: wit-bindgen for Perry" }
+  - { seconds: 2666, label: "Should Perry become the TypeScript SDK default?" }
+  - { seconds: 2939, label: "Engines, scripts, and the density trade-off" }
+  - { seconds: 3001, label: "Compile Perry itself to a component?" }
+  - { seconds: 3114, label: "A gap in TypeScript runtimes" }
+  - { seconds: 3191, label: "Wrap-up: KubeCon and a workshop outline" }
+  - { seconds: 3243, label: "Can Perry use the Node.js ecosystem?" }
+image: https://i.ytimg.com/vi/gCxwAVqhky0/maxresdefault.jpg
+duration: 3357
+showTitle: true
+slug: 2026-10-21-community-meeting
+speakers:
+  - bailey-hayes
+  - victor-adossi
+  - frank-schaffa
+  - jeremy-fleitz
+  - liam-randall
+  - aditya-salunkhe
+about: wasmCloud
+mentions:
+  - denyByDefault
+  - CNCF
+  - Kubernetes
+  - KEDA
+  - k6
+  - JCO
+  - TypeScript
+  - Perry
+  - Porffor
+  - StarlingMonkey
+---
+
+import YouTube from 'react-player/youtube';
+
+{/* Video hero — the whole point of this page */}
+
+<YouTube url="https://www.youtube.com/watch?v=gCxwAVqhky0" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=gCxwAVqhky0" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The October 21, 2026 wasmCloud community call came the day after the [wasmCloud 2.11 release](/blog/wasmcloud-2-11-release/), which turns its policy enforcement points to deny by default. Victor Adossi showed that a single pinned CPU core and a 512 MiB memory budget now hold 4,000 warm or 42,000 scale-to-zero HTTP components. These numbers are the kind of evidence that **wasm runtime autoscaling** depends on. He then demonstrated JCO running TypeScript compiled to a kilobyte-sized WebAssembly component by Perry, with no JavaScript engine inside.
+
+{/* truncate */}
+
+## Key Takeaways
+
+- **wasmCloud 2.11 enforces by default.** The policy enforcement points added over the last few releases move from count mode to enforce and deny by default. You can set them back to count mode. The [release blog](/blog/wasmcloud-2-11-release/) covers the changes and how to upgrade
+- **A threat model is in review.** [PR #5685](https://github.com/wasmCloud/wasmCloud/pull/5685) adds a short `THREAT_MODEL.md` that says what is in and out of scope for a wasmCloud vulnerability and which boundaries the host defends. A [Security Insights file (#5724)](https://github.com/wasmCloud/wasmCloud/pull/5724) builds on it for the CNCF Security Slam badges
+- **Security Slam cleanup.** Bailey Hayes is retiring repos that predate wasmCloud 1.0 ([#5692](https://github.com/wasmCloud/wasmCloud/issues/5692)), updating CNCF governance metadata, and [checking dependency licenses with cargo-deny](https://github.com/wasmCloud/wasmCloud/pull/5722). Each license outside the CNCF allowlist, such as MPL-2.0, now has its own exception request
+- **One core holds 4,000 warm components.** With 2.11's performance fixes, a host pinned to one CPU with a 512 MiB process-memory budget served 4,000 warm `wasi:http` P3 components at 0.5 ms p50 and 0.8 ms p99, up from about 2,600. Each warm workload cost about 70 KiB
+- **And 42,000 scale-to-zero components.** Per-workload cost for scale-to-zero fell from about 197 KiB to 11.9 KiB, so the same budget held 42,000 on one core and 42,500 on two, at 1.2 ms p50 and 1.9 ms p99 including the cold start. A [host density benchmark (#5708)](https://github.com/wasmCloud/wasmCloud/pull/5708) lets you reproduce it. Victor asked for results from other hardware
+- **Macs no longer freeze under load.** New memory limits, detection, and dynamic checks stop the host from launching components when memory runs low. Without them, macOS lets a process use all memory and lock up the machine
+- **TypeScript without a JavaScript engine.** JCO now tests components built by [Perry](https://github.com/PerryTS/perry), which compiles TypeScript through LLVM to a WASI P2 component measured in kilobytes. A StarlingMonkey-based ComponentizeJS component typically starts at about 7 MB and ends up around 10 MB. Perry's WASI support isn't released yet, and it can't yet bind arbitrary WIT interfaces
+
+## Chapters
+
+- [0:10 — Welcome: two weeks to KubeCon and a big release](https://youtu.be/gCxwAVqhky0?t=10)
+- [2:06 — The wasmCloud 2.11 release and its contributors](https://youtu.be/gCxwAVqhky0?t=126)
+- [3:38 — Policy enforcement points move from count to enforce](https://youtu.be/gCxwAVqhky0?t=218)
+- [4:08 — A threat model: what wasmCloud protects against](https://youtu.be/gCxwAVqhky0?t=248)
+- [5:13 — Security Slam: retired repos, CNCF metadata, license exceptions](https://youtu.be/gCxwAVqhky0?t=313)
+- [6:36 — A Security Insights file](https://youtu.be/gCxwAVqhky0?t=396)
+- [8:30 — Victor Adossi: how many components fit on one core?](https://youtu.be/gCxwAVqhky0?t=510)
+- [11:16 — Memory guardrails so macOS doesn't freeze](https://youtu.be/gCxwAVqhky0?t=676)
+- [12:32 — 4,000 warm components on one core](https://youtu.be/gCxwAVqhky0?t=752)
+- [14:11 — 42,000 scale-to-zero components](https://youtu.be/gCxwAVqhky0?t=851)
+- [15:22 — Frank Schaffa: what is the latency at 4,000?](https://youtu.be/gCxwAVqhky0?t=922)
+- [18:33 — The host density benchmark PR](https://youtu.be/gCxwAVqhky0?t=1113)
+- [19:09 — Run it on your own hardware](https://youtu.be/gCxwAVqhky0?t=1149)
+- [21:21 — Density vs. k6 vs. micro-benchmarks, and OTel](https://youtu.be/gCxwAVqhky0?t=1281)
+- [22:45 — What should Wasm density be compared against?](https://youtu.be/gCxwAVqhky0?t=1365)
+- [23:21 — Jeremy Fleitz: Go containers vs. Wasm with KEDA](https://youtu.be/gCxwAVqhky0?t=1401)
+- [23:59 — Liam Randall: isolation at every layer vs. microVMs](https://youtu.be/gCxwAVqhky0?t=1439)
+- [26:46 — Can one host run a million workloads?](https://youtu.be/gCxwAVqhky0?t=1606)
+- [27:36 — AI-driven security and performance work](https://youtu.be/gCxwAVqhky0?t=1656)
+- [29:35 — JavaScript engines vs. ahead-of-time compilers](https://youtu.be/gCxwAVqhky0?t=1775)
+- [31:10 — Perry: TypeScript to WebAssembly through LLVM](https://youtu.be/gCxwAVqhky0?t=1870)
+- [33:56 — Perry support lands in JCO](https://youtu.be/gCxwAVqhky0?t=2036)
+- [36:04 — No engine inside: kilobytes instead of ~10 MB](https://youtu.be/gCxwAVqhky0?t=2164)
+- [37:51 — How much TypeScript works?](https://youtu.be/gCxwAVqhky0?t=2271)
+- [38:58 — Node.js built-ins in the host or the guest](https://youtu.be/gCxwAVqhky0?t=2338)
+- [40:12 — Next step: wit-bindgen for Perry](https://youtu.be/gCxwAVqhky0?t=2412)
+- [44:26 — Should Perry become the TypeScript SDK default?](https://youtu.be/gCxwAVqhky0?t=2666)
+- [48:59 — Engines, scripts, and the density trade-off](https://youtu.be/gCxwAVqhky0?t=2939)
+- [50:01 — Compile Perry itself to a component?](https://youtu.be/gCxwAVqhky0?t=3001)
+- [51:54 — A gap in TypeScript runtimes](https://youtu.be/gCxwAVqhky0?t=3114)
+- [53:11 — Wrap-up: KubeCon and a workshop outline](https://youtu.be/gCxwAVqhky0?t=3191)
+- [54:03 — Can Perry use the Node.js ecosystem?](https://youtu.be/gCxwAVqhky0?t=3243)
+
+## Meeting Notes
+
+### wasmCloud 2.11: Deny by Default
+
+Bailey Hayes opened with KubeCon two weeks away and a large release cut the day before. She merged the [wasmCloud 2.11 release blog](/blog/wasmcloud-2-11-release/) live on the call. wasmCloud publishes a release blog for each minor release to curate what landed and give upgrade tips, because the raw changelog isn't readable. Bailey said Eric Gregory and Victor Adossi landed more changes than she did this cycle. She also thanked regular contributor Junjie, Betty Blocks for long-running bug reports and fixes, and a new contributor whose pattern for preventing panics when acquiring permits she extended to the other kinds of permits in the system.
+
+The main change is that the **policy enforcement points** introduced over the last few releases, which ran in count mode, now **enforce and deny by default**. Anyone who needs to relax them can switch back to count mode. These are the controls previewed on the [October 14 call](/community/2026-10-14-community-meeting/) for guest memory, socket egress, and hostPath volumes.
+
+### Threat Model and the Security Slam
+
+One of the Q4 roadmap items is a threat model. [PR #5685](https://github.com/wasmCloud/wasmCloud/pull/5685) adds a short `THREAT_MODEL.md` that says what is in scope and out of scope for a wasmCloud vulnerability, which boundaries the host protects, and how to relax enforcement. Its diagram puts the operator and control plane and the host process (Wasmtime, `wash-runtime`, and native plugins) on the trusted side, and workloads and their clients on the untrusted side.
+
+Bailey registered wasmCloud for the fall **CNCF Security Slam**, which ends just before KubeCon. Its PRs include a cleanup that [archives repos](https://github.com/wasmCloud/wasmCloud/issues/5692) from before wasmCloud 1.0, updates to the new CNCF metadata formats (maintainer lists are now YAML rather than Markdown), and a [cargo-deny license check](https://github.com/wasmCloud/wasmCloud/pull/5722). The check files a CNCF exception for each dependency license outside the allowlist, such as MPL-2.0. Next is a [Security Insights file (#5724)](https://github.com/wasmCloud/wasmCloud/pull/5724) that builds on the threat model and records the practices from wasmCloud's Q2 security CI sprint: attestations and signing, SBOMs, CodeQL, `cargo audit`, Go vet, Dependabot, and [zizmor](https://github.com/zizmorcore/zizmor) on every GitHub Actions workflow. The Security Insights file is required for one of the early badges. Victor asked in chat whether that meant security was done. Bailey answered that it never will be, but the posture will be strong and well documented.
+
+### Density: How Many Components Fit on One Core
+
+Victor Adossi presented the scale work behind many of 2.11's `perf` and `fix` PRs. Density has long been part of WebAssembly's pitch: a machine runs tens of VMs and hundreds of containers (Kubernetes also limits pods per node), while Wasm workloads pack far tighter inside one process. Some fixes were for **macOS**, which lets a process use all available memory and freezes the machine because there is no OOM killer to step in. The host now detects this, has a switch to set max memory with more reasonable defaults, and checks memory as it goes. It backs off and refuses to launch components rather than crashing.
+
+To keep results consistent, Victor pinned the host to one or two CPU cores with a 512 MiB process-memory budget and ran a basic `wasi:http` P3 component built in Rust. On one core, **4,000 warm components** stayed loaded, up from about 2,600, at 0.5 ms p50 and 0.8 ms p99 for local requests. The limit is now the instance pool: four core instances per workload times 13,106 slots is 4,368, and raising `--core-instances` is the next step. **Scale-to-zero** reached **42,000 components on one core** and 42,500 on two, because per-workload cost fell from about 197 KiB to 11.9 KiB. Those requests include waking a scaled-to-zero component and took 1.2 ms p50 and 1.9 ms p99. Starts were two to five times faster, and CPU time per start fell from about 1.5 to 1.9 ms to 0.2 to 0.6 ms. Victor noted that P2 is still slightly faster than P3. He thinks there may be another order of magnitude available.
+
+Frank Schaffa asked about response times when all 4,000 are serving HTTP. The p50 and p99 figures above answer that for local traffic. Victor asked people to run the new [host density benchmark (#5708)](https://github.com/wasmCloud/wasmCloud/pull/5708). It adds `bench-scale`, which drives a host over the NATS host API, and a `scale_density` bench in `wash-runtime`, and it prints a results table. He wants numbers from other machines, including Apple M5s and big servers. Bailey planned to merge it that day (it has since merged) and run it on the project's bench host, a tuned AMD Ryzen machine with the CPU governor set to performance.
+
+### Benchmark Shapes and the Comparisons That Matter
+
+Frank asked whether the runs would show the cost of OpenTelemetry. Bailey said Jeremy Fleitz's [k6](https://k6.io/) work is the place for OTel comparisons. She explained the shapes of wasmCloud's benchmarks: density tests are new; **k6** means end to end, close to running against a real cluster; and Criterion and Gungraun are micro-benchmarks that count instructions and catch excess allocations. Asked what to compare against, Victor suggested a plain Rust server such as Axum or Tower on the same number of CPUs. Jeremy described his work comparing a scratch Go container autoscaled with [KEDA](https://keda.sh/) against tuned Rust components in wasmCloud on Kubernetes, with OTel on and off.
+
+Liam Randall pointed out that these are not like-for-like comparisons. MicroVM platforms such as E2B claim about 900 microVMs on the largest hardware, but each still needs around 512 MB of memory. Those platforms isolate at the virtual-machine layer, so per-process and per-invocation isolation still needs other tools, such as seccomp for system calls, eBPF for the network, and Landlock or Bubblewrap for processes. wasmCloud's sandbox isolates in process, in resources (for example against thundering herds), and in time, and adds policy enforcement for files, network, secrets, and config. He mentioned having crashed his Mac at about 500,000 workloads, in an unrelated test, before Victor's guardrails landed. He suggested a hackathon to see whether one host can run a million. Bailey said all of this work is open in the wasmCloud repo. AI has been very effective for security analysis and fuzzing (every AI-driven campaign she runs turns up one or two issues to patch), and Liam, Victor, and Jeremy have been using it for performance testing and tuning.
+
+### TypeScript Components Without an Engine: Perry and JCO
+
+Victor then turned to [JCO](https://github.com/bytecodealliance/jco). Most JavaScript-to-WebAssembly work embeds an engine such as QuickJS or StarlingMonkey. A newer approach compiles ahead of time. [Porffor](https://github.com/CanadaHonk/porffor) compiles JavaScript to C, which WASI SDK can turn into a component, and it now has a WASI build. [Perry](https://github.com/PerryTS/perry) starts from TypeScript, parses and type-checks it with SWC, and compiles through LLVM IR to native code on many platforms (including GTK desktop apps) or to WebAssembly. Perry's experimental `--target wasi` produces a **WASI P2 component**, and its docs already anticipate P3.
+
+Victor added a [Perry backend to JCO](https://github.com/bytecodealliance/jco/pull/2272) and a `perry-filesystem` example. The guest is ordinary TypeScript that calls `readFileSync` and `statSync` from `node:fs`. Perry compiles those calls to WASI P2 filesystem imports, and `jco transpile` runs the result in Node.js or the browser. JCO will test the example against every release. For now it needs a custom Perry build, because Perry hasn't released its WASI support. The result is an **engineless** component measured in kilobytes. A ComponentizeJS component built on StarlingMonkey starts at about 7 MB and typically ends up around 10 MB, and a Rust component is usually hundreds of kilobytes. Because Perry reuses SWC, TypeScript support should be solid, apart from edge cases in the newest features of the Go-based TypeScript compiler.
+
+Liam asked about the Node.js support Victor recently added to JCO. You can turn that support on or off in `jco transpile`, so Node built-ins can be implemented by the host or compiled into the guest by Perry, which ships its own Node implementation in Rust. Victor wants to measure the difference, and do the same for StarlingMonkey's emerging Node support.
+
+### What Perry Needs, and What Could Come Next
+
+The missing piece is **arbitrary WIT interfaces**. ComponentizeJS uses an "embedding splicer" that turns a WIT interface into C++ glue attached to the component. Perry has no equivalent, so a Perry program can't import an arbitrary WIT interface yet. A `wit-bindgen` generator for Perry is next, and Victor called it "a prompt away." The other gap is web built-ins: Perry focuses on Node.js built-ins, and Victor hasn't checked its WinterTC or `fetch` coverage. Bailey's proposed roadmap: Perry support in `wit-bindgen`, then Perry as an option or the default in the [wasmCloud TypeScript SDK](https://github.com/wasmCloud/typescript), then density tests that compare off-the-shelf StarlingMonkey and QuickJS components with Perry. That fits the "Are we componentized yet?" goal of giving people the data to choose.
+
+Victor described the trade-off. Many engine instances are heavy, many Perry components are light, and one pooled engine running many small scripts could be lighter still, with less isolation. Bailey floated compiling Perry itself into a host component so that users ship scripts and get small scheduled workloads. Victor said that is possible, since LLVM has a Wasm build, but other work should come first. Bailey sees a gap for a TypeScript-first runtime with Bun and Deno "getting slurped up," and Liam noted that this approach delivers isolates done in Wasm.
+
+To close, Bailey asked people to book KubeCon and said she hopes to bring at least an outline of the wasmCloud KubeCon workshop to the next call for community feedback on topics and missing docs. Aditya Salunkhe asked in chat whether Perry would open up the Node.js ecosystem. Victor said yes for packages that depend only on Node's APIs rather than native C++ addons, and that Node ecosystem support can already be tried through the JCO host today.
+
+## WebAssembly News and Updates
+
+In **webassembly news** this week, JavaScript and TypeScript are getting ahead-of-time compilers for WebAssembly. [Perry](https://github.com/PerryTS/perry) compiles TypeScript through LLVM to WASI P2 components, [Porffor](https://github.com/CanadaHonk/porffor) compiles JavaScript to C, and the [Bytecode Alliance](https://bytecodealliance.org/)'s [JCO](https://github.com/bytecodealliance/jco) can now build and test Perry components alongside its StarlingMonkey-based ComponentizeJS path. On the supply-chain side, the CNCF's fall Security Slam is pushing projects toward threat models, Security Insights files, and per-dependency license exceptions. For the component model, the new density numbers are a reminder of what [WASI](https://wasi.dev/) and Wasmtime make possible: tens of thousands of isolated `wasi:http` handlers in one process.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more. The platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, and observability through [standard interfaces](/docs/overview/interfaces/) and a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell for building, running, deploying, and debugging. The [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule containers, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. Together they give you a production platform for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: What Density Means for Wasm Runtime Autoscaling
+
+**Wasm runtime autoscaling** depends on two costs: what an idle workload costs while it waits, and how long it takes to wake one. The 2.11 numbers measure both. A scale-to-zero workload costs about 11.9 KiB of host memory, so 42,000 of them fit in a 512 MiB budget on one core. Waking one and serving its request took 1.2 ms at p50 and 1.9 ms at p99, which includes the cold start. Warm workloads cost about 70 KiB each, and on one core the limit is the instance pool, not memory. Compare that with a container or microVM, where an idle replica still costs tens to hundreds of megabytes and a cold start takes seconds. With Wasm, scaling to zero is the normal case.
+
+These are local, single-host numbers from one benchmark, and Victor was explicit that more data is needed: other CPUs and architectures, OTel on and off, and end-to-end runs through Kubernetes and KEDA from Jeremy Fleitz's k6 suite. The [host density benchmark](https://github.com/wasmCloud/wasmCloud/pull/5708) makes that possible. Run `bench-scale` against your own host and contribute the table. For the deployment side, see [workloads and components](/docs/overview/workloads/components/), [hosts](/docs/overview/hosts/), [workload security](/docs/kubernetes-operator/workload-security/), and [lightweight deployments on Kubernetes](/docs/kubernetes-operator/operator-manual/lightweight-deployments/).
+
+## Who Should Watch This
+
+**Platform engineers sizing Wasm hosts** should watch Victor Adossi's density results from [12:32](https://youtu.be/gCxwAVqhky0?t=752) and Liam Randall's comparison with microVMs at [23:59](https://youtu.be/gCxwAVqhky0?t=1439). **TypeScript and JavaScript developers** will want the Perry and JCO demo starting at [31:10](https://youtu.be/gCxwAVqhky0?t=1870). **Security and compliance leads** should start with the threat model and Security Slam work at [4:08](https://youtu.be/gCxwAVqhky0?t=248).
+
+## Up Next
+
+Bailey Hayes aims to bring an outline of the wasmCloud KubeCon workshop to the next call and wants feedback on topics and missing docs. Expect density numbers from the project's bench host now that the host density benchmark has merged, progress on the threat model and Security Insights PRs before the Security Slam ends, and Liam Randall's links comparing sandbox isolation approaches.
+
+{/* TODO: Link to next meeting page once created */}
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-10-21-community-meeting-transcript/)**
