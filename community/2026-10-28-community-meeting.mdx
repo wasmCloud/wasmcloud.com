@@ -7,9 +7,64 @@ title: 'Meeting Agenda - 2026-10-28'
 
 {/* Update before the start of the meeting with planned agenda items */}
 
--
--
--
+- v2.11.0 shipped (Oct 20) The [release blog post](https://github.com/wasmCloud/wasmcloud.com/pull/1307) and the docs version bump are live.
+  - Highlights:
+    - Guest memory and socket egress are now enforced by default (breaking).
+    - `hostPath` volumes are now gated.
+    - Plugins can override WASI builtin interfaces.
+    - You can now attach native host control to a running host.
+    - New pool sizing and a max-process-memory limit.
+    - OCI pulls now share clients and coalesce duplicate pulls.
+    - Added k6 benchmarking.
+- Welcome to first-time contributor @angyaljanos, who validated connection quotas ([#5661](https://github.com/wasmCloud/wasmCloud/pull/5661)).
+- 🔐 NATS authentication and credentials (since 2.11)
+  - **The host can authenticate to NATS separately for each connection**, with tokens and passwords read from files ([#5733](https://github.com/wasmCloud/wasmCloud/pull/5733), [#5742](https://github.com/wasmCloud/wasmCloud/pull/5742)).
+  - **Operator:** new NATS client auth flags, a connection name and inbox prefixes ([#5735](https://github.com/wasmCloud/wasmCloud/pull/5735)).
+  - **Credential rotation** ([#5755](https://github.com/wasmCloud/wasmCloud/pull/5755)):
+    - `wasmcloud:nats` re-reads credentials on every connect.
+    - New JWT-as-token mode, for auth callout on servers without trusted operators.
+    - Embedders can reuse the host's NATS auth on their own connections.
+    - Operator liveness now fails if NATS keeps refusing the credential after a grace period.
+  - A host ID can be assigned before connecting ([#5734](https://github.com/wasmCloud/wasmCloud/pull/5734)).
+  - The host can shut down even while a NATS secret read is stalled ([#5741](https://github.com/wasmCloud/wasmCloud/pull/5741)).
+  - **For embedders:** `NatsConnectionOptions` and `NatsAuth` are now `#[non_exhaustive]`.
+- 📨 `wasmcloud:nats@0.1.3`: JetStream and KV ([#5751](https://github.com/wasmCloud/wasmCloud/pull/5751))
+  - Read the last message on a subject, read with timestamps, and see stream creation and stored times.
+  - Purge by subject (optionally keeping some messages) and delete by sequence. Both sit behind a new `stream-delete-allow` grant, which denies by default.
+  - KV `create-with-ttl` (expiring leases) and `delete-by-revision` (conditional release).
+- ⚡ Performance and density
+  - **Fixed the v2.11 service-bench regression (about 9%)** ([#5737](https://github.com/wasmCloud/wasmCloud/pull/5737)). It was caused by a scheduling change in wasmtime 48.0.6. p3 HTTP response bodies now go straight to hyper instead of being relayed frame by frame.
+  - **Better pool sizing** ([#5745](https://github.com/wasmCloud/wasmCloud/pull/5745)):
+    - New `--max-memories` and `--total-core-instances` flags.
+    - Pool totals now follow the memory count, so the core-instance limit no longer runs out at a quarter of the memories reserved.
+    - Messaging admission now reserves real pool resources. Before, a stock host admitted only 133 in-flight messages against a pool sized for 1000 instances.
+  - **A host density benchmark (`scale_density`) now runs in CI** ([#5708](https://github.com/wasmCloud/wasmCloud/pull/5708), [#5739](https://github.com/wasmCloud/wasmCloud/pull/5739)). Its results are published on [arewefastyet](https://github.com/wasmCloud/arewefastyet).
+  - On cgroup v1 hosts with no memory limit, the detected limit came out at about 8 EiB. It is now capped at RAM plus swap ([#5710](https://github.com/wasmCloud/wasmCloud/pull/5710)).
+- 🛠️ Fixes and hardening
+  - Values above the semaphore capacity are refused instead of crashing the host. This covers the NATS `max-in-flight` and `subscription-capacity` settings and the ingress and start limits ([#5718](https://github.com/wasmCloud/wasmCloud/pull/5718)).
+  - Plugin-served WASI overrides that aren't supported are refused when the plugin registers ([#5721](https://github.com/wasmCloud/wasmCloud/pull/5721)).
+  - **Community:** `wasmcloud:postgres` refuses a parameter whose type doesn't match, from Srinivas Chippagiri ([#5732](https://github.com/wasmCloud/wasmCloud/pull/5732)).
+  - **Community:** corrected the `reclaim_min_instances` docs (it disables reclaim), from Shreya Deshannavar ([#5569](https://github.com/wasmCloud/wasmCloud/pull/5569), [#5731](https://github.com/wasmCloud/wasmCloud/pull/5731)).
+  - OpenTelemetry HTTP span names now match each other ([#5579](https://github.com/wasmCloud/wasmCloud/pull/5579)).
+  - Dependency security fixes: zstd-sys (RUSTSEC-2026-0410) and ctutils. wasi-gfx 0.3.1 now comes from crates.io instead of a git patch.
+- 🏛️ Project health, security and governance
+  - **[THREAT_MODEL.md](https://github.com/wasmCloud/wasmCloud/pull/5685)** covers trust boundaries, security goals, the settings that weaken them, and what counts as a vulnerability.
+  - New **[Security Insights file](https://github.com/wasmCloud/wasmCloud/pull/5724)**.
+  - The OSPS Baseline scan now runs on `main` ([#5761](https://github.com/wasmCloud/wasmCloud/pull/5761)).
+  - **cargo-deny license checks in CI** ([#5722](https://github.com/wasmCloud/wasmCloud/pull/5722)). Four CNCF license-exception requests are open (cncf/foundation#1580–1583).
+  - New bug reporting guide and issue template ([#5760](https://github.com/wasmCloud/wasmCloud/pull/5760)). ADOPTERS.md is restored ([#5759](https://github.com/wasmCloud/wasmCloud/pull/5759)).
+  - **Org cleanup:** archive notices were added to about 20 legacy repos, including weld, wadm-operator, wasmcloud-js, provider-sdk-go and wasmcloud-test.
+  - Meeting pages for Oct 14 and Oct 21 are now on wasmcloud.com.
+- In flight and open for discussion
+  - **Feature request:** DaemonSet-style placement, which runs a workload on every host in a host group ([#5730](https://github.com/wasmCloud/wasmCloud/issues/5730)). Community input wanted.
+  - **Workload start throughput** (from Aditya Salunkhe and Liam Randall):
+  - **Finer memory pool controls:** [#5763](https://github.com/wasmCloud/wasmCloud/pull/5763), plus a configurable linear-memory reservation and guard ([#5738](https://github.com/wasmCloud/wasmCloud/pull/5738)).
+  - **Community:** the NATS blobstore should treat deleted objects as absent ([#5726](https://github.com/wasmCloud/wasmCloud/pull/5726)).
+  - Workload annotations exposed to component plugins ([#5750](https://github.com/wasmCloud/wasmCloud/pull/5750), draft).
+  - Security self-assessment ([#5762](https://github.com/wasmCloud/wasmCloud/pull/5762), draft).
+  - `wasmcloud:postgres` follow-up for string and byte parameters ([#5747](https://github.com/wasmCloud/wasmCloud/issues/5747)).
+  - Creating Host Component Plugins that can source secrets
+
 
 {/* truncate */}
 
