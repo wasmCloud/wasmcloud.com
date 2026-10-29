@@ -1,0 +1,105 @@
+---
+title: 'Verify wasmCloud releases and SBOMs'
+sidebar_label: 'Verify releases'
+description: 'Verify wash binaries, container images, and software bills of materials against the wasmCloud release workflow identity with the GitHub CLI.'
+proficiency: Intermediate
+about: wasmCloud
+mentions:
+  - wash
+platforms: [wasmCloud]
+---
+
+# Verify wasmCloud releases
+
+Verify a downloaded `wash` binary or container image before running it. Release attestations bind the artifact's SHA-256 digest to the wasmCloud release workflow using a short-lived GitHub Actions certificate and Sigstore.
+
+Install a current [GitHub CLI](https://cli.github.com/) and authenticate with `gh auth login`. For container verification, also authenticate to `ghcr.io` with your container client. All commands below require this signer workflow:
+
+```text
+wasmCloud/wasmCloud/.github/workflows/release-tag.yml
+```
+
+The release workflow runs on `main`. Keep both `--repo` and `--signer-workflow` in your verification commands: the repository identifies the publisher, and the workflow identifies the expected signer. A successful command exits with status zero and reports a verified attestation. A nonzero status means verification failed; do not run that artifact until you resolve the failure.
+
+## Verify a wash binary
+
+Download the asset for your platform from the [GitHub release](https://github.com/wasmCloud/wasmCloud/releases). This example uses Linux x86-64; replace the version and asset name as needed:
+
+```bash
+version='{{WASMCLOUD_VERSION}}'
+asset='wash-x86_64-unknown-linux-gnu'
+gh release download "v${version}" --repo wasmCloud/wasmCloud --pattern "${asset}"
+gh attestation verify "./${asset}" \
+  --repo wasmCloud/wasmCloud \
+  --signer-workflow wasmCloud/wasmCloud/.github/workflows/release-tag.yml \
+  --source-ref refs/heads/main
+```
+
+Verify the original downloaded file before renaming or installing it. The same command accepts the macOS binaries, Windows binary, or Windows `.zip` archive. For an installed binary, pass its path instead, such as `~/.wash/bin/wash`. Verification checks its contents rather than its filename. Binaries you compile yourself have different digests and are not covered by release attestations.
+
+## Verify a container image
+
+Published images include `ghcr.io/wasmcloud/wash`, `ghcr.io/wasmcloud/runtime-gateway`, and `ghcr.io/wasmcloud/runtime-operator`. OCI tags use the version without the `v` prefix. The all-features wash image uses the suffix `-all-features`.
+
+```bash
+version='{{WASMCLOUD_VERSION}}'
+for image in wash runtime-gateway runtime-operator; do
+  gh attestation verify "oci://ghcr.io/wasmcloud/${image}:${version}" \
+    --repo wasmCloud/wasmCloud \
+    --signer-workflow wasmCloud/wasmCloud/.github/workflows/release-tag.yml \
+    --source-ref refs/heads/main || exit 1
+done
+gh attestation verify "oci://ghcr.io/wasmcloud/wash:${version}-all-features" \
+  --repo wasmCloud/wasmCloud \
+  --signer-workflow wasmCloud/wasmCloud/.github/workflows/release-tag.yml \
+  --source-ref refs/heads/main
+```
+
+These attestations cover the released multi-platform image index. To deploy the verified contents, pin the image digest reported by verification rather than relying on a mutable tag.
+
+## Verify and read an SBOM
+
+Releases with SBOM support attach SPDX 2.3 JSON inventories (`*.spdx.json`) and their Sigstore bundles (`*.sbom.sigstore.json`) to the GitHub release. Each wash target has its own inventory. The Windows executable and its ZIP archive share one inventory. Image inventories cover each platform separately, including application dependencies and detected operating system packages.
+
+An SBOM attestation has a different predicate type from build provenance. Verify it against the **binary or image digest it describes**, using `--predicate-type https://spdx.dev/Document/v2.3`. Verifying the SBOM file itself does not establish that it describes your binary.
+
+For a binary, extract the authenticated inventory from the verified attestation:
+
+```bash
+asset='wash-x86_64-unknown-linux-gnu'
+gh attestation verify "./${asset}" \
+  --repo wasmCloud/wasmCloud \
+  --signer-workflow wasmCloud/wasmCloud/.github/workflows/release-tag.yml \
+  --source-ref refs/heads/main \
+  --predicate-type https://spdx.dev/Document/v2.3 \
+  --format json \
+  --jq '.[0].verificationResult.statement.predicate' > verified-sbom.spdx.json
+```
+
+For an image, select the platform manifest from the verified release index. This example uses Docker Buildx and `jq` for `linux/amd64`. Set `arch=arm64` for `linux/arm64`, and change `image` to verify another released image, including `wash:${version}-all-features`.
+
+```bash
+version='{{WASMCLOUD_VERSION}}'
+image="ghcr.io/wasmcloud/wash:${version}"
+arch=amd64
+index_digest=$(docker buildx imagetools inspect "${image}" --format '{{json .Manifest}}' | jq -er .digest)
+gh attestation verify "oci://${image%:*}@${index_digest}" \
+  --repo wasmCloud/wasmCloud \
+  --signer-workflow wasmCloud/wasmCloud/.github/workflows/release-tag.yml \
+  --source-ref refs/heads/main || exit 1
+digest=$(docker buildx imagetools inspect "${image%:*}@${index_digest}" --raw | \
+  jq -er --arg arch "${arch}" '.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch) | .digest')
+gh attestation verify "oci://${image%:*}@${digest}" \
+  --repo wasmCloud/wasmCloud \
+  --signer-workflow wasmCloud/wasmCloud/.github/workflows/release-tag.yml \
+  --source-ref refs/heads/main \
+  --predicate-type https://spdx.dev/Document/v2.3 \
+  --format json \
+  --jq '.[0].verificationResult.statement.predicate' > verified-image-sbom.spdx.json
+```
+
+Image SBOM attestations are also published to GHCR. Add `--bundle-from-oci` to the platform SBOM verification command to retrieve them from the registry.
+
+To use a downloaded bundle for binary verification, add `--bundle ./wash-x86_64-unknown-linux-gnu.sbom.sigstore.json` to the binary SBOM command. The release's `wash.sigstore.json` bundle contains build provenance and uses the default predicate type instead.
+
+Older releases may lack SBOMs or attestations. Missing attestations are a verification failure, not a successful check. SBOMs report detected components; they do not prove that those components are free of vulnerabilities.
