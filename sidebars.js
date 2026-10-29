@@ -10,6 +10,7 @@ const sidebars = {
     },
     'index',
     'installation',
+    'verify-releases',
     {
       type: 'category',
       label: 'Quickstart',
