@@ -11,6 +11,8 @@ on:
         required: true
         type: string
 
+permissions: {}
+
 # Opt into Node 24 for bundled-JS actions ahead of GitHub's June 16, 2026 cutoff.
 # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
 env:
@@ -19,11 +21,29 @@ env:
 jobs:
   create_agenda:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      MEETING_DATE: ${{ inputs.date }}
+      LIVESTREAM_URL: ${{ inputs.livestream_url }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Create Community Agenda
+        with:
+          persist-credentials: false
+      # agenda.sh substitutes both values into sed expressions and file paths.
+      - name: Validate inputs
         run: |
-          bash agenda.sh ${{ inputs.date }} ${{ inputs.livestream_url }}
+          if [[ ! "$MEETING_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "::error::date must be YYYY-MM-DD"
+            exit 1
+          fi
+          if [[ ! "$LIVESTREAM_URL" =~ ^https://(www\.)?(youtube\.com|youtu\.be)/[A-Za-z0-9_?=\&/.-]+$ ]]; then
+            echo "::error::livestream_url must be a YouTube URL"
+            exit 1
+          fi
+      - name: Create Community Agenda
+        run: bash agenda.sh "$MEETING_DATE" "$LIVESTREAM_URL"
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
         with:
