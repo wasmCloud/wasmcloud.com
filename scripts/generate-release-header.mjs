@@ -35,7 +35,7 @@ import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import sharp from '../node_modules/sharp/lib/index.js';
+import sharp from 'sharp';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
