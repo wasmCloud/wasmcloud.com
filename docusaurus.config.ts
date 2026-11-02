@@ -99,6 +99,9 @@ const config = (async (): Promise<Config> => {
     future: {
       faster: true,
       v4: true,
+      // The offline image builds without git or .git, where the eager Git
+      // reader throws; default-v1 warns and leaves out the dates.
+      ...(offlineBuild && { experimental_vcs: 'default-v1' as const }),
     },
     url: siteBaseUrl(),
     baseUrl: '/',
