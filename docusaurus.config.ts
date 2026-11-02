@@ -79,8 +79,12 @@ const config = (async (): Promise<Config> => {
       tagline_2: 'Deploy them anywhere.',
     },
     future: {
-      experimental_faster: true,
+      faster: true,
       v4: true,
+      // `faster` turns on the eager Git reader, which keys files by absolute
+      // path; the sitemap looks community posts up by relative path and then
+      // emits no <lastmod>. Keep the per-file Git reader.
+      experimental_vcs: 'default-v1',
     },
     url: siteBaseUrl(),
     baseUrl: '/',
@@ -89,7 +93,6 @@ const config = (async (): Promise<Config> => {
     // versions become unresolvable, so downgrade to warn for this build path
     // only. The production build keeps the throw behavior.
     onBrokenLinks: offlineBuild ? 'warn' : 'throw',
-    onBrokenMarkdownLinks: 'warn',
     favicon: '/favicon.ico',
 
     // Even if you don't use internalization, you can use this field to set useful
@@ -523,6 +526,9 @@ const config = (async (): Promise<Config> => {
 
     markdown: {
       format: 'detect',
+      hooks: {
+        onBrokenMarkdownLinks: 'warn',
+      },
       mdx1Compat: {
         admonitions: false,
         comments: false,
