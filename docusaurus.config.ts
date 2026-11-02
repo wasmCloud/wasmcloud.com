@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
-import { Config } from '@docusaurus/types';
+import path from 'node:path';
+import { Config, RouteConfig } from '@docusaurus/types';
 import {
   Options as PresetClassicOptions,
   ThemeConfig as PresetClassicThemeConfig,
@@ -30,6 +31,23 @@ import wasmCloudVersionPlugin from './src/remark/wasmcloud-version';
 // would cause an air-gapped browser to call out — analytics, search, fonts —
 // and trim the build to the current docs version only.
 const offlineBuild = process.env.OFFLINE_BUILD === '1';
+
+// The sitemap looks up a route's <lastmod> by its site-relative sourceFilePath,
+// but the Git reader that `future.faster` enables keys files by absolute path.
+// Routes whose plugin doesn't set lastUpdatedAt (community posts, src/pages)
+// would otherwise get no <lastmod>.
+function withAbsoluteSourcePaths(routes: RouteConfig[]): RouteConfig[] {
+  return routes.map((route) => ({
+    ...route,
+    ...(route.metadata?.sourceFilePath && {
+      metadata: {
+        ...route.metadata,
+        sourceFilePath: path.resolve(__dirname, route.metadata.sourceFilePath),
+      },
+    }),
+    ...(route.routes && { routes: withAbsoluteSourcePaths(route.routes) }),
+  }));
+}
 
 const rehypeShikiPlugin = [
   rehypeShiki,
@@ -81,10 +99,6 @@ const config = (async (): Promise<Config> => {
     future: {
       faster: true,
       v4: true,
-      // `faster` turns on the eager Git reader, which keys files by absolute
-      // path; the sitemap looks community posts up by relative path and then
-      // emits no <lastmod>. Keep the per-file Git reader.
-      experimental_vcs: 'default-v1',
     },
     url: siteBaseUrl(),
     baseUrl: '/',
@@ -166,7 +180,10 @@ const config = (async (): Promise<Config> => {
             filename: 'sitemap.xml',
             createSitemapItems: async (params) => {
               const { defaultCreateSitemapItems, ...rest } = params;
-              const items = await defaultCreateSitemapItems(rest);
+              const items = await defaultCreateSitemapItems({
+                ...rest,
+                routes: withAbsoluteSourcePaths(rest.routes),
+              });
               const COMMUNITY_YEAR_RE = /^\/community\/(\d{4})[-/]/;
               // Low-value utility / auto-generated pages with no SEO value — keep out of the sitemap
               const SITEMAP_DROP_EXACT = new Set([
