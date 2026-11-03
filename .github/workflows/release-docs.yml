@@ -61,11 +61,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          cache: npm
+          node-version: '24'
+          package-manager-cache: false
 
       - name: Install
         run: npm ci
@@ -74,26 +77,18 @@ jobs:
         run: npm run build
 
       - name: Create tarball
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          VERSION="${{ needs.version.outputs.version }}"
           tar czf "wasmcloud-docs-${VERSION}.tar.gz" -C build .
           sha256sum "wasmcloud-docs-${VERSION}.tar.gz" > "wasmcloud-docs-${VERSION}.tar.gz.sha256"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
-        with:
-          name: Offline docs ${{ needs.version.outputs.version }}
-          # Pin tag_name so workflow_dispatch (which runs on refs/heads/main)
-          # creates the release against docs-v<version> instead of the main ref.
-          # For a normal tag-push event this matches GITHUB_REF_NAME so it's a
-          # no-op; for workflow_dispatch, the action creates the tag against
-          # target_commitish (main HEAD) using GITHUB_TOKEN.
-          tag_name: docs-v${{ needs.version.outputs.version }}
-          generate_release_notes: true
-          files: |
-            wasmcloud-docs-${{ needs.version.outputs.version }}.tar.gz
-            wasmcloud-docs-${{ needs.version.outputs.version }}.tar.gz.sha256
-          body: |
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.version.outputs.version }}
+          RELEASE_NOTES: |
             Air-gapped wasmCloud documentation bundle, version ${{ needs.version.outputs.version }}.
 
             **Container image:** `ghcr.io/wasmcloud/docs:${{ needs.version.outputs.version }}` (also tagged `:latest`).
@@ -106,6 +101,22 @@ jobs:
             ```
 
             See the [Private Registries and Air-Gapped Deployments guide](https://wasmcloud.com/docs/kubernetes-operator/operator-manual/private-registries/) for the in-cluster pattern.
+        run: |
+          tag="docs-v${VERSION}"
+          notes="${RUNNER_TEMP}/offline-release-notes.md"
+          printf '%s\n\n' "$RELEASE_NOTES" > "$notes"
+          gh api "repos/${GH_REPO}/releases/generate-notes" \
+            -f "tag_name=${tag}" -f "target_commitish=${GITHUB_SHA}" \
+            --jq .body >> "$notes"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --title "Offline docs ${VERSION}" --notes-file "$notes"
+            gh release upload "$tag" --clobber \
+              "wasmcloud-docs-${VERSION}.tar.gz" "wasmcloud-docs-${VERSION}.tar.gz.sha256"
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" \
+              --title "Offline docs ${VERSION}" --notes-file "$notes" \
+              "wasmcloud-docs-${VERSION}.tar.gz" "wasmcloud-docs-${VERSION}.tar.gz.sha256"
+          fi
 
   image:
     needs: version
@@ -115,6 +126,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
