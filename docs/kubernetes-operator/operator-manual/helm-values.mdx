@@ -162,6 +162,10 @@ Set to `false` when namespace boundaries are part of your tenant isolation model
 
 - Scheduling is locked to the workload's own namespace.
 - Any cross-namespace `environment` value is rejected with a `CrossEnvironmentSchedulingDenied` Warning Event and a `HostSelection=False` condition on the Workload.
+- Since 2.12.0, a workload pinning a host directly with `spec.hostId` goes through the same check. Pinning another namespace's host is refused with the same `CrossEnvironmentSchedulingDenied` Warning. Before 2.12.0 host selection returned early for a pinned workload, so `hostId` bypassed the rule entirely and isolation held only for workloads that did not pin.
+- A workload pinned to a host with no `Host` object yet waits rather than failing, with one `PinnedHostNotRegistered` Warning Event per wait: an unregistered host has no environment to check against.
+
+Since 2.12.0 the rule also applies to workloads that are already running, not only to new placements. Turning `allowSharedHosts` off on a live cluster therefore has an effect: each placed workload is re-checked on every reconcile, and one sitting outside the rule is stopped on its host and its placement cleared so selection runs again, with its `Placement`, `Sync`, and `Ready` conditions going `Unknown` in the meantime. A pinned workload outside the rule stays unplaced. Evictions are paced at ten a second so the switch does not restart every cross-tenant workload at once, and a host that does not answer a stop is retried with backoff (5s doubling to 30s) rather than holding up the controller.
 
 See [Troubleshooting: Workload stays unscheduled with `allowSharedHosts: false`](../../troubleshooting.mdx#workload-stays-unscheduled-with-allowsharedhosts-false) for the symptom and resolution patterns.
 
@@ -184,6 +188,40 @@ operator:
   extraArgs:
     - "-leader-elect"
 ```
+
+### `operator.volumes` and `operator.volumeMounts`
+
+Since 2.12.0, pod-level volumes and container mounts for the operator, in the standard Kubernetes shape. These exist mainly so the operator can read a NATS credential of its own:
+
+```yaml
+operator:
+  volumes:
+    - name: nats-creds
+      secret:
+        secretName: operator-nats-creds
+  volumeMounts:
+    - name: nats-creds
+      mountPath: /etc/nats-creds
+      readOnly: true
+  extraArgs:
+    - "-nats-creds=/etc/nats-creds/operator.creds"
+```
+
+Mount a Secret directory without `subPath`. Kubernetes refreshes a projected Secret volume in place, but a `subPath` mount is a one-time copy, so a rotated credential would never reach the container.
+
+The operator's own NATS authentication is set through [`operator.extraArgs`](#operatorenv-operatorenvfrom-and-operatorextraargs), not through dedicated chart values. Since 2.12.0 these flags are available:
+
+| Flag | Purpose |
+| --- | --- |
+| `-nats-creds` | Credentials file. Reread on every connect, so a rotated Secret is what the next reconnect presents |
+| `-nats-nkey` | File holding an nkey seed |
+| `-nats-token-file` | File holding an auth token, reread on every connect |
+| `-nats-user` / `-nats-password-file` | Username, and a file holding its password. Both are required together |
+| `-nats-name` | Connection name NATS shows in its connection reports, and hands an auth callout as `client_info.name`. Defaults to `runtime-operator` |
+| `-nats-inbox-prefix` | Subject prefix for replies to the operator's requests, in place of `_INBOX`. Set one only this client may subscribe to, so other NATS clients can neither read nor forge its replies |
+| `-nats-auth-failure-grace` | How long the server may keep refusing the credential before liveness fails. Defaults to `5m`, longer than the kubelet takes to refresh a mounted Secret |
+
+Liveness changed with them. The probe still stays healthy through an ordinary reconnect, so a NATS rolling restart does not restart the operator, but since 2.12.0 it also fails once the server has been refusing the credential for `-nats-auth-failure-grace` — a credential that has genuinely expired no longer leaves the operator reconnecting forever while hosts go unobserved.
 
 ### `operator.probes`
 
@@ -452,7 +490,7 @@ The identity is host-group-wide and destination-wide: every workload authenticat
 Introduced in 2.8.0. Wasmtime engine sizing for hosts, set inside the `resources` block alongside the Kubernetes requests and limits (the chart strips them out before rendering the container `resources`). Both are passed to the host as environment variables, so older host images ignore them.
 
 - **`defaultHeapMemory`**: Ceiling on any single guest linear memory. Defaults to wasmtime's 4 GiB.
-- **`coreInstances`**: Number of instance slots in wasmtime's pooling allocator. Defaults to 1000.
+- **`coreInstances`**: Core instances — WebAssembly core modules — the pooling allocator admits at once. A component is several of them: a Rust HTTP handler is four, a Componentize-Go one five, and a composition adds every member's.
 
 Sizes accept Kubernetes quantity suffixes (`Gi`/`GiB` binary, `G`/`GB` decimal, bare values are bytes):
 
@@ -462,8 +500,60 @@ runtime:
     limits:
       memory: "2Gi"
     defaultHeapMemory: "512Mi"
-    coreInstances: "500"
+    maxMemories: "500"
 ```
+
+:::warning[`coreInstances` is no longer the knob that sizes the pool]
+Through 2.11.0, `coreInstances` was both the core-instance total and the number of instances the pool held, and it defaulted to 1000. Since 2.12.0 [`maxMemories`](#runtimeresourcesmaxmemories) is the count that sizes the pool, and `coreInstances` defaults to **sixteen per memory** — a number a component of the usual shape never fills, so the linear memories are what a full pool runs out of first.
+
+An existing `coreInstances: "500"` still works and still produces a 500-instance pool: set alone, it pins `maxMemories` to the same count, which is the pool it sized before. The host warns at startup and asks you to move the value to `maxMemories`. Set both and both are installed as given, with a startup warning when they disagree.
+
+An embedder reading `Engine::total_core_instances()` to size its own work is affected the same way; see [the embedder note](../../runtime/building-custom-hosts.mdx#embedder-changes-at-2120).
+:::
+
+### `runtime.resources.maxMemories`
+
+Since 2.12.0. Linear memories the pooling allocator keeps room for, and the knob that sizes the pool: multiplied by one memory's reservation (4 GiB plus a 32 MiB guard by default) it is the pool's address-space reservation. The fiber-stack, component-instance, core-instance, table, and GC-heap totals are all derived from it, since a component of the usual shape spends one of each per memory.
+
+Left empty, the host derives it from the node: half the usable address space, and at most 90% of `vm.max_map_count` allowing six mappings per warm component. On a default Linux node with a 65,530 mapping limit and a 47-bit address space that works out to **9,829** memories. The floor is 1000.
+
+```yaml
+runtime:
+  resources:
+    maxMemories: "4000"
+```
+
+Set it explicitly when you want to plan a node's `vm.max_map_count` around a known pool size rather than the other way round.
+
+- **`setMaxMemoriesFromMemoryPrecommitLimit`** (default `false`): On a node that commits the pool's stack and table mappings at startup instead of reserving them — Windows, 32-bit targets, and Linux with `vm.overcommit_memory=2` or a finite `RLIMIT_DATA` — an empty `maxMemories` stays at the 1000 floor, because the derived count would commit roughly 2.6 GiB of stacks and tables at the floor and about 25 GiB at the derived count. Setting this to `true` lets such a host size itself against a quarter of its commit limit instead. It has no effect on other nodes, or when `maxMemories` is set.
+
+### `runtime.resources.memoryReservation` and `runtime.resources.memoryGuardSize`
+
+Since 2.12.0, the per-memory address-space layout. Each memory's pool slot is `memoryReservation` of reserved address space followed by `memoryGuardSize` of unmapped guard. Empty leaves wasmtime's defaults: 4 GiB and 32 MiB.
+
+Shrinking the layout is how you fit more warm instances into a node's address space — about 16,000 memories fit at the 4 GiB default — but it is not a free win:
+
+:::warning[A smaller reservation moves an isolation boundary]
+At 4 GiB, the reservation covers everything a 32-bit dynamic index can address and the guard covers many constant offsets, so wasmtime can skip bounds-checking them. A smaller reservation puts sibling memories within reach of a 32-bit index, and a smaller guard protects fewer constant offsets. Isolation then rests more on software bounds checks, whose bugs could expose another guest's memory. This reduces defense in depth, and the extra explicit checks can slow guest memory access. The host warns at startup when the layout is below the defaults.
+:::
+
+With pooling on, no memory grows past its reservation, so `defaultHeapMemory` is lowered to it. With pooling off, wasmtime may relocate a memory and grow it beyond the reservation; the guest and process memory budgets still apply. A `memoryGuardSize` of `0` is honored (the chart renders a literal zero rather than dropping it) and disables the guard.
+
+### `runtime.resources.hostcallFuel`
+
+Since 2.12.0. Roughly the most bytes a guest may copy to the host in one call. Past it, the call traps.
+
+```yaml
+runtime:
+  resources:
+    hostcallFuel: "256MiB"
+```
+
+It also bounds each read the host makes from a future or a stream, but not byte streams the host reads directly, such as HTTP bodies and socket writes. Unset, it is wasmtime's own default of 128 MiB. This is wasmtime's `Store::set_hostcall_fuel` and is **unrelated to fuel metering** (`--meters fuel`), which counts instructions.
+
+The host allocates these bytes outside the guest memory budget, out of whatever `limits.memory` leaves after that budget — 192 MiB at the default `768Mi`, and less on a small limit where the budget's 256 MiB floor claims more than three quarters. The host warns at startup when `hostcallFuel` is larger than that remainder, under any `guestMemoryMode` but `count`. A value of `0` is refused at chart render time rather than crash-looping every host: leave it empty for the default.
+
+When a guest exhausts its hostcall fuel, the host logs a hint naming this knob once per deploy.
 
 The host's guest memory budget is derived from its cgroup rather than set by the chart (since 2.11.0): **three quarters of `resources.limits.memory`, clamped between 256 MiB and 1 TiB**. Where no memory limit can be detected at all, the budget is the 256 MiB floor rather than a fraction of anything. Before 2.11.0 the chart forwarded `limits.memory` verbatim as `WASH_HOST_MAX_GUEST_MEMORY`, which made the budget the whole pod's memory — a budget the kernel OOM-kills the pod for crossing before the host can refuse a guest. The chart no longer sets that variable; override the derivation by setting `WASH_HOST_MAX_GUEST_MEMORY` in [`runtime.env`](#runtimehostgroupsenv-envfrom-and-extraargs) if you need an explicit budget. Since 2.9.0 the host counts guest memory against the budget and since 2.11.0 enforces it by default; see [`guestMemoryMode`](#runtimeresourcesguestmemorymode) below.
 
@@ -473,11 +563,19 @@ These values size the engine for the whole host; they are not per-workload limit
 
 ### `runtime.resources.guestMemoryMode`
 
-How the host treats the guest memory budget (since 2.9.0): `enforce`, the default since 2.11.0, refuses guest memory growth past the budget; `count` records what enforcement would refuse without refusing anything. Set inside the `resources` block like the sizing values above; passed to the host as the `WASH_GUEST_MEMORY_MODE` environment variable, which the chart now renders unconditionally so the budget is enforced whatever the paired host image defaults to.
+How the host treats the guest memory budget (since 2.9.0). Set inside the `resources` block like the sizing values above; passed to the host as the `WASH_GUEST_MEMORY_MODE` environment variable, which the chart now renders unconditionally so the budget is enforced whatever the paired host image defaults to.
+
+- **`enforce`** (the default since 2.11.0): refuses guest memory growth past the budget.
+- **`count`**: records what enforcement would refuse without refusing anything.
+- **`growth`** (since 2.12.0): enforces like `enforce`, but leaves up to 2 MiB of each memory's *first* allocation — its declared initial size — uncharged.
 
 A blank value reads as unset and therefore enforces, which is worth knowing because an empty ConfigMap key or `value: ""` delivers one. To get counting behavior, set `count` explicitly.
 
-Under `enforce`, a guest whose `memory.grow` would cross the budget sees the growth fail (the same result as hitting its own heap ceiling), not a trap. A refusal during instantiation surfaces as a workload start error. The host publishes `guest_memory.in_use`, `guest_memory.high_water`, `guest_memory.limit`, `guest_memory.refused`, and `guest_memory.would_refuse` metrics whenever an OpenTelemetry exporter is configured, meaning an `OTEL_EXPORTER_OTLP_ENDPOINT` is set on the host (see [Host telemetry](./telemetry.mdx)), so `count` remains the way to size a budget before committing to it: watch `high_water` and `would_refuse`, then leave the default in place. (See [metrics you can scale on](./autoscaling.mdx#metrics-you-can-scale-on) for the host's guest metrics generally.)
+`growth` exists for hosts packing many small instances. Initial memory is mapped lazily and costs only what the guest touches, which is what the process limit measures; charged at its declared size, a 1 MiB handler that touches 70 KiB fills the budget fifteen times faster than it fills the container. The trade is overcommit, and it is bounded rather than open-ended: only the first 2 MiB of each memory's initial allocation goes uncharged, and the rest is charged as growth, so one instance cannot claim a large initial memory for free where `enforce` would have refused it. `WASH_HOST_MAX_INITIAL_GUEST_MEMORY` (set via [`runtime.env`](#runtimehostgroupsenv-envfrom-and-extraargs)) caps the total uncharged across all instances; unset it is four times the guest budget. Past the cap a new instance fails to instantiate and a running guest's first `memory.grow` of an empty memory returns -1. Set it only in `growth` mode — the host warns otherwise.
+
+Remember what overcommit means here: [`--max-process-memory`](./concurrency-and-connections.mdx#host-process-memory) refuses new instances and further growth once the host is over, but it cannot stop instances already admitted from writing the initial memory they hold.
+
+Under `enforce`, a guest whose `memory.grow` would cross the budget sees the growth fail (the same result as hitting its own heap ceiling), not a trap. A refusal during instantiation surfaces as a workload start error. The host publishes `guest_memory.in_use`, `guest_memory.high_water`, `guest_memory.limit`, `guest_memory.refused`, and `guest_memory.would_refuse` metrics whenever an OpenTelemetry exporter is configured, meaning an `OTEL_EXPORTER_OTLP_ENDPOINT` is set on the host (see [Host telemetry](./telemetry.mdx)), so `count` remains the way to size a budget before committing to it: watch `high_water` and `would_refuse`, then leave the default in place. (See [metrics you can scale on](./autoscaling.mdx#metrics-you-can-scale-on) for the host's guest metrics generally.) In `growth` mode the host adds `guest_memory.initial_limit` and `guest_memory.initial_refused`, which count against the uncharged cap rather than the budget; they are registered only in that mode.
 
 The host warns at startup when an enforced budget exceeds 90% of the detected memory limit. Since the budget is now derived as three quarters of `limits.memory` rather than forwarded from it, the default leaves that headroom on its own; raise `limits.memory` to raise the budget with it.
 
@@ -536,6 +634,16 @@ The chart now sets `terminationGracePeriodSeconds` on every pod (previously hard
 
 `runtime.natsConnectTimeoutSeconds` (default `60`, rendered as `--nats-connect-timeout`) lets a starting host wait for a NATS server that is not up yet instead of exiting and burning pod restarts.
 
+### `runtime.natsIgnoreDiscoveredServers`
+
+Since 2.12.0, default `true`. Restricts host and workload NATS connections to the URLs they are configured with, rendered as `--nats-ignore-discovered-servers`. It applies to every host group.
+
+A NATS client normally keeps every server address the cluster advertises and picks among them at random when it reconnects. Behind a Kubernetes Service those advertised addresses are **pod IPs**, and a pod IP can be recycled — a later pod, possibly in another NATS cluster, can end up holding an address the client is still willing to reconnect to. Pinning the client to its configured URL closes that off, which is why the chart defaults it on for its own NATS Service.
+
+Set it to `false` when a host group points at a single pod URL and genuinely needs discovery for cluster failover, or when it runs an older host image that does not recognize the flag.
+
+The same policy reaches the multiplexed plugins' own NATS backends, not just the host's control and data connections.
+
 ### `runtime.hostGroups[].networking`
 
 Maps to the host's socket policy and connection quota flags. The chart renders these keys as host flags since 2.9.0; the block existed in the 2.8.0 values file but was not wired to the host, so on earlier charts set these through `extraArgs`:
@@ -587,6 +695,56 @@ runtime:
 ```
 
 `runtime.hostGroups[].hostPlugins` remains as a deprecated alias: its entries are concatenated onto `plugins` and rendered identically, so prefer `plugins` for new declarations. The chart refuses to render the removed `wasmcloudNats` and `wasmcloudNatsWorkloadConfig` keys with a message pointing at `plugins`.
+
+### `runtime.hostGroups[].pluginSecrets`
+
+Since 2.12.0. Secrets served by a host component plugin at bind time rather than mounted from a Kubernetes Secret. A name declared here can be used by any `plugins` entry's or binding's `secretFrom`; the chart routes it into the host config's `secrets:` catalog as a plugin-backed entry instead of mounting a volume, so it gets no volume and no Reloader annotation.
+
+```yaml
+runtime:
+  hostGroups:
+    - name: default
+      pluginSecrets:
+        # Each workload's own secrets, under the key names it imports.
+        workload-secrets:
+          plugin: vault-secrets
+          keys:
+            db-password: db-password
+          workloads: all
+        # One postgres role every replica of billing/reports shares.
+        reports-db:
+          plugin: vault-secrets
+          keys:
+            url: platform/postgres/reports-url
+          workloads:
+            - namespace: billing
+              name: reports
+      plugins:
+        - id: vault-secrets
+          image: ghcr.io/example/vault-secrets:0.1.0
+        - id: wasmcloud-secrets
+          secretFrom: [workload-secrets]
+        - id: wasmcloud-postgres
+          bindings:
+            reports-db:
+              secretFrom: [reports-db]
+```
+
+Each entry takes three keys:
+
+- **`plugin`**: the `id` of the `plugins` entry that serves the values. That plugin exports `wasmcloud:host/secret-source`; see [serving secrets to other plugins](../../runtime/creating-host-component-plugins.mdx#serving-secrets-to-other-plugins).
+- **`keys`**: a map of config key to the key the plugin is asked for.
+- **`workloads`** (required): the namespaces, and optionally names, whose workloads may have these values — or `all`. A name is the owning `WorkloadDeployment`'s, `WorkloadDaemonSet`'s, or `WorkloadReplicaSet`'s, falling back to the `Workload`'s own.
+
+The host calls the plugin on **every** workload bind, naming the workload. So one `workloads: all` entry can serve each workload its own value, provided the source scopes its answer by the name it is given — which is how a workload's own secrets reach it with nothing per-workload in the host's config. A rotated value reaches the next bind.
+
+:::warning[The namespace is the trust boundary, a name only narrows within it]
+A grant is checked against the namespace and name the host was given with the workload. The Kubernetes operator takes both from the `Workload` and its owners, so a replica cannot claim another deployment's name — but anyone who may create a `Workload` in a namespace may give it any name. Treat the namespace as the boundary and a `name` as a narrowing within it. On a standalone host, whoever can send a start request chooses both.
+:::
+
+A workload outside the grant fails to deploy, with one exception: on `wasmcloud-secrets`, whose keys each stand alone, an entry named by the `plugins` entry itself is withheld rather than failing the bind. A withheld key is left out of that workload's config and still counts as set, so no host default takes its place.
+
+Two constraints to know before designing around this. Only `plugins` entries and bindings may name a `pluginSecrets` entry — a workload manifest cannot. And while an entry's own `secretFrom` names one, no other plugin on the host may serve the same interface, or a workload's plain import would route around the grant; the host refuses to start in that case.
 
 ### `runtime.hostGroups[].wasmcloudNatsUrl`
 
