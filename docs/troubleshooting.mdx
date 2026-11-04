@@ -407,7 +407,7 @@ A workload setting `spec.hostId` either gets a `CrossEnvironmentSchedulingDenied
 
 **Cause:** Since 2.12.0 a pinned host goes through the same environment check as a selected one. Through 2.11.0 host selection returned early for a pinned workload, so `hostId` bypassed `allowSharedHosts: false` entirely and a workload in one namespace could pin itself onto another tenant's host. `PinnedHostNotRegistered` is the second half: a host with no `Host` object yet has no environment to check, so the workload waits rather than being refused or let through.
 
-**Fix:** For the refusal, pin to a host in the workload's own namespace environment, or set `spec.template.spec.environment` to a namespace that is intentionally shared. For the wait, confirm the host is actually running and registering — `kubectl get hosts` should show it; if it never appears, the pin names a host ID that does not exist.
+**Fix:** For the refusal, pin to a host in the workload's own namespace environment. While `allowSharedHosts` is `false`, an environment naming another namespace (`spec.template.spec.environment` on a `WorkloadDeployment`, `spec.environment` on a `Workload`) is refused too, so placement outside the namespace requires turning sharing back on. For the wait, confirm the host is actually running and registering — `kubectl get hosts` should show it; if it never appears, the pin names a host ID that does not exist.
 
 **See also:** [`operator.allowSharedHosts`](./kubernetes-operator/operator-manual/helm-values.mdx#operatorallowsharedhosts).
 
@@ -415,15 +415,16 @@ A workload setting `spec.hostId` either gets a `CrossEnvironmentSchedulingDenied
 
 `kubectl apply` of a `WorkloadDaemonSet` is rejected by the API server, and the operator logs `WorkloadDaemonSet CRD is not installed, its controller is off`.
 
-**Cause:** `WorkloadDaemonSet` is new in 2.12.0, and Helm installs a chart's `crds/` directory on `helm install` only — never on `helm upgrade`. Upgrading the chart brings the operator image and the new RBAC rules but not the CRD itself.
+**Cause:** `WorkloadDaemonSet` is new in 2.12.0, and Helm installs a chart's `crds/` directory on `helm install` only, never on `helm upgrade`. Upgrading the chart brings the operator image and the new RBAC rules but no CRDs, new or changed.
 
-**Fix:** Apply the CRD by hand:
+**Fix:** Apply all of the 2.12.0 chart's CRDs, not only the new one. 2.12.0 also changes the `Host` and `WorkloadReplicaSet` CRDs, and the operator depends on both: against the 2.11 `Host` schema, a newly registered host's heartbeat is rejected.
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/v2.12.0/charts/runtime-operator/crds/runtime.wasmcloud.dev_workloaddaemonsets.yaml
+helm pull oci://ghcr.io/wasmcloud/charts/runtime-operator --version 2.12.0 --untar --untardir /tmp/wasmcloud-chart
+kubectl apply --server-side -f /tmp/wasmcloud-chart/runtime-operator/crds/
 ```
 
-An operator that started without the CRD polls for it every 30 seconds and exits once it appears, so Kubernetes restarts the pod with the controller registered. Expect one restart — not a crash loop.
+An operator that started without the `WorkloadDaemonSet` CRD polls for it every 30 seconds and exits once it appears, so Kubernetes restarts the pod with the controller registered. Expect one restart, not a crash loop.
 
 **See also:** [`WorkloadDaemonSet`](./kubernetes-operator/crds.mdx#workloaddaemonset).
 
