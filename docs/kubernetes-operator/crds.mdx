@@ -80,7 +80,7 @@ httpPort: 4000
 
 Unlike most Kubernetes resources, the `Host` CRD does not use a `spec` wrapper — fields like `hostId`, `hostname`, `httpPort`, and `environment` are set at the resource root. See the [Host API reference](./api-reference.md#host) for the full field list.
 
-Since 2.12.0, seven `status` fields are optional rather than required: `version`, `osName`, `osArch`, `osKernel`, `systemCPUUsage`, `systemMemoryTotal`, and `systemMemoryFree`. Because they were required, a heartbeat arriving before the operator's cache was populated had to write placeholder values — `unknown`, or `0` — and so overwrote real ones. A heartbeat now updates only `lastSeen`, and those fields are written only when the host reports them. A `Host` whose system fields flickered to `unknown` or `0` between reports should be steady after upgrading.
+Since 2.12.0, seven `status` fields are optional rather than required: `version`, `osName`, `osArch`, `osKernel`, `systemCPUUsage`, `systemMemoryTotal`, and `systemMemoryFree`. Because they were required, a heartbeat arriving before the operator's cache was populated had to write placeholder values — `unknown`, or `0` — and so overwrote real ones. A heartbeat now updates only `lastSeen`, and those fields are written only when the host reports them. A `Host` whose system fields flickered to `unknown` or `0` between reports should be steady after upgrading. Apply the 2.12.0 `Host` CRD before upgrading the operator: against the old schema, which still requires those fields, a new host's first heartbeat is rejected. See [Apply the 2.12.0 CRDs before upgrading the chart](#workloaddaemonset).
 
 ## Workload
 
@@ -373,23 +373,27 @@ hello-everywhere   1          4         4            4             True
 
 `status.desiredHosts` counts the schedulable hosts matching the selector, `status.updatedHosts` those with no instance of a previous template left, and `status.readyHosts` those running every instance of the current template. `status.replicas` totals instances across hosts. `status.hosts` lists only the hosts that are not ready or still carry an outdated instance, so it stays short on a large host group — an empty list on a `Ready` daemon set is the healthy state, not missing data.
 
-:::warning[A new CRD does not arrive with `helm upgrade`]
-`WorkloadDaemonSet` is a new custom resource. Helm installs a chart's `crds/` directory on `helm install` only, never on `helm upgrade`, so an existing install needs the CRD applied by hand:
+:::warning[Apply the 2.12.0 CRDs before upgrading the chart]
+Helm installs a chart's `crds/` directory on `helm install` only, never on `helm upgrade`. 2.12.0 adds the `WorkloadDaemonSet` CRD and changes four existing ones: `Host` (seven status fields become optional), `WorkloadReplicaSet` (the `/scale` subresource), and `WorkloadDeployment` and `Workload` (a corrected field description). Apply all of them before you upgrade the chart:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/v2.12.0/charts/runtime-operator/crds/runtime.wasmcloud.dev_workloaddaemonsets.yaml
+helm pull oci://ghcr.io/wasmcloud/charts/runtime-operator --version 2.12.0 --untar --untardir /tmp/wasmcloud-chart
+kubectl apply --server-side -f /tmp/wasmcloud-chart/runtime-operator/crds/
+helm upgrade wasmcloud oci://ghcr.io/wasmcloud/charts/runtime-operator --version 2.12.0 --namespace wasmcloud
 ```
 
-Until it exists, `kubectl apply` of a `WorkloadDaemonSet` fails with `no matches for kind "WorkloadDaemonSet"`. The RBAC rules for the new kind *do* come from the chart templates, so upgrade the chart as well.
+Adjust the release name and namespace to your install, and pass `helm upgrade` the same values files you installed with.
 
-Order does not matter. An operator that started without the CRD polls for it every 30 seconds and exits once it appears, so Kubernetes restarts the pod with the controller registered — expect one restart, not a crash loop.
+Skipping this is not only a matter of a missing new kind. With the 2.11 `Host` CRD still installed, the API server rejects the 2.12.0 operator's heartbeat for a newly registered host, because that heartbeat now writes only `lastSeen` and the old schema still requires the other seven fields. With the 2.11 `WorkloadReplicaSet` CRD, `kubectl scale` and HPA cannot target a replica set. Until the `WorkloadDaemonSet` CRD exists, `kubectl apply` of one fails with `no matches for kind "WorkloadDaemonSet"`.
+
+If the operator starts before the `WorkloadDaemonSet` CRD exists, it runs without that controller, polls for the CRD every 30 seconds, and exits once it appears so that Kubernetes restarts the pod with the controller registered. Expect one restart, not a crash loop.
 :::
 
 ## WorkloadReplicaSet
 
 A [WorkloadReplicaSet](./api-reference.md#workloadreplicaset) ensures that a given number of Workload replicas are running at once. It is typically managed by a WorkloadDeployment but can be used directly for more granular control.
 
-Since 2.12.0 it implements the `/scale` subresource too, so `kubectl scale`, HPA, and KEDA can target a `WorkloadReplicaSet` directly for the cases where you are managing one yourself. `status.currentReplicas` and `status.selector` exist to serve that subresource; `status.currentReplicas` mirrors `status.replicas.current` as a flat integer. Prefer scaling the owning `WorkloadDeployment` when there is one — a deployment reconciles its replica sets back to its own `spec.replicas`.
+Since 2.12.0 it implements the `/scale` subresource too, so `kubectl scale`, HPA, and KEDA can target a `WorkloadReplicaSet` directly for the cases where you are managing one yourself. `status.currentReplicas` and `status.selector` exist to serve that subresource; `status.currentReplicas` mirrors `status.replicas.current` as a flat integer. The subresource is part of the CRD, so it exists only once the 2.12.0 `WorkloadReplicaSet` CRD is applied; `helm upgrade` does not apply it. Prefer scaling the owning `WorkloadDeployment` when there is one — a deployment reconciles its replica sets back to its own `spec.replicas`.
 
 Example manifest:
 
