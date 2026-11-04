@@ -131,4 +131,4 @@ impl Guest for StatusReceiver {
 }
 ```
 
-[wasmcloud]: https://wasmcloud.com/docs/v1/intro
+[wasmcloud]: https://wasmcloud.com/docs/v1/intro/

@@ -80,7 +80,7 @@ wash dev
 > [!NOTE]
 > To do things more manually, see [`docs/slow-start.md`][slow-start-docs].
 
-[wasmcloud-host]: https://wasmcloud.com/docs/v1/concepts/hosts
+[wasmcloud-host]: https://wasmcloud.com/docs/v1/concepts/hosts/
 [slow-start-docs]: https://github.com/wasmCloud/typescript/blob/main/examples/components/http-streaming/docs/slow-start.md
 
 ## Send a request to the running component
@@ -93,4 +93,4 @@ curl localhost:8000
 
 ## Adding Capabilities
 
-To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/adding-capabilities/?lang=typescript) section of the wasmCloud documentation.
+To learn how to extend this example with additional capabilities, see the [Adding Capabilities](https://wasmcloud.com/docs/v1/tour/add-features/?lang=typescript) section of the wasmCloud documentation.

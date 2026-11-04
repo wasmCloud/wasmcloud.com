@@ -23,8 +23,8 @@ type GlossaryData = {
 };
 
 const DATA = glossaryData as unknown as GlossaryData;
-const GLOSSARY_SET_ID = 'https://wasmcloud.com/docs/glossary#defined-term-set';
-const GLOSSARY_BASE = 'https://wasmcloud.com/docs/glossary';
+const GLOSSARY_SET_ID = 'https://wasmcloud.com/docs/glossary/#defined-term-set';
+const GLOSSARY_BASE = 'https://wasmcloud.com/docs/glossary/';
 
 export default function GlossarySchema(): JSX.Element {
   const termsSchema = DATA.terms.map((t) => {

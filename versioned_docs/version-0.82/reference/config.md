@@ -36,7 +36,7 @@ version = "0.1.0"
 cargo_path = "/tmp/cargo"
 ```
 
-This is a fairly minimal configuration for a wasmCloud Rust `echo` actor. It defines everything needed to build and sign the actor, such as which [capabilities the actor claims](https://wasmcloud.com/docs/fundamentals/capabilities/) and what language toolchain to use.
+This is a fairly minimal configuration for a wasmCloud Rust `echo` actor. It defines everything needed to build and sign the actor, such as which [capabilities the actor claims](https://wasmcloud.com/docs/v1/concepts/capabilities/) and what language toolchain to use.
 
 > Note that `cargo_path` isn't required. If you're using a standard `cargo` toolchain you could omit the `[rust]` section from this file entirely.
 

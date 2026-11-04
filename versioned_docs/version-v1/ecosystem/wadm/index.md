@@ -24,8 +24,8 @@ mentions:
 platforms: [wasmCloud, Kubernetes]
 ---
 
-:::warning[Planned changes to scheduling]
-The [**wasmCloud Q3 2025 Roadmap**](https://github.com/orgs/wasmCloud/projects/7) sets out plans for an overhaul to scheduling in the next major release of wasmCloud. The new scheduling API will not use NATS to communicate between components by default, but will still support distributed communication via NATS. For more information, see the [Roadmap](https://github.com/orgs/wasmCloud/projects/7) and [Issue #4640: “Intentional distributed networking.”](https://github.com/wasmCloud/wasmCloud/issues/4640)
+:::tip[wadm is replaced in wasmCloud v2]
+This page documents **wadm**, the application deployment manager for wasmCloud v1. In [wasmCloud v2](/blog/wasmcloud-v2-is-here/), declarative deployment is handled by the [**runtime operator**](/docs/kubernetes-operator/): you describe workloads with Kubernetes [custom resources](/docs/kubernetes-operator/crds/) and schedule WebAssembly components the same way you schedule containers. See the [v1 → v2 migration guide](/docs/migration/) to move existing wadm manifests, or start fresh with the [quickstart](/docs/quickstart/).
 :::
 
 ## Overview

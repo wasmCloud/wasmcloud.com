@@ -21,7 +21,7 @@ const CONTENT = [
 const BUTTON = [
   // [text, href]
   'Get Started',
-  '/docs/quickstart',
+  '/docs/quickstart/',
 ] as const;
 
 function Hero({}: Props) {

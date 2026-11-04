@@ -50,7 +50,7 @@ export default function FaqSchema(): JSX.Element | null {
     '@type': 'FAQPage',
     mainEntity: allQuestions.map((q) => ({
       '@type': 'Question',
-      '@id': `https://wasmcloud.com/docs/faq#${q.id}`,
+      '@id': `https://wasmcloud.com/docs/faq/#${q.id}`,
       name: q.question,
       text: q.question,
       answerCount: 1,

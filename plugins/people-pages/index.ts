@@ -74,6 +74,9 @@ export interface Appearance {
    *  the Person page's `subjectOf` JSON-LD — both fields are required
    *  by Google's rich-results validator. */
   description?: string;
+  /** Meeting recording length in seconds (`duration:` frontmatter);
+   *  emitted as VideoObject.duration on the person page. */
+  duration?: number;
 }
 
 export interface PersonPageData {
@@ -260,6 +263,7 @@ async function collectAppearances(repoRoot: string) {
     const url = `/community/${slug}/`;
     const image = resolveImage(fm.image, `/community`);
     const description = typeof fm.description === 'string' ? fm.description : undefined;
+    const duration = typeof fm.duration === 'number' ? fm.duration : undefined;
 
     const appearance: Appearance = {
       title,
@@ -267,6 +271,7 @@ async function collectAppearances(repoRoot: string) {
       date,
       ...(image && { image }),
       ...(description && { description }),
+      ...(duration !== undefined && { duration }),
     };
     for (const speakerSlug of speakers) {
       (bySpeaker[speakerSlug] ??= []).push(appearance);

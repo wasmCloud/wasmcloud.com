@@ -7,7 +7,19 @@ import BlogListPaginator from '@theme/BlogListPaginator';
 import SearchMetadata from '@theme/SearchMetadata';
 import type { Props } from '@theme/BlogListPage';
 import BlogPostItems from '@theme/BlogPostItems';
-import BlogListPageStructuredData from '@theme/BlogListPage/StructuredData';
+import Head from '@docusaurus/Head';
+import { useBlogListPageStructuredData } from '@docusaurus/plugin-content-blog/client';
+import { normalizeBlogListLd } from '../../structured-data/blog-list';
+
+/** Default Blog list JSON-LD with canonical trailing-slash URLs. */
+function BlogListPageStructuredData(props: Props): JSX.Element {
+  const data = useBlogListPageStructuredData(props) as unknown as Record<string, unknown>;
+  return (
+    <Head>
+      <script type="application/ld+json">{JSON.stringify(normalizeBlogListLd(data))}</script>
+    </Head>
+  );
+}
 import styles from './styles.module.css';
 import BlogPostListItem from '../list-item';
 import Layout from '@theme/Layout';

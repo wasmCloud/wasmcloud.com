@@ -155,4 +155,4 @@ impl Guest for QueryRunner {
 }
 ```
 
-[wasmcloud]: https://wasmcloud.com/docs/v1/intro
+[wasmcloud]: https://wasmcloud.com/docs/v1/intro/
