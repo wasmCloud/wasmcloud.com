@@ -197,6 +197,10 @@ Keys fall into three ownership classes, enforced by the plugin's declaration in 
 
 Since 2.12.0 the host rereads every file-backed credential — `creds`, `nkey-seed-file`, `password-file`, `token-file`, and the TLS material — on **every reconnect**, so a Secret mounted into the host pod rotates without a redeploy. Mount it as a directory without `subPath`, or Kubernetes will not refresh it in place.
 
+:::warning[`tls-ca` now makes TLS required]
+Setting `tls-ca` (like setting a client certificate) makes TLS **required** on the connection as of 2.12.0. Before that it only supplied trust material: the NATS client upgrades to TLS when its options, a `tls://` URL, or the server's `INFO` ask for it, so against a `nats://` URL a peer on the path could drop `tls_required` from `INFO` and read whatever the `CONNECT` carried — the token, the password, or a JWT sent as a token. A connection that sets TLS material and then negotiates plaintext now fails instead. The chart passes the CA flags only when its NATS has TLS enabled, so chart deployments are unaffected. The same applies to the host's own scheduler and data connections.
+:::
+
 `jwt-as-token` exists for one specific NATS topology: an auth callout on a server with no trusted operators, which drops the user JWT before the callout ever sees it. Sending the same JWT as the token gets it through. It requires `creds` and conflicts with `nkey-seed`, `token-file`, and `username`.
 
 **Grant ceilings.** The operator declares the maximum grant. A workload that omits the key takes the whole ceiling; one that sets the key may only narrow it, and setting a ceiling key the host never declared is refused. A ceiling nobody set denies everything. Reserved spaces (`$JS.>`, `$SYS.>`, `$KV.>`, `$OBJ.>`, `_nats_push.>`, and the host's own control subjects) stay denied even under a `>` grant; `_INBOX` is additionally reserved for subscriptions.
