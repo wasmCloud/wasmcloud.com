@@ -119,7 +119,7 @@ The `HostPlugin` trait uses several types from the `wash_runtime` crate:
 - **`WitInterface`** - Describes a specific interface with `namespace`, `package`, `interfaces` (a set of interface names), an optional `version`, an optional `name` (used for multi-backend binding), and a `config` map. Since 2.9.0 `version`, `name`, and `config` are serde-defaulted, so a manifest entry served by a declared binding can omit `config`.
 - **`WitInterfaces<'a>`** - A borrowed wrapper around `&HashSet<WitInterface>` passed to `on_workload_bind`, `on_workload_item_bind`, and `on_workload_unbind`. Provides `iter()`, `get(namespace, package, interfaces)`, and `contains(namespace, package, interfaces)` lookup helpers, avoiding a clone of the interface set per callback.
 - **`UnresolvedWorkload`** - A workload that has been initialized but not yet bound to plugins.
-- **`WorkloadItem<'a>`** - An enum passed to `on_workload_item_bind`. Variants are `WorkloadItem::Component(&mut WorkloadComponent)` and `WorkloadItem::Service(&mut WorkloadService)`. Implements `Deref<Target = WorkloadMetadata>`, so `item.linker()` is accessible directly without pattern matching. Use `item.is_component()` / `item.is_service()` when you need to handle the two variants differently.
+- **`WorkloadItem<'a>`** - An enum passed to `on_workload_item_bind`. Variants are `WorkloadItem::Component(&mut WorkloadComponent)` and `WorkloadItem::Service(&mut WorkloadService)`. Implements `Deref<Target = WorkloadMetadata>`, so `item.linker()` is accessible directly without pattern matching. Since 2.12.0 `linker()` returns `anyhow::Result<&mut Linker<SharedCtx>>`, an error once workload resolution has sealed the linker, so call it as `item.linker()?` inside `on_workload_item_bind`. Use `item.is_component()` / `item.is_service()` when you need to handle the two variants differently.
 - **`ResolvedWorkload`** - A fully bound workload ready for execution.
 
 ### Operator-declared bindings
@@ -254,7 +254,10 @@ impl HostPlugin for CustomLogger {
     ) -> anyhow::Result<()> {
         // WorkloadItem implements Deref<Target = WorkloadMetadata>, so linker()
         // is accessible directly without pattern matching:
-        // item.linker().func_wrap(...)?;
+        // item.linker()?.func_wrap(...)?;
+        //
+        // linker() returns a Result since 2.12.0: it is an error once workload
+        // resolution has sealed the linker, so bind here, before resolution.
         //
         // Use item.is_component() / item.is_service() if you need to
         // handle components and services differently.
