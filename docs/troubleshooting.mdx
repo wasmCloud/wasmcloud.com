@@ -96,9 +96,11 @@ components:
 
 Entries are matched against the request's host (no scheme, no path) using case-insensitive comparison. A leading wildcard like `*.example.com` matches any subdomain but **not** the bare `example.com` — list both if you need both.
 
-If `allowedHosts` is empty or the field is omitted, **all outbound HTTP requests are denied** — the policy fails closed. To allow unrestricted outbound HTTP, set `allowedHosts: ["*"]` explicitly. (In local development, `wash dev` substitutes the allow-all policy when the field is omitted from `.wash/config.yaml`, which is why a component can work in the dev loop and then fail on Kubernetes.)
+If `allowedHosts` is empty or the field is omitted, **all outbound HTTP requests are denied** — the policy fails closed. To allow unrestricted outbound HTTP, set `allowedHosts: ["*"]` explicitly. (In local development, `wash dev` substitutes an allow-all policy when the project declares none, which is why a component can work in the dev loop and then fail on Kubernetes.)
 
-`*` grants HTTP egress only: it opens no `wasi:sockets` name lookup. A component that opens a raw socket to a hostname needs an `allowedIpNameLookups` entry, or an `allowedHosts` entry naming that host, even under `allowedHosts: ["*"]`. Since 2.11.0 this applies in the dev loop too, which enforces the socket policy with no opt-out.
+On **2.11.0 specifically**, `wash dev` denied every outbound request for a project whose `.wash/config.yaml` had no `workload:` section at all — an empty `workload: {}` key got allow-all, and its absence did not. 2.12.0 fixes that, and now logs a line when the effective policy admits every host. If a dev-loop component is being denied on 2.11.0, either add `workload: {}` or upgrade.
+
+`*` grants HTTP egress and raw-socket connections, but opens no `wasi:sockets` name lookup. A component that opens a raw socket to a hostname needs an `allowedIpNameLookups` entry, or an `allowedHosts` entry naming that host, even under `allowedHosts: ["*"]` — in the dev loop as well as in production.
 
 **See also:** [Workload Security — Restricting outbound HTTP with `allowedHosts`](./kubernetes-operator/workload-security.mdx#restricting-outbound-http-with-allowedhosts). If outbound HTTP is blocked at the cluster level rather than the wasmCloud level, see the same page for [NetworkPolicy](./kubernetes-operator/workload-security.mdx#kubernetes-networkpolicy-for-host-pods) guidance.
 
@@ -138,6 +140,46 @@ A workload that deployed cleanly on 2.10.x is refused at deploy on 2.11.0, with 
 **Fix:** Move the address from the workload manifest to the host group's `plugins` entry, keeping `backend` on the workload. Declare it under `bindings.<label>.config` rather than the entry's own `config` when workloads must not share a store. To find every affected workload before committing, set `workloadConfig: warn` on the plugin entry: it permits them and logs exactly what `deny` would refuse.
 
 **See also:** [Operator-owned backend addresses](./kubernetes-operator/host-interface-configuration.mdx#operator-owned-backend-addresses) for the full migration.
+
+### Workload is refused for setting a redis `backend-reconnect-*` or `backend-*-timeout-ms` key
+
+A workload carrying redis connection tuning in its manifest deployed cleanly on 2.11.0 and is refused at deploy on 2.12.0.
+
+**Cause:** 2.12.0 gave the redis keyvalue backends a self-healing connection, and with it four tuning keys taken from the v1 redis provider: `backend-reconnect-num-retries`, `backend-reconnect-max-delay-ms`, `backend-connection-timeout-ms`, and `backend-response-timeout-ms`. They are host-owned like the address keys, so under the default `workloadConfig: deny` a workload that sets one is refused — where previously the key was simply ignored. A manifest carried over from a v1 redis link is the likely source.
+
+**Fix:** Move the value to the binding in the host group's `plugins` entry, or drop it. Note the combined bound: retries × max delay + connection timeout must fit inside 600000ms, or the binding is refused at the operator's end too.
+
+**See also:** [Redis connection settings](./kubernetes-operator/host-interface-configuration.mdx#redis-connection-settings).
+
+### A Postgres query that worked returns `invalid-params` after upgrading to 2.12.0
+
+A prepared statement or query that ran fine on 2.11.0 now fails with `invalid-params`, or a value that used to come back wrong now errors instead.
+
+**Cause:** Through 2.11.0 nothing checked a bound parameter against the parameter's type: every scalar went to its inner encoder, and those encoders accept any type. When widths matched, Postgres read the bytes as a different value — an `int8(1)` bound to a `float8` parameter came back as `5e-324`. Since 2.12.0 a mismatch is refused with `invalid-params`, which is what the interface has always documented.
+
+**Fix:** Bind each value as the parameter's own type. Integers, floats, `bool`, `date`, and `time` bind only to their own type; `timestamp` and `timestamptz` interchange; text no longer binds to fixed-width or structured types. If the query was returning a plausible-looking wrong number before, this error is the bug surfacing, not a new one.
+
+**See also:** [Parameter types are checked since 2.12.0](./kubernetes-operator/host-interface-configuration.mdx#parameter-types-are-checked-since-2120).
+
+### A guest traps on a large value passed to the host
+
+A component trapping on a call that moves a lot of data — a big list, a long string, a `stream` or `future` the host reads — and the host logs a hint naming `--hostcall-fuel`.
+
+**Cause:** Since 2.12.0 the host bounds roughly how many bytes a guest may copy to it in one call, and each read it makes from a future or a stream. Unset, that bound is wasmtime's own default of 128 MiB. The hint is logged once per deploy.
+
+**Fix:** Raise `--hostcall-fuel` (`WASH_HOSTCALL_FUEL`, chart value `runtime.resources.hostcallFuel`), or move the data across in chunks. These bytes come out of what the container limit leaves after the guest memory budget, so raising the bound may mean raising `limits.memory` with it — the host warns at startup when the value exceeds that remainder. This has nothing to do with `--meters fuel`; byte streams the host reads directly, such as HTTP bodies and socket writes, are not bounded by it.
+
+**See also:** [Hostcall fuel](./kubernetes-operator/operator-manual/concurrency-and-connections.mdx#hostcall-fuel).
+
+### An S3 blobstore container reports an error instead of "not found"
+
+A component on the `s3` blobstore backend gets an error from `container_exists` for a bucket that is simply absent, or `NoSuchObject` on a read when the whole bucket is missing.
+
+**Cause:** This shows through from `object_store`, not from wasmCloud. A list on a missing bucket and a list it is not permitted to see both come back the same way, so the backend cannot report `false` without claiming to know which it was. A 404 on a read is reported as a missing object even when it is the bucket that is gone; only writes and deletes can tell the two apart.
+
+**Fix:** Provision the bucket outside wasmCloud. `create-container` and `delete-container` are not implemented on this backend. If the bucket does exist, check the binding's credentials and whether the endpoint being dialed is inside the plugin's `allowedHosts` ceiling.
+
+**See also:** [`backend: s3`](./kubernetes-operator/host-interface-configuration.mdx#backend-s3).
 
 ### A `hostPath` volume is refused
 
@@ -349,6 +391,42 @@ After enabling `operator.allowSharedHosts: false`, workloads that previously sch
 
 **See also:** [wasmCloud 2.1.0 release notes](/blog/wasmcloud-2-1-0-release/) for the full namespace-scoped scheduling model.
 
+### Running workloads restart after turning `allowSharedHosts` off
+
+Setting `operator.allowSharedHosts: false` on a live cluster stops and reschedules workloads that were already running, a handful at a time, and their `Placement`, `Sync`, and `Ready` conditions go `Unknown` while it happens.
+
+**Cause:** This is intended behavior as of 2.12.0. Before it, the environment rule applied only at placement time, so workloads placed while sharing was allowed kept running outside their namespace's environment indefinitely — the switch tightened new scheduling and left the existing violations in place. Each placed workload is now re-checked on every reconcile, and one outside the rule is stopped on its host and its placement cleared so selection runs again.
+
+**Fix:** Nothing, if the rescheduling is what you wanted. Evictions are paced at ten a second so the switch does not restart the whole cluster at once, and a host that does not answer a stop is retried with backoff (5s doubling to 30s). A workload pinned with `spec.hostId` to a host outside the rule stays unplaced rather than moving, since there is nowhere for it to go — unpin it or give its namespace a host group. If you did not intend the churn, make sure each namespace has a host pool *before* flipping the value.
+
+**See also:** [`operator.allowSharedHosts`](./kubernetes-operator/operator-manual/helm-values.mdx#operatorallowsharedhosts).
+
+### A workload pinned with `hostId` is refused, or waits with `PinnedHostNotRegistered`
+
+A workload setting `spec.hostId` either gets a `CrossEnvironmentSchedulingDenied` Warning Event, or stays unscheduled with one `PinnedHostNotRegistered` Warning per reconcile.
+
+**Cause:** Since 2.12.0 a pinned host goes through the same environment check as a selected one. Through 2.11.0 host selection returned early for a pinned workload, so `hostId` bypassed `allowSharedHosts: false` entirely and a workload in one namespace could pin itself onto another tenant's host. `PinnedHostNotRegistered` is the second half: a host with no `Host` object yet has no environment to check, so the workload waits rather than being refused or let through.
+
+**Fix:** For the refusal, pin to a host in the workload's own namespace environment, or set `spec.template.spec.environment` to a namespace that is intentionally shared. For the wait, confirm the host is actually running and registering — `kubectl get hosts` should show it; if it never appears, the pin names a host ID that does not exist.
+
+**See also:** [`operator.allowSharedHosts`](./kubernetes-operator/operator-manual/helm-values.mdx#operatorallowsharedhosts).
+
+### `no matches for kind "WorkloadDaemonSet"`
+
+`kubectl apply` of a `WorkloadDaemonSet` is rejected by the API server, and the operator logs `WorkloadDaemonSet CRD is not installed, its controller is off`.
+
+**Cause:** `WorkloadDaemonSet` is new in 2.12.0, and Helm installs a chart's `crds/` directory on `helm install` only — never on `helm upgrade`. Upgrading the chart brings the operator image and the new RBAC rules but not the CRD itself.
+
+**Fix:** Apply the CRD by hand:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/v2.12.0/charts/runtime-operator/crds/runtime.wasmcloud.dev_workloaddaemonsets.yaml
+```
+
+An operator that started without the CRD polls for it every 30 seconds and exits once it appears, so Kubernetes restarts the pod with the controller registered. Expect one restart — not a crash loop.
+
+**See also:** [`WorkloadDaemonSet`](./kubernetes-operator/crds.mdx#workloaddaemonset).
+
 ## Hosts and namespaces
 
 ### `Host` objects don't appear in the expected namespace
@@ -424,3 +502,23 @@ Host resources disappear (taking their assigned Workloads with them) while the h
 **Cause:** On releases before 2.9.0, an operator that lost its own NATS connection or restarted after downtime could judge every host unresponsive at once and delete the Host resources.
 
 **Fix:** Upgrade to 2.9.0 or later, and check operator NATS connectivity. Since 2.9.0, hosts that fall silent together stay `Unknown`: a Host is removed only when the operator has been hearing the rest of the fleet continuously for the unreachable window (60 seconds by default).
+
+### The host warns about `--core-instances` at startup
+
+A host that has run the same settings for releases starts warning about `--core-instances` (or `WASH_CORE_INSTANCES`, or `runtime.resources.coreInstances`) after upgrading to 2.12.0, and asks you to move the value to `--max-memories`.
+
+**Cause:** Through 2.11.0, `--core-instances` was both the core-instance total and the number of instances the pool held. Since 2.12.0 `--max-memories` is the count that sizes the pool, and `--core-instances` is a counter for live core modules — several per component — defaulting to sixteen per memory.
+
+**Fix:** Rename the setting. Nothing breaks if you don't: set alone, `--core-instances` still pins `--max-memories` to the same count, producing the pool it sized before, which is why this is a warning and not an error. Set both and both are installed as given, with a warning when they disagree. Leaving `--max-memories` unset is also now reasonable — the host derives it from the node, roughly 9,829 memories on a default Linux node, against the fixed 1000 of earlier releases.
+
+**See also:** [How the instance pool is sized](./kubernetes-operator/operator-manual/concurrency-and-connections.mdx#how-the-instance-pool-is-sized).
+
+### The operator's liveness probe fails after a NATS credential expires
+
+The operator pod restarts, and its logs show NATS refusing its credential rather than a connection failure.
+
+**Cause:** Since 2.12.0 the operator's liveness probe fails once the NATS server has been refusing its credential for `-nats-auth-failure-grace` (default `5m`). Through 2.11.0 only a permanently closed connection failed the probe, so a genuinely expired credential left the operator reconnecting forever while hosts went unobserved.
+
+**Fix:** Renew the credential. A Secret mounted as a directory without `subPath` is refreshed in place by the kubelet, and the operator rereads credential files on every connect, so the next reconnect picks up the new value — the grace is set longer than the kubelet's refresh interval for exactly this case. A restart that happens anyway means the refresh is not reaching the container: check for a `subPath` mount. Raise `-nats-auth-failure-grace` only if your rotation genuinely takes longer than five minutes.
+
+**See also:** [`operator.volumes` and `operator.volumeMounts`](./kubernetes-operator/operator-manual/helm-values.mdx#operatorvolumes-and-operatorvolumemounts).
