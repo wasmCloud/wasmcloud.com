@@ -2,7 +2,7 @@
 title: 'wasmCloud 2.12: A workload on every host, secrets a plugin serves, and a pool sized to the machine'
 authors: [ericgregory]
 date: '2026-11-04'
-description: 'wasmCloud 2.12 adds the WorkloadDaemonSet CRD and a /scale subresource on WorkloadReplicaSet, lets a host plugin serve secrets to other plugins, sizes the instance pool from the node, adds an S3 blobstore backend and NATS client authentication, and signs release tags with Sigstore.'
+description: 'wasmCloud 2.12 adds the WorkloadDaemonSet CRD and a /scale subresource on WorkloadReplicaSet, lets a host plugin serve secrets to other plugins, sizes the instance pool from the node, adds an S3 blobstore backend and NATS client authentication, and signs release tags with Sigstore. It includes breaking changes.'
 slug: wasmcloud-2-12-release
 about: wasmCloud
 image: './images/2.12-blog-header.webp'
@@ -11,16 +11,15 @@ mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS, 
 
 ![wasmCloud 2.12 release banner](./images/2.12-blog-header.webp)
 
-[wasmCloud 2.12.0](https://github.com/wasmCloud/wasmCloud/releases/tag/v2.12.0) is now available.
+[wasmCloud 2.12.0](https://github.com/wasmCloud/wasmCloud/releases/tag/v2.12.0) is now available! This release brings wasmCloud's custom resources closer to the Kubernetes tools operators already use:
 
-**Start with the CRD changes — one of them needs a `kubectl apply` that `helm upgrade` will not do for you:**
+- **`WorkloadDaemonSet`**: a new custom resource that runs a workload on every matching host and follows the host set as hosts join and leave
+- **`/scale` on `WorkloadReplicaSet`**: `kubectl scale`, HPA, and KEDA can now target a replica set directly
+- **Secrets a plugin serves**: a host component plugin can act as the secret backend for other plugins' bindings, including the secrets workloads read, so a rotated value reaches the next bind with no volume to remount
 
-- **`WorkloadDaemonSet` is a new custom resource**: it runs a workload on every host matching its selector and follows the host set as hosts join and leave. Being a *new* CRD, it does not arrive with a chart upgrade — Helm installs `crds/` on `helm install` only.
-- **`WorkloadReplicaSet` gained the `/scale` subresource**, so `kubectl scale`, HPA, and KEDA can target it directly. Two new status fields, `currentReplicas` and `selector`, exist to serve it.
-- **Seven `Host` status fields became optional** (`version`, `osName`, `osArch`, `osKernel`, `systemCPUUsage`, `systemMemoryTotal`, `systemMemoryFree`). Because they were required, the heartbeat handler had to write placeholder values — `unknown`, or `0` — whenever its cache was not yet populated, overwriting real ones. Heartbeats now touch only `lastSeen`.
-- **`reclaimMinInstances` is documented correctly at last**: a value at or above `poolSize` turns reclaim *off* rather than clamping to the pool. Only the description changed; the behavior is what it always was.
+**2.12 includes breaking changes.** It changes four existing CRDs as well as adding one, and `helm upgrade` does not apply CRDs, so apply the 2.12.0 CRDs before you upgrade the chart. Several stricter checks also refuse configurations that 2.11 accepted. [Breaking changes and what to check before you upgrade](#breaking-changes-and-what-to-check-before-you-upgrade) has the full list.
 
-Beyond the CRDs, 2.12 lets a host component plugin serve secrets to other plugins' bindings, sizes the Wasmtime instance pool from the machine instead of a fixed 1000, adds an S3 `wasi:blobstore` backend and real NATS client authentication, and signs its release tags with Sigstore for the first time.
+2.12 also sizes the Wasmtime instance pool from the machine instead of a fixed 1000, adds an S3 `wasi:blobstore` backend and NATS client authentication for the host's own connections, and signs its release tags with Sigstore for the first time.
 
 {/* truncate */}
 
@@ -36,7 +35,7 @@ Beyond the CRDs, 2.12 lets a host component plugin serve secrets to other plugin
 | Bytes a guest may pass in one call | Wasmtime's 128 MiB, unconfigurable | `--hostcall-fuel` |
 | Secrets for a plugin binding | Kubernetes Secret, mounted | that, or served by a host plugin at bind |
 | `wasi:blobstore` backends | in-memory, filesystem, NATS | + S3 |
-| Host NATS authentication | credentials file only | creds, nkey, token, user/password; all reread on reconnect |
+| Host NATS authentication | TLS client certificate only | creds, nkey, token, or user/password; files reread on reconnect |
 | JetStream destructive calls | absent | `purge-subject`, `delete-message`, behind `stream-delete-allow` |
 | A NATS CA with no TLS negotiated | connected in plaintext | refused |
 | Release tags | unsigned | Sigstore-signed |
@@ -78,25 +77,32 @@ NAME               PER-HOST   DESIRED   UP-TO-DATE   READY-HOSTS   READY
 hello-everywhere   1          4         4            4             True
 ```
 
-`status.hosts` lists only the hosts that are not ready or still carry an outdated instance, so it stays short on a large host group — an empty list on a `Ready` daemon set is the healthy state, not missing data.
+`status.hosts` lists only the hosts that are not ready or still carry an outdated instance, so it stays short on a large host group. An empty list on a `Ready` daemon set is the healthy state, not missing data.
 
 This is the shape for work that belongs to the host rather than to a share of traffic: a per-host log or metrics shipper, a node-local cache the host's other workloads call, a probe that has to report from every host.
 
-:::warning[Applying the CRD is a manual step]
-Helm installs a chart's `crds/` directory on `helm install` and never on `helm upgrade`. Upgrading the chart brings the operator image and the new RBAC rules, but not the CRD, so:
-
-```bash
-kubectl apply -f https://raw.githubusercontent.com/wasmCloud/wasmCloud/v2.12.0/charts/runtime-operator/crds/runtime.wasmcloud.dev_workloaddaemonsets.yaml
-```
-
-Order does not matter. An operator that started without the CRD polls for it every 30 seconds and exits once it appears, so Kubernetes restarts the pod with the controller registered. Expect one restart, not a crash loop.
-:::
-
 ## Scaling a `WorkloadReplicaSet` directly
 
-`WorkloadReplicaSet` now implements `/scale`, for the case where you manage one yourself rather than letting a deployment own it. Target the `WorkloadDeployment` whenever one exists: it reconciles its replica sets back to its own `spec.replicas`, so a scale applied to the child is undone on the next pass.
+`WorkloadReplicaSet` now implements `/scale`, for the case where you manage one yourself rather than letting a deployment own it. Two new status fields, `currentReplicas` and `selector`, exist to serve it. Target the `WorkloadDeployment` whenever one exists: it reconciles its replica sets back to its own `spec.replicas`, so a scale applied to the child is undone on the next pass.
 
-A `WorkloadDaemonSet` deliberately has no `/scale` subresource. Its instance count is the host set multiplied by `replicasPerHost`, so the host group is the axis — scale that.
+A `WorkloadDaemonSet` deliberately has no `/scale` subresource. Its instance count is the host set multiplied by `replicasPerHost`, so the host group is the axis to scale.
+
+## Other CRD changes
+
+- **Seven `Host` status fields became optional**: `version`, `osName`, `osArch`, `osKernel`, `systemCPUUsage`, `systemMemoryTotal`, and `systemMemoryFree`. Because they were required, the heartbeat handler had to write placeholder values (`unknown`, or `0`) whenever its cache was not yet populated, overwriting real ones. Heartbeats now touch only `lastSeen`.
+- **`reclaimMinInstances` is documented correctly**: a value at or above `poolSize` turns reclaim *off* rather than clamping to the pool. Only the description changed; the behavior is what it always was.
+
+:::warning[Apply every 2.12.0 CRD before upgrading the chart]
+Helm installs a chart's `crds/` directory on `helm install` and never on `helm upgrade`, and that covers changed CRDs as well as new ones. Upgrading the chart alone brings the operator image and RBAC rules but leaves the 2.11 `Host` and `WorkloadReplicaSet` schemas in place. The new operator depends on both: against the old `Host` schema, which still requires the seven fields above, a newly registered host's heartbeat is rejected; against the old `WorkloadReplicaSet` schema, there is no `/scale` to target. Apply all of the chart's CRDs first:
+
+```bash
+helm pull oci://ghcr.io/wasmcloud/charts/runtime-operator --version 2.12.0 --untar --untardir /tmp/wasmcloud-chart
+kubectl apply --server-side -f /tmp/wasmcloud-chart/runtime-operator/crds/
+helm upgrade wasmcloud oci://ghcr.io/wasmcloud/charts/runtime-operator --version 2.12.0 --namespace wasmcloud
+```
+
+Use your own release name, namespace, and values files. If the operator starts before the `WorkloadDaemonSet` CRD exists, it runs without that controller, polls for the CRD every 30 seconds, and restarts once it appears. Expect one restart, not a crash loop.
+:::
 
 ## Secrets a plugin serves to other plugins
 
@@ -134,12 +140,14 @@ runtime:
               secretFrom: [reports-db]
 ```
 
-The source plugin exports `wasmcloud:host/secret-source`, which only the host calls. The host calls it on **every** granted workload bind, naming the workload — its replica id, the name it keeps across replicas, and its namespace. So a single `workloads: all` entry can serve each workload its own value, provided the source scopes its answer by the name it is handed. That is how a workload's own secrets reach it with nothing per-workload in the host's configuration, and how each replica of a deployment can get its own database role. A rotated value reaches the next bind, with no volume to remount and no Reloader annotation in the loop.
+The source plugin exports `wasmcloud:host/secret-source`, which only the host calls. The host calls it on **every** granted workload bind, naming the workload: its replica id, the name it keeps across replicas, and its namespace. So a single `workloads: all` entry can serve each workload its own value, provided the source scopes its answer by the name it is handed. A workload declares `wasmcloud:secrets` with no config and calls `store.get("db-password")`; the host asks the source for `db-password` on that workload's behalf, and the source picks the Vault path for that workload.
+
+That division of labor decides what needs a host rollout. Deploying another workload that reads an existing key name, or rotating a value in the backend, does not touch the hosts: the new value reaches each workload at its next bind, with no volume to remount and no Reloader annotation in the loop. Adding a key name, changing a grant, or changing how the source plugin reaches its backend does, because those live in the host group's values. [How the pieces fit together](/docs/kubernetes-operator/operator-manual/secrets-and-configuration/#how-the-pieces-fit-together) walks through the flow.
 
 On the consuming side, a key filled this way is **left out of `interface-binding.config`** so it never crosses as a plain string. The plugin reads it through the new `wasmcloud:host/binding-secrets` import, which hands back `wasmcloud:secrets` handles, and a plugin that does not import that interface is refused a binding holding one rather than silently receiving a config map with the key missing.
 
 :::warning[The namespace is the boundary; a name narrows within it]
-A grant is checked against the namespace and name the host was given with the workload. The Kubernetes operator takes both from the `Workload` and its owners, so a replica cannot claim another deployment's name — but anyone who may create a `Workload` in a namespace may give it any name. Treat the namespace as the trust boundary and a `name` as a narrowing inside it. On a standalone host, whoever can send a start request chooses both.
+A grant is checked against the namespace and name the host was given with the workload. The Kubernetes operator takes both from the `Workload` and its owners, so a replica cannot claim another deployment's name, but anyone who may create a `Workload` in a namespace may give it any name. Treat the namespace as the trust boundary and a `name` as a narrowing inside it. On a standalone host, whoever can send a start request chooses both.
 
 One structural constraint: while an entry-level secret feeds a plugin, no other plugin on the host may serve the same interface, or a workload's plain import would route around the grant. The host refuses to start in that case. This is why a source exports `secret-source` rather than `wasmcloud:secrets` itself.
 :::
@@ -148,12 +156,16 @@ One structural constraint: while an entry-level secret feeds a plugin, no other 
 
 Through 2.11.0, `--core-instances` was both the core-instance total and the number of instances the pool held, and it defaulted to a flat 1000 regardless of the node. In 2.12.0 the two come apart:
 
-- **`--max-memories`** is the count of guest linear memories the pool keeps room for, and the knob that sizes it — multiplied by one memory's reservation it *is* the pool's address-space reservation, and the fiber-stack, component-instance, table, and GC-heap totals are all derived from it. Left unset it is derived from the machine: half the usable address space, at most 90% of `vm.max_map_count` at six mappings per warm component, floor 1000. On a default Linux node that is **9,829**.
-- **`--core-instances`** is now a counter for live core modules — four for a Rust HTTP handler, five for a Componentize-Go one, plus every member of a composition — defaulting to sixteen per memory, a number components of the usual shape never fill. The linear memories are what a full pool runs out of first.
+- **`--max-memories`** is the count of guest linear memories the pool keeps room for, and the knob that sizes it. Multiplied by one memory's reservation it *is* the pool's address-space reservation, and the fiber-stack, component-instance, table, and GC-heap totals are all derived from it. Left unset, `wash host` derives it from the machine: half the usable address space, at most 90% of `vm.max_map_count` at six mappings per warm component, floor 1000. On a default Linux node that is **9,829**.
+- **`--core-instances`** is now a counter for live core modules (four for a Rust HTTP handler, five for a Componentize-Go one, plus every member of a composition), defaulting to sixteen per memory, a number components of the usual shape never fill. The linear memories are what a full pool runs out of first.
 
-An existing `--core-instances` keeps working: set alone, it pins `--max-memories` to the same count, reproducing the pool it sized before, and the host warns at startup asking you to move the value. That makes this a rename with a nudge rather than a breaking change — but if you read `Engine::total_core_instances()` from embedder code to size your own work, note that **the number it returns is now sixteen times what it was**. It is deprecated in favor of `Engine::total_memories()`, and the deprecation is worth acting on rather than silencing.
+An existing `--core-instances` keeps working: set alone, it pins `--max-memories` to the same count, reproducing the pool it sized before, and the host warns at startup asking you to move the value. For operators that makes this a rename with a nudge.
 
-The per-memory layout is adjustable for the first time, too: `--memory-reservation` and `--memory-guard-size` replace Wasmtime's 4 GiB and 32 MiB. Shrinking them fits more warm instances into a node's address space — and moves an isolation boundary while doing it.
+:::warning[Embedders: `Engine::total_core_instances()` now returns sixteen times what it did]
+If you read `Engine::total_core_instances()` from embedder code to size your own work, the number it returns is now sixteen times what it was, because it counts core modules rather than memories. It is deprecated in favor of `Engine::total_memories()`, and the deprecation is worth acting on rather than silencing.
+:::
+
+The per-memory layout is adjustable for the first time, too: `--memory-reservation` and `--memory-guard-size` replace Wasmtime's 4 GiB and 32 MiB. Shrinking them fits more warm instances into a node's address space, and moves an isolation boundary while doing it.
 
 :::warning[A smaller reservation is a security trade, not just a sizing one]
 At 4 GiB the reservation covers everything a 32-bit dynamic index can address, and the guard covers many constant offsets, so Wasmtime can skip bounds-checking them. A smaller reservation puts sibling memories within reach of a 32-bit index; a smaller guard protects fewer constant offsets. Isolation then rests more on software bounds checks, whose bugs could expose another guest's memory. The host warns at startup when the layout is below the defaults. Reach for `--max-memories` first; reach for the layout only when the address space is genuinely the constraint and you have accepted the trade.
@@ -187,13 +199,13 @@ host:
           secretFrom: [s3-assets]
 ```
 
-Every key but `backend` is host-owned, under the names AWS uses, because each one decides where a binding connects or as whom. **Every binding names exactly one credential source** — static keys, `skip_signature: true` for anonymous access, or `use_host_identity: true` to run as the host — and a binding that names none fails to bind rather than quietly inheriting the host's identity. Under a declared `allowedHosts` ceiling each bind checks the endpoint the client will dial, and virtual-hosted requests are refused there, since their host carries a bucket the guest picks later.
+Every key but `backend` is host-owned, under the names AWS uses, because each one decides where a binding connects or as whom. **Every binding names exactly one credential source**: static keys, `skip_signature: true` for anonymous access, or `use_host_identity: true` to run as the host. A binding that names none fails to bind rather than quietly inheriting the host's identity. Under a declared `allowedHosts` ceiling each bind checks the endpoint the client will dial, and virtual-hosted requests are refused there, since their host carries a bucket the guest picks later.
 
 A few places where S3 shows through the `wasi:blobstore` surface are worth knowing before you build on it: `container_exists` on a missing bucket is an error rather than `false`, because `object_store` reports a list 404 and a 403 alike; reads and listings are each buffered in host memory and refused past 64 MiB, so a larger object has to be read in ranges; and cross-bucket copies go through host memory. The [reference](/docs/kubernetes-operator/host-interface-configuration/#backend-s3) has the full list.
 
 ## NATS: authentication, rotation, and destructive JetStream calls
 
-Host and workload NATS connections can now authenticate the way a NATS deployment actually expects. Each connection — scheduler, data, and every `wasmcloud:nats` or NATS blobstore binding — takes credentials, an nkey, a token, or a username and password, independently of the others, and a credential given as a **file** is reread on every connect. A rotated Kubernetes Secret therefore reaches the next reconnect without a redeploy, provided it is mounted as a directory without `subPath`. `jwt-as-token` covers one specific topology: an auth callout on a server with no trusted operators, which drops the user JWT before the callout sees it.
+The host's own NATS connections can now authenticate the way a NATS deployment actually expects. Through 2.11.0 the scheduler and data connections could present only a TLS client certificate; each now takes credentials, an nkey, a token, or a username and password, independently of the other. `wasmcloud:nats` bindings, which already accepted those credentials, gain file-backed forms (`nkey-seed-file`, `password-file`, `token-file`), and NATS blobstore bindings can now use their own. Every credential given as a **file** is reread on every connect, so a rotated Kubernetes Secret reaches the next reconnect without a redeploy, provided it is mounted as a directory without `subPath`. `jwt-as-token` covers one specific topology: an auth callout on a server with no trusted operators, which drops the user JWT before the callout sees it.
 
 The operator gets the same treatment through `operator.extraArgs` (`-nats-creds`, `-nats-nkey`, `-nats-token-file`, `-nats-user`/`-nats-password-file`, plus `-nats-name` and `-nats-inbox-prefix`), with new `operator.volumes` and `operator.volumeMounts` values to mount the Secret. Its liveness probe changed to match: it still rides out an ordinary reconnect, but it now fails once the server has been *refusing* the credential for `-nats-auth-failure-grace` (default `5m`), so a genuinely expired credential no longer leaves the operator reconnecting forever while hosts go unobserved.
 
@@ -201,23 +213,23 @@ The operator gets the same treatment through `operator.extraArgs` (`-nats-creds`
 
 The `wasmcloud:nats` package moves to `0.1.3` with destructive JetStream operations behind a new grant:
 
-- `purge-subject` and `delete-message` require **`stream-delete-allow`** for the stream, on top of `stream-allow`, and check the affected subject against `subject-allow` as well. Reading never needed the new grant, so an existing declaration keeps working exactly as it did — a workload simply cannot purge or delete until the operator grants it.
+- `purge-subject` and `delete-message` require **`stream-delete-allow`** for the stream, on top of `stream-allow`, and check the affected subject against `subject-allow` as well. Reading never needed the new grant, so an existing declaration keeps working exactly as it did; a workload simply cannot purge or delete until the operator grants it.
 - `get-last-by-subject`, `get-by-sequence-at`, `get-stream-created`, and `message-handle.stored-at-unix-nanos` fill in reads that previously needed a round trip through other means.
 - On the KV side, `create-with-ttl` and `delete-by-revision`.
 
 And one security fix worth calling out separately:
 
 :::warning[A NATS CA now makes TLS required]
-Setting `tls-ca`, or a client certificate, on a NATS connection makes TLS **required** as of 2.12.0. Previously it only supplied trust material, and the client upgraded to TLS only when its options, a `tls://` URL, or the server's `INFO` asked for it. Against a `nats://` URL, a peer on the path could drop `tls_required` from `INFO` and read whatever the `CONNECT` carried: the token, the password, or a JWT sent as a token. The chart passes the CA flags only when its NATS has TLS enabled, so chart deployments were not exposed — a hand-rolled configuration with a CA and a `nats://` URL was.
+Setting `tls-ca`, or a client certificate, on a NATS connection makes TLS **required** as of 2.12.0. Previously it only supplied trust material, and the client upgraded to TLS only when its options, a `tls://` URL, or the server's `INFO` asked for it. Against a `nats://` URL, a peer on the path could drop `tls_required` from `INFO` and read whatever the `CONNECT` carried: the token, the password, or a JWT sent as a token. A connection with TLS material now upgrades to TLS whatever the URL scheme, and fails if TLS cannot be negotiated. The chart passes the CA flags only when its NATS has TLS enabled, so chart deployments were not exposed; a hand-rolled configuration with a CA and a `nats://` URL was.
 :::
 
 ## Redis connections that heal
 
-Both redis keyvalue plugins held a single bare multiplexed connection, so a redis restart or failover left every later call failing with "broken pipe" until the host restarted — and because the multiplexed backend is pooled per url and prefix, redeploying the workload did not help either. Each backend now holds a connection that drops a dead socket and redials the same client with bounded, jittered retries, with concurrent callers sharing one redial and its outcome.
+Both redis keyvalue plugins held a single bare multiplexed connection, so a redis restart or failover left every later call failing with "broken pipe" until the host restarted. Because the multiplexed backend is pooled per url and prefix, redeploying the workload did not help either. Each backend now holds a connection that drops a dead socket and redials the same client with bounded, jittered retries, with concurrent callers sharing one redial and its outcome.
 
 What gets retried is deliberately narrow. Reads that fail on a dropped connection are retried once on the new one. **Writes are never replayed**: if the first attempt was applied and only its reply was lost, a replay could overwrite another client's write. `list-keys` cursors carry the generation of the connection that issued them and are refused after a reconnect, since a `SCAN` cursor only means anything on the server that handed it out.
 
-Four tuning keys come with it, spelled as the v1 redis provider spelled them: `backend-reconnect-num-retries`, `backend-reconnect-max-delay-ms`, `backend-connection-timeout-ms`, and `backend-response-timeout-ms`. They are **host-owned**, so under the default `workloadConfig: deny` a workload that sets one is now refused where it previously bound with the key ignored — a manifest carried over from a v1 redis link is the likely source. Move the value to the operator's binding, or drop it.
+Four tuning keys come with it, spelled as the v1 redis provider spelled them: `backend-reconnect-num-retries`, `backend-reconnect-max-delay-ms`, `backend-connection-timeout-ms`, and `backend-response-timeout-ms`. They are **host-owned**, so under the default `workloadConfig: deny` a workload that sets one is now refused where it previously bound with the key ignored. A manifest carried over from a v1 redis link is the likely source. Move the value to the operator's binding, or drop it.
 
 ## Supply chain and project security posture
 
@@ -225,7 +237,7 @@ Four tuning keys come with it, spelled as the v1 redis provider spelled them: `b
 
 ```bash
 version='2.12.0'
-git fetch origin "tag v${version}" "tag runtime-operator/v${version}"
+git fetch origin tag "v${version}" tag "runtime-operator/v${version}"
 for tag in "v${version}" "runtime-operator/v${version}"; do
   gitsign verify-tag \
     --certificate-identity https://github.com/wasmCloud/wasmCloud/.github/workflows/release-tag.yml@refs/heads/main \
@@ -234,36 +246,50 @@ for tag in "v${version}" "runtime-operator/v${version}"; do
 done
 ```
 
-Keep the identity and issuer flags: plain `git verify-tag` does not check the Sigstore certificate claims, so it will not tell you the signature came from the release workflow. GitHub's web UI labels these tags "Unverified" because it does not support Sigstore verification yet — that is a display gap, not a failed check. Earlier tags are unsigned and stay that way; a rerun never re-signs an existing tag. Tag signatures cover the source revision, so verify binary and image attestations separately. [Verify wasmCloud releases](/docs/verify-releases/) has all of it.
+Keep the identity and issuer flags: plain `git verify-tag` does not check the Sigstore certificate claims, so it will not tell you the signature came from the release workflow. GitHub's web UI labels these tags "Unverified" because it does not support Sigstore verification yet; that is a display gap, not a failed check. Earlier tags are unsigned and stay that way, since a rerun never re-signs an existing tag. Tag signatures cover the source revision, so verify binary and image attestations separately. [Verify wasmCloud releases](/docs/verify-releases/) has all of it.
 
-Alongside that, the project landed a published [threat model](https://github.com/wasmCloud/wasmCloud/blob/main/THREAT_MODEL.md), a [security self-assessment](https://github.com/wasmCloud/wasmCloud/blob/main/SECURITY-SELF-ASSESSMENT.md), a [Security Insights](https://github.com/ossf/security-insights-spec) manifest, release SBOMs with verification guidance, support, access-grant, test, scanning, secrets and CRA policies, documented code review standards, and dependency provenance documentation — targeting [OSPS Baseline](https://baseline.openssf.org/) Level 3. CI gained `cargo-deny` license checks, dependency review on Rust and Go changes, an OSPS Baseline scan on `main`, and combined native line coverage above 80%.
+Alongside that, the project landed a published [threat model](https://github.com/wasmCloud/wasmCloud/blob/main/THREAT_MODEL.md), a [security self-assessment](https://github.com/wasmCloud/wasmCloud/blob/main/SECURITY-SELF-ASSESSMENT.md), a [Security Insights](https://github.com/ossf/security-insights-spec) manifest, release SBOMs with verification guidance, support, access-grant, test, scanning, secrets and CRA policies, documented code review standards, and dependency provenance documentation, all aimed at [OSPS Baseline](https://baseline.openssf.org/) Level 3. CI gained `cargo-deny` license checks, dependency review on Rust and Go changes, an OSPS Baseline scan on `main`, and combined native line coverage above 80%.
+
+## For embedders and plugin authors
+
+Several Rust APIs changed in source-breaking ways. The full list is in [Embedder changes at 2.12.0](/docs/runtime/building-custom-hosts/#embedder-changes-at-2120); the ones most likely to stop a build:
+
+- **`NatsConnectionOptions` is `#[non_exhaustive]`.** A struct literal no longer compiles; build one from `Default` with the `with_*` methods, which keeps future options source-compatible.
+- **`WorkloadMetadata::linker()` returns a `Result`**, an error once workload resolution has sealed the linker. In `on_workload_item_bind`, write `item.linker()?`.
+- **`HostMemoryBudgets::resolve` and `resolve_strs` take a fourth argument**, `max_memories`, before `core_instances`.
+- **`Engine::total_core_instances()` returns sixteen times what it did** (see above); use `Engine::total_memories()`.
+- **A host ID can be assigned before the host connects**, through `HostBuilder::with_id` and `ClusterHostBuilder::with_host_id`, for embedders whose own systems already know a node's identity.
+- **A plugin may no longer declare a WASI override for an interface the host does not link itself.** The seven host-linked packages are the whole scope; `wasi:otel`, `wasi:keyvalue`, `wasi:config`, `wasi:logging`, and `wasi:blobstore` are replaced by registering another plugin, which plugin precedence resolves. Through 2.11.0 such a declaration was accepted and shadowed nothing useful; it is now rejected with a message naming the interface.
 
 ## Other notable changes
 
 - **UDP sockets got real attention.** Datagram handling, reconnects, shared receive budgets, and nonblocking progress are all fixed, with UDP contracts now covered by tests. If you tried raw UDP before and found it rough, try again.
 - **P3 fixes.** A stopped workload with linked async exports is freed, pre-instantiation errors on P3 services surface instead of vanishing, service failures are honored and linked tasks reclaimed, command exits are preserved during initialization, and P3 response bodies are handed to hyper directly.
 - **Telemetry.** HTTP span names follow the OpenTelemetry convention, the component handler span is exported as `invoke_component_handler`, cumulative guest metrics are counted once instead of double-counted, and the OpenTelemetry stack is on 0.32.
-- **A NATS blobstore binding connects with its own credentials**, so a workload's object stores can live in its own account rather than the host's — including a binding whose identity is only a TLS client certificate, which previously fell back to the host's connection. Deleted objects are treated as absent, instead of surfacing a tombstone as an object with no data.
-- **Three more rules in the shared NATS config reader.** A blank identity value is an error rather than an unset key, so a Secret that resolved to an empty string can't quietly switch a binding's identity; `ws://` and `wss://` servers are refused, since the bundled async-nats has no WebSocket support and would have dialed them as plain TCP with the TLS upgrade skipped; and a binding naming its own credentials no longer inherits the host's client certificate, which under `verify_and_map` had it signing in as the host.
+- **A NATS blobstore binding connects with its own credentials**, so a workload's object stores can live in its own account rather than the host's, including a binding whose identity is only a TLS client certificate, which previously fell back to the host's connection. Deleted objects are treated as absent, instead of surfacing a tombstone as an object with no data.
+- **Clearing a filesystem blobstore container keeps the container.** Through 2.11.0 it deleted the container's directory too. A symlinked container root is now refused rather than followed.
 - **A `wit.sources` key can name a whole namespace.** Every package of it in use is served from that source, and a package the source lacks is an error naming what it does hold rather than a silent fallback to the registry. Before 2.12.0 a namespace-only key failed every fetch and build, because the key was always parsed as `namespace:package`. `wash` also falls back to `WKG_CACHE_DIR` and the default `wkg` cache when none is configured, instead of panicking.
+- **Copy-on-write memory images can be turned off** with `WASMTIME_MEMORY_INIT_COW=false`, which frees two mappings per warm memory and raises the derived pool on a default Linux node to 14,744.
 - **A concurrency limit above what a semaphore can hold** is refused at startup rather than panicking when the semaphore is built.
-- **A plugin may no longer declare a WASI override for an interface the host does not link itself.** The seven host-linked packages are the whole scope; `wasi:otel`, `wasi:keyvalue`, `wasi:config`, `wasi:logging`, and `wasi:blobstore` are replaced by registering another plugin, which plugin precedence resolves. Through 2.11.0 such a declaration was accepted and shadowed nothing useful; it is now rejected with a message naming the interface.
-- **A host ID can be assigned before the host connects**, through `HostBuilder::with_id` and `Washlet::with_host_id`, for embedders whose own systems already know a node's identity.
-- **`wash dev` egress is allow-all again** when a project declares no policy. On 2.11.0 a project whose `.wash/config.yaml` had no `workload:` section at all got deny-all — an empty `workload: {}` key got allow-all, and its absence did not. `wash dev` now also logs a line when the effective policy admits every host, and the allow-all default is scoped to `wash dev`: `wash host` reading the same file gets deny-all, matching Kubernetes.
+- **`wash dev` egress is allow-all again** when a project declares no policy. On 2.11.0 a project whose `.wash/config.yaml` had no `workload:` section at all got deny-all, while an empty `workload: {}` key got allow-all. `wash dev` now also logs a line when the effective policy admits every host, and the allow-all default is scoped to `wash dev`: `wash host` reading the same file gets deny-all, matching Kubernetes.
 
-## What to check before you upgrade
+## Breaking changes and what to check before you upgrade
 
-- **Apply the `WorkloadDaemonSet` CRD** if you want to use it. `helm upgrade` will not.
-- **Rename `coreInstances` to `maxMemories`** in chart values and host flags. Nothing breaks if you don't — the host warns and reproduces the old pool — but the default is no longer 1000, and leaving `maxMemories` unset is now the better choice on most nodes.
-- **Embedders: stop reading `Engine::total_core_instances()`.** It returns sixteen times what it used to. `Engine::total_memories()` is the count that sizes the pool.
+- **Apply every 2.12.0 CRD before upgrading the chart.** `helm upgrade` applies none of them, and the new operator needs the updated `Host` and `WorkloadReplicaSet` CRDs, not only the new `WorkloadDaemonSet` one. The commands are [above](#other-crd-changes).
+- **A NATS CA or client certificate now requires TLS.** A connection that sets one fails if the server does not offer TLS, instead of falling back to plaintext. Enable TLS on that server, or remove the TLS settings.
+- **The shared NATS config reader is stricter.** A blank identity value is an error rather than an unset key, so a Secret that resolved to an empty string fails the bind instead of quietly switching a binding's identity. `ws://` and `wss://` servers are refused, since the bundled async-nats has no WebSocket support and would have dialed them as plain TCP with the TLS upgrade skipped. And a binding naming its own credentials no longer inherits the host's client certificate, which under `verify_and_map` had it signing in as the host.
+- **Unknown fields in `secrets:` entries are refused.** Through 2.11.0 a stray field, such as `fromenv` for `fromEnv`, was dropped silently and the host started anyway. Check your host configuration's `secrets:` catalog before upgrading.
 - **Move redis connection keys out of workload manifests.** `backend-reconnect-*` and `backend-*-timeout-ms` are host-owned now, so a manifest setting one is refused under the default `deny` rather than ignored.
-- **Check Postgres parameter types.** A bound value whose type cannot be the parameter's type is now refused with `invalid-params`. A query that was returning a plausible-looking wrong number — an `int8(1)` bound to a `float8` came back as `5e-324` — will start erroring. That is the bug surfacing, not a new one.
-- **A NATS CA or client certificate now requires TLS.** A hand-rolled configuration pairing one with a `nats://` URL will fail to connect instead of silently negotiating plaintext.
+- **Check Postgres parameter types.** A bound value whose type cannot be the parameter's type is now refused with `invalid-params`. A query that was returning a plausible-looking wrong number (an `int8(1)` bound to a `float8` came back as `5e-324`) will start erroring. That is the bug surfacing, not a new one.
 - **`allowSharedHosts: false` now applies to workloads already running**, and to workloads pinned with `spec.hostId`. Turning it off on a live cluster stops and reschedules workloads sitting outside the rule, ten a second. Make sure each namespace has a host pool *before* flipping the value.
+- **`runtime.natsIgnoreDiscoveredServers` defaults to true.** A host group that points at a single NATS pod URL and relies on discovery for failover needs it set to false.
+- **Plugins can no longer override WASI interfaces the host does not link.** A plugin declaring one is rejected at registration; register another plugin for that interface instead.
+- **Embedders: several APIs are source-breaking.** See [For embedders and plugin authors](#for-embedders-and-plugin-authors), and stop reading `Engine::total_core_instances()`, which returns sixteen times what it used to.
+- **Rename `coreInstances` to `maxMemories`** in chart values and host flags. Nothing breaks if you don't, since the host warns and reproduces the old pool, but the default is no longer 1000, and leaving `maxMemories` unset is now the better choice on most nodes.
 
 ## What's coming
 
-The CRD surface is where this release's shape is clearest: `WorkloadDaemonSet` and `/scale` on `WorkloadReplicaSet` are both about meeting Kubernetes where it already is, so that a Wasm workload is scheduled, scaled, and observed with the tools a cluster operator already has. Plugin-served secrets point the same direction for the platform side — a secret backend the operator already runs, reached without a per-workload mount. Multi-tenancy remains the open question underneath several changes here: `pluginSecrets` grants and the `allowSharedHosts` rule both treat the namespace as the boundary, and host groups are still the unit of real separation. The [roadmap](https://github.com/orgs/wasmCloud/projects/7) has what's in progress, and [wasmCloud Wednesday](/community/) is the place to weigh in.
+The CRD surface is where this release's shape is clearest: `WorkloadDaemonSet` and `/scale` on `WorkloadReplicaSet` are both about meeting Kubernetes where it already is, so that a Wasm workload is scheduled, scaled, and observed with the tools a cluster operator already has. Plugin-served secrets point the same direction for the platform side: a secret backend the operator already runs, reached without a per-workload mount. Multi-tenancy remains the open question underneath several changes here. `pluginSecrets` grants and the `allowSharedHosts` rule both treat the namespace as the boundary, and host groups are still the unit of real separation. The [roadmap](https://github.com/orgs/wasmCloud/projects/7) has what's in progress, and [wasmCloud Wednesday](/community/) is the place to weigh in.
 
 ## Get started with wasmCloud 2.12
 
@@ -289,7 +315,7 @@ winget install wasmCloud.wash
 
 For new users, the [quickstart](/docs/quickstart/) gets you from installation to a running component on Kubernetes in a few minutes.
 
-Thanks to **@cvas22**, **@ThomasDravigney**, and **@mackaby** for their first contributions to wasmCloud in this release — refusing a mismatched Postgres parameter type, giving NATS blobstore bindings their own credentials and fixing deleted-object handling, and preserving nonblocking UDP progress.
+Thanks to **@cvas22**, **@ThomasDravigney**, and **@mackaby** for their first contributions to wasmCloud in this release: refusing a mismatched Postgres parameter type, giving NATS blobstore bindings their own credentials and fixing deleted-object handling, and preserving nonblocking UDP progress.
 
 Full changelog: [v2.11.0...v2.12.0](https://github.com/wasmCloud/wasmCloud/compare/v2.11.0...v2.12.0)
 
