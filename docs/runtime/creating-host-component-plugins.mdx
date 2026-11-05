@@ -59,7 +59,7 @@ world plugin {
 }
 ```
 
-(The `wasmcloud:host` package is at 0.1.4 since wasmCloud 2.9.0; the host matches its reserved interfaces by name and resolves versions semver-compatibly, so a plugin built against an earlier 0.1.x continues to load.)
+(The `wasmcloud:host` package is at 0.1.6 since wasmCloud 2.12.0, and was at 0.1.4 from 2.9.0; the host matches its reserved interfaces by name and resolves versions semver-compatibly, so a plugin built against an earlier 0.1.x continues to load.)
 
 The plugin can additionally export `wasi:cli/run@0.3.0` to have a background task that runs alongside inbound invocations — useful when the plugin needs to maintain a long-lived connection, run a scheduler, or process background work. `wasi:cli/run` is optional; a pure capability plugin can omit it and export only its capability interface.
 
@@ -67,7 +67,7 @@ A plugin's world must either **export at least one capability function** or **im
 
 ## The `wasmcloud:host` interface
 
-The `wasmcloud:host` WIT package (0.1.4 since wasmCloud 2.9.0) provides four subinterfaces plugins can import — `identity`, `cancel`, `workload-call`, and the shared `types` (which carries `workload-id`, `component-id`, and the `call-error` variant) — and one a plugin can optionally export (`workload-lifecycle`).
+The `wasmcloud:host` WIT package (0.1.6 since wasmCloud 2.12.0) provides five subinterfaces plugins can import — `identity`, `cancel`, `workload-call`, `binding-secrets` (since 0.1.6), and the shared `types` (which carries `workload-id`, `component-id`, `plugin-id`, `binding-name`, and the `call-error` variant) — and two a plugin can optionally export (`workload-lifecycle` and `secret-source`, since 0.1.5).
 
 ### `wasmcloud:host/identity`
 
@@ -137,6 +137,48 @@ Where `identity` and `cancel` are imports, `workload-lifecycle` (added in wasmCl
 - **`on-workload-unbind`**: a best-effort cleanup notification when the workload stops.
 
 A plugin that doesn't export the interface is unaffected. Note that inside a lifecycle hook, `get-workload-id` reports the binding workload's ID but `get-component-id`'s value is **not meaningful** and must not be relied on (as of `wasmcloud:host` 0.1.3 this is explicit in the WIT) — read IDs from the `workload-info` record instead. Two more rules for hook bodies: a hook must not invoke the plugin's own exported capabilities (this times out during post-restart replay), and it cannot [call the binding workload's exports](#wasmcloudhostworkload-call) (the workload is still deploying at bind and torn down at unbind).
+
+:::note[`workload-info.name` is this replica's name]
+Under the operator, a `WorkloadDeployment`'s replicas have generated names. The name a workload keeps across replicas — the one a secret grant is matched on — is reported by [`secret-source`](#serving-secrets-to-other-plugins) in its `request`, and `workload-info` does not carry it. The WIT says so explicitly as of 0.1.6.
+:::
+
+### `wasmcloud:host/binding-secrets`
+
+Since `wasmcloud:host` 0.1.6 (wasmCloud 2.12.0). A binding's config key whose value comes from a plugin-backed `secrets:` entry is **left out of `interface-binding.config`**, so it never crosses as a plain string. A plugin reads it through `binding-secrets` instead:
+
+```wit
+world plugin {
+  import wasmcloud:host/binding-secrets@0.1.6;
+  export wasmcloud:host/workload-lifecycle@0.1.6;
+  // ...
+}
+```
+
+`get(namespace, package, name)` returns each secret key of the workload's binding of that interface, sorted by key, as a `wasmcloud:secrets` handle the plugin owns; read the value with `wasmcloud:secrets/reveal`. It answers **only inside `on-workload-bind`**, about the workload being bound. Anywhere else, for a binding that workload does not have, or after the host has timed the bind out, it returns an error. Each call hands over fresh handles.
+
+A plugin that does not import this interface is **refused a binding that holds a plugin-backed secret**, rather than silently receiving a config map with the key missing.
+
+### Serving secrets to other plugins
+
+`wasmcloud:host/secret-source`, since `wasmcloud:host` 0.1.5, is the other side of the same feature: an interface a plugin **exports** so the host can ask it for the secrets other plugins' bindings need — including the `wasmcloud:secrets` bindings that workloads read their own secrets through.
+
+```wit
+world plugin {
+  export wasmcloud:host/secret-source@0.1.6;
+}
+```
+
+The host calls `resolve` once per granted workload bind with the entry's keys, and hands the values to the consuming plugin as config. The request says whom the values are for: the consuming plugin and binding, and the workload — its replica `id`, its `name` (the one it keeps across replicas: the owning `WorkloadDeployment`'s, `WorkloadDaemonSet`'s, or `WorkloadReplicaSet`'s, else its own), and its `namespace`. All of that comes from the host's own records, never from anything a workload sends.
+
+`resolve` must return each requested key exactly once and nothing else. A key that does not exist is `not-found`. The error variants are `not-found(list<secret-key>)`, `access-denied(option<string>)`, `unavailable(option<string>)` — the bind can be retried — and `other(option<string>)`. The host fails the bind and logs the case and message, **so a message must never contain a secret value**. The WIT lets a value be text or bytes, but in 2.12.0 the host delivers every value as binding config, which holds text, so an answer that is not valid UTF-8 fails the bind. Serve binary material such as a key in a text encoding (PEM rather than DER, or base64).
+
+Because every request names the workload, one catalog entry can serve each workload its own secret: scope the backend path by `request.workload`, and a value reaches only the workload it was resolved for. That is how a workload's own secrets reach it with nothing per-workload in the host's config.
+
+An operator wires this up by declaring the entry in the host's `secrets:` catalog with a `plugin` key, granting it to the workloads that may use it, and naming it from a consuming `plugins` entry's or binding's `secretFrom`. On Kubernetes that is [`runtime.hostGroups[].pluginSecrets`](../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupspluginsecrets), which has the grant semantics and the trust boundary. A plugin serving this interface sees only the requests the operator granted, and may refuse more.
+
+:::warning[A source exports `secret-source`, not `wasmcloud:secrets`]
+A plain import routes to whichever registered plugin serves it, and a grant is checked only on the plugin whose entry declares the secret. So while an entry-level secret feeds a plugin, the host **refuses to start** if another plugin serves the same interface — otherwise a workload's plain import would route around the grant. A secret source therefore exports `secret-source`, which only the host calls, and leaves the workload-facing interface to the plugin that consumes it.
+:::
 
 ## Building the plugin
 
@@ -212,6 +254,23 @@ host:
 ```
 
 The top-level `configs:` and `secrets:` catalogs map names to sources (`dir:`, `file:`, `inline:`, or `fromEnv:`); `configFrom`/`secretFrom` reference catalog entries by name.
+
+Since 2.12.0 a `secrets:` entry with a field the host does not recognize is refused, naming the field. Through 2.11.0 an unknown field was dropped silently, so a typo such as `fromenv` for `fromEnv` left the entry without that source and the host started anyway. Check existing `secrets:` entries before upgrading: a config that loaded on 2.11.0 with a stray field fails to load on 2.12.0.
+
+Since 2.12.0 a `secrets:` entry can instead name a `plugin` that serves its values at bind, with the `keys` it is asked for and the `workloads` it is granted to:
+
+```yaml
+secrets:
+  reports-db:
+    plugin: vault-secrets
+    keys:
+      url: platform/postgres/reports-url
+    workloads:
+      - namespace: billing
+        name: reports
+```
+
+Only a `plugins` entry's or binding's `secretFrom` may name one — never a workload manifest. See [Serving secrets to other plugins](#serving-secrets-to-other-plugins) for the interface and [`runtime.hostGroups[].pluginSecrets`](../kubernetes-operator/operator-manual/helm-values.mdx#runtimehostgroupspluginsecrets) for the Helm shape and the grant semantics.
 
 ### `wash dev`
 
