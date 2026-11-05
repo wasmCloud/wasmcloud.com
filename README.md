@@ -21,6 +21,15 @@ npm run build
 
 This command generates static content into the `build` directory and can be served using any static contents hosting service.
 
+#### Offline Docker image
+
+```bash
+docker build -t wasmcloud-docs:test .
+docker run --rm -p 127.0.0.1:8080:80 wasmcloud-docs:test
+```
+
+Open <http://127.0.0.1:8080> to view the offline site. CI builds this same Dockerfile and checks that the image serves the homepage, docs, and blog. The build runs on `node:24-alpine` without Git, and `Dockerfile.dockerignore` excludes `.git`, so this check catches last-update metadata readers that require a Git worktree. Running `OFFLINE_BUILD=1 npm run build` in a checkout does not exercise those conditions.
+
 #### Serving static content
 
 To serve the generated static content:
@@ -28,6 +37,16 @@ To serve the generated static content:
 ```bash
 npm run serve
 ```
+
+### Workflow security checks
+
+CI runs [zizmor](https://docs.zizmor.sh/) on all GitHub Actions workflows and blocks findings at every severity. To run the same checks locally with zizmor 1.31.1 installed:
+
+```bash
+zizmor .github/workflows
+```
+
+Set `GH_TOKEN` to enable online audits, or add `--offline` for local checks without GitHub access.
 
 ### Diagram workflow
 
