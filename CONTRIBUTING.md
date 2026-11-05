@@ -12,6 +12,21 @@ Report problems with wasmCloud itself in [wasmCloud/wasmCloud](https://github.co
 Don't report security vulnerabilities as issues. Follow the
 [security policy](https://github.com/wasmCloud/wasmcloud.com/security/policy) to report them privately.
 
+## Escalating to the CRA Steward
+
+The wasmCloud security team escalates two kinds of event to the Linux Foundation, wasmCloud's CRA
+steward, at steward@linuxfoundation.org:
+
+- **Actively exploited vulnerabilities:** a vulnerability in the site or its build for which the
+  security team has reliable evidence that a malicious actor has exploited it.
+- **Severe incidents:** a security compromise of the project's own infrastructure, such as its
+  GitHub organization, the site's hosting and deploy pipeline, or published artifacts.
+
+A vulnerability with no evidence of exploitation is not an escalation event and follows the normal
+process in the [security policy](https://github.com/wasmCloud/wasmcloud.com/security/policy).
+Remediation never waits on the escalation decision. The same policy covers all of wasmCloud; see
+[wasmCloud's CONTRIBUTING.md](https://github.com/wasmCloud/wasmCloud/blob/main/CONTRIBUTING.md#escalating-to-the-cra-steward).
+
 ## Making Changes
 
 The [Documentation Contribution Guide](https://wasmcloud.com/docs/contributing/documentation) covers
