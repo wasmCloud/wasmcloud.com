@@ -62,9 +62,13 @@ components:
 
 Entries are matched case-insensitively against the request's host (no scheme, no path). A leading wildcard like `*.example.com` matches any subdomain but not the bare `example.com` — list both if you need both. When `allowedHosts` is non-empty, any outbound HTTP request whose host doesn't match an entry is blocked by the host before it leaves the process. Since 2.10.0 the denial reaches the guest as a handleable `http-request-denied` error rather than a trap, for WASI 0.2 and 0.3 components alike. This is enforced at the wasmCloud level, independently of any Kubernetes NetworkPolicy.
 
-The policy fails closed: if `allowedHosts` is empty or the field is omitted, all outbound HTTP requests are denied. To allow unrestricted outbound HTTP, set `allowedHosts: ["*"]` explicitly. (Local development behaves differently: when the field is omitted from `.wash/config.yaml`, `wash dev` substitutes the allow-all policy, so dev-loop workloads make outbound HTTP freely.)
+The policy fails closed: if `allowedHosts` is empty or the field is omitted, all outbound HTTP requests are denied. To allow unrestricted outbound HTTP, set `allowedHosts: ["*"]` explicitly.
 
-Note that `*` covers HTTP egress only. It opens no `wasi:sockets` name lookup, and since 2.11.0 `wash dev` enforces the socket address policy with no flag to relax it, so a dev-loop component that opens a **raw socket to a hostname** needs an `allowedIpNameLookups` entry even under an allow-all `allowedHosts`. Components that only make outbound HTTP are unaffected.
+Local development behaves differently: `wash dev` substitutes an allow-all policy when the project declares none, so dev-loop workloads make outbound HTTP freely. Since 2.12.0 that applies when the `workload:` section is **absent entirely**, not only when `workload:` is present with `allowedHosts` omitted — in 2.11.0 a project with no `workload:` block at all resolved to an empty allowlist and `wash dev` denied every outbound request. An explicit `allowedHosts: []` still denies everything, in dev as anywhere else. `wash dev` now logs a line when the effective policy admits every host, so the allow-all is visible rather than assumed.
+
+The allow-all is scoped to `wash dev` as of 2.12.0. A `wash host` reading a config file with no `allowedHosts` gets deny-all, matching Kubernetes.
+
+Note that `*` covers HTTP egress and raw-socket connections, but opens no `wasi:sockets` **name lookup**. A component that opens a raw socket to a *hostname* needs an `allowedIpNameLookups` entry even under an allow-all `allowedHosts`, in dev as well as in production. Components that only make outbound HTTP are unaffected.
 
 :::note
 `allowedHosts` controls outbound HTTP calls made via `wasi:http/outgoing-handler`. It does not restrict network access that may be available through other host interfaces that are explicitly bound to the component.
