@@ -36,6 +36,8 @@ Package v1alpha1 contains API Schema definitions for the runtime v1alpha1 API gr
 - [Host](#host)
 - [HostList](#hostlist)
 - [Workload](#workload)
+- [WorkloadDaemonSet](#workloaddaemonset)
+- [WorkloadDaemonSetList](#workloaddaemonsetlist)
 - [WorkloadDeployment](#workloaddeployment)
 - [WorkloadDeploymentList](#workloaddeploymentlist)
 - [WorkloadList](#workloadlist)
@@ -240,6 +242,7 @@ KubernetesSpec groups Kubernetes-specific configuration for a workload.
 
 
 _Appears in:_
+- [WorkloadDaemonSetSpec](#workloaddaemonsetspec)
 - [WorkloadDeploymentSpec](#workloaddeploymentspec)
 - [WorkloadSpec](#workloadspec)
 
@@ -384,12 +387,71 @@ _Underlying type:_ _string_
 
 
 _Appears in:_
+- [WorkloadDaemonSetSpec](#workloaddaemonsetspec)
 - [WorkloadDeploymentSpec](#workloaddeploymentspec)
 
 | Field | Description |
 | --- | --- |
 | `RollingUpdate` |  |
 | `Recreate` |  |
+
+
+#### WorkloadDaemonSet
+
+
+
+WorkloadDaemonSet runs a Workload on every Host that matches its host selector, spec.replicasPerHost instances per Host, and follows the Host set as it changes. Since 2.12.0.
+
+
+
+_Appears in:_
+- [WorkloadDaemonSetList](#workloaddaemonsetlist)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `runtime.wasmcloud.dev/v1alpha1` | | |
+| `kind` _string_ | `WorkloadDaemonSet` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[WorkloadDaemonSetSpec](#workloaddaemonsetspec)_ |  |  |  |
+
+
+#### WorkloadDaemonSetList
+
+
+
+WorkloadDaemonSetList contains a list of WorkloadDaemonSet.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `runtime.wasmcloud.dev/v1alpha1` | | |
+| `kind` _string_ | `WorkloadDaemonSetList` | | |
+| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `items` _[WorkloadDaemonSet](#workloaddaemonset) array_ |  |  |  |
+
+
+#### WorkloadDaemonSetSpec
+
+
+
+WorkloadDaemonSetSpec defines the desired state of WorkloadDaemonSet.
+
+
+
+_Appears in:_
+- [WorkloadDaemonSet](#workloaddaemonset)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `replicasPerHost` _integer_ | ReplicasPerHost is the number of Workload instances to run on each Host<br />that matches template.spec.hostSelector. Unlike WorkloadDeployment's<br />replicas, it is not a total. | 1 | Minimum: 0 <br />Optional: \{\} <br /> |
+| `template` _[WorkloadReplicaTemplate](#workloadreplicatemplate)_ |  |  | Required: \{\} <br /> |
+| `deployPolicy` _[WorkloadDeployPolicy](#workloaddeploypolicy)_ | DeployPolicy is how a template change reaches the hosts. RollingUpdate<br />starts the new instances on a host before stopping the old ones there,<br />MaxConcurrentHosts hosts at a time. Recreate stops every old instance at once. | RollingUpdate | Enum: [RollingUpdate Recreate] <br />Optional: \{\} <br /> |
+| `maxConcurrentHosts` _integer_ | MaxConcurrentHosts is how many hosts a RollingUpdate updates at once. | 1 | Minimum: 1 <br />Optional: \{\} <br /> |
+| `artifacts` _[WorkloadDeploymentArtifact](#workloaddeploymentartifact) array_ |  |  | Optional: \{\} <br /> |
+| `kubernetes` _[KubernetesSpec](#kubernetesspec)_ | Kubernetes groups Kubernetes-specific configuration such as Service<br />references and endpoint management. |  | Optional: \{\} <br /> |
 
 
 #### WorkloadDeployment
@@ -420,6 +482,7 @@ _Appears in:_
 
 
 _Appears in:_
+- [WorkloadDaemonSetSpec](#workloaddaemonsetspec)
 - [WorkloadDeploymentSpec](#workloaddeploymentspec)
 
 | Field | Description | Default | Validation |
@@ -552,6 +615,7 @@ _Appears in:_
 
 
 _Appears in:_
+- [WorkloadDaemonSetSpec](#workloaddaemonsetspec)
 - [WorkloadDeploymentSpec](#workloaddeploymentspec)
 - [WorkloadReplicaSetSpec](#workloadreplicasetspec)
 

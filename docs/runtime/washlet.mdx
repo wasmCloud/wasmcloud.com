@@ -62,10 +62,14 @@ wash host --host-group my-cluster --scheduler-nats-url nats://nats:4222
 | `--wasi-webgpu` | false | Enable the WebGPU interface |
 | `--allow-insecure-registries` | false | Allow pulling from insecure OCI registries |
 | `--registry-pull-timeout` | `30s` | Timeout for OCI pulls |
-| `--scheduler-tls-ca` | — | TLS CA for scheduler NATS |
-| `--data-tls-ca` | — | TLS CA for data plane NATS |
+| `--scheduler-nats-tls-ca` | — | TLS CA for scheduler NATS. Setting it, or a client certificate, makes TLS **required** on that connection (since 2.12.0) |
+| `--data-nats-tls-ca` | — | TLS CA for data plane NATS, with the same requirement |
+| `--scheduler-nats-creds`, `--data-nats-creds` | — | Credentials file per connection, reread on every reconnect (since 2.12.0). `--*-nats-nkey`, `--*-nats-token-file`, and `--*-nats-user` with `--*-nats-password-file` are the alternatives |
+| `--nats-ignore-discovered-servers` | false | Restrict NATS connections to their configured URLs rather than following cluster-advertised addresses (since 2.12.0). The Helm chart sets it on |
 
 This table covers the core cluster flags; for the full and current flag surface, including the probe, drain, and memory flags and the socket and filesystem policy flags, see the [`wash host` command reference](../wash/commands.mdx#wash-host).
+
+Each connection authenticates on its own, so a host can present one identity to the control plane and another to the data plane. A credential given as a **file** is reread on every connect, which is what makes a rotated Kubernetes Secret reach the next reconnect without a redeploy — mount it as a directory, without `subPath`, or the kubelet will not refresh it in place.
 
 ### Environment variables
 
@@ -132,6 +136,7 @@ async fn main() -> anyhow::Result<()> {
 | Method | Description |
 |--------|-------------|
 | `with_host_group(str)` | Host group label for workload scheduling |
+| `with_host_id(str)` | Assign the host ID before the host connects, so the embedder knows it up front (since 2.12.0). 1–128 ASCII letters, digits, hyphens, or underscores, since it forms one subject token. `host_id()` reads it back. Fallible: it returns `Result` |
 | `with_host_name(str)` | Human-readable name (auto-generated if not set) |
 | `with_nats_client(Arc<Client>)` | NATS client for the control plane |
 | `with_plugin(Arc<dyn HostPlugin>)` | Register a plugin (IDs must be unique) |
@@ -139,6 +144,10 @@ async fn main() -> anyhow::Result<()> {
 | `with_host_builder(HostBuilder)` | Provide a pre-configured `HostBuilder` for advanced use |
 | `with_artifact_cleaner(frequency, max_age)` | Clean up stale cached artifacts on a schedule |
 | `build()` | Construct the `ClusterHost` |
+
+:::warning[Never reuse a host ID]
+`with_host_id` is for a host whose identity your own system already knows — a node name, a lease, an allocation record. The ID has to be unique among every host sharing a control plane, and must not be reused by a *later* host process: the operator may ignore heartbeats from a removed host's ID for an hour or more, so a reused ID can leave a healthy host looking dead. Derive it from something that is never recycled, not from a slot or ordinal.
+:::
 
 ### NATS-backed plugins
 

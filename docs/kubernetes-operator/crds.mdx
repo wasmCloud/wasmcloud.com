@@ -28,6 +28,7 @@ wasmCloud uses CRDs from the [`runtime.wasmcloud.dev/v1alpha1`](./api-reference.
 - [Host](#host) - `runtime.wasmcloud.dev/v1alpha1`
 - [Workload](#workload) - `runtime.wasmcloud.dev/v1alpha1`
 - [WorkloadDeployment](#workloaddeployment) - `runtime.wasmcloud.dev/v1alpha1`
+- [WorkloadDaemonSet](#workloaddaemonset) - `runtime.wasmcloud.dev/v1alpha1` (since 2.12.0)
 - [WorkloadReplicaSet](#workloadreplicaset) - `runtime.wasmcloud.dev/v1alpha1`
 
 This document explains each of these custom resources at a high level. For a complete API specification, see the [API reference](./api-reference.md).
@@ -78,6 +79,8 @@ httpPort: 4000
 ```
 
 Unlike most Kubernetes resources, the `Host` CRD does not use a `spec` wrapper — fields like `hostId`, `hostname`, `httpPort`, and `environment` are set at the resource root. See the [Host API reference](./api-reference.md#host) for the full field list.
+
+Since 2.12.0, seven `status` fields are optional rather than required: `version`, `osName`, `osArch`, `osKernel`, `systemCPUUsage`, `systemMemoryTotal`, and `systemMemoryFree`. Because they were required, a heartbeat arriving before the operator's cache was populated had to write placeholder values — `unknown`, or `0` — and so overwrote real ones. A heartbeat now updates only `lastSeen`, and those fields are written only when the host reports them. A `Host` whose system fields flickered to `unknown` or `0` between reports should be steady after upgrading. Apply the 2.12.0 `Host` CRD before upgrading the operator: against the old schema, which still requires those fields, a new host's first heartbeat is rejected. See [Apply the 2.12.0 CRDs before upgrading the chart](#workloaddaemonset).
 
 ## Workload
 
@@ -318,9 +321,79 @@ Two pooling caveats worth designing around: a warm instance's context (environme
 - **`allowedIpNameLookups`**: A list of names this component is permitted to resolve via `wasi:sockets` name lookup (added in wasmCloud 2.6.0 as `allowIpNameLookup`; renamed to its current form in 2.6.1). Entries may be exact hostnames, `*.suffix` wildcards, `*` (any name), or literal IPs. DNS resolution is denied unless granted — a lookup matching neither this list nor `allowedHosts` is denied, so a component that names neither must connect by IP address. Since 2.11.0 this list covers names *beyond* those `allowedHosts` already grants, so a component whose destinations are all listed in `allowedHosts` needs no entries here. See [Workload Security](./workload-security.mdx#allowing-dns-name-lookups-with-allowedipnamelookups) for usage and a note on CRD versions.
 - **`allowedHostLoopbackPorts`**: Ports this component may reach on the *machine's* loopback through the reserved name `host.wasmcloud.internal`. Entries are single ports with an optional protocol (`"5432"`, `"5432/tcp"`, `"53/udp"`), and no ranges, wildcards, or names. This is a two-key grant: the list is inert unless the host itself runs with `--allow-host-loopback` (off by default), so neither the workload author nor the operator can open this door alone. `127.0.0.1` keeps meaning the workload's own virtual loopback; only the reserved name reaches the machine. See [Workload Security](./workload-security.mdx) for the socket policy context.
 
+## WorkloadDaemonSet
+
+A `WorkloadDaemonSet` (since 2.12.0) runs a workload on *every* host matching its host selector and follows the host set as it changes. Where a `WorkloadDeployment` spreads a total number of replicas across a host group, a `WorkloadDaemonSet` keeps `spec.replicasPerHost` instances on each host: add a host to the group and the workload appears on it, drain the host and the instances go with it.
+
+Reach for it when a workload's job is tied to the host it runs on rather than to a share of traffic — a per-host log or metrics shipper, a node-local cache or sidecar a host's other workloads call, or a probe that has to report from every host.
+
+```yaml
+apiVersion: runtime.wasmcloud.dev/v1alpha1
+kind: WorkloadDaemonSet
+metadata:
+  name: hello-everywhere
+  namespace: default
+spec:
+  replicasPerHost: 1
+  deployPolicy: RollingUpdate
+  maxConcurrentHosts: 1
+  template:
+    spec:
+      hostSelector:
+        hostgroup: default
+      components:
+        - name: hello-world
+          image: ghcr.io/wasmcloud/components/http-hello-world-rust:0.1.0
+      hostInterfaces:
+        - namespace: wasi
+          package: http
+          interfaces:
+            - incoming-handler
+          config:
+            host: hello.localhost.direct
+```
+
+The `template` is the same [`WorkloadReplicaTemplate`](./api-reference.md#workloadreplicatemplate) a `WorkloadDeployment` takes, so host interfaces, volumes, and [component resource controls](#component-resource-controls) all carry over unchanged. `spec.artifacts` and `spec.kubernetes` work as they do on a `WorkloadDeployment`.
+
+Fields specific to this resource:
+
+- **`replicasPerHost`**: Instances to keep on each matching host. Defaults to `1`. Unlike `WorkloadDeployment`'s `replicas`, it is a per-host count, not a total — the total is this multiplied by the number of matching hosts.
+- **`deployPolicy`**: How a template change reaches the hosts. `RollingUpdate` (the default) starts the new instances on a host before stopping that host's old ones; `Recreate` stops every old instance at once.
+- **`maxConcurrentHosts`**: How many hosts a `RollingUpdate` moves through at a time. Defaults to `1`.
+
+A `WorkloadDaemonSet` creates `Workload` resources directly, each pinned to its host, rather than going through a `WorkloadReplicaSet`. It has no `/scale` subresource: the host set is the scaling axis, so scale the host group (or its [`replicas` Helm value](./operator-manual/helm-values.mdx#runtimehostgroups)) instead.
+
+Status reports progress by host rather than by replica:
+
+```console
+$ kubectl get workloaddaemonset
+NAME               PER-HOST   DESIRED   UP-TO-DATE   READY-HOSTS   READY
+hello-everywhere   1          4         4            4             True
+```
+
+`status.desiredHosts` counts the schedulable hosts matching the selector, `status.updatedHosts` those with no instance of a previous template left, and `status.readyHosts` those running every instance of the current template. `status.replicas` totals instances across hosts. `status.hosts` lists only the hosts that are not ready or still carry an outdated instance, so it stays short on a large host group — an empty list on a `Ready` daemon set is the healthy state, not missing data.
+
+:::warning[Apply the 2.12.0 CRDs before upgrading the chart]
+Helm installs a chart's `crds/` directory on `helm install` only, never on `helm upgrade`. 2.12.0 adds the `WorkloadDaemonSet` CRD and changes four existing ones: `Host` (seven status fields become optional), `WorkloadReplicaSet` (the `/scale` subresource), and `WorkloadDeployment` and `Workload` (a corrected field description). Apply all of them before you upgrade the chart:
+
+```bash
+helm pull oci://ghcr.io/wasmcloud/charts/runtime-operator --version 2.12.0 --untar --untardir /tmp/wasmcloud-chart
+kubectl apply --server-side -f /tmp/wasmcloud-chart/runtime-operator/crds/
+helm upgrade wasmcloud oci://ghcr.io/wasmcloud/charts/runtime-operator --version 2.12.0 --namespace wasmcloud
+```
+
+Adjust the release name and namespace to your install, and pass `helm upgrade` the same values files you installed with.
+
+Skipping this is not only a matter of a missing new kind. With the 2.11 `Host` CRD still installed, the API server rejects the 2.12.0 operator's heartbeat for a newly registered host, because that heartbeat now writes only `lastSeen` and the old schema still requires the other seven fields. With the 2.11 `WorkloadReplicaSet` CRD, `kubectl scale` and HPA cannot target a replica set. Until the `WorkloadDaemonSet` CRD exists, `kubectl apply` of one fails with `no matches for kind "WorkloadDaemonSet"`.
+
+If the operator starts before the `WorkloadDaemonSet` CRD exists, it runs without that controller, polls for the CRD every 30 seconds, and exits once it appears so that Kubernetes restarts the pod with the controller registered. Expect one restart, not a crash loop.
+:::
+
 ## WorkloadReplicaSet
 
 A [WorkloadReplicaSet](./api-reference.md#workloadreplicaset) ensures that a given number of Workload replicas are running at once. It is typically managed by a WorkloadDeployment but can be used directly for more granular control.
+
+Since 2.12.0 it implements the `/scale` subresource too, so `kubectl scale`, HPA, and KEDA can target a `WorkloadReplicaSet` directly for the cases where you are managing one yourself. `status.currentReplicas` and `status.selector` exist to serve that subresource; `status.currentReplicas` mirrors `status.replicas.current` as a flat integer. The subresource is part of the CRD, so it exists only once the 2.12.0 `WorkloadReplicaSet` CRD is applied; `helm upgrade` does not apply it. Prefer scaling the owning `WorkloadDeployment` when there is one — a deployment reconciles its replica sets back to its own `spec.replicas`.
 
 Example manifest:
 

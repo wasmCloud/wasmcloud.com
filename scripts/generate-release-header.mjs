@@ -114,14 +114,39 @@ function hex(cx, cy, r) {
   }).join(' ');
 }
 
-/** The per-release element. Swap this for a new release. */
+/**
+ * The per-release element. Swap this for a new release.
+ *
+ * 2.12: a honeycomb lattice, one cell per host, each carrying the same inner
+ * form — the shape of a WorkloadDaemonSet. Uniformity is the point, so the
+ * cells are identical and only the two cells crossing the canvas edge are
+ * clipped. Opacities stay in the series' range (fills 0.02-0.26, strokes
+ * 0.09-0.24) so the lockup and numeral keep the contrast.
+ */
 function composition() {
+  const R = 118; // cell radius: width R*sqrt(3) = 204.4, height 236
+  const dx = R * Math.sqrt(3);
+  const dy = R * 1.5;
+  const originX = 1500;
+  const originY = 238;
+  const cells = [];
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 5; col++) {
+      const cx = originX + col * dx + (row % 2 ? dx / 2 : 0);
+      const cy = originY + row * dy;
+      if (cx - R > W + R || cy - R > H) continue;
+      cells.push(
+        `  <polygon points="${hex(cx, cy, R)}" fill="none" stroke="#00c389" stroke-opacity="0.20" stroke-width="2"/>\n` +
+          `  <polygon points="${hex(cx, cy, R * 0.46)}" fill="url(#tealFill)" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1.5"/>`,
+      );
+    }
+  }
+  // A soft wash behind the lattice, so it reads as one field rather than a
+  // scatter, and one larger ring anchoring it to the right edge.
   return `
-  <polygon points="${hex(1520, 250, 330)}" fill="#ffffff" fill-opacity="0.028"/>
-  <polygon points="${hex(1700, 555, 412)}" fill="none" stroke="#00c389" stroke-opacity="0.24" stroke-width="3"/>
-  <polygon points="${hex(1700, 555, 312)}" fill="none" stroke="#ffffff" stroke-opacity="0.09" stroke-width="2"/>
-  <polygon points="${hex(1700, 555, 212)}" fill="url(#tealFill)" stroke="#00c389" stroke-opacity="0.18" stroke-width="2"/>
-  <polygon points="${hex(2010, 880, 250)}" fill="url(#tealFill2)" stroke="#00c389" stroke-opacity="0.20" stroke-width="2"/>`;
+  <polygon points="${hex(1880, 600, 520)}" fill="#ffffff" fill-opacity="0.022"/>
+${cells.join('\n')}
+  <polygon points="${hex(1880, 600, 560)}" fill="none" stroke="#00c389" stroke-opacity="0.16" stroke-width="3"/>`;
 }
 
 const lockup = await lockupInline();
