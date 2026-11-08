@@ -73,6 +73,8 @@ spec:
 
 * `reclaimWindowSeconds` (since 2.9.0) lets the pool shrink back after a spike: every window the host retires idle instances beyond what the window's peak load needed, never interrupting a call in flight. `reclaimMinInstances` sets a floor. By default a pool holds its high-water mark until the workload stops. Like the limits above, reclaim is only meaningful alongside `poolSize`.
 
+* A `reclaimMinInstances` **at or above `poolSize` turns reclaim off** rather than clamping to the pool: a sweep could never find a surplus to retire. The CRD field documentation said "capped at `poolSize`" through 2.11.0, which read as though the pair still reclaimed; it was corrected in 2.12.0. Behavior has not changed — only the description.
+
 :::note[`poolSize` does nothing for a WASI 0.2 HTTP handler]
 A WASI 0.2 component serves one HTTP request per instance, so its instances are never reused between requests and `poolSize` has no effect on them. Since 2.11.0 the host warns when `poolSize` is set on one, rather than leaving the setting to look effective. Build the component for WASI 0.3 to keep HTTP instances warm.
 :::
@@ -136,11 +138,33 @@ Two properties to design around:
 
 The host exports `process_memory.footprint`, `process_memory.high_water`, and `process_memory.limit` as gauges in bytes, plus a `process_memory.refused` counter that is kept separate from the guest budget's `guest_memory.refused`. What counts toward the footprint differs by platform: Linux measures anonymous resident memory plus swap, deliberately excluding shared file mappings so a shared Wasmtime memory image is not counted once per instance; macOS includes compressed pages.
 
+## How the instance pool is sized
+
+Since 2.12.0 the knob that sizes the engine's pool is `--max-memories` (`WASH_MAX_MEMORIES`, chart value [`runtime.resources.maxMemories`](./helm-values.mdx#runtimeresourcesmaxmemories)): the count of guest linear memories the pooling allocator keeps room for. Multiplied by one memory's reservation it *is* the pool's address-space reservation, and the fiber-stack, component-instance, core-instance, table, and GC-heap totals are all derived from it, one of each per memory for a component of the usual shape.
+
+Left unset, the host derives the count from the machine rather than using a fixed number: half the usable address space, and at most 90% of `vm.max_map_count` allowing six mappings per warm component. On a default Linux node that is **9,829** memories; the floor is 1000. Setting `WASMTIME_MEMORY_INIT_COW=false` in the host's environment (since 2.12.0) copies each component's data segments into its memory at instantiation instead of mapping them copy-on-write. A warm memory then needs two fewer mappings, which raises the derived count on a default Linux node to 14,744, at the cost of the copy on every instantiation.
+
+:::warning[`--core-instances` no longer sizes the pool]
+Through 2.11.0, `--core-instances` (default 1000) was both the core-instance total and the number of instances the pool held. Since 2.12.0 it is a *counter* for live core modules — several per component, four for a Rust HTTP handler, five for a Componentize-Go one, plus every member of a composition — and defaults to sixteen per memory, a number components of the usual shape never fill, so the linear memories are what a full pool runs out of first.
+
+Set alone, `--core-instances` still pins `--max-memories` to the same count, reproducing the pool it sized before, and the host warns at startup. Set beside `--max-memories`, both are installed as given, with a warning when they disagree. `WASMTIME_POOLING_TOTAL_*` overrides any one total on its own.
+:::
+
+The per-memory layout is separately adjustable since 2.12.0. Each slot is `--memory-reservation` (wasmtime's 4 GiB by default) followed by `--memory-guard-size` (32 MiB), whatever `--default-heap-memory` is. Lowering `--default-heap-memory` caps how far a guest may grow but does not shrink the reservation; `--memory-reservation` does. A pooled memory cannot outgrow its reservation, so when `--memory-reservation` is set, a `--default-heap-memory` above it is lowered to the reservation; the startup warning about a reduced layout reports the lowered value. Shrinking the layout fits more warm instances into a node's address space, and [moves an isolation boundary](./helm-values.mdx#runtimeresourcesmemoryreservation-and-runtimeresourcesmemoryguardsize) while it does — read that note before reaching for it. The host warns at startup when the layout is below the defaults, or when the reservation would exceed 90% of mappable address space or outgrow `vm.max_map_count` on Linux.
+
 ### When the instance pool runs out
 
-The engine's pool is sized by `--core-instances` (default 1000), not by `--default-heap-memory`. Every pool slot reserves Wasmtime's 4 GiB memory reservation plus a 32 MiB guard regardless of the heap ceiling, so lowering `--default-heap-memory` caps how far a guest may grow without shrinking the reservation; a ceiling above 4 GiB now fails host startup rather than being silently ignored. Reduce the slot count to reduce address-space use. The host warns at startup when the reservation would exceed 90% of mappable address space or outgrow `vm.max_map_count` on Linux.
-
 Pool exhaustion used to surface as a bare Wasmtime message while the workload still reported healthy. Since 2.11.0 the instantiation error names the setting to raise, for example `host instance pool exhausted. Raise --core-instances (or WASMTIME_POOLING_TOTAL_CORE_INSTANCES), or give this host fewer warm instances`. These warnings are rate-limited to once every 10 seconds, with repeats at debug level.
+
+### Hostcall fuel
+
+Since 2.12.0, `--hostcall-fuel` (`WASH_HOSTCALL_FUEL`, chart value [`runtime.resources.hostcallFuel`](./helm-values.mdx#runtimeresourceshostcallfuel)) bounds roughly how many bytes a guest may copy to the host in one call, and each read the host makes from a future or a stream. Past it, the call traps, and the host logs a hint naming the knob once per deploy. Unset it is wasmtime's own default of 128 MiB. These bytes are allocated outside the guest memory budget, from what the container limit leaves over after it, and the host warns at startup when the value exceeds that remainder.
+
+It does not bound byte streams the host reads directly, such as HTTP bodies and socket writes, and it is **unrelated to fuel metering** (`--meters fuel`), which counts instructions.
+
+### Limits above what a semaphore can hold
+
+A concurrency ceiling larger than Tokio's `Semaphore::MAX_PERMITS` used to panic when the semaphore was constructed. Since 2.12.0 such a value is refused at startup instead, so a mistyped limit fails the host with a message rather than taking it down later.
 
 ## Messaging admission (per component)
 
@@ -158,6 +182,7 @@ This limit is separate from `maxConcurrency`: `maxConcurrency` bounds calls on o
 - Instance concurrency sets connection demand; the per-workload quota sets the ceiling. Size them as a pair.
 - The keep-alive pool is sized automatically from declared concurrency, so you tune concurrency and the quota, not the pool directly.
 - Outbound HTTP over quota waits up to `--http-connection-wait` (default `5s`) then fails; raw sockets and inbound connections are refused immediately.
+- Since 2.12.0, `--max-memories` sizes the host's instance pool and is derived from the node when unset; `--core-instances` is a counter, not the pool size.
 - The connection quota applies once per replica, so scaling out multiplies the total connection budget. The messaging admission gate does not: replicas of one deployment share it (since 2.10.0).
 - Messaging deliveries have their own admission limit (`max_in_flight`, as of 2.8.0), applied before instance limits come into play.
 - A host-process memory limit sits above all of it (since 2.11.0), refusing guest growth and new workload starts past 90% of the cgroup limit, and enforced even in `count` mode.

@@ -89,7 +89,9 @@ function secondsToIsoDuration(seconds: number): string {
 
 type PersonEntity = {
   '@type': 'Person';
+  '@id'?: string;
   name: string;
+  url?: string;
   affiliation?: { '@type': 'Organization'; name: string; url?: string };
 };
 
@@ -99,8 +101,17 @@ type PersonEntity = {
  * never rendered visually on meeting / transcript pages — and is consumed
  * here to populate `actor.affiliation` for M11's VideoObject and M8's
  * transcript Article `mentions[]`.
+ *
+ * Maintainers also get the `@id` and `url` of their `/people/<slug>/`
+ * profile, so the speaker on the video and the Person on the profile page
+ * resolve to one entity. Being listed in `speakers:` is itself the
+ * "published surface" the people-pages plugin requires, so every
+ * maintainer here is guaranteed to have that profile page.
  */
-function buildSpeakers(frontMatter: Record<string, unknown>): PersonEntity[] | undefined {
+function buildSpeakers(
+  frontMatter: Record<string, unknown>,
+  siteUrl: string,
+): PersonEntity[] | undefined {
   const raw = frontMatter.speakers;
   if (!Array.isArray(raw)) return undefined;
   const slugs = raw.filter((s): s is string => typeof s === 'string');
@@ -110,9 +121,13 @@ function buildSpeakers(frontMatter: Record<string, unknown>): PersonEntity[] | u
     .map((slug) => {
       const person = PEOPLE.people.find((p) => p.slug === slug);
       if (!person) return null;
+      const profileUrl =
+        person.wasmcloud_role === 'maintainer' ? `${siteUrl}/people/${slug}/` : undefined;
       const entity: PersonEntity = {
         '@type': 'Person',
+        ...(profileUrl && { '@id': `${profileUrl}#person` }),
         name: person.name,
+        ...(profileUrl && { url: profileUrl }),
       };
       if (person.org) {
         const orgInfo = PEOPLE.organizations[person.org];
@@ -203,7 +218,7 @@ export default function VideoSEO({
     typeof frontMatter.duration === 'number' ? frontMatter.duration : undefined;
 
   const keywords = getKeywords(frontMatter);
-  const speakers = buildSpeakers(frontMatter);
+  const speakers = buildSpeakers(frontMatter, siteUrl);
   // Transcript pages typically don't repeat `about:` / `mentions:` in their
   // own frontmatter — those refs live on the parent landing page. When this
   // is a transcript page and its own frontmatter omits one of the refs, fall

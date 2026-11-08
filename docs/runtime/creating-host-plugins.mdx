@@ -119,7 +119,7 @@ The `HostPlugin` trait uses several types from the `wash_runtime` crate:
 - **`WitInterface`** - Describes a specific interface with `namespace`, `package`, `interfaces` (a set of interface names), an optional `version`, an optional `name` (used for multi-backend binding), and a `config` map. Since 2.9.0 `version`, `name`, and `config` are serde-defaulted, so a manifest entry served by a declared binding can omit `config`.
 - **`WitInterfaces<'a>`** - A borrowed wrapper around `&HashSet<WitInterface>` passed to `on_workload_bind`, `on_workload_item_bind`, and `on_workload_unbind`. Provides `iter()`, `get(namespace, package, interfaces)`, and `contains(namespace, package, interfaces)` lookup helpers, avoiding a clone of the interface set per callback.
 - **`UnresolvedWorkload`** - A workload that has been initialized but not yet bound to plugins.
-- **`WorkloadItem<'a>`** - An enum passed to `on_workload_item_bind`. Variants are `WorkloadItem::Component(&mut WorkloadComponent)` and `WorkloadItem::Service(&mut WorkloadService)`. Implements `Deref<Target = WorkloadMetadata>`, so `item.linker()` is accessible directly without pattern matching. Use `item.is_component()` / `item.is_service()` when you need to handle the two variants differently.
+- **`WorkloadItem<'a>`** - An enum passed to `on_workload_item_bind`. Variants are `WorkloadItem::Component(&mut WorkloadComponent)` and `WorkloadItem::Service(&mut WorkloadService)`. Implements `Deref<Target = WorkloadMetadata>`, so `item.linker()` is accessible directly without pattern matching. Since 2.12.0 `linker()` returns `anyhow::Result<&mut Linker<SharedCtx>>`, an error once workload resolution has sealed the linker, so call it as `item.linker()?` inside `on_workload_item_bind`. Use `item.is_component()` / `item.is_service()` when you need to handle the two variants differently.
 - **`ResolvedWorkload`** - A fully bound workload ready for execution.
 
 ### Operator-declared bindings
@@ -162,7 +162,9 @@ The type parameter is the concrete backend your host registered for the looked-u
 
 Since 2.11.0 a native plugin can replace functions in a WASI interface the host normally serves, which is what a plugin acting as a sandboxer needs. This is a `wash-runtime` library capability: there is no WIT export a component plugin can use to declare one, and no Helm value or CRD field that requests it.
 
-Overridable interfaces are the host-linked WASI base — `wasi:io`, `wasi:filesystem`, `wasi:clocks`, `wasi:random`, `wasi:cli`, `wasi:sockets`, and `wasi:http` — at `0.2.0` or `0.3.0` (`wasi:io` at `0.2.0` only, since WASI 0.3 folds it into the component model). Interfaces the host does not link as builtins, such as `wasi:keyvalue` or `wasi:logging`, are served by a plugin the ordinary way rather than overridden.
+Overridable interfaces are the host-linked WASI base — `wasi:io`, `wasi:filesystem`, `wasi:clocks`, `wasi:random`, `wasi:cli`, `wasi:sockets`, and `wasi:http` — at `0.2.0` or `0.3.0` (`wasi:io` at `0.2.0` only, since WASI 0.3 folds it into the component model).
+
+Those seven packages are the whole scope. A `wasi:*` package the host does **not** link itself — `wasi:otel`, `wasi:blobstore`, `wasi:keyvalue`, `wasi:config`, `wasi:logging` — is served by a plugin the ordinary way, and replaced by registering another plugin that serves the same interface, which plugin precedence then resolves. Since 2.12.0 declaring one of them as an override is **rejected**, at registration and again before a workload binds, with a message naming the interface; through 2.11.0 the declaration was accepted and shadowed nothing useful.
 
 Declaring one takes two steps. First return the interfaces from `wasi_overrides`:
 
@@ -252,7 +254,10 @@ impl HostPlugin for CustomLogger {
     ) -> anyhow::Result<()> {
         // WorkloadItem implements Deref<Target = WorkloadMetadata>, so linker()
         // is accessible directly without pattern matching:
-        // item.linker().func_wrap(...)?;
+        // item.linker()?.func_wrap(...)?;
+        //
+        // linker() returns a Result since 2.12.0: it is an error once workload
+        // resolution has sealed the linker, so bind here, before resolution.
         //
         // Use item.is_component() / item.is_service() if you need to
         // handle components and services differently.
