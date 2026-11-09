@@ -53,8 +53,8 @@ function BlogListPageContent(props: Props): JSX.Element {
                         Atom
                       </a>{' '}
                       or{' '}
-                      <a href="https://twitter.com/wasmcloud" target="_blank" rel="noopener">
-                        follow us on Twitter
+                      <a href="https://x.com/intent/follow?screen_name=wasmcloud" target="_blank" rel="noopener">
+                        follow us on X
                       </a>
                       .
                     </p>
