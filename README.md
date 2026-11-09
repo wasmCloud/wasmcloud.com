@@ -6,12 +6,27 @@ Repository for the wasmCloud homepage including our community, team, docs, links
 
 ## Running the site locally
 
+Use Node.js 24, matching the CI and release builds.
+
 ```bash
 npm ci
 npm run start
 ```
 
 This command starts a local development server and opens up a browser window. Most changes are reflected live without having to restart the server.
+
+### Dependency security
+
+Run `npm audit` and `npm run test:dependency-security` after dependency updates.
+The root npm overrides select patched Tinypool and serialize-javascript releases
+for the Docusaurus build, minimatch for the LLM plugin, and the CommonJS-compatible
+UUID 11 release for SockJS. Upstream consumers still request vulnerable versions;
+remove each override when their supported ranges include the security fixes.
+
+Deepmerge has no patched upstream release. Its root file dependency and override
+use a [locally hardened copy](vendor/deepmerge/README.md), with regression tests
+covering both ReactPlayer and SVGR. Keep the vendored directory available during
+installation, including in Docker's dependency layer.
 
 ### Build
 
