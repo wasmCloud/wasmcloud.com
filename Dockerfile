@@ -14,6 +14,7 @@ WORKDIR /repo
 # Copy dependency manifests first so the `npm ci` layer is reused across
 # doc-content-only rebuilds. Any change to package*.json busts the cache.
 COPY package.json package-lock.json ./
+COPY vendor/deepmerge ./vendor/deepmerge
 RUN npm ci
 
 COPY . .
