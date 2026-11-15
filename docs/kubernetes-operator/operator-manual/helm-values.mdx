@@ -449,6 +449,33 @@ Local routing bypasses ingress auth, rate limits, mesh mTLS, and NetworkPolicy, 
 
 Enables the WebGPU plugin on hosts in the group. Requires a host image built with the `wasi-webgpu` feature.
 
+### `runtime.hostGroups[].nodeSelector` and `runtime.hostGroups[].tolerations`
+
+Which nodes the group's host pods are scheduled onto (since 2.12.1). `nodeSelector` is the node labels those pods must match, and `tolerations` the taints they tolerate; both take the standard Kubernetes shapes and are rendered into the host pod spec. Both are unset by default, so an existing release renders the same pod spec as before.
+
+These matter most for a group that needs particular hardware. A group's `resources` can request a device, but it cannot choose the nodes that have one, and a managed GPU pool is usually tainted so that only consenting pods land there:
+
+```yaml
+runtime:
+  hostGroups:
+    - name: gpu
+      webgpu:
+        enabled: true
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+      nodeSelector:
+        nvidia.com/gpu.present: 'true'
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+```
+
+A group's own `resources` block replaces the chart-wide one outright rather than merging into it, so a group declaring `resources` for a device also has to restate the memory and CPU values it still wants — including the `limits.memory` the host's guest memory budget is derived from.
+
+Placement then takes two steps, and both are needed. Kubernetes decides which **nodes** the group's host pods run on, from these two keys; the operator decides which **host group** a workload runs on, from the workload's `hostSelector`. A workload that needs a GPU has to have the group reach GPU nodes *and* select that group itself.
+
 ### `runtime.ociCaPaths` and `runtime.hostGroups[].ociCaPaths`
 
 PEM bundles of additional CA certificates the host trusts when pulling artifacts (e.g., workload components, host component plugins, or washlet artifacts) from OCI registries. `runtime.ociCaPaths` applies chart-wide; the per-host-group form is additive. The chart renders entries as `--oci-ca-path` arguments (the paths must be mounted into the pod via `volumes`/`volumeMounts`).
@@ -644,6 +671,8 @@ Set it to `false` when a host group points at a single pod URL and genuinely nee
 
 The same policy reaches the multiplexed plugins' own NATS backends, not just the host's control and data connections.
 
+Where TLS is configured — a TLS CA, a client certificate, or TLS-first — advertised servers are ignored whatever this value is (since 2.12.1). This covers the host's own control and data connections and the `wasmcloud:nats` and NATS blobstore binding connections, which are the ones that take TLS material; setting this to `false` no longer restores discovery for them. A server's `INFO` is otherwise read in plaintext before TLS begins, so a peer on the path could advertise a `ws://` address that the client would then dial without TLS, exposing the credentials in the next `CONNECT`. The NATS blobstore also honors this value for its binding connections, as `wasmcloud:nats` already did.
+
 ### `runtime.hostGroups[].networking`
 
 Maps to the host's socket policy and connection quota flags. The chart renders these keys as host flags since 2.9.0; the block existed in the 2.8.0 values file but was not wired to the host, so on earlier charts set these through `extraArgs`:
@@ -671,7 +700,7 @@ One declaration block configures host plugins of both kinds (since 2.9.0): nativ
 - **`workloadConfig`**: `deny` (the default), `warn`, or `allow`. Under `deny`, host-owned keys (connection, credential, and since 2.11.0 backend-address settings) come only from this declaration: a workload manifest that sets one or widens a grant ceiling is refused at deploy, and once any binding is declared for a plugin, so is a manifest naming a binding the declaration does not carry. `warn` behaves like `allow` but logs everything `deny` would refuse, for rehearsing a lockdown. `deny` refuses the keys a plugin claims or this entry sets, so what it covers grew in 2.11.0 when the multiplexed plugins began claiming their address keys — see the warning below.
 - **`hostOwnedKeys`**: additional keys to claim for the host under `deny`.
 - **`bindings`**: a map of label to `{config, configFrom, secretFrom}`. A component imports the plugin's interface under that label (the Component Model's `implements` clause), and the labeled import resolves against the binding's config layered over the entry's.
-- **`allowedHosts` / `allowedIpNameLookups`**: the plugin's own HTTP, DNS, and raw-socket egress grants. **Omitting all three of `allowedHosts`, `allowedIpNameLookups`, and `allowedHostLoopbackPorts` installs no ceiling**, so the plugin dials wherever its configuration points; an empty list is the same as omitting it. Naming any **one** of the three installs the ceiling, and the lists left empty then deny everything on their own surfaces — so an entry declaring only `allowedHostLoopbackPorts` denies the plugin every other endpoint. Since 2.10.0 they apply to native and component entries alike, and refusals follow the group's [`networking.socketEgress`](#runtimehostgroupsnetworking) mode. A native plugin that cannot enforce a declared ceiling fails host startup rather than ignoring it. Since 2.11.0 the multiplexed keyvalue, blobstore, messaging, and postgres plugins accept a ceiling too (declaring one on them previously failed host startup), checked per backend at every bind before any pooled connection is reused. Three details when writing one: `postgres`/`postgresql`, `redis`/`valkey`, and `rediss`/`valkeys` match as one scheme; a plaintext entry also admits its TLS form at the same endpoint (`nats://` admits `tls://`) but never the reverse; and a port-less entry means that client's default port (`redis` 6379, `postgres` 5432, `nats` 4222) rather than any port. A url naming a hostname is matched by name only, since the plugin's client resolves it itself, so `denySpecialRanges` and `denyPrivateRanges` constrain only a url naming a literal address.
+- **`allowedHosts` / `allowedIpNameLookups`**: the plugin's own HTTP, DNS, and raw-socket egress grants. **Omitting all three of `allowedHosts`, `allowedIpNameLookups`, and `allowedHostLoopbackPorts` installs no ceiling**, so the plugin dials wherever its configuration points; an empty list is the same as omitting it. Naming any **one** of the three installs the ceiling, and the lists left empty then deny everything on their own surfaces — so an entry declaring only `allowedHostLoopbackPorts` denies the plugin every other endpoint. Since 2.10.0 they apply to native and component entries alike, and refusals follow the group's [`networking.socketEgress`](#runtimehostgroupsnetworking) mode. A native plugin that cannot enforce a declared ceiling fails host startup rather than ignoring it. Since 2.11.0 the multiplexed keyvalue, blobstore, messaging, and postgres plugins accept a ceiling too (declaring one on them previously failed host startup), checked per backend at every bind before any pooled connection is reused. Three details when writing one: `postgres`/`postgresql`, `redis`/`valkey`, and `rediss`/`valkeys` match as one scheme; a plaintext entry also admits its TLS form at the same endpoint (`nats://` admits `tls://`) but never the reverse; and a port-less entry means that client's default port (`redis` 6379, `postgres` 5432, `nats` 4222) rather than any port. Since 2.12.1 a url naming a hostname is also held to what it resolves to: the host looks the name up at each of those binds and puts every address it answers with through the address policies — `denySpecialRanges` and `denyPrivateRanges` constrain a named endpoint too, and a name resolving into loopback needs the same two-key grant a literal needs. The resolved addresses are not matched against `allowedHosts` themselves, so a name the list permits still needs no separate address entry. Before 2.12.1 such a name was matched only as written, so a permitted name answering with `127.0.0.1` or `169.254.169.254` reached the machine's loopback or a cloud metadata service past both policies. This is a bind-time check rather than a pin: the lookup is bounded at five seconds, a name that fails to resolve or does not resolve in that window is left to the plugin's own client, and a reconnect after the check is not judged again.
 - **`allowedHostLoopbackPorts`**: ports the plugin may reach on the machine's loopback through `host.wasmcloud.internal` (since 2.10.0). A two-key grant like the workload field of the same name: inert unless the host also runs with `--allow-host-loopback`. Enforced in either `socketEgress` mode.
 - **`ports`**: ports a plugin may bind (`name` and `port`, optional `protocol` and `bind`; since 2.10.0). Entries with a `bind` address are reserved in the host's port table at load, and unspecified or loopback `bind` addresses are rejected. The per-plugin `publish` field is not yet supported and is rejected. (Unrelated to [`runtime.hostGroups[].ports`](#runtimehostgroupsvolumes-volumemounts-and-ports), which are pod container ports.)
 - Component-plugin-only fields: `maxRestarts`, `digest` (an OCI digest pin).

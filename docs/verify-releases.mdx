@@ -11,7 +11,7 @@ platforms: [wasmCloud]
 
 # Verify wasmCloud releases
 
-Verify a downloaded `wash` binary or container image before running it. Release attestations bind the artifact's SHA-256 digest to the wasmCloud release workflow using a short-lived GitHub Actions certificate and Sigstore. Since 2.12.0 the release **tags** are signed the same way, so the source revision a release was cut from can be verified too.
+Verify a downloaded `wash` binary or container image before running it. Release attestations bind the artifact's SHA-256 digest to the wasmCloud release workflow using a short-lived GitHub Actions certificate and Sigstore. Since 2.12.0 the release **tags** are signed the same way, so the source revision a release was cut from can be verified too. Since 2.12.1 each release also carries a signed [OpenVEX](https://openvex.dev/) assessment of scanner findings.
 
 Install a current [GitHub CLI](https://cli.github.com/) and authenticate with `gh auth login`. For container verification, also authenticate to `ghcr.io` with your container client. All commands below require this signer workflow:
 
@@ -126,5 +126,35 @@ gh attestation verify "oci://${image%:*}@${digest}" \
 Image SBOM attestations are also published to GHCR. Add `--bundle-from-oci` to the platform SBOM verification command to retrieve them from the registry.
 
 To use a downloaded bundle for binary verification, add `--bundle ./wash-x86_64-unknown-linux-gnu.sbom.sigstore.json` to the binary SBOM command. The release's `wash.sigstore.json` bundle contains build provenance and uses the default predicate type instead.
+
+## Verify a release VEX assessment
+
+Since 2.12.1 each release carries an [OpenVEX](https://openvex.dev/) document recording the project's assessment of scanner findings against its dependencies, as `wasmcloud.openvex.json`, with its Sigstore bundle as `wasmcloud.openvex.sigstore.json`. It is attested by the same release workflow as the binaries and SBOMs, under the predicate type `https://openvex.dev/ns/v0.2.0`.
+
+Verify it and extract the authenticated document:
+
+```bash
+version='{{WASMCLOUD_VERSION}}'
+gh release download "v${version}" --repo wasmCloud/wasmCloud --pattern 'wasmcloud.openvex.json'
+gh attestation verify ./wasmcloud.openvex.json \
+  --repo wasmCloud/wasmCloud \
+  --signer-workflow wasmCloud/wasmCloud/.github/workflows/release-tag.yml \
+  --source-ref refs/heads/main \
+  --predicate-type https://openvex.dev/ns/v0.2.0 \
+  --format json \
+  --jq '.[0].verificationResult.statement.predicate' > verified-vex.json
+```
+
+`--predicate-type` is required here. `gh attestation verify` looks for the SLSA build provenance predicate by default, and the release workflow attests the VEX document under the OpenVEX predicate alone, so omitting the flag fails with `no matching predicate found` — the same error a wrong value gives. The command writes the document to `verified-vex.json` and prints no confirmation of its own, so check its exit status rather than looking for output.
+
+Each statement in the document names a `vulnerability` and a `products` list, a `status`, and, for a `not_affected` status, an OpenVEX `justification` alongside an `impact_statement` explaining the reasoning. Read them with `jq`:
+
+```bash
+jq -r '.statements[] | "\(.vulnerability.name // .vulnerability["@id"]) \(.status): \(.justification // "-")"' verified-vex.json
+```
+
+A VEX assessment is the project's own analysis, published so that a scanner finding against a wasmCloud release can be triaged against it. It supplements upstream advisories rather than replacing them, and a `not_affected` statement applies to the products it names, not to your use of the dependency elsewhere — each statement names the release artifacts it covers.
+
+Read each release's own document rather than treating the newest as cumulative. A statement is carried onto the next release renamed to that release's artifacts, and one that no longer applies is dropped, so a finding absent from the current document may have been assessed against an earlier release instead. A release's published assets are immutable, so an older release's document stays as it was when that release was cut.
 
 Older releases may lack SBOMs or attestations. Missing attestations are a verification failure, not a successful check. SBOMs report detected components; they do not prove that those components are free of vulnerabilities.

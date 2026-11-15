@@ -65,7 +65,7 @@ wash host --host-group my-cluster --scheduler-nats-url nats://nats:4222
 | `--scheduler-nats-tls-ca` | — | TLS CA for scheduler NATS. Setting it, or a client certificate, makes TLS **required** on that connection (since 2.12.0) |
 | `--data-nats-tls-ca` | — | TLS CA for data plane NATS, with the same requirement |
 | `--scheduler-nats-creds`, `--data-nats-creds` | — | Credentials file per connection, reread on every reconnect (since 2.12.0). `--*-nats-nkey`, `--*-nats-token-file`, and `--*-nats-user` with `--*-nats-password-file` are the alternatives |
-| `--nats-ignore-discovered-servers` | false | Restrict NATS connections to their configured URLs rather than following cluster-advertised addresses (since 2.12.0). The Helm chart sets it on |
+| `--nats-ignore-discovered-servers` | false | Restrict NATS connections to their configured URLs rather than following cluster-advertised addresses (since 2.12.0). The Helm chart sets it on. Connections that require TLS (a TLS CA, a client certificate, or TLS-first) ignore advertised servers regardless, since 2.12.1 |
 
 This table covers the core cluster flags; for the full and current flag surface, including the probe, drain, and memory flags and the socket and filesystem policy flags, see the [`wash host` command reference](../wash/commands.mdx#wash-host).
 
@@ -221,6 +221,10 @@ runtime.operator.heartbeat.<host_id>
 ```
 
 Messages are JSON-encoded. You typically don't interact with these subjects directly—the operator handles scheduling and the washlet handles command processing.
+
+Since 2.12.1 the operator checks that a heartbeat's payload ID matches the ID in the subject it arrived on, and ignores the heartbeat otherwise. It also refuses to let a different ID claim an existing `Host` name. A name does not stay taken, though: once the old host has gone unheard-from for the heartbeat TTL (60 seconds, not currently configurable) and the operator is hearing the rest of the fleet, it deletes that `Host` itself, and the name is free. Delete the `Host` by hand only to free a name immediately, or while the old host is still running and heartbeating.
+
+Both checks assume NATS permissions confine each host to its own heartbeat subject. One credential shared across a host group (`runtime.operator.heartbeat.*`) lets any host in the group publish a heartbeat as any other. Where the hosts in a group do not trust each other, give each its own credential and matching [`--host-id`](../wash/commands.mdx#wash-host) — which means one replica per host group, since the chart renders a single argument list for every replica in a group.
 
 ## Keep reading
 
