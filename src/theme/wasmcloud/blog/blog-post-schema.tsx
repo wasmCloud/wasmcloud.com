@@ -206,7 +206,17 @@ function buildImageProperty(
   return resolved.length > 0 ? resolved : undefined;
 }
 
-export default function BlogPostSchema(): JSX.Element | null {
+type Props = {
+  /**
+   * Extra properties merged into the Article-family node. Used by community
+   * pages to link the post to its VideoObject and the meeting series, so the
+   * page carries ONE Article node instead of a second, competing node under
+   * the same @id. `mentions` arrays are concatenated rather than replaced.
+   */
+  extra?: Record<string, unknown>;
+};
+
+export default function BlogPostSchema({ extra }: Props = {}): JSX.Element | null {
   const { siteConfig } = useDocusaurusContext();
   const { metadata } = useBlogPost();
   const peoplePages = usePluginData('people-pages-plugin') as
@@ -221,7 +231,10 @@ export default function BlogPostSchema(): JSX.Element | null {
   const schemaType = resolveSchemaType(
     (frontMatter as { schema_type?: string }).schema_type,
   );
-  const canonicalUrl = `${siteUrl}${permalink}`;
+  // Match the trailing-slash form of <link rel="canonical"> (trailingSlash:
+  // true) so url / mainEntityOfPage / @id agree with the canonical URL and
+  // with @id references emitted from other components.
+  const canonicalUrl = `${siteUrl}${permalink.endsWith('/') ? permalink : `${permalink}/`}`;
   const datePublished = typeof date === 'string' ? date : date instanceof Date ? date.toISOString() : undefined;
   // Docusaurus's `lastUpdatedAt` is already a JS Date.getTime()-shaped
   // millisecond timestamp, NOT a unix-seconds value. Don't multiply by 1000
@@ -297,6 +310,17 @@ export default function BlogPostSchema(): JSX.Element | null {
     ...(entityRefs.about && { about: entityRefs.about }),
     ...(entityRefs.mentions && { mentions: entityRefs.mentions }),
   };
+
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) {
+      if (value === undefined) continue;
+      const existing = article[key];
+      article[key] =
+        key === 'mentions' && Array.isArray(existing) && Array.isArray(value)
+          ? [...value, ...existing]
+          : value;
+    }
+  }
 
   if (speakableFlag) {
     article.speakable = {

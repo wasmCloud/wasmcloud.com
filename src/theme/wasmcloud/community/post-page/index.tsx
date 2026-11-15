@@ -11,7 +11,8 @@ import styles from './styles.module.css';
 import Layout from '@theme/Layout';
 import CommunityPostItem from '../post-item';
 import Link from '@docusaurus/Link';
-import VideoSEO from '../video-seo';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import VideoSEO, { buildCommunityArticleExtras } from '../video-seo';
 import MeetingSpeakers from '../meeting-speakers';
 // Replaces Docusaurus's default `<BlogPostPageStructuredData />` with our
 // richer BlogPostSchema so community pages emit the same Article-family
@@ -82,7 +83,13 @@ function CommunityPostPageContent({ children }: { children: ReactNode }): JSX.El
 
 function CommunityPostPageSEO(): JSX.Element | null {
   const { metadata } = useBlogPost();
-  return <VideoSEO metadata={metadata} />;
+  const { siteConfig } = useDocusaurusContext();
+  return (
+    <>
+      <BlogPostSchema extra={buildCommunityArticleExtras(metadata, siteConfig.url)} />
+      <VideoSEO metadata={metadata} />
+    </>
+  );
 }
 
 export default function CommunityPostPage(props: Props): JSX.Element {
@@ -93,7 +100,6 @@ export default function CommunityPostPage(props: Props): JSX.Element {
         className={clsx(ThemeClassNames.wrapper.blogPages, ThemeClassNames.page.blogPostPage)}
       >
         <BlogPostPageMetadata />
-        <BlogPostSchema />
         <NoindexIfArchived />
         <CommunityPostPageSEO />
         <CommunityPostPageContent>
