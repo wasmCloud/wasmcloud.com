@@ -11,6 +11,8 @@ import {
 // landing page via this map (see video-seo.tsx + the prebuild generator).
 // On non-community pages and on landing pages the map is unused.
 import transcriptInheritance from '@site/src/data/transcript-inheritance.json';
+import { meetingStartIso } from '@theme/wasmcloud/community/meeting-time';
+import { withTrailingSlash } from '@theme/wasmcloud/structured-data/url';
 
 type InheritedRefs = { about?: string; mentions?: string[] };
 const TRANSCRIPT_INHERITANCE: Record<string, InheritedRefs> =
@@ -231,11 +233,18 @@ export default function BlogPostSchema({ extra }: Props = {}): JSX.Element | nul
   const schemaType = resolveSchemaType(
     (frontMatter as { schema_type?: string }).schema_type,
   );
-  // Match the trailing-slash form of <link rel="canonical"> (trailingSlash:
-  // true) so url / mainEntityOfPage / @id agree with the canonical URL and
-  // with @id references emitted from other components.
-  const canonicalUrl = `${siteUrl}${permalink.endsWith('/') ? permalink : `${permalink}/`}`;
-  const datePublished = typeof date === 'string' ? date : date instanceof Date ? date.toISOString() : undefined;
+  const canonicalUrl = withTrailingSlash(`${siteUrl}${permalink}`);
+  // Community meeting pages (this component also serves the /community/
+  // blog instance) are dated by the call itself, which starts at 1:00 PM
+  // America/New_York — not midnight UTC, the previous evening in Eastern.
+  const isCommunityPage = permalink.startsWith('/community/');
+  const datePublished = isCommunityPage
+    ? meetingStartIso(date, (frontMatter as { start_time?: unknown }).start_time)
+    : typeof date === 'string'
+      ? date
+      : date instanceof Date
+        ? date.toISOString()
+        : undefined;
   // Docusaurus's `lastUpdatedAt` is already a JS Date.getTime()-shaped
   // millisecond timestamp, NOT a unix-seconds value. Don't multiply by 1000
   // — that produces year 58000+ dates and trashes the rich result.

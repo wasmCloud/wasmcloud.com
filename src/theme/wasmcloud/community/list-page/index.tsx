@@ -8,6 +8,7 @@ import SearchMetadata from '@theme/SearchMetadata';
 import type { Props } from '@theme/BlogListPage';
 import BlogPostItems from '@theme/BlogPostItems';
 import CommunitySidebar from '../sidebar';
+import { meetingStartIso } from '../meeting-time';
 import CollectionPageSchema from '../../structured-data/collection-page';
 import styles from './styles.module.css';
 import BlogPostListItem from '../list-item';
@@ -49,8 +50,8 @@ function CommunityListPageStructuredData(props: Props): JSX.Element {
   const siteUrl = siteConfig.url.replace(/\/$/, '');
   const withSlash = (p: string) => (p.endsWith('/') ? p : `${p}/`);
   const meetings = items
-    .map((item) => item.content.metadata)
-    .filter((m) => !isTranscriptPermalink(m.permalink));
+    .map((item) => item.content)
+    .filter((c) => !isTranscriptPermalink(c.metadata.permalink));
   return (
     <CollectionPageSchema
       permalink={withSlash(metadata.permalink)}
@@ -65,14 +66,15 @@ function CommunityListPageStructuredData(props: Props): JSX.Element {
         publisher: { '@id': 'https://wasmcloud.com/#organization' },
         inLanguage: 'en',
         // Same @id BlogPostSchema gives each meeting page's Article node.
-        hasPart: meetings.map((m) => {
+        hasPart: meetings.map(({ metadata: m, frontMatter }) => {
           const url = `${siteUrl}${withSlash(m.permalink)}`;
           return {
             '@type': 'BlogPosting',
             '@id': `${url}#article`,
             url,
             headline: m.title,
-            datePublished: m.date,
+            // The call's real start (1:00 PM Eastern), not midnight UTC.
+            datePublished: meetingStartIso(m.date, (frontMatter as { start_time?: unknown }).start_time),
           };
         }),
       }}
