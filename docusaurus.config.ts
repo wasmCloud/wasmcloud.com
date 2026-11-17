@@ -456,7 +456,7 @@ const config = (async (): Promise<Config> => {
               },
               {
                 label: 'Calendar & wasmCloud Wednesdays',
-                href: 'https://calendar.google.com/calendar/u/0/embed?src=c_6cm5hud8evuns4pe5ggu3h9qrs@group.calendar.google.com',
+                href: 'https://zoom-lfx.platform.linuxfoundation.org/meetings/wasmcloud',
               },
               {
                 label: 'Community Meeting Notes',
