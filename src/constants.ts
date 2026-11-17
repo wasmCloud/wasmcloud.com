@@ -1,5 +1,4 @@
-const ZOOM =
-  'https://zoom.us/j/98144613430?pwd=VjBObmZIaUppUXVWRkxSZ3crZzhkZz09';
+const ZOOM = 'https://zoom.us/j/98144613430?pwd=VjBObmZIaUppUXVWRkxSZ3crZzhkZz09';
 
 // Google Calendar "add event" link for the weekly community call, Wednesdays
 // 1-2pm ET. The `recur` rule makes the added event repeat; copying an event
@@ -18,6 +17,8 @@ const Links = {
   YOUTUBE: 'https://youtube.com/live/PWrul2fTquw',
   PLAYLIST: 'https://www.youtube.com/@wasmCloud/streams',
   CALENDAR,
+  // CNCF (LFX) project meetings calendar; offers an iCal feed to subscribe to.
+  CNCF_CALENDAR: 'https://zoom-lfx.platform.linuxfoundation.org/meetings/wasmcloud',
   ZOOM,
   GITHUB: 'https://github.com/wasmcloud/wasmcloud',
   SLACK: 'https://slack.wasmcloud.com',

@@ -102,11 +102,15 @@ function BlogListPageContent(props: Props): JSX.Element {
                 {metadata.blogDescription && (
                   <div className="col col--4">
                     <p className={styles.description}>
-                      {metadata.blogDescription} Add the next meeting to your{' '}
+                      {metadata.blogDescription} Add the weekly meeting to your{' '}
                       <a href={Links.CALENDAR} target="_blank">
-                        Calendar
-                      </a>{' '}
-                      or watch it live on{' '}
+                        Google Calendar
+                      </a>
+                      , subscribe from the{' '}
+                      <a href={Links.CNCF_CALENDAR} target="_blank">
+                        CNCF calendar
+                      </a>
+                      , or watch it live on{' '}
                       <a href={Links.YOUTUBE} target="_blank">
                         YouTube
                       </a>
