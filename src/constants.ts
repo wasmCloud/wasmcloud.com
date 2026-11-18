@@ -14,7 +14,7 @@ const CALENDAR = `https://calendar.google.com/calendar/render?${new URLSearchPar
 })}`;
 
 const Links = {
-  YOUTUBE: 'https://youtube.com/live/PWrul2fTquw',
+  YOUTUBE: 'https://youtube.com/live/0rcFomxfvTk',
   PLAYLIST: 'https://www.youtube.com/@wasmCloud/streams',
   CALENDAR,
   // CNCF (LFX) project meetings calendar; offers an iCal feed to subscribe to.
