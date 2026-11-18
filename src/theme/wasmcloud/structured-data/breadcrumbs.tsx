@@ -1,7 +1,28 @@
 import React from 'react';
 import { useLocation } from '@docusaurus/router';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import routes from '@generated/routes';
 import JsonLd from '../json-ld';
+
+/**
+ * Every exact route the site builds (trailing-slash normalized). URL prefixes
+ * such as `/docs/v1/deployment/` or `/community/2023/05/` usually have no page;
+ * emitting them as breadcrumb `item`s sent Google to 404s (later patched with
+ * netlify.toml redirects, which then showed up as "Page with redirect").
+ */
+const ROUTE_PATHS: Set<string> = (() => {
+  const paths = new Set<string>();
+  const visit = (list: ReadonlyArray<{ path?: string | string[]; exact?: boolean; routes?: unknown }>) => {
+    for (const route of list) {
+      if (route.exact && typeof route.path === 'string' && route.path !== '*') {
+        paths.add(route.path.endsWith('/') ? route.path : `${route.path}/`);
+      }
+      if (Array.isArray(route.routes)) visit(route.routes);
+    }
+  };
+  visit(routes);
+  return paths;
+})();
 
 /**
  * Emit a BreadcrumbList JSON-LD on every non-homepage route, derived from
@@ -110,6 +131,9 @@ export default function BreadcrumbsSchema(): JSX.Element | null {
   segments.forEach((segment, idx) => {
     if (shouldSkipSegment(segments, idx)) return;
     const accumulatedPath = '/' + segments.slice(0, idx + 1).join('/') + '/';
+    // Intermediate crumbs must point at a real page; the last crumb is the
+    // current page itself.
+    if (idx < segments.length - 1 && !ROUTE_PATHS.has(accumulatedPath)) return;
     itemListElement.push({
       '@type': 'ListItem',
       position: itemListElement.length + 1,

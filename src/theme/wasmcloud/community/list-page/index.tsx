@@ -2,6 +2,7 @@ import React from 'react';
 import clsx from 'clsx';
 
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import Head from '@docusaurus/Head';
 import { PageMetadata, HtmlClassNameProvider, ThemeClassNames } from '@docusaurus/theme-common';
 import BlogListPaginator from '@theme/BlogListPaginator';
 import SearchMetadata from '@theme/SearchMetadata';
@@ -33,6 +34,13 @@ function BlogListPageMetadata(props: Props): JSX.Element {
     <>
       <PageMetadata title={title} description={blogDescription} />
       <SearchMetadata tag="blog_posts_list" />
+      {/* /community/page/N/ — thin paginated listing, already dropped from the
+          sitemap (docusaurus.config.ts). Keep `follow` so meetings stay reachable. */}
+      {metadata.page > 1 && (
+        <Head>
+          <meta name="robots" content="noindex, follow" />
+        </Head>
+      )}
     </>
   );
 }
