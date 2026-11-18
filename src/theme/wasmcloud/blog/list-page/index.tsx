@@ -36,6 +36,13 @@ function BlogListPageMetadata(props: Props): JSX.Element {
     <>
       <PageMetadata title={title} description={blogDescription} />
       <SearchMetadata tag="blog_posts_list" />
+      {/* /blog/page/N/ — thin paginated listing, already dropped from the
+          sitemap (docusaurus.config.ts). Keep `follow` so posts stay reachable. */}
+      {metadata.page > 1 && (
+        <Head>
+          <meta name="robots" content="noindex, follow" />
+        </Head>
+      )}
     </>
   );
 }

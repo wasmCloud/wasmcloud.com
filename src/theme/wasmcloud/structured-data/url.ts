@@ -12,6 +12,8 @@ export function withTrailingSlash(url: string): string {
   const m = url.match(/^([^?#]*)(.*)$/);
   if (!m) return url;
   const [, path, rest] = m;
-  if (path.endsWith('/') || /\.[a-z0-9]+$/i.test(path.split('/').pop() ?? '')) return url;
+  // Extensions start with a letter, so a version-like slug such as
+  // `/blog/2025-05-21-one-year-of-wasmcloud-1.0` still gets its slash.
+  if (path.endsWith('/') || /\.[a-z][a-z0-9]*$/i.test(path.split('/').pop() ?? '')) return url;
   return `${path}/${rest}`;
 }
