@@ -170,6 +170,7 @@ function buildImageProperty(
   frontMatter: Record<string, unknown>,
   metadata: ReturnType<typeof useBlogPost>['metadata'],
   siteUrl: string,
+  assetImage: string | undefined,
 ): string[] | undefined {
   // Prefer the explicit `image` frontmatter (the M3 transform produces 16:9
   // / 4:3 / 1:1 WebP variants next to the source hero); fall back to
@@ -179,6 +180,19 @@ function buildImageProperty(
     | string[]
     | undefined;
   if (!raw) return undefined;
+
+  // A post-relative path (`./images/foo.webp`) is bundled by Docusaurus to a
+  // hashed `/assets/images/foo-<hash>.webp`, exposed as `assets.image` — the
+  // same URL og:image uses. Building the URL from the frontmatter string
+  // instead yields `${siteUrl}/images/foo.webp`, which 404s.
+  if (
+    typeof raw === 'string' &&
+    assetImage &&
+    !/^(?:https?:)?\//.test(raw)
+  ) {
+    return [/^https?:\/\//.test(assetImage) ? assetImage : `${siteUrl}${assetImage}`];
+  }
+
   const resolve = (rawUrl: string): string | undefined => {
     if (!rawUrl) return undefined;
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
@@ -220,7 +234,7 @@ type Props = {
 
 export default function BlogPostSchema({ extra }: Props = {}): JSX.Element | null {
   const { siteConfig } = useDocusaurusContext();
-  const { metadata } = useBlogPost();
+  const { metadata, assets } = useBlogPost();
   const peoplePages = usePluginData('people-pages-plugin') as
     | PeoplePagesData
     | undefined;
@@ -261,6 +275,7 @@ export default function BlogPostSchema({ extra }: Props = {}): JSX.Element | nul
     frontMatter as Record<string, unknown>,
     metadata,
     siteUrl,
+    assets?.image,
   );
   // Community transcript pages don't carry their own about/mentions
   // (those refs live on the parent landing page). Inherit from the
