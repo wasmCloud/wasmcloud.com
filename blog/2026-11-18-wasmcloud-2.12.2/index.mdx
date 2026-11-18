@@ -11,7 +11,7 @@ mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS, 
 
 ![wasmCloud 2.12.2 release banner](./images/2.12-blog-header.webp)
 
-[wasmCloud 2.12.2](https://github.com/wasmCloud/wasmCloud/releases/tag/v2.12.2) is now available. It is a patch release, and a large one at 102 commits:
+[wasmCloud 2.12.2](https://github.com/wasmCloud/wasmCloud/releases/tag/v2.12.2) is now available. We don't always publish release blogs for patch releases, but this is a big one, bringing...
 
 - **Host directories for component plugins**: a host component plugin had no filesystem at all. It can now mount directories from the host, so a plugin can serve files it does not carry in its own image
 - **Scanners that gate merges**: OSV-Scanner runs over every lockfile and CodeQL runs on every pull request, both blocking, alongside a stated policy for malicious dependencies and remediation deadlines by severity
@@ -40,9 +40,7 @@ mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS, 
 
 ## Host directories a plugin can read
 
-A [host component plugin](/docs/runtime/creating-host-component-plugins) runs in its own Wasm store, and that store had no filesystem. There was no way to give a plugin read access to files it serves from. Workloads have had `hostPath` volume mounts for several releases; plugins had nothing equivalent, which ruled out the obvious cases — model weights, a certificate bundle, a seed dataset.
-
-A `host.plugins` entry now takes `volumes` and `volumeMounts`, spelled the way a workload's are:
+A [host component plugin](/docs/runtime/creating-host-component-plugins) runs in its own Wasm store. Previously, there was no way to give a plugin read access to files. Now a `host.plugins` entry takes `volumes` and `volumeMounts`, spelled the way a workload's are:
 
 ```yaml
 host:
@@ -63,15 +61,15 @@ A plugin still has no filesystem unless its entry gives it one. An omitted or em
 
 Only `hostPath` volumes work; an `emptyDir` is parsed so that it can be refused as unsupported rather than reported as an unknown field. `mountPath` must be absolute with no `.` or `..` segment, two mounts may not share a path, and unknown keys are refused rather than dropped, so a misspelled `readonly` fails the config instead of quietly leaving the mount writable. Both lists are checked when the config is read, with the error naming the entry, and again when the plugin loads, so a missing directory fails host startup rather than surfacing later.
 
-Two boundaries are worth knowing. A plugin's directories are **not** held to the workload `hostPaths.allowed` grant, because that list governs what workloads may mount and a plugin's volumes come from the host's own configuration — but the host's reserved paths still apply, so a plugin cannot mount the host's credentials, the scratch root, or a kernel filesystem. In the other direction, no workload `hostPath` volume may expose a directory a plugin mounts, since a workload able to write it could change what the plugin serves.
+**Note:** A plugin's directories are *not* held to the workload `hostPaths.allowed` grant, because that list governs what workloads may mount and a plugin's volumes come from the host's own configuration. But the host's reserved paths still apply, so a plugin cannot mount the host's credentials, the scratch root, or a kernel filesystem. In the other direction, no workload `hostPath` volume may expose a directory a plugin mounts, since a workload able to write it could change what the plugin serves.
 
 :::warning[Not available through the Helm chart]
-The chart does not render these fields. A `runtime.hostGroups[].plugins` entry carrying `volumes` or `volumeMounts` fails rendering with a message naming the plugin, rather than quietly starting a plugin with no filesystem. In 2.12.2 this is a `wash host` and `wash dev` feature, with no chart value yet.
+Currently, the chart does not render these fields. A `runtime.hostGroups[].plugins` entry carrying `volumes` or `volumeMounts` fails rendering with a message naming the plugin, rather than quietly starting a plugin with no filesystem. In 2.12.2 this is a `wash host` and `wash dev` feature, with no chart value yet.
 :::
 
 ## The supply chain, gated at merge
 
-The largest single group of 2.12.2's commits — 35 of the 102 — is CI and supply-chain work. The theme is moving checks from *reported* to *blocking*.
+A massive part of this release consists of CI and supply chain work, with much of the work moving checks from *reported* to *blocking*.
 
 **OSV-Scanner now runs over every lockfile in the repository** — 17 `Cargo.lock` files and the Go module sums — on every pull request, merge queue run, push to `main`, and daily, and a finding fails the audit gate. RustSec informational advisories (unmaintained or unsound crates) stay warnings, as they already were for `cargo audit`.
 
@@ -105,11 +103,11 @@ The workload controller now watches `Host` and enqueues the unplaced workloads a
 
 Alongside that: rollout creation and replica slots are idempotent, stale workload status writes are prevented, replica sets are indexed by owner and revision, host retirement runs in parallel, and healthy-workload polling is configurable.
 
-One runtime fix worth calling out for embedders: the engine caches compiles by `Component.digest`, and a component with no digest skipped the cache entirely, recompiling on every start. Deployed workloads were never affected, because the washlet always fills the digest in. An embedder building `types::Component` or `types::Service` by hand and leaving `digest` unset was: in an internal agent-density bench, that meant 7 agent starts per second instead of about 1,800. A component with no digest is now cached under the hash of its bytes.
+**A note for embedders:** the engine caches compiles by `Component.digest`, and a component with no digest skipped the cache entirely, recompiling on every start. Deployed workloads were never affected, because the washlet always fills the digest in. An embedder building `types::Component` or `types::Service` by hand and leaving `digest` unset was: in an internal agent-density bench, that meant 7 agent starts per second instead of about 1,800. A component with no digest is now cached under the hash of its bytes.
 
 ## Allocators, and a note on host IDs
 
-`wash` gained opt-in `mimalloc` and `jemalloc` features. Defaults are unchanged and the runtime library never installs a global allocator. On a `c9g.16xlarge` with 300,000 warm workloads, both raised start throughput by roughly 45% — from about 33,600 starts/s on system glibc to between 48,300 and 50,000 — with jemalloc using about 1% more memory per warm workload and mimalloc about 5%.
+`wash` gained opt-in `mimalloc` and `jemalloc` features. Defaults are unchanged and the runtime library never installs a global allocator. On a `c9g.16xlarge` with 300,000 warm workloads, both raised start throughput by roughly 45% (from about 33,600 starts/s on system glibc to between 48,300 and 50,000) with jemalloc using about 1% more memory per warm workload and mimalloc about 5%.
 
 Separately, the UUIDv7s the runtime mints for host, component, context, and store IDs are now seeded from OS entropy rather than the global `fastrand` generator. Previously, hosts on one node that initialized on the same clock tick could mint identical IDs, including the default host ID used in NATS control subjects, and an embedder seeding `fastrand` for reproducibility made those IDs repeat across processes. If you set [`--host-id`](/docs/wash/commands#wash-host) explicitly, nothing changes for you.
 
