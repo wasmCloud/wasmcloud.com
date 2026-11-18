@@ -230,7 +230,7 @@ Required keys: `id`, and exactly one of `image` or `file`. Optional keys (image 
 
 For image sources in an authenticated registry, pass credentials through the environment — `WASH_HOST_PLUGIN_REGISTRY_USER` and `WASH_HOST_PLUGIN_REGISTRY_PASSWORD` (or the `--host-plugin-registry-user` / `--host-plugin-registry-password` flags). Credentials are deliberately kept out of the `--host-plugin` spec string so they never appear in process listings or shell history; both must be set together.
 
-Note that the `--host-plugin` flag grammar covers only the basic fields (`id`, source, `pull`, `digest`, `max-restarts`). The richer fields, `config`/`configFrom`/`secretFrom`, the egress allowlists, `workloadConfig`, `hostOwnedKeys`, `bindings`, and the 2.10.0 additions `allowedHostLoopbackPorts` and `ports`, can only be expressed in a config file (below) or chart values.
+Note that the `--host-plugin` flag grammar covers only the basic fields (`id`, source, `pull`, `digest`, `max-restarts`). The richer fields, `config`/`configFrom`/`secretFrom`, the egress allowlists, `workloadConfig`, `hostOwnedKeys`, `bindings`, and the 2.10.0 additions `allowedHostLoopbackPorts` and `ports`, can only be expressed in a config file (below) or chart values. The 2.12.2 additions `volumes` and `volumeMounts` are config-file only; the flag refuses `volume`, `volumes`, `volume-mount`, and `volumeMounts` by name and says where they belong, rather than reporting them as unknown fields.
 
 ### `wash host` config file
 
@@ -333,6 +333,51 @@ host:
 
 The entry's `workloadConfig` policy (`deny` by default on `wash host`, `allow` under `wash dev`, with `warn` allowing while logging what `deny` would refuse) governs what workload manifests may set: under `deny`, host-owned keys come only from the declaration, and once any binding is declared, naming an undeclared one is refused at deploy. Two unnamed entries of one package resolve to a single binding; give them labels to keep them distinct.
 
+### Host directories a plugin can read
+
+Since 2.12.2 a plugin entry can mount directories from the host, so a plugin can serve files it does not carry in its own image — model weights, a certificate bundle, a seed dataset. Declare the directories under `volumes` and where the plugin sees each one under `volumeMounts`, spelled as a workload's [`volumes` and `volumeMounts`](../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx) are:
+
+```yaml
+host:
+  plugins:
+    - id: model-server
+      file: ./build/model_server.wasm
+      volumes:
+        - name: models
+          hostPath:
+            path: ./models
+        - name: cache
+          hostPath:
+            path: /var/cache/models
+      volumeMounts:
+        - name: models
+          mountPath: /models
+          readOnly: true
+        - name: cache
+          mountPath: /cache
+```
+
+**A plugin has no filesystem unless its entry gives it one.** An omitted or empty `volumeMounts` is the default and mounts nothing; declaring `volumes` alone mounts nothing either. The same fields work under `dev.plugins` for `wash dev`.
+
+The rules each entry is held to:
+
+- Only `hostPath` is supported. An `emptyDir` volume parses and is then refused as unsupported, so the error names what is wrong rather than reporting an unknown field.
+- A relative `hostPath.path` resolves against the directory `wash` runs in, like a plugin's `file`.
+- `mountPath` must be absolute and may not contain a `.` or `..` segment. Empty segments and a trailing slash are normalized away, so `/models` and `/models/` are one mount, and two mounts may not share a path.
+- `readOnly` defaults to `false`, as a workload's mount does. Mount a directory the plugin only serves from as `readOnly: true`.
+- Unknown keys are refused rather than dropped, so a misspelled `readonly` fails the config instead of quietly leaving the mount writable.
+- Only a component entry may carry them. A native entry — one with no `file` or `image` — is refused, because a native plugin runs in the workload's own store and the fields would preopen nothing there.
+
+Both lists are checked when the config is read, with the error naming the entry, and again when the plugin loads. A missing directory, a file where a directory is expected, or two mounts at one path fails host startup rather than leaving the plugin to discover it. Each directory is opened once at load and the handle kept, as a workload's volumes are, and every incarnation the supervisor starts gets the same handles — so a plugin restart keeps the same view of the filesystem.
+
+A plugin's directories are not held to the workload [`hostPaths.allowed`](../kubernetes-operator/operator-manual/filesystems-and-volumes.mdx#the-host-must-allow-the-path-first) grant: that list governs what *workloads* may mount, while a plugin's volumes come from the host's own configuration. The host's reserved paths still apply, so a plugin may not mount the files the host reads its credentials and configuration from, the `emptyDir` scratch root, or a kernel filesystem such as `/proc`, `/sys`, or `/dev`.
+
+In the other direction, no workload `hostPath` volume may expose a directory a plugin mounts — the directory itself, one inside it, or one containing it — because a workload able to write it could change what the plugin serves. The claim is registered as the plugin loads, so it keeps workloads out from that point rather than revoking a directory a workload already holds, and it stays in place while any copy of the plugin holds it, so one plugin unloading does not release a directory another still mounts. A [custom host](./building-custom-hosts.mdx) can declare the paths on the engine builder to close the gap before its plugins load.
+
+:::warning[Not available through the Helm chart]
+The chart does not render these fields. A `runtime.hostGroups[].plugins` entry carrying `volumes` or `volumeMounts` fails rendering with a message naming the plugin, rather than quietly starting a plugin with no filesystem. In 2.12.2 this is a `wash host` and `wash dev` feature, with no chart value yet.
+:::
+
 ### After loading
 
 Once a plugin is loaded, workloads that import a WIT interface the plugin exports have their calls routed through the capability ingress to the plugin's pinned instance. Workloads see the plugin as an ordinary provider of the interface — beyond declaring the interface under `hostInterfaces` as usual, no plugin-specific workload configuration is required.
@@ -349,7 +394,7 @@ These are set on the host process (via container `env`, Helm `runtime.env`, etc.
 
 ## Considerations
 
-- **Wasm-only capabilities.** Host component plugins run inside the sandbox. They cannot open listening ports, access arbitrary filesystem paths, or reach the host's hardware directly, and their outbound network reach is an explicit grant: HTTP and DNS are deny-all without per-plugin allowlists. If your capability needs direct host resources beyond that, build a [native host plugin](./creating-host-plugins.mdx) instead.
+- **Wasm-only capabilities.** Host component plugins run inside the sandbox. They cannot reach the host's hardware directly, they bind only the addresses an operator declares under `ports`, and they cannot choose their own filesystem paths — a plugin sees only the [host directories its entry mounts](#host-directories-a-plugin-can-read), and nothing at all without them. Their outbound network reach is an explicit grant too: HTTP and DNS are deny-all without per-plugin allowlists. If your capability needs direct host resources beyond that, build a [native host plugin](./creating-host-plugins.mdx) instead.
 - **Design your WIT for cross-store traffic.** Resource handles, streams, and futures that cross the store boundary are relocated by the runtime rather than shared. Prefer WIT shapes that minimize resource churn across the boundary — for example, favor value-returning calls over long-lived resource handles when the choice is reasonable.
 - **Cooperative cancellation.** Long-running handlers should poll `wasmcloud:host/cancel.is-cancelled` at safe points; otherwise a workload teardown must wait for the natural completion of any in-flight invocation.
 - **Runtime execution model.** See [Trigger services considerations](../overview/hosts/trigger-services.mdx#considerations) for single-instance concurrency, shared state, and restart-budget notes that apply to every trigger service, including plugins.
