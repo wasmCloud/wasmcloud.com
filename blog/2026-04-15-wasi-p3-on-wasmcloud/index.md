@@ -24,6 +24,12 @@ mentions:
 
 ![Writing and Running Async Components on wasmCloud with WASI P3](./images/p3-blog-header.webp)
 
+:::info[Discussed on the community call]
+
+Bailey Hayes described P3 support in wasmCloud, its status behind a feature flag, and the plan to make it the default, on the [April 15, 2026 wasmCloud community call](/community/2026-04-15-community-meeting/). Read the [transcript](/community/2026-04-15-community-meeting-transcript/) or [watch the discussion from 9:39](https://youtu.be/DwmoGmXHdDM?t=579). She had filed the WASI P3 tracking issue and feature flag plan two weeks earlier, on the [April 1, 2026 wasmCloud community call](/community/2026-04-01-community-meeting/). Read the [transcript](/community/2026-04-01-community-meeting-transcript/) or [watch the discussion from 23:30](https://youtu.be/zaDiEcB-Lfc?t=1410).
+
+:::
+
 With a WASI P3 release just around the corner, now is a good time to start thinking about what it looks like to build and run P3 components on wasmCloud. And good news: you don't have to speculate. Experimental P3 is available in wasmCloud today. So what does it actually look like to write and run a WASI P3 component on wasmCloud? In this post, we'll break down the status of the preview, and how you can help get that support to production-readiness. 
 
 ## Experimental P3 support status: what works, and what doesn't

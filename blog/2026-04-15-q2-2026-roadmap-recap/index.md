@@ -25,6 +25,12 @@ mentions:
 
 ![Q2 2026 Roadmap Recap](./images/q2-2026-blog-header.webp)
 
+:::info[Discussed on the community call]
+
+Bailey Hayes ran the Q2 roadmap planning session with community dot-voting, on the [April 8, 2026 wasmCloud community call](/community/2026-04-08-community-meeting/). Read the [transcript](/community/2026-04-08-community-meeting-transcript/) or [watch the discussion from 2:49](https://youtu.be/qXr5bM4JVR8?t=169). She reviewed the finalized roadmap a week later, on the [April 15, 2026 wasmCloud community call](/community/2026-04-15-community-meeting/). Read the [transcript](/community/2026-04-15-community-meeting-transcript/) or [watch the discussion from 4:32](https://youtu.be/DwmoGmXHdDM?t=272).
+
+:::
+
 [wasmCloud v2](https://wasmcloud.com/blog/wasmcloud-v2-is-here/) ships a fundamentally different runtime, Kubernetes-native orchestration, in-process host plugins, and an explicit networking model. It's the result of sustained work to translate production experience and community feedback into a reimagining of wasmCloud that's both simpler to operate and more powerful to build on. But shipping v2 was just the starting line.
 
 Last Wednesday, we ran our Q2 roadmap planning session as part of the regular wasmCloud Wednesday community call. We walked through candidate priorities, the community weighed in on what matters most, and the results are now live as tracking issues in the [Q2 2026 project board](https://github.com/orgs/wasmCloud/projects/7/views/19). This post walks through the work currently underway, the issues queued up for pickup, and how to get involved.
