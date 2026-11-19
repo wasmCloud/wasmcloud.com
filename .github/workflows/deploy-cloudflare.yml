@@ -1,4 +1,5 @@
-# The Cloudflare Workers copy of wasmcloud.com, staged at next.wasmcloud.com.
+# wasmcloud.com on Cloudflare Workers (live since 2026-11-19), plus the test
+# copy at next.wasmcloud.com.
 #
 # One Worker (wasmcloud-www, in cloudflare/) serves the whole Docusaurus build
 # from its static assets. This workflow builds the site, assembles the asset
@@ -6,12 +7,13 @@
 #
 #   pull request   upload a version that takes no traffic; the preview URL is
 #                  in the job log
-#   push to main   deploy to the hostnames in cloudflare/wrangler.jsonc, then
-#                  smoke-test the test hostname
+#   push to main   deploy to wasmcloud.com and next.wasmcloud.com, then
+#                  smoke-test both
 #
-# Production is still Netlify, which builds from main on its own. This
-# workflow is separate from CI on purpose: a failure here must not block or
-# roll back a Netlify publish. See cloudflare/CLOUDFLARE-MIGRATION.md.
+# This workflow publishes production. Netlify still builds from main on its
+# own and still publishes to Netlify, which no longer receives traffic; it is
+# kept as the rollback target until it is retired. See
+# cloudflare/CLOUDFLARE-MIGRATION.md.
 #
 # Needs two repository secrets, CLOUDFLARE_API_TOKEN (Account: Workers
 # Scripts: Edit; Zone wasmcloud.com: Workers Routes: Edit) and
@@ -19,7 +21,7 @@
 # build environment variables today: GTM_CONTAINER_ID, GOOGLE_ANALYTICS_ID,
 # HUBSPOT_ID and REO_CLIENT_ID. Without the secrets the build still runs, as a
 # check, and the publish steps warn and do nothing.
-name: Deploy - Cloudflare (next.wasmcloud.com)
+name: Deploy - Cloudflare (wasmcloud.com)
 
 on:
   push:
@@ -48,10 +50,6 @@ env:
   # so bump to a version that old, here and in cloudflare/Makefile.
   WRANGLER: wrangler@4.160.1
   WRANGLER_SEND_METRICS: 'false'
-  # The test hostname the push deploy is smoke-tested on. Until the
-  # wasmcloud.com zone is active on Cloudflare's nameservers only the
-  # workers.dev URL answers; switch this to https://next.wasmcloud.com then.
-  SMOKE_URL: https://wasmcloud-www.cosmonic.workers.dev
 
 jobs:
   cloudflare:
@@ -112,8 +110,7 @@ jobs:
         run: npm ci
 
       # The command Netlify runs. CONTEXT is deliberately not set: it is
-      # Netlify's variable, and nothing here should behave as a Netlify
-      # production build while Netlify is still production.
+      # Netlify's variable, and nothing in the build needs it today.
       - name: Build the site
         env:
           GTM_CONTAINER_ID: ${{ vars.GTM_CONTAINER_ID }}
@@ -188,8 +185,14 @@ jobs:
 
       # Reads the routing table `make cf` wrote, so it checks the deployed
       # Worker against the rules it was built from.
-      - name: Smoke-test the test hostname
+      - name: Smoke-test next.wasmcloud.com
         if: github.event_name == 'push' && steps.secrets.outputs.present == 'true'
         working-directory: ./cloudflare
         run: |
-          python3 scripts/smoke.py "$SMOKE_URL"
+          python3 scripts/smoke.py https://next.wasmcloud.com
+
+      - name: Smoke-test wasmcloud.com
+        if: github.event_name == 'push' && steps.secrets.outputs.present == 'true'
+        working-directory: ./cloudflare
+        run: |
+          python3 scripts/smoke.py https://wasmcloud.com

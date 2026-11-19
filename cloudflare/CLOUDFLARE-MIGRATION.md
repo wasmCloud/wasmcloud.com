@@ -1,15 +1,18 @@
 # wasmcloud.com on Cloudflare Workers
 
-Production is Netlify. This folder holds the Cloudflare copy: one Worker,
-`wasmcloud-www`, that serves the whole Docusaurus build from its static assets
-with the redirects and headers Netlify applies, plus a Markdown version of
-every content page for AI agents.
+Production is Cloudflare, since 2026-11-19. One Worker, `wasmcloud-www`, serves
+the whole Docusaurus build from its static assets with the redirects and
+headers Netlify applied, plus a Markdown version of every content page for AI
+agents. Netlify still builds and publishes from `main` but receives no
+traffic; it is the rollback target until it is retired.
 
 | Hostname | State |
 |---|---|
-| `https://wasmcloud-www.cosmonic.workers.dev` | Live. The staging URL to test on today. `noindex` on every response. |
-| `https://next.wasmcloud.com` | Live since the nameservers moved to Cloudflare on 2026-11-19. `noindex` on every response. |
-| `wasmcloud.com`, `www.`, `docs.` | Netlify. Not touched. |
+| `wasmcloud.com`, `www.wasmcloud.com`, `docs.wasmcloud.com` | Live on the Worker |
+| `next.wasmcloud.com` | The test copy: the same Worker, `noindex` on every response |
+
+**A merge to `main` publishes production.** `.github/workflows/deploy-cloudflare.yml`
+deploys and then smoke-tests both hostnames.
 
 ## How it fits together
 
@@ -61,8 +64,8 @@ make cf                          # build/assets and worker/routes.generated.json
 make cf-test                     # router unit tests
 make cf-dev                      # the Worker on http://127.0.0.1:8787 (restart after every make cf)
 python3 scripts/parity.py --test http://127.0.0.1:8787
-python3 scripts/parity.py --test https://wasmcloud-www.cosmonic.workers.dev
-python3 scripts/smoke.py https://wasmcloud-www.cosmonic.workers.dev
+python3 scripts/parity.py                              # wasmcloud.com vs next.wasmcloud.com
+python3 scripts/smoke.py https://next.wasmcloud.com
 ```
 
 `netlify2cf.py` needs Python 3.11 or later: `make cf PYTHON=python3.12`.
@@ -253,10 +256,41 @@ Use what Netlify documents for external DNS: `wasmcloud.com` as a CNAME to
 or an A record to Netlify's load balancer, and `www` as a CNAME to the same
 `netlify.app` name. All DNS-only.
 
-## Cutover checklist
+## Cutover: done 2026-11-19
 
-Not run. Liam runs or approves every step. Rollback is the same swap in
-reverse, and Netlify stays live throughout.
+The three hostnames moved to the Worker between 19:32 and 19:37 UTC, in the
+order `www`, the bare domain, `docs`. For each, its DNS records were deleted
+in the dashboard and the hostname attached about five seconds later with
+`wrangler triggers deploy`, which changes hostnames without uploading a new
+version. The bare domain answered 200 on 30 of 30 requests over the next
+three minutes; no 522s were seen.
+
+What was different from the plan:
+
+- The nameservers had moved from Netlify DNS to Cloudflare the same
+  afternoon, against the runbook's "separate days".
+- Three records were missing from the Cloudflare zone after that move
+  (`slack`, `arewefastyet`, `_github-pages-challenge-wasmcloud`) and were
+  added before the cutover. `slack.wasmcloud.com` did not resolve for part of
+  the afternoon.
+- The deploy workflow was disabled for the cutover, so a merge to `main`
+  could not deploy the old config and detach the live hostnames.
+
+Records deleted, for a rollback (all DNS-only, TTL Auto):
+
+| Name | Type | Value |
+|---|---|---|
+| `wasmcloud.com` | A | `18.208.88.157`, `98.84.224.111` |
+| `wasmcloud.com` | AAAA | `2600:1f18:16e:df01::258`, `2600:1f18:16e:df01::259` |
+| `www.wasmcloud.com` | A | `18.208.88.157`, `98.84.224.111` |
+| `www.wasmcloud.com` | AAAA | `2600:1f18:16e:df01::258`, `2600:1f18:16e:df01::259` |
+| `docs.wasmcloud.com` | CNAME | `brave-albattani-5b0c07.netlify.app` (was proxied; recreate DNS-only) |
+
+Still on Netlify and not part of this site: `slack.wasmcloud.com`.
+
+The checklist as it was written, kept for the rollback steps:
+
+## Cutover checklist
 
 **Day before**
 
