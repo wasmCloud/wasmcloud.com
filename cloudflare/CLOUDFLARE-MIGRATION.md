@@ -221,11 +221,7 @@ Things that are not code and block the move. A person does each.
 4. **Confirm the Workers plan.** The Cosmonic account was moved to Workers
    Paid on 2026-11-19 for cosmonic.com. Free stops serving at 100,000 requests
    a day.
-5. **Decide what happens to `slack.wasmcloud.com`.** It points at Netlify
-   today and is not part of this site: it is a separate Netlify project, and
-   `/slack` on wasmcloud.com redirects to it. It needs its record carried over
-   to the Cloudflare zone unchanged, and its own plan before Netlify is
-   retired.
+5. **`slack.wasmcloud.com`**: done, see the cutover record below.
 
 ### DNS records on 2026-11-19 (Netlify DNS, before the move)
 
@@ -286,7 +282,12 @@ Records deleted, for a rollback (all DNS-only, TTL Auto):
 | `www.wasmcloud.com` | AAAA | `2600:1f18:16e:df01::258`, `2600:1f18:16e:df01::259` |
 | `docs.wasmcloud.com` | CNAME | `brave-albattani-5b0c07.netlify.app` (was proxied; recreate DNS-only) |
 
-Still on Netlify and not part of this site: `slack.wasmcloud.com`.
+`slack.wasmcloud.com` moved the same day, at 19:45 UTC. It was a separate
+Netlify project serving one page that forwards to the Slack invite; it is now
+its own small Worker, `wasmcloud-slack`, in `cloudflare/slack/`, serving the
+same page byte for byte. It is deployed by hand from that folder, not by the
+workflow. Its Netlify records were A `18.208.88.157` and `98.84.224.111`
+(Netlify DNS also answered AAAA `2600:1f18:16e:df01::258` and `::259`).
 
 The checklist as it was written, kept for the rollback steps:
 
