@@ -97,7 +97,12 @@ export default {
     try {
       res = await route(c);
       // /docs/faq.md, /docs/faq/index.md: the Markdown of /docs/faq/ at a URL
-      // of its own, for clients that cannot send an Accept header. Only where
+      // of its own, for clients that cannot send an Accept header. Everyone
+      // who asks for that URL gets the same Markdown, search crawlers
+      // included: the rule in agents.json is that a crawler is never given
+      // something different from a person at the same URL, and answering
+      // Googlebot 404 here while people get 200 would break it. The copy is
+      // marked noindex, with the HTML page as its canonical. Only where
       // nothing else answers: a real file (the .md files docusaurus-plugin-llms
       // writes) or a rule has already won by this point.
       if (res.status === 404 && readOnly) {
@@ -306,15 +311,22 @@ async function serveLocal(c) {
     }
     return out;
   }
-  if (res.status === 200 && c.request.method === 'GET' && c.request.headers.has('range')) {
-    return byteRange(res, c.request.headers.get('range'));
-  }
   // Cloudflare labels scripts text/javascript; Netlify, and so production,
   // says application/javascript. Same meaning, but parity is by header value.
+  // Before the range handling below, so a script has one type however much
+  // of it was asked for.
   if (/\.m?js$/.test(assetPath) && res.headers.has('content-type')) {
-    const out = new Response(res.body, res);
-    out.headers.set('content-type', 'application/javascript; charset=UTF-8');
-    return out;
+    res = new Response(res.body, res);
+    res.headers.set('content-type', 'application/javascript; charset=UTF-8');
+  }
+  // The asset layer normally answers a Range request itself (206). Where it
+  // answers 200 regardless, slice here. Never when the request carries
+  // If-Range: a 200 then can mean "the file changed, here is all of it", and
+  // slicing that would hand the client part of a new file to join onto its
+  // piece of the old one.
+  if (res.status === 200 && c.request.method === 'GET' && c.request.headers.has('range')
+      && !c.request.headers.has('if-range')) {
+    return byteRange(res, c.request.headers.get('range'));
   }
   return res;
 }

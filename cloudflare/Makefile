@@ -12,9 +12,10 @@ PYTHON ?= python3
 # The Docusaurus build to publish.
 SITE_BUILD ?= ../build
 # Pinned on purpose: `npx wrangler` resolves the newest CLI at run time, with
-# credentials that can publish the site. The repo's .npmrc only resolves
-# releases at least 7 days old, so bump to a version that old or older, here
-# and in .github/workflows/deploy-cloudflare.yml.
+# credentials that can publish the site. .npmrc in this folder only resolves
+# releases at least 7 days old (wrangler's own dependencies included), so bump
+# to a version that old or older, here and in
+# .github/workflows/deploy-cloudflare.yml.
 WRANGLER ?= npx --yes wrangler@4.160.1
 
 .PHONY: cf cf-dev cf-test cf-deploy
@@ -27,7 +28,10 @@ cf:
 	@# _headers and _redirects are Netlify's files: the Worker reads its rules
 	@# from the generated table, and the asset layer must not apply them too.
 	rsync -a --exclude=/_headers --exclude=/_redirects --exclude=.DS_Store "$(SITE_BUILD)/" build/assets/
-	$(PYTHON) scripts/html2md.py build/assets | tail -1
+	@# Not piped into tail: a pipe reports the last command's status, so a
+	@# failed conversion would pass and thin Markdown would be deployed.
+	$(PYTHON) scripts/html2md.py build/assets > build/html2md.log
+	@tail -1 build/html2md.log
 	@# Last, because the table also lists which pages html2md.py just wrote a
 	@# Markdown twin for.
 	$(PYTHON) scripts/netlify2cf.py --assets build/assets

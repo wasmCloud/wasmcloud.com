@@ -61,7 +61,9 @@ export function* matches(rules, pathname, host) {
   for (const rule of rules) {
     if (rule.host && rule.host !== host) continue;
     const m = matchPattern(rule, path);
-    if (m) yield { rule, target: rule.to.replace(':splat', m.splat) };
+    // A function, not a string: in a replacement string `$&` and `$'` are
+    // patterns, and both are legal characters in a path.
+    if (m) yield { rule, target: rule.to.replace(':splat', () => m.splat) };
   }
 }
 
