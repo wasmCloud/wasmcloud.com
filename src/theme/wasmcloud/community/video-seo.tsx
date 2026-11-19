@@ -3,18 +3,11 @@ import Head from '@docusaurus/Head';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import type { BlogPostMetadata } from '@docusaurus/plugin-content-blog';
 import peopleData from '@site/src/data/people.json';
-// Auto-generated at prebuild time by scripts/generate-transcript-inheritance.mjs.
-// Maps each transcript permalink to its parent landing page's about/mentions
-// frontmatter so transcript Article JSON-LD inherits the same entity graph
-// without the author having to duplicate the refs across both files.
-import transcriptInheritance from '@site/src/data/transcript-inheritance.json';
 import JsonLd from '@theme/wasmcloud/json-ld';
 import { buildEntityRefs } from '@theme/wasmcloud/structured-data/entities';
 import { isTranscriptPermalink } from './utils';
-
-type InheritedRefs = { about?: string; mentions?: string[] };
-const TRANSCRIPT_INHERITANCE: Record<string, InheritedRefs> =
-  (transcriptInheritance as { entries?: Record<string, InheritedRefs> }).entries ?? {};
+import { addSecondsIso, meetingStartIso } from './meeting-time';
+import { withTrailingSlash } from '@theme/wasmcloud/structured-data/url';
 
 type Chapter = { seconds: number; label: string };
 
@@ -42,6 +35,15 @@ const PEOPLE = peopleData as PeopleJson;
 const VIDEO_LANGUAGE = 'en';
 const PROJECT_ORG_ID = 'https://wasmcloud.com/#organization';
 const VIDEO_PUBLISHER = { '@id': PROJECT_ORG_ID } as const;
+// Inlined (not just an @id ref) because Google's Event validator reads
+// organizer.name / organizer.url from the Event node itself and does not
+// resolve @id references across separate JSON-LD payloads.
+const EVENT_ORGANIZER = {
+  '@type': 'Organization',
+  '@id': PROJECT_ORG_ID,
+  name: 'wasmCloud',
+  url: 'https://wasmcloud.com/',
+} as const;
 const VIDEO_GENRE = 'Technology';
 const VIDEO_CATEGORY = 'Community Calls';
 // YouTube's maxresdefault thumbnails are 1280×720
@@ -54,12 +56,6 @@ function extractYouTubeId(image: unknown): string | null {
   if (typeof image !== 'string') return null;
   const m = image.match(YOUTUBE_THUMBNAIL_RE);
   return m ? m[1] : null;
-}
-
-function asIsoDate(date: unknown): string | undefined {
-  if (date instanceof Date) return date.toISOString();
-  if (typeof date === 'string') return date;
-  return undefined;
 }
 
 function getChapters(frontMatter: Record<string, unknown>): Chapter[] {
@@ -157,21 +153,56 @@ function getKeywords(frontMatter: Record<string, unknown>): string | undefined {
 }
 
 /**
- * Derive the transcript URL from the meeting page's permalink. Mirror image
- * of the convention in `isTranscriptPermalink`: meeting page lives at
- * `/community/<date>-community-meeting/`, transcript at the same slug with
- * `-transcript` appended.
+ * Derive the meeting page URL from a transcript permalink: the meeting page
+ * lives at `/community/<date>-community-meeting/`, the transcript at the same
+ * slug with `-transcript` appended.
  */
-function transcriptUrlForMeeting(siteUrl: string, permalink: string): string {
-  const noTrailing = permalink.endsWith('/') ? permalink.slice(0, -1) : permalink;
-  return `${siteUrl}${noTrailing}-transcript/`;
-}
-
 function meetingUrlForTranscript(siteUrl: string, permalink: string): string {
   const noTrailing = permalink.endsWith('/') ? permalink.slice(0, -1) : permalink;
   // strip -transcript suffix
   const meetingPath = noTrailing.replace(/-transcript$/, '');
   return `${siteUrl}${meetingPath}/`;
+}
+
+/**
+ * Properties community pages merge into their single Article-family node
+ * (emitted by BlogPostSchema). Keeping them on that node, rather than
+ * emitting a second Article under the same @id, gives the page one
+ * unambiguous primary entity linked to the recording and the series.
+ *
+ *   - Meeting page: `video` → the page's VideoObject.
+ *   - Transcript page: `associatedMedia` → the meeting page's VideoObject,
+ *     plus speakers as `mentions` (Person + affiliation).
+ *   - Both: `isPartOf` the wasmCloud Community Meeting series.
+ */
+export function buildCommunityArticleExtras(
+  metadata: BlogPostMetadata,
+  siteUrlRaw: string,
+): Record<string, unknown> {
+  const siteUrl = siteUrlRaw.replace(/\/$/, '');
+  const series = {
+    '@type': 'CreativeWorkSeries',
+    '@id': `${siteUrl}/community/#series`,
+    name: 'wasmCloud Community Meeting',
+    url: `${siteUrl}/community/`,
+  };
+  const youtubeId = extractYouTubeId(metadata.frontMatter.image);
+  if (!youtubeId) return { isPartOf: series };
+
+  const permalink = withTrailingSlash(metadata.permalink);
+  const isTranscript = isTranscriptPermalink(permalink);
+  const meetingPageUrl = isTranscript
+    ? meetingUrlForTranscript(siteUrl, permalink)
+    : `${siteUrl}${permalink}`;
+  const videoRef = { '@id': `${meetingPageUrl}#video` };
+  if (!isTranscript) return { isPartOf: series, video: videoRef };
+
+  const speakers = buildSpeakers(metadata.frontMatter, siteUrl);
+  return {
+    isPartOf: series,
+    associatedMedia: videoRef,
+    ...(speakers && { mentions: speakers }),
+  };
 }
 
 /**
@@ -185,11 +216,11 @@ function meetingUrlForTranscript(siteUrl: string, permalink: string): string {
  *     graph; virtual events no longer eligible for Google's Event rich
  *     result as of June 2025).
  *
- * Transcript page (M8 — Article):
- *   - Article with `associatedMedia` link to the VideoObject's @id (the
- *     transcript's source recording), `isPartOf` a CreativeWorkSeries for
- *     the wasmCloud Community Meeting collection, plus mentions: [Person]
- *     for speakers and about/mentions Thing entities from M12's dictionary.
+ * Transcript page (M8): no JSON-LD here. The page's single Article-family
+ *   node comes from BlogPostSchema, with `associatedMedia`, `isPartOf` and
+ *   speaker `mentions` merged in via `buildCommunityArticleExtras`. Emitting
+ *   a second Article under the same @id gave Google two conflicting nodes
+ *   (BlogPosting vs Article, different headlines) for one page.
  */
 export default function VideoSEO({
   metadata,
@@ -205,10 +236,14 @@ export default function VideoSEO({
   const watchUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
   const embedUrl = `https://www.youtube.com/embed/${youtubeId}`;
   const thumbnailUrl = `https://i.ytimg.com/vi/${youtubeId}/maxresdefault.jpg`;
-  const uploadDate = asIsoDate(date);
+  // Calls start at 1:00 PM America/New_York; the frontmatter only carries a
+  // calendar date (which Docusaurus turns into midnight UTC — the previous
+  // evening in Eastern time). Anchor every community timestamp at the real
+  // start, with an explicit offset. See ./meeting-time.ts.
+  const uploadDate = meetingStartIso(date, frontMatter.start_time);
   const isTranscript = isTranscriptPermalink(permalink);
   const siteUrl = siteConfig.url.replace(/\/$/, '');
-  const canonicalUrl = `${siteUrl}${permalink}`;
+  const canonicalUrl = withTrailingSlash(`${siteUrl}${permalink}`);
 
   const chapters = getChapters(frontMatter);
   // Total video length in seconds, from the landing page's `duration:`
@@ -219,47 +254,19 @@ export default function VideoSEO({
 
   const keywords = getKeywords(frontMatter);
   const speakers = buildSpeakers(frontMatter, siteUrl);
-  // Transcript pages typically don't repeat `about:` / `mentions:` in their
-  // own frontmatter — those refs live on the parent landing page. When this
-  // is a transcript page and its own frontmatter omits one of the refs, fall
-  // back to the inheritance map (generated at prebuild from landing-page
-  // frontmatter; see scripts/generate-transcript-inheritance.mjs). Avoids the
-  // M10 validator warning `no about or mentions (M12 entity refs)` on
-  // transcript Article nodes.
-  const permalinkWithSlash = permalink.endsWith('/') ? permalink : permalink + '/';
-  const inheritedRefs: InheritedRefs | undefined = isTranscript
-    ? TRANSCRIPT_INHERITANCE[permalink] || TRANSCRIPT_INHERITANCE[permalinkWithSlash]
-    : undefined;
-  const frontMatterForRefs = inheritedRefs
-    ? {
-        ...frontMatter,
-        ...(frontMatter.about === undefined && inheritedRefs.about
-          ? { about: inheritedRefs.about }
-          : {}),
-        ...(!Array.isArray(frontMatter.mentions) && inheritedRefs.mentions
-          ? { mentions: inheritedRefs.mentions }
-          : {}),
-      }
-    : frontMatter;
-  const entityRefs = buildEntityRefs(frontMatterForRefs);
+  // Meeting pages carry their own about/mentions. Transcript pages emit no
+  // JSON-LD from here (their Article node, including inherited entity refs,
+  // comes from BlogPostSchema), so no inheritance lookup is needed.
+  const entityRefs = buildEntityRefs(frontMatter);
 
   // Stable IDs the schemas use to cross-reference each other:
   //   VideoObject @id  →  canonical meeting URL + #video
   //   Event @id        →  canonical meeting URL + #event
-  //   Article @id      →  canonical transcript URL + #article
-  // The Article→Video link uses `transcribes` (valid: range CreativeWork);
-  // the reverse `transcript` field on VideoObject would expect a Text value
-  // (the actual transcript content), so we only emit the Article→Video
-  // direction. `recordedAt` ↔ `recordedIn` pairs the Video with its Event.
-  const meetingPageUrl = isTranscript
-    ? meetingUrlForTranscript(siteUrl, permalink)
-    : canonicalUrl;
-  const transcriptPageUrl = isTranscript
-    ? canonicalUrl
-    : transcriptUrlForMeeting(siteUrl, permalink);
-  const videoObjectId = `${meetingPageUrl}#video`;
-  const eventId = `${meetingPageUrl}#event`;
-  const transcriptArticleId = `${transcriptPageUrl}#article`;
+  // `recordedAt` ↔ `recordedIn` pairs the Video with its Event. The
+  // meeting page's BlogPosting links to #video via `video`, and the
+  // transcript's BlogPosting via `associatedMedia` (buildCommunityArticleExtras).
+  const videoObjectId = `${canonicalUrl}#video`;
+  const eventId = `${canonicalUrl}#event`;
 
   // ---- Meeting page: VideoObject + Event -----------------------------------
 
@@ -321,15 +328,13 @@ export default function VideoSEO({
   // virtual events lost SERP rich-result eligibility in June 2025; this
   // emission is for parser ingestion + Person performer[] entity-graph
   // density (M11 Risk #13 in the spike).
-  let eventEndDate: string | undefined;
-  if (uploadDate && durationSeconds !== undefined) {
-    try {
-      const startMs = new Date(uploadDate).getTime();
-      eventEndDate = new Date(startMs + durationSeconds * 1000).toISOString();
-    } catch {
-      eventEndDate = undefined;
-    }
-  }
+  const eventEndDate =
+    uploadDate && durationSeconds !== undefined
+      ? addSecondsIso(uploadDate, durationSeconds)
+      : undefined;
+  // The call is always free and open; `validFrom` is the start of the
+  // meeting day (agenda stubs are posted that morning).
+  const offerValidFrom = uploadDate?.replace(/T\d{2}:\d{2}:\d{2}/, 'T00:00:00');
 
   const event = !isTranscript && uploadDate
     ? {
@@ -347,67 +352,28 @@ export default function VideoSEO({
         // past-dated `endDate` is what marks the event as having occurred.
         eventStatus: 'https://schema.org/EventScheduled',
         eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
+        // Online-event shape per schema.org/Event and Google's Event docs:
+        // VirtualLocation + OnlineEventAttendanceMode, plus the recommended
+        // image, offers, organizer, and performer fields.
         location: {
           '@type': 'VirtualLocation',
           url: watchUrl,
         },
-        organizer: VIDEO_PUBLISHER,
+        image: [thumbnailUrl],
+        offers: {
+          '@type': 'Offer',
+          url: canonicalUrl,
+          price: '0',
+          priceCurrency: 'USD',
+          availability: 'https://schema.org/InStock',
+          ...(offerValidFrom && { validFrom: offerValidFrom }),
+        },
+        organizer: EVENT_ORGANIZER,
         ...(speakers && { performer: speakers }),
         inLanguage: VIDEO_LANGUAGE,
         isAccessibleForFree: true,
         url: canonicalUrl,
         recordedIn: { '@id': videoObjectId },
-      }
-    : null;
-
-  // ---- Transcript page: Article --------------------------------------------
-
-  const transcriptArticle = isTranscript
-    ? {
-        '@context': 'https://schema.org',
-        '@type': 'Article',
-        '@id': transcriptArticleId,
-        headline: `${title} (Transcript)`,
-        description,
-        datePublished: uploadDate,
-        // Author defaults to the wasmCloud project — transcripts are not
-        // personally authored, the project entity is the appropriate author.
-        author: VIDEO_PUBLISHER,
-        publisher: VIDEO_PUBLISHER,
-        // Article rich-result eligibility wants an `image`. The YouTube
-        // maxresdefault thumbnail is the canonical preview for this
-        // transcript (it shares its source video with the meeting page).
-        image: thumbnailUrl,
-        inLanguage: VIDEO_LANGUAGE,
-        url: canonicalUrl,
-        mainEntityOfPage: canonicalUrl,
-        // Link back to the canonical video entity via `associatedMedia` —
-        // a valid Article property whose range is MediaObject (VideoObject
-        // qualifies). Schema.org does not define a `transcribes` property,
-        // so we don't emit it; the prose context + the video reference
-        // here carry the relationship.
-        associatedMedia: { '@id': videoObjectId },
-        // Series-level grouping (every weekly meeting is part of the
-        // wasmCloud Community Meeting series). Use `CreativeWorkSeries`
-        // — schema.org has no bare `Series` type; `CreativeWorkSeries`
-        // is the correct CreativeWork-subtype expected by `isPartOf`.
-        isPartOf: {
-          '@type': 'CreativeWorkSeries',
-          name: 'wasmCloud Community Meeting',
-          url: `${siteUrl}/community/`,
-        },
-        // Speakers ⇒ mentions: [Person] with affiliation Organization edges
-        ...(speakers && { mentions: speakers }),
-        ...(entityRefs.about && { about: entityRefs.about }),
-        // If both speakers AND topic-mentions exist, merge into a single
-        // mentions array (Schema.org allows the same property to carry
-        // mixed Person + Thing children).
-        ...(entityRefs.mentions &&
-          !speakers && { mentions: entityRefs.mentions }),
-        ...(entityRefs.mentions &&
-          speakers && {
-            mentions: [...speakers, ...entityRefs.mentions],
-          }),
       }
     : null;
 
@@ -430,13 +396,12 @@ export default function VideoSEO({
         <meta property="article:section" content={VIDEO_CATEGORY} />
       </Head>
 
-      {/* JSON-LD: VideoObject + Event on meeting pages; Article on transcript pages.
+      {/* JSON-LD: VideoObject + Event on meeting pages (transcripts: none here).
        *  Each JsonLd owns its own <Head> wrapper — keeps JSON-LD payloads at
        *  the same React-tree depth as the OG meta tags above without nesting.
        */}
       {videoObject && <JsonLd data={videoObject} />}
       {event && <JsonLd data={event} />}
-      {transcriptArticle && <JsonLd data={transcriptArticle} />}
     </>
   );
 }

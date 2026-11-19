@@ -2,13 +2,15 @@ import React from 'react';
 import clsx from 'clsx';
 
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import Head from '@docusaurus/Head';
 import { PageMetadata, HtmlClassNameProvider, ThemeClassNames } from '@docusaurus/theme-common';
 import BlogListPaginator from '@theme/BlogListPaginator';
 import SearchMetadata from '@theme/SearchMetadata';
 import type { Props } from '@theme/BlogListPage';
 import BlogPostItems from '@theme/BlogPostItems';
 import CommunitySidebar from '../sidebar';
-import BlogListPageStructuredData from '@theme/BlogListPage/StructuredData';
+import { meetingStartIso } from '../meeting-time';
+import CollectionPageSchema from '../../structured-data/collection-page';
 import styles from './styles.module.css';
 import BlogPostListItem from '../list-item';
 import Layout from '@theme/Layout';
@@ -32,7 +34,59 @@ function BlogListPageMetadata(props: Props): JSX.Element {
     <>
       <PageMetadata title={title} description={blogDescription} />
       <SearchMetadata tag="blog_posts_list" />
+      {/* /community/page/N/ — thin paginated listing, already dropped from the
+          sitemap (docusaurus.config.ts). Keep `follow` so meetings stay reachable. */}
+      {metadata.page > 1 && (
+        <Head>
+          <meta name="robots" content="noindex, follow" />
+        </Head>
+      )}
     </>
+  );
+}
+
+/**
+ * `/community/` is a directory of recorded meetings, not a blog. Emit a
+ * CollectionPage whose main entity is the meeting series — the same
+ * `#series` @id every meeting / transcript page references via `isPartOf`
+ * (see buildCommunityArticleExtras) — listing the meetings on this page.
+ * Replaces Docusaurus's default `Blog` node.
+ */
+function CommunityListPageStructuredData(props: Props): JSX.Element {
+  const { metadata, items } = props;
+  const { siteConfig } = useDocusaurusContext();
+  const siteUrl = siteConfig.url.replace(/\/$/, '');
+  const withSlash = (p: string) => (p.endsWith('/') ? p : `${p}/`);
+  const meetings = items
+    .map((item) => item.content)
+    .filter((c) => !isTranscriptPermalink(c.metadata.permalink));
+  return (
+    <CollectionPageSchema
+      permalink={withSlash(metadata.permalink)}
+      name={metadata.blogTitle}
+      description={metadata.blogDescription}
+      mainEntity={{
+        '@type': 'CreativeWorkSeries',
+        '@id': `${siteUrl}/community/#series`,
+        name: 'wasmCloud Community Meeting',
+        url: `${siteUrl}/community/`,
+        description: metadata.blogDescription,
+        publisher: { '@id': 'https://wasmcloud.com/#organization' },
+        inLanguage: 'en',
+        // Same @id BlogPostSchema gives each meeting page's Article node.
+        hasPart: meetings.map(({ metadata: m, frontMatter }) => {
+          const url = `${siteUrl}${withSlash(m.permalink)}`;
+          return {
+            '@type': 'BlogPosting',
+            '@id': `${url}#article`,
+            url,
+            headline: m.title,
+            // The call's real start (1:00 PM Eastern), not midnight UTC.
+            datePublished: meetingStartIso(m.date, (frontMatter as { start_time?: unknown }).start_time),
+          };
+        }),
+      }}
+    />
   );
 }
 
@@ -58,11 +112,15 @@ function BlogListPageContent(props: Props): JSX.Element {
                 {metadata.blogDescription && (
                   <div className="col col--4">
                     <p className={styles.description}>
-                      {metadata.blogDescription} Add the next meeting to your{' '}
+                      {metadata.blogDescription} Add the weekly meeting to your{' '}
                       <a href={Links.CALENDAR} target="_blank">
-                        Calendar
-                      </a>{' '}
-                      or watch it live on{' '}
+                        Google Calendar
+                      </a>
+                      , subscribe from the{' '}
+                      <a href={Links.CNCF_CALENDAR} target="_blank">
+                        CNCF calendar
+                      </a>
+                      , or watch it live on{' '}
                       <a href={Links.YOUTUBE} target="_blank">
                         YouTube
                       </a>
@@ -127,7 +185,7 @@ export default function BlogListPage(props: Props): JSX.Element {
       className={clsx(ThemeClassNames.wrapper.blogPages, ThemeClassNames.page.blogListPage)}
     >
       <BlogListPageMetadata {...props} />
-      <BlogListPageStructuredData {...props} />
+      <CommunityListPageStructuredData {...props} />
       <BlogListPageContent {...props} />
     </HtmlClassNameProvider>
   );

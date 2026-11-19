@@ -456,7 +456,7 @@ const config = (async (): Promise<Config> => {
               },
               {
                 label: 'Calendar & wasmCloud Wednesdays',
-                href: 'https://calendar.google.com/calendar/u/0/embed?src=c_6cm5hud8evuns4pe5ggu3h9qrs@group.calendar.google.com',
+                href: 'https://zoom-lfx.platform.linuxfoundation.org/meetings/wasmcloud',
               },
               {
                 label: 'Community Meeting Notes',
@@ -582,7 +582,7 @@ const config = (async (): Promise<Config> => {
             '@type': 'SearchAction',
             target: {
               '@type': 'EntryPoint',
-              urlTemplate: `${siteBaseUrl()}/search?q={search_term_string}`,
+              urlTemplate: `${siteBaseUrl()}/search/?q={search_term_string}`,
             },
             'query-input': 'required name=search_term_string',
           },

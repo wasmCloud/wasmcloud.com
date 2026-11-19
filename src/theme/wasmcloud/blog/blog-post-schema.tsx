@@ -11,6 +11,8 @@ import {
 // landing page via this map (see video-seo.tsx + the prebuild generator).
 // On non-community pages and on landing pages the map is unused.
 import transcriptInheritance from '@site/src/data/transcript-inheritance.json';
+import { meetingStartIso } from '@theme/wasmcloud/community/meeting-time';
+import { withTrailingSlash } from '@theme/wasmcloud/structured-data/url';
 
 type InheritedRefs = { about?: string; mentions?: string[] };
 const TRANSCRIPT_INHERITANCE: Record<string, InheritedRefs> =
@@ -168,6 +170,7 @@ function buildImageProperty(
   frontMatter: Record<string, unknown>,
   metadata: ReturnType<typeof useBlogPost>['metadata'],
   siteUrl: string,
+  assetImage: string | undefined,
 ): string[] | undefined {
   // Prefer the explicit `image` frontmatter (the M3 transform produces 16:9
   // / 4:3 / 1:1 WebP variants next to the source hero); fall back to
@@ -177,6 +180,19 @@ function buildImageProperty(
     | string[]
     | undefined;
   if (!raw) return undefined;
+
+  // A post-relative path (`./images/foo.webp`) is bundled by Docusaurus to a
+  // hashed `/assets/images/foo-<hash>.webp`, exposed as `assets.image` — the
+  // same URL og:image uses. Building the URL from the frontmatter string
+  // instead yields `${siteUrl}/images/foo.webp`, which 404s.
+  if (
+    typeof raw === 'string' &&
+    assetImage &&
+    !/^(?:https?:)?\//.test(raw)
+  ) {
+    return [/^https?:\/\//.test(assetImage) ? assetImage : `${siteUrl}${assetImage}`];
+  }
+
   const resolve = (rawUrl: string): string | undefined => {
     if (!rawUrl) return undefined;
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
@@ -206,9 +222,19 @@ function buildImageProperty(
   return resolved.length > 0 ? resolved : undefined;
 }
 
-export default function BlogPostSchema(): JSX.Element | null {
+type Props = {
+  /**
+   * Extra properties merged into the Article-family node. Used by community
+   * pages to link the post to its VideoObject and the meeting series, so the
+   * page carries ONE Article node instead of a second, competing node under
+   * the same @id. `mentions` arrays are concatenated rather than replaced.
+   */
+  extra?: Record<string, unknown>;
+};
+
+export default function BlogPostSchema({ extra }: Props = {}): JSX.Element | null {
   const { siteConfig } = useDocusaurusContext();
-  const { metadata } = useBlogPost();
+  const { metadata, assets } = useBlogPost();
   const peoplePages = usePluginData('people-pages-plugin') as
     | PeoplePagesData
     | undefined;
@@ -221,8 +247,18 @@ export default function BlogPostSchema(): JSX.Element | null {
   const schemaType = resolveSchemaType(
     (frontMatter as { schema_type?: string }).schema_type,
   );
-  const canonicalUrl = `${siteUrl}${permalink}`;
-  const datePublished = typeof date === 'string' ? date : date instanceof Date ? date.toISOString() : undefined;
+  const canonicalUrl = withTrailingSlash(`${siteUrl}${permalink}`);
+  // Community meeting pages (this component also serves the /community/
+  // blog instance) are dated by the call itself, which starts at 1:00 PM
+  // America/New_York — not midnight UTC, the previous evening in Eastern.
+  const isCommunityPage = permalink.startsWith('/community/');
+  const datePublished = isCommunityPage
+    ? meetingStartIso(date, (frontMatter as { start_time?: unknown }).start_time)
+    : typeof date === 'string'
+      ? date
+      : date instanceof Date
+        ? date.toISOString()
+        : undefined;
   // Docusaurus's `lastUpdatedAt` is already a JS Date.getTime()-shaped
   // millisecond timestamp, NOT a unix-seconds value. Don't multiply by 1000
   // — that produces year 58000+ dates and trashes the rich result.
@@ -239,6 +275,7 @@ export default function BlogPostSchema(): JSX.Element | null {
     frontMatter as Record<string, unknown>,
     metadata,
     siteUrl,
+    assets?.image,
   );
   // Community transcript pages don't carry their own about/mentions
   // (those refs live on the parent landing page). Inherit from the
@@ -297,6 +334,17 @@ export default function BlogPostSchema(): JSX.Element | null {
     ...(entityRefs.about && { about: entityRefs.about }),
     ...(entityRefs.mentions && { mentions: entityRefs.mentions }),
   };
+
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) {
+      if (value === undefined) continue;
+      const existing = article[key];
+      article[key] =
+        key === 'mentions' && Array.isArray(existing) && Array.isArray(value)
+          ? [...value, ...existing]
+          : value;
+    }
+  }
 
   if (speakableFlag) {
     article.speakable = {

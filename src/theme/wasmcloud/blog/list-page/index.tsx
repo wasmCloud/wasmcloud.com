@@ -7,7 +7,19 @@ import BlogListPaginator from '@theme/BlogListPaginator';
 import SearchMetadata from '@theme/SearchMetadata';
 import type { Props } from '@theme/BlogListPage';
 import BlogPostItems from '@theme/BlogPostItems';
-import BlogListPageStructuredData from '@theme/BlogListPage/StructuredData';
+import Head from '@docusaurus/Head';
+import { useBlogListPageStructuredData } from '@docusaurus/plugin-content-blog/client';
+import { normalizeBlogListLd } from '../../structured-data/blog-list';
+
+/** Default Blog list JSON-LD with canonical trailing-slash URLs. */
+function BlogListPageStructuredData(props: Props): JSX.Element {
+  const data = useBlogListPageStructuredData(props) as unknown as Record<string, unknown>;
+  return (
+    <Head>
+      <script type="application/ld+json">{JSON.stringify(normalizeBlogListLd(data))}</script>
+    </Head>
+  );
+}
 import styles from './styles.module.css';
 import BlogPostListItem from '../list-item';
 import Layout from '@theme/Layout';
@@ -24,6 +36,13 @@ function BlogListPageMetadata(props: Props): JSX.Element {
     <>
       <PageMetadata title={title} description={blogDescription} />
       <SearchMetadata tag="blog_posts_list" />
+      {/* /blog/page/N/ — thin paginated listing, already dropped from the
+          sitemap (docusaurus.config.ts). Keep `follow` so posts stay reachable. */}
+      {metadata.page > 1 && (
+        <Head>
+          <meta name="robots" content="noindex, follow" />
+        </Head>
+      )}
     </>
   );
 }
@@ -53,8 +72,8 @@ function BlogListPageContent(props: Props): JSX.Element {
                         Atom
                       </a>{' '}
                       or{' '}
-                      <a href="https://twitter.com/wasmcloud" target="_blank" rel="noopener">
-                        follow us on Twitter
+                      <a href="https://x.com/intent/follow?screen_name=wasmcloud" target="_blank" rel="noopener">
+                        follow us on X
                       </a>
                       .
                     </p>
