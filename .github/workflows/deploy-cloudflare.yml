@@ -1,0 +1,193 @@
+# The Cloudflare Workers copy of wasmcloud.com, staged at next.wasmcloud.com.
+#
+# One Worker (wasmcloud-www, in cloudflare/) serves the whole Docusaurus build
+# from its static assets. This workflow builds the site, assembles the asset
+# tree and the routing table with `make cf`, and publishes it.
+#
+#   pull request   upload a version that takes no traffic; the preview URL is
+#                  in the job log
+#   push to main   deploy to the hostnames in cloudflare/wrangler.jsonc, then
+#                  smoke-test the test hostname
+#
+# Production is still Netlify, which builds from main on its own. This
+# workflow is separate from CI on purpose: a failure here must not block or
+# roll back a Netlify publish. See cloudflare/CLOUDFLARE-MIGRATION.md.
+#
+# Needs two repository secrets, CLOUDFLARE_API_TOKEN (Account: Workers
+# Scripts: Edit; Zone wasmcloud.com: Workers Routes: Edit) and
+# CLOUDFLARE_ACCOUNT_ID, and four repository variables that Netlify holds as
+# build environment variables today: GTM_CONTAINER_ID, GOOGLE_ANALYTICS_ID,
+# HUBSPOT_ID and REO_CLIENT_ID. Without the secrets the build still runs, as a
+# check, and the publish steps warn and do nothing.
+name: Deploy - Cloudflare (next.wasmcloud.com)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# One run per ref. A superseded PR run is cancelled; pushes to main queue
+# rather than race, and are never cancelled mid-deploy.
+concurrency:
+  group: cloudflare-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  # Pinned: `npx wrangler` resolves the newest CLI at run time, on a job
+  # holding a token that can publish the site. The repo's .npmrc only resolves
+  # releases at least 7 days old, so bump to a version that old, here and in
+  # cloudflare/Makefile.
+  WRANGLER: wrangler@4.160.1
+  WRANGLER_SEND_METRICS: 'false'
+  # The test hostname the push deploy is smoke-tested on. Until the
+  # wasmcloud.com zone is active on Cloudflare's nameservers only the
+  # workers.dev URL answers; switch this to https://next.wasmcloud.com then.
+  SMOKE_URL: https://wasmcloud-www.cosmonic.workers.dev
+
+jobs:
+  cloudflare:
+    name: Build and publish to Cloudflare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          # Full history: the sitemap's <lastmod> and each page's "last
+          # updated" date are read from git, and a shallow clone has neither.
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          cache: npm
+
+      - name: Docusaurus Cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: node_modules/.cache
+          key: ${{ runner.os }}-docusaurus-${{ hashFiles('**/package-lock.json') }}-cloudflare-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docusaurus-${{ hashFiles('**/package-lock.json') }}-cloudflare-
+            ${{ runner.os }}-docusaurus-${{ hashFiles('**/package-lock.json') }}-
+
+      # These four ids are public (they are in every page's source) but they
+      # are configuration, and a build without them ships 'localdev' in their
+      # place: a site with no analytics. A pull request only warns, so forks
+      # pass; a push to main refuses to publish.
+      - name: Check the analytics ids are set
+        env:
+          GTM_CONTAINER_ID: ${{ vars.GTM_CONTAINER_ID }}
+          GOOGLE_ANALYTICS_ID: ${{ vars.GOOGLE_ANALYTICS_ID }}
+          HUBSPOT_ID: ${{ vars.HUBSPOT_ID }}
+          REO_CLIENT_ID: ${{ vars.REO_CLIENT_ID }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "$GTM_CONTAINER_ID" ] || missing="$missing GTM_CONTAINER_ID"
+          [ -n "$GOOGLE_ANALYTICS_ID" ] || missing="$missing GOOGLE_ANALYTICS_ID"
+          [ -n "$HUBSPOT_ID" ] || missing="$missing HUBSPOT_ID"
+          [ -n "$REO_CLIENT_ID" ] || missing="$missing REO_CLIENT_ID"
+          if [ -z "$missing" ]; then
+            exit 0
+          fi
+          if [ "$EVENT" = "push" ]; then
+            echo "::error::Repository variables not set:$missing. Refusing to publish a build without analytics."
+            exit 1
+          fi
+          echo "::warning::Repository variables not set:$missing. This build uses 'localdev' in their place."
+
+      - name: Install
+        run: npm ci
+
+      # The command Netlify runs. CONTEXT is deliberately not set: it is
+      # Netlify's variable, and nothing here should behave as a Netlify
+      # production build while Netlify is still production.
+      - name: Build the site
+        env:
+          GTM_CONTAINER_ID: ${{ vars.GTM_CONTAINER_ID }}
+          GOOGLE_ANALYTICS_ID: ${{ vars.GOOGLE_ANALYTICS_ID }}
+          HUBSPOT_ID: ${{ vars.HUBSPOT_ID }}
+          REO_CLIENT_ID: ${{ vars.REO_CLIENT_ID }}
+        run: npm run build
+
+      - name: Fail if the build is missing
+        run: |
+          set -euo pipefail
+          for f in build/index.html build/docs/index.html build/blog/index.html build/404.html; do
+            [ -s "$f" ] || { echo "::error::$f was not built."; exit 1; }
+          done
+
+      # Fails on any rule in netlify.toml or static/_headers that the Worker
+      # cannot reproduce, naming the rule.
+      - name: Build the Worker assets and routing table
+        working-directory: ./cloudflare
+        run: make cf
+
+      - name: Test the Worker's router
+        working-directory: ./cloudflare
+        run: make cf-test
+
+      # Bundles the Worker and walks the asset tree exactly as a deploy would,
+      # without credentials and without publishing. This is the check a pull
+      # request gets when the secrets are missing.
+      - name: Check the Worker bundles
+        working-directory: ./cloudflare
+        run: |
+          npx --yes "$WRANGLER" deploy --dry-run
+
+      - name: Look for the Cloudflare secrets
+        id: secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is empty or unset, so nothing was published to Cloudflare."
+            echo "A repo admin adds them under Settings > Secrets and variables > Actions."
+          fi
+
+      # Uploads a version without routing traffic to it. The Worker must
+      # already exist (a push deploy, or one by hand, creates it).
+      #
+      # The PR number reaches the command through an environment variable.
+      # Nothing author-controlled (no title, no branch name, no commit
+      # message) is ever interpolated into a run: block.
+      - name: Upload a preview version
+        if: github.event_name == 'pull_request' && steps.secrets.outputs.present == 'true'
+        working-directory: ./cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          npx --yes "$WRANGLER" versions upload --message "PR #${PR_NUMBER}"
+
+      - name: Deploy the Worker
+        if: github.event_name == 'push' && steps.secrets.outputs.present == 'true'
+        working-directory: ./cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes "$WRANGLER" deploy --message "$GITHUB_SHA"
+
+      # Reads the routing table `make cf` wrote, so it checks the deployed
+      # Worker against the rules it was built from.
+      - name: Smoke-test the test hostname
+        if: github.event_name == 'push' && steps.secrets.outputs.present == 'true'
+        working-directory: ./cloudflare
+        run: |
+          python3 scripts/smoke.py "$SMOKE_URL"
