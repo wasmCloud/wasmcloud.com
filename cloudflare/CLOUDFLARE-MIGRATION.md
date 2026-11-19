@@ -9,10 +9,13 @@ traffic; it is the rollback target until it is retired.
 | Hostname | State |
 |---|---|
 | `wasmcloud.com`, `www.wasmcloud.com`, `docs.wasmcloud.com` | Live on the Worker |
-| `next.wasmcloud.com` | The test copy: the same Worker, `noindex` on every response |
+| `next.wasmcloud.com` | Removed on 2026-11-19, after the cutover. It was the `noindex` test copy. |
 
 **A merge to `main` publishes production.** `.github/workflows/deploy-cloudflare.yml`
-deploys and then smoke-tests both hostnames.
+deploys and then smoke-tests `wasmcloud.com`. A change is tried before it
+merges on the pull request's preview version, whose URL is in the job log.
+To compare a test copy with production again, put `next.wasmcloud.com` back
+in `routes` in `wrangler.jsonc`; `scripts/parity.py` still defaults to it.
 
 ## How it fits together
 
