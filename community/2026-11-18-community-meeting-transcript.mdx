@@ -1,0 +1,322 @@
+---
+date: '2026-11-18'
+title: 'Transcript: KubeCon Recap: AI Agent Sandbox for a Million Agents, 17 Models on One GPU, Credential Brokering'
+description: 'Full transcript of the November 18, 2026 wasmCloud community call covering the KubeCon sandboxing workshop, Arm density benchmarks, a million Codex agents, WebGPU on one L4, and the workload identity and credential brokering RFCs.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - ai agent sandbox
+  - agent sandboxing
+  - wasm sandbox
+  - webassembly kubernetes
+  - webassembly news
+  - deny-by-default
+  - kubecon na 2026
+  - arm neoverse
+  - scale density benchmark
+  - cosmonic agent sdk
+  - webgpu
+  - wasi webgpu
+  - gpu sharing
+  - workload identity
+  - spiffe
+  - credential brokering
+  - confused deputy
+  - threat model
+  - openssf
+image: https://i.ytimg.com/vi/0rcFomxfvTk/maxresdefault.jpg
+showTitle: true
+slug: 2026-11-18-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - agentSandboxing
+  - denyByDefault
+  - ambientAuthority
+  - Kubernetes
+  - WebGPU
+  - SPIFFE
+  - OpenSSF
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-11-18-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=0rcFomxfvTk" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=0rcFomxfvTk" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Bailey Hayes** [0:09](https://youtu.be/0rcFomxfvTk?t=9)
+
+Hello and welcome to wasmCloud's community call for November 18. I hope everybody's having an awesome wasmCloud Wednesday. We are all back from KubeCon, which was a really great event, and I figured maybe we should do a little recap to start on what we all saw and what we thought was cool. Anybody can ask us questions, that kind of thing. I'll give you my summary, but I welcome everybody else to jump in here.
+
+First thing that I wanted to share was that Eric and I did a workshop together, and I dropped a link to that in the chat. It's a wasmCloud workshop. It's pretty fun to go through. We've got a really guided series of steps, but basically we teach people how to build an agent with WebAssembly. It's actually not using the Cosmonic Agent SDK, so that we could build from first principles all the way up. And Eric had this really cool idea to use GTFOBins. These are basically evil binaries of the common CLIs that you might be familiar with, and he picked a couple of these, and we were able to take the evil version, and because we ran it in WebAssembly, we were safely sandboxed, which is pretty cool.
+
+<img src="/img/community/2026-11-18/image001.webp" alt="The sandbox-workshop-kcna26 README on GitHub, with the steps, GitHub Codespaces instructions, and troubleshooting table" />
+
+So it makes a really strong case that, a, not only should you use WebAssembly, because it's basically the best sandbox that you could possibly use, but b, you should really sandbox your agent from your tools. Because if your agent is told, "hey, you've got this goal, go connect to the user database," but the agent is only allow-listed a tool of curl, well, curl can now do SQLite connections if they have the ability to rewrite that binary, right? So you can imagine, not intentionally evil, just trying to complete the task that they were given, it can result in some odd behavior. So don't give people ambient authority to all the things and all the processes running in a container. Maybe actually safely sandbox them one at a time. So that was a really cool one.
+
+Our slides are up there. I thought it might be fun to just share a few of those slides. My biggest takeaway of KubeCon is that there were two kinds of projects. There was this huge category of everybody trying to figure out sandboxing and how to lock down AI in various ways, and I feel like that was half the conversation. And my feeling was that we really, really need to define what sandboxing is, because I do not agree. A micro VM, not a sandbox. A container, not a sandbox. You can layer things in on top of that and get to a sandbox, but starting there, definitely not a sandbox. A lot of the reason for that is, to be a sandbox, you must be deny by default. You must have isolation. You must be able to safely run untrusted application code. Was it you, Eric, or Liam? One of you knew to use this definition, and it's fabulous. This really hit, I thought. And if other people want to talk about why wasmCloud's awesome, use this. This really seemed to make the case.
+
+<img src="/img/community/2026-11-18/image002.webp" alt="Workshop slide quoting the NIST SP 800-95 definition of a sandbox, with isolation, least authority, and deny-by-default" />
+
+**Eric Gregory** [3:49](https://youtu.be/0rcFomxfvTk?t=229)
+
+Yeah, that was a collab.
+
+**Bailey Hayes** [3:52](https://youtu.be/0rcFomxfvTk?t=232)
+
+Yeah, well, it hit. So here's the NIST definition. If you can't meet this definition, you know what I'm saying? Let's start with that. I thought that was really great. We do have some good new slideware around describing what wasmCloud is and what its pieces and parts are. Some of these I think would be nice to make it up to the wasmCloud site, and then an updated "compile these languages to Wasm, and it could be an agent, and it would be small, and it would be sandboxed." Another thing that I thought was really nice, that Eric iterated on top of slides that Liam created, was the capabilities one. Let me grab that one. I really liked that one. How far into it is it? Farther up. Okay, and while I'm bumbling around, anything you would add, Eric? Ah, here it is. I thought this was a nice explainer on what capabilities are.
+
+<img src="/img/community/2026-11-18/image003.webp" alt="Workshop slide: the same capability model you use every day, with browser and phone permission prompts" />
+
+**Eric Gregory** [4:57](https://youtu.be/0rcFomxfvTk?t=297)
+
+Yeah, really, all credit goes to Liam on that one. And no, I think you've hit the big points.
+
+**Bailey Hayes** [5:03](https://youtu.be/0rcFomxfvTk?t=303)
+
+Then we got to do...
+
+**Liam Randall** [5:04](https://youtu.be/0rcFomxfvTk?t=304)
+
+This is my good friend Claudio helping with these slides, actually. And even on the definition one, there is an even more stringent definition in the U.S. government. You have NIST, which is what most companies align to in the U.S. The Fortune 500, they all just adopt the NIST cybersecurity framework, and then that pulls in all these other documents. And then on top of that, there's an even more stringent definition of a sandbox for classified information that is even stronger than that. But the NIST definition is table stakes.
+
+**Bailey Hayes** [5:41](https://youtu.be/0rcFomxfvTk?t=341)
+
+Which is table stakes, and most of the projects I saw did not meet it, so I'm like, okay, all right, let's start there. So we've got a lot more slideware, so I shared that. And if folks want to help us make our documentation better, always welcome in that regard. I think a lot of this was really good to work through, and to try to think about introducing another cohort of people who have never heard of wasmCloud to why you should use it. We've really inverted our messaging from the "write once, run anywhere, polyglot application, cloud native development" to "okay, you need a sandbox, all code's untrusted." Let's just talk about it from that perspective, and that made a big difference, I think. So those were my big learnings from a lot of that.
+
+And in the same talk, oh, one more thing, which was really fun. Arm gave us access. Actually, am I obligated to do this? I'm not sure. I'm going to just do it so I don't invoke wrath. Arm very kindly gave us access to Arm Neoverse. What's interesting is that we've been benchmarking wasmCloud for a while, but on a runner from Hetzner that was x86. So this was the first time we really spent some time benchmarking not on our own local development MacBooks, but on a type of server that you would legitimately run in production in the cloud, which is over half of the new compute going to hyperscalers, so definitely worthwhile for us. All right, there's my marketing plug. Oh, go ahead, Liam.
+
+<img src="/img/community/2026-11-18/image004.webp" alt="Arm slide: 1.5 billion Neoverse cores shipped to data centers and 50% of compute shipped to top hyperscalers in 2025 was Arm-based" />
+
+**Liam Randall** [7:30](https://youtu.be/0rcFomxfvTk?t=450)
+
+What blew my mind is, between my Mac and the cloud, I just feel like Arm has won. But it was incredible to me: we met with a company that does a lot with on-prem data centers, and we made that comment. We're like, "oh well, it's all Arm," and they're like, "we see no Arm in all the on-prem stuff." And it kind of just blew my mind, how people were still operating equipment that I would say is kind of a legacy design. But wild. Sorry, that did blow my mind.
+
+**Bailey Hayes** [8:07](https://youtu.be/0rcFomxfvTk?t=487)
+
+I was there for that comment. I was like, okay, so we shall keep doing our Hetzner, our cheapo Hetzner Ryzen 5 box. That's okay. But part of this effort here made it possible for us to start running benchmarks on other servers, and we've also created a couple of new classes of benchmarks. This benchmark was originally created by Victor, so we built on top of what Victor made, and this is our scale density benchmark that anybody could run. If you give it something beefy like this Arm server, which is 64 cores and 128, I think, gigs of RAM, the thing that limited us mainly is cores, for concurrency. That's basically what we need, and I did not hit a threshold beyond the core problem. And this is a bare-metal benchmark running a basic HTTP component, so it's not really driving a ton of realistic workload. But this is the baseline for how many feasible sandboxes I can run on one host at the same time. And the first thing anybody would ask is, is it fast? The p99 here is 1.4 milliseconds, so it is incredibly fast, incredibly dense.
+
+<img src="/img/community/2026-11-18/image005.webp" alt="arewefastyet density page for aws-c9g-16xlarge: 1.42M warm components, 9.65M scale-to-zero workloads, 82 KiB per warm component, 1.4 ms request p99, 179k cold starts per second" />
+
+What was especially delightful about this is that, like I said, everybody at this conference was talking about sandboxing. There was a keynote, and then the same story told over and over again in many different talks, and one of them was the new project announced for Agent Substrate. They were really proud of their numbers, which are impressive on the architecture they chose, and they were really excited about having 22,000 agents across 65 micro VMs. And I was like, okay, well, guess what we can do.
+
+<img src="/img/community/2026-11-18/image006.webp" alt="Photo of a conference slide: Agent Substrate on AKS showing 22,655 idle agents across the cluster" />
+
+So if you go over here and look at this, we also posted on the exact same Arm server that I got access to. I provisioned it as a Kubernetes control plane, and I set up a pod on that Arm worker, and then in that pod, I took what Eric did, compiling Codex to WebAssembly, and so I ran Codex on the same Arm. What I ran into there was Kubernetes scaling issues. Our cap wasn't actually the cores. I didn't max out our memory or our cores. Instead, when you're doing an agent SDK, there were two problems I ran into. One, etcd has some serious scale issues. I think next time I do this, I would probably set it up with Postgres, which was my other key learning. I think they talked about it here: AKS Agent Substrate. They actually decided to swap out etcd for Postgres to do scaling of this kind of magnitude. So next time I'll do that.
+
+<img src="/img/community/2026-11-18/image007.webp" alt="Cosmonic Agent SDK landing page: sandbox agents by the million, 1.75 million agents on one server, about 70 KB per agent, 72,000 agents started per second" />
+
+The other thing I ran into is that I was using SQLite for the local session storage. Whenever an agent makes a chat, it creates a session and wants to write that to disk, so you have a local cache of that thing, so that we can scale it down to zero and wake it up when it comes back. And because Arm gave me this really wonderful server, it was on their AWS account and not mine, so I wasn't able to attach a larger EBS volume to it to expand my file system. If I had a little bit more time, I probably would have started doing something more interesting, maybe like S3 reconciliation, and just forgo a local cache next time I'm trying to do this, something like that. There's an endless number of options there. So that was really fun, and it had similar RPS as the basic HTTP component. What this workload was, was a Codex agent making a single query to an OpenAI endpoint, which was a mock OpenAI endpoint that I set up so that I didn't make a bunch of tokens go brrr. But it did respond back with a valid OpenAI response, and it parsed that actual workload. Yeah, Frank.
+
+**Frank Schaffa** [12:48](https://youtu.be/0rcFomxfvTk?t=768)
+
+So one thing I'm wondering, you mentioned Kubernetes. Did you try to run this on K3s? Because then you don't need to be bound by etcd and so forth. You can put any other database there.
+
+**Bailey Hayes** [13:07](https://youtu.be/0rcFomxfvTk?t=787)
+
+Well, I didn't get access to this Arm box until Saturday. Our talk was Wednesday, and I hit a lot of things before even getting to that point. I set it all up on EC2 nodes, and yeah, I think all those options were totally on the table. In retrospect, one more day probably would have done that. Also, I think a better volume would have gone a long way for me too. But once I passed a million, I'm like, point made. I can keep going, but I can just point at that and be like, okay, you understand the order of magnitude difference here. That's what I needed to hit.
+
+**Frank Schaffa** [14:02](https://youtu.be/0rcFomxfvTk?t=842)
+
+And I'm wondering, did you talk to the Google guys? Because they're running in a micro VM, and here you're running in a sandbox. I'm wondering, what were the pros and cons between those two different things?
+
+**Bailey Hayes** [14:27](https://youtu.be/0rcFomxfvTk?t=867)
+
+Yeah, I think it's totally fair to say it's a bit apples and oranges. They ran inside gVisor, right, for Google, and because they were doing that, they were able to do more things like write code, because they basically created a Go agent with the A2A framework that they built. So it's not Codex or one of those agentic harnesses off the shelf. It's one of their own agents, built with their own agent SDK, and built on A2A, so there's a lot in that stack to make all that run. Whereas for me, for both the one that I showed on the Cosmonic side of the house and the one that I showed with wasmCloud, it's just stock wasmCloud, right? You can run any workload. Doesn't matter if it's agents or not. To us, that's just a component that needs an HTTP capability that happens to be hitting an OpenAI endpoint. That's all it fundamentally is, brass tacks. And you might add other capabilities for tool discovery, or you might just say, here's tools that are in my workload. I don't have to call them tools. I don't treat them special. It can call these APIs. Boom. Now it's an agent with tools, right?
+
+And so the difference is they had a whole operating system with a whole bunch of random CLIs, all in the same sandbox, that they are able to call and do whatever with. And their sandboxing capability is really focused on the networking policy controls that are around all of that, which, everything that's there, we just inherit too, because we just run right in the same infrastructure. But because you can do whatever you want in a micro VM, it's different, right? It's definitely a lot more open-ended and not as locked down.
+
+**Frank Schaffa** [16:26](https://youtu.be/0rcFomxfvTk?t=986)
+
+Yeah, so I think this is great, and it shows us that, okay, every sandbox in theory could be a different function, so it doesn't have to be a different agent and so forth. So from an integration point of view, it gives you a lot of capabilities. And I'm hoping we don't lose the track here, and only talk about agents instead of talking about integration of functions.
+
+**Bailey Hayes** [17:00](https://youtu.be/0rcFomxfvTk?t=1020)
+
+Yes, all code is untrusted code in this new frontier, right? So your vibe-coded app, your MCP server, your agent, the tools your agent calls, the REST endpoints your agent calls, all of it should be safely sandboxed with wasmCloud, in my opinion.
+
+**Frank Schaffa** [17:18](https://youtu.be/0rcFomxfvTk?t=1038)
+
+Okay, I guess Aditya, go ahead.
+
+**Aditya Salunkhe** [17:20](https://youtu.be/0rcFomxfvTk?t=1040)
+
+Yeah, I almost had the same question. The figure from Agent Substrate was around 22,000, and I was wondering if the actual agents were self-driving loops, or were they just plain old calls?
+
+**Bailey Hayes** [17:43](https://youtu.be/0rcFomxfvTk?t=1063)
+
+Plain old agent calls. Yeah.
+
+**Aditya Salunkhe** [17:44](https://youtu.be/0rcFomxfvTk?t=1064)
+
+You mentioned that your setup also had the same thing, but yeah, it's really interesting to see the drastic difference between having pretty much the same thing, but almost a million. Wow.
+
+**Bailey Hayes** [18:02](https://youtu.be/0rcFomxfvTk?t=1082)
+
+It's so funny. You can tell I got so much delight out of that.
+
+So basically, right, the terminology in AI is always changing. But essentially, I interpreted your question as, was this an agentic harness, like a full-blown coding agent thing that would run, writing code, like a Codex, which is what I sandboxed. Which is not what they sandboxed. They sandboxed their own little Go app, baby app, that compiled against their A2A framework. Now, they did do lots of other demos, and maybe I didn't see them all. Their keynote one was controlling a character on a screen, but that was very much "go left, go right, go do things." So it wasn't an agentic loop at all, really. It's just responding to basically chat.
+
+**Aditya Salunkhe** [18:57](https://youtu.be/0rcFomxfvTk?t=1137)
+
+That's awesome. Really interested to see how this blooms further, especially with the agents concept coming to wasmCloud. Did I mention I also got something like a whole ARM64 CPU compiling inside WebAssembly? And the overhead was really less, and the startup time was also quite less, because I used a bit of snapshotting tech and made the boot-ups really quick. It's close to 12 milliseconds, and it is really quite fast in my usage.
+
+**Bailey Hayes** [19:39](https://youtu.be/0rcFomxfvTk?t=1179)
+
+Victor, did you hear that? Oh, there you go. Okay, I just wanted to check.
+
+**Aditya Salunkhe** [19:43](https://youtu.be/0rcFomxfvTk?t=1183)
+
+Yeah, and I haven't even made it multi-CPU yet. So I need to make a lot of improvements, but hopefully I can turn this into a really good tool so that it benefits the whole ecosystem. Really interesting to see how it blends with the agent adding its own tool with the Agent SDK. Shout out Cosmonic. They don't sponsor me, but...
+
+**Bailey Hayes** [20:08](https://youtu.be/0rcFomxfvTk?t=1208)
+
+Thank you. Yeah. So we open sourced and launched an Agent SDK while we were at KubeCon, which is a WIT-ification of, basically, the TL;DR would be the OpenAI REST API, WIT-ified. So how do you create a chat and interact with models? That's part of the OpenAI endpoint. And so we're able to do two cool things. You can put in literally an OpenAI backend. You can use OpenAI as an inference provider. You could bring your own at that layer as well with a component, because now it's WIT-ified, right? And as far as the components are aware, it doesn't care how that capability is supplied, only that it is. And then another aspect of it is that we WIT-ified session storage, so that you could do distributed, durable session storage for a component. It's basically a decomposition of all the things that an agent needs to be able to run.
+
+Most of this work was led by Eric, and now a lot of it also Victor, and I've been really excited to see that unfold. We've made a lot of cool different kinds of demos and uses out of that. So yeah, I definitely would love to collaborate with anybody in the industry, and you, Aditya, of course, if anybody wants to jam on what the right capability contract for agents is. Because our goal, at a high level, is I should be able to build an agent with any agentic framework. So if it's A2A, or it's somebody that just does OpenAI-type stuff, or it's Codex, or it's Claude, or it's Goose, or Pi and Hermes. And by the way, shout out, Eric and Victor got Pi, Hermes, Goose, and Codex all compiling to Wasm using this Agent SDK. So basically, how do I come up with the right capability contract to build this and scale it? Secure, scale, make it resilient. All right. I saw a lot of hands. I don't know who's next. Somebody tell me who's next.
+
+**Aditya Salunkhe** [22:19](https://youtu.be/0rcFomxfvTk?t=1339)
+
+I think Jeremy and me.
+
+**Jeremy Fleitz** [22:20](https://youtu.be/0rcFomxfvTk?t=1340)
+
+Yeah, I'll just go really quick. I just want to reiterate, going back to the Agent Substrate micro VM thing. The workshop that Eric and Bailey did at KubeCon, this is running in a Codespace, and that's in the slide deck. You can just launch it there. I had the wonderful "musical-barnacle" name that popped up for me. But going back to Agent Substrate and comparing it to the way we sandbox: if you look at the components here, this is really just showing exactly how it works. The agent's its own component, but then you have curl by itself, and then SQLite by itself. So we're literally taking the tool and putting it inside its own sandbox, if you will. That way, when the agent does call into curl or SQLite, it's using that same contract, our WIT contract, to call in, versus actually trying to use the actual binary inside the same box. So that's the huge difference to me. I know it's very quick and easy to say that on the call, but just letting everybody know to really try out this workshop, since it's really very simple to launch. You don't have to install anything. I don't know who's next. I think it's maybe Frank or Victor?
+
+<img src="/img/community/2026-11-18/image008.webp" alt="The workshop in a GitHub Codespace: a workloaddeployment.yaml with separate agent, curl, and sqlite components, and an EACCES permission-denied error on writing /etc/passwd" />
+
+**Frank Schaffa** [23:42](https://youtu.be/0rcFomxfvTk?t=1422)
+
+Yeah. So going back to the discussion, did you have a chance to talk to the Google guys? Did they show interest, or is there follow-up on this?
+
+**Bailey Hayes** [23:56](https://youtu.be/0rcFomxfvTk?t=1436)
+
+We do have follow-up meetings Friday and Monday to catch up with some of that team. I think the biggest challenge, and why I was so motivated to make all our benchmarks open source, make it "here's the Ansible playbook, here's the Terraform, here's the GitOps repo, go do it yourself," is because people don't believe it. The numbers are too incredible and several orders of magnitude different, so people are like, "hold up, why isn't everybody doing this?" That is literally a comment I got after our talk, and I'm like, "I don't know. Maybe they didn't know. Maybe you should tell people." And people have since DM'd me and said, "I did."
+
+**Liam Randall** [24:38](https://youtu.be/0rcFomxfvTk?t=1478)
+
+Why don't we let Victor jump in, and then, Bailey, I'd love to pick up on that. Sorry, Victor, you've had your hand up for a bit.
+
+**Victor Adossi** [24:46](https://youtu.be/0rcFomxfvTk?t=1486)
+
+Yes, no worries. The only thing I was going to say was about the multi-core support on the RISC-V side. Since we only have co-op threads right now, I'm not sure you can expect much in terms of speedup, but you'll be able to run more things, actually. So that's nice.
+
+**Aditya Salunkhe** [25:09](https://youtu.be/0rcFomxfvTk?t=1509)
+
+My agent did a spike and it gained about 10 to 20%. So not sure if it's exactly one-to-N scalability, but yeah, like you said, a few more tasks than before.
+
+**Liam Randall** [25:31](https://youtu.be/0rcFomxfvTk?t=1531)
+
+Bailey, to your point around people not believing it. I was really involved in rolling out containers and Kubernetes in 2014, and did the first deployments of both at a whole bunch of Fortune 100s and the U.S. government and lots of other places, and it was this exact same conversation. Everybody was like, "Why would I want a Kubernetes?" And I'd say, "Well, how else can you orchestrate your containers?" And they'd be like, "Containers? I can't use those. I'm too busy doing all my VM stuff." And I'm like, if you do containers, you do less VM stuff. You sort of had to walk them through this paradigm shift, this Thomas Kuhn, Kuhnian, structured scientific insight in your mind, right? And obviously when you have the flip, it's clear. But I think AI is forcing people to have the flip faster this time around. Whereas all of us have seen the world and known that less container is good, least dependencies is best, and starting with the first principles, you end up where we are. So I think it's neat seeing other people finally get that insight and be like, "ah, now I know what you and Bailey are always yelling about like lunatics." It's making it work. So, fingers crossed. And Frank, to your question, I would say our schedule in the next week represents that we have the attention of a lot of people on this who are curious, keen to understand more.
+
+**Bailey Hayes** [27:18](https://youtu.be/0rcFomxfvTk?t=1638)
+
+So I literally think what we were missing was a silly stunt hack like this. It's not a hack. We just had never thrown serious hardware at it. We've been running density benchmarks on some of the world's cheapest, crappiest hardware, but that wasn't cool enough.
+
+**Liam Randall** [27:37](https://youtu.be/0rcFomxfvTk?t=1657)
+
+I don't think that that's it, Bailey. I think it's this combination of all this hard work that this whole team here has been doing, that you've been really leading as the quarterback on this last year. For example, the policy enforcement points that you've added in wasmCloud, and the strong multi-tenancy, and the scale. It's the combination of these things together that tells this unified story, and the Kubernetes integration, right? So when we think about where trust and correctness come from: it starts in Wasm, then it brings in the component model. We leverage Wasmtime for delivering the individual tenant pieces. wasmCloud brings in multi-tenancy, those policy enforcement points, and then integration into Kubernetes. Now it's a story that really works.
+
+And you've let me go and tell those stories at security conferences, about removing the preconditions of post-exploitation in kill chains. A lot of people are like, "wait a minute, all the ways that agents break in and out, that can just go away? We don't have to defend that any longer?" People are having this aha moment, and we couldn't tell this story two months ago, by the way. Three out of those four pieces were there, but you hadn't nailed the scale one yet. Five months ago, we couldn't tell all the policy enforcement points, and a year ago, we couldn't tell the Kubernetes one, or not as well as we can now. So I think it's really this combination. You've been playing this chess game over the last 18 months, rebuilding and releasing wasmCloud 2, and then knocking these things out. And I hope we're going to have time to talk about what you're working on next on identity, where now you're exceeding the other frameworks. You're about to explore it and go past them. I'm excited. I hope we have time to get that on today's agenda.
+
+**Bailey Hayes** [29:34](https://youtu.be/0rcFomxfvTk?t=1774)
+
+Yep, I do have it there. Well, let me just play the video I played at the end of Eric's and my talk. Fun fact about this video: I recorded it the day of, because that's when I got to where it had the nicest number. If you go and look in wasmCloud, you'll see a lot of different PRs between Victor and me on basically making it so that our operator can do much, much more concurrency, because the first time I scheduled this workload, it was like boop, boop, boop, boop on through, and I wanted a fun actual video. So first, Argo CD couldn't render a million custom resources, so then I had to make a Perses dashboard for it. So here's my million custom resources. They are deployed on this thing, and as I deploy them, this is how fast they get deployed. I think we instantiate and schedule a workload at 75,000-ish per second, which is good. It wasn't initially good, but we got there. And then once it says all these workloads have started, now Codex goes forth and says hey to your OpenAI endpoint, and OpenAI is going to tell you hey back, and all those succeeded, and they all had a pretty nice p99. But blitzing through all of those on one host, you can see that we had a huge budget remaining for our memory. I had 20 more gigs. I could have done something crazy there. It really was just me not having been able to scale out my volume on that one. I think I could have packed a lot more on. So that was super fun. I think we should do more of these.
+
+<img src="/img/community/2026-11-18/image009.webp" alt="Cosmonic Control recorded benchmark: one million deployments on one Arm worker, 1,002,000 hosted workloads, 540,000 successful chats, 39.02 GiB host pod working set" />
+
+Let's see, we've got more things to talk about. Let's talk about the other half of the conference now. So we talked about density for our side, but you might notice there's a new benchmark over here. It got set up to use a spot instance in AWS. I will say, and I'll continue to say: NVIDIA, if you liked my presentation and how I surfaced how awesome the Arm server is, I can do that for you too. Or I can get spot instances that are 70 cents an hour, and they can get pulled from me in the middle of my benchmarks before a demo, which is what happened. But this one completed all the way through, and you can see that it's still running against a pull request here. To get the demo working all the way through, Mendy and I both had a series of different patches across the ecosystem, basically to make something really cool for our talk. I'll show you some of that.
+
+<img src="/img/community/2026-11-18/image010.webp" alt="arewefastyet GPU page, how far from native: Qwen2.5 7B on an NVIDIA L4, CUDA 53.6 tok/s, native WebGPU 33.4 tok/s, and Wasm 32.1 tok/s for generation" />
+
+What this benchmark shows is the difference between where WebGPU is today on that branch compared to CUDA direct, so native direct. And the reality is that it's slower. In some cases it's 60% of native, and in another case it's an order of magnitude off from native. That's not insanely bad, but it is a lot. There's definitely a gap, and part of our talk together was going through all the things that can close that gap. One more thing I want to highlight here is that, as part of this, we did Wasm plus WebGPU, right? So just by taking advantage of the WebAssembly component being essentially our universal package, where we can distribute the GPU kernel inside a component and have that load, we get a benefit of sandboxing. We get a benefit of distributability. I'm going to talk about multi-tenancy a little bit in a second. And the overhead cost to be able to do that was less than 4%. So our wasmCloud sandbox here really didn't impact the performance. Closing this gap upstream is definitely what's going to make the biggest difference. Another kind of downside that I wanted to highlight, that we ran into, is just for us to load a sizable model.
+
+**Bailey Hayes** [34:04](https://youtu.be/0rcFomxfvTk?t=2044)
+
+It takes some time, but by spending one day on it, I shaved, I want to say, 30% of the cost off. So I think there's still plenty of low-hanging fruit here to keep improving. But the reason why I want to talk about this is the other half of the conference was completely about this. In my perspective, it was all the different ways you can try to do multi-tenanted GPU slicing. So there was one half on sandboxing and the other half on how to deal with "we can't get GPUs." I felt that very acutely, having a hard time getting a GPU in AWS, so it's definitely a real problem that people are actively trying to solve across the entire industry. A lot of them are using this vendor-specific API, MIG, to be able to slice and dice up a GPU, and the most that you can get right now is seven slices. They don't even list the crappy GPU hardware that I used. I used a very simple L4. Everybody kind of showed how to do this. There were a ton of different projects on how to do quota and fair sharing across these little tenant slices, and once you've loaded a model, how to keep that around as long as you can. There's so much complexity and work being done in the industry.
+
+<img src="/img/community/2026-11-18/image011.webp" alt="Talk slide, Enter WebGPU: WebGPU is to the GPU what Wasm is to the CPU, wasi:webgpu brings WebGPU to WASI, and wgpu is the Rust implementation underneath" />
+
+Mendy and I kind of came in and were like, okay, well, there's this cool thing that browsers have solved, and it's called WebGPU. WebGPU is a web standard. Browsers have found a way to sandbox in a multi-tenanted way across consumer hardware across the planet, at massive scale. They've been able to do this wildly successfully. So successfully that your grandma uses it every day. And inside wasmCloud we have the wgpu crate here. Oh, yeah, I'm showing you our full speaker notes. I should probably clean those up now that I've shared this publicly. But whatever, it's kind of fun to see the sauce. We use the exact same crate that Firefox uses, and there are definitely a lot of benefits in doing that.
+
+But I think the biggest one, and probably the only thing that I'll really dive into here, is that in the other approaches, you can get seven models on one GPU device. On my very cheaply provisioned NVIDIA L4 that I got a hold of, I ran 17 different models on it, all concurrently serving at the same time. These are models that you'd recognize, like Qwen, Llama, Smol, and then the other models were actually the ones that Mendy gave as live demos. Mendy showed off ONNX Runtime compiling to Wasm. He showed off TensorFlow.js compiling to Wasm. He showed off llama.cpp. He showed off a Rust driver that sits on top of that. So we showed basically taking a component for Rust, C++, JavaScript, each one of them doing their own ways of running a model. Different types of model serving: scientific compute, doing something that's kind of artsy, graphicy, and all of those different workloads working on the exact same GPU device. So this one also raised a lot of eyebrows, and a lot of people came by to talk.
+
+And I'll be honest, there's a good reason. I know exactly why nobody's talking about this one, and it's because of how much we had to do to make it work. It probably only works if you follow that one branch here. Let me open that up so you can just get a feel for it. We've got some fixes that actively need to be changed and landed upstream. So only on our secret special sauce branch, obviously, can you actually build and make all that work. But Mendy, for the past week, has just been upstreaming every single one of these things that we had to do to make all these different demos work out really well.
+
+**Bailey Hayes** [38:36](https://youtu.be/0rcFomxfvTk?t=2316)
+
+And then obviously I iterated for a few days and had massive gains in performance, so I think we need to just keep at it, and it's going to become a very reasonable, very feasible option for server-side GPU compute. And one other cool advantage is that, because it's WebGPU, this web standard, it's sandboxed. So in the scenario of "I've sliced up my GPU seven times," if one of those faults, it faults the whole device. Whereas with this, a fault is a trap. It doesn't actually fault the device. So that's a pretty interesting difference, especially when you think about how long it takes to load some of these large language models. You would never want to risk a fault. So that was another fun wasmCloud talk.
+
+Okay, I've been talking a lot. Anybody else want to share their thoughts? Well, all those slides and the repo for doing the WebGPU demo are also all up in our agenda already. I'm going to jump back to our meeting agenda now and just call out a few things really quick.
+
+Shout out also to Aditya. Thank you for landing the next major feature that was in the release yesterday. That was the host component plugin volume mounting. We've got to add the Kubernetes side of the house for that next, but that really moves things forward, so that we can start developing some pretty cool host component plugins, and I hear there might be a cool demo of one from Shreya next week. I plan on getting it into the agenda, so a little preview on that one. Jeremy's got a PR to add a new feature to our NATS plugin, basically allowing the possibility to create buckets from our plugin, so that's more of an admin-y, privileged interface. So take a look at that one and see if that design makes sense to you.
+
+And then one more I wanted to highlight: we've got two different RFCs out here. This one we had already scoped on our roadmap, and I already had POCs of it cooking in drafts before KubeCon, and obviously then things had to be put down. KubeCon had to happen, and now I'm coming back to them. I've expanded this very concretely after several rounds of iteration, and these three PRs are basically most of what it would take to land this feature. The main thing that I had to really iterate on was actually what the SPIFFE ID would be for our workloads. We don't have a ton of time, so I'm probably not going to give you a full primer on that. I'm just going to tell you all to please look at this, and then when I land all of this, hopefully before next Wednesday, I'll give you a full rundown demo on all of it.
+
+<img src="/img/community/2026-11-18/image012.webp" alt="GitHub issue #5653, Workload identity built on mTLS, with the RFC acceptance criteria and identity design" />
+
+The other one that I wanted to make sure people knew was out there: basically the only thing that I saw across the KubeCon floor that wasmCloud didn't yet do, that all these different sandboxing projects did, was credential and secret brokering. And I'm like, okay, I'm going to fix that. So I brought that into design scope, and it builds directly on top of workload identity. If I know what my identity is, I know the right ways to broker it when I'm doing any kind of egress. So if I'm making a WASI HTTP request with something like an API key in it, my workload has no reason to have that API key in memory in the guest. This all comes back to a phrase that I really like that Liam has said before, which is "you can't leak what you don't have." So let's not give that to the workload. Let's let the host broker it. That's why it's credential brokering. Let the host say, "Okay, I'm going to put that API key right here for you. Whenever you do WASI HTTP, I know that it's this header that needs to be substituted, so I will just swap that out for you on egress, on the way out."
+
+<img src="/img/community/2026-11-18/image013.webp" alt="GitHub issue #6007, RFC: credential and secret brokering, describing placeholder substitution on host egress" />
+
+**Bailey Hayes** [42:53](https://youtu.be/0rcFomxfvTk?t=2573)
+
+And we can make that work for any host plugin API, and we can make it work for any secret, and we can do something really nice and intuitive for actual credentials. When I say actual credentials, I mean, let's say we're doing mutual TLS, for example, and we need to do token exchange and token refresh. We can build on top of all of those, and have our hosts actually know how to refresh the token and do the right thing at the right insertion points. This is also POC'd, with drafts up of what it would take to do this. I needed to create a WIT definition so that I can let plugins know when they need to do brokering, so that a native plugin or a host component plugin can have the privilege of being able to broker the egress requests that are happening through them. Yeah, Frank.
+
+**Frank Schaffa** [43:48](https://youtu.be/0rcFomxfvTk?t=2628)
+
+So from the plugin, opening these credentials or certificates sounds interesting. But I'm just wondering, what could be the risk of having this capability? Because now all of a sudden you're changing something in the way the flow of requests is going.
+
+**Bailey Hayes** [44:15](https://youtu.be/0rcFomxfvTk?t=2655)
+
+It's a reasonable question. I think what's scary for us is that in our threat model we are a multi-tenanted host, where a lot of the other solutions, including Agent Substrate and others, I've noticed don't aim to be multi-tenanted. They say, okay, for every tenant you get your privileged container or micro VM, and so whatever grants happen for that one micro VM, you know they're happening for that one tenant. Where we have the biggest risk is the confused deputy problem. Let's say a host component plugin that somebody authored has a bug, and they are able to assert the workload identity of a component making a request on them. A plugin has an on-workload-bind, and so it builds a workload table, let's say, of all the different workloads by identity that it is brokering requests for. If it has an off-by-one error or something like that, where it gets the connection pool incorrect between different workloads, which could potentially be different tenants, then it would step into the confused deputy.
+
+Now, what's cool is some of the things that we've now added. I actually don't think I've presented on this yet, so let me do that. wasmCloud got an award for meeting the highest bar, basically, for what an open source project can do, and it was sponsored through the OpenSSF. I'm super thankful and appreciative of all the things that they've done to make this really easy, and a ton of different tools to really harden your project and audit it, and also create a very robust threat model around it. Something that's new in wasmCloud over the last couple of weeks, to be able to achieve that badge, was to do an OpenSSF self-assessment, and then we opted to go as far as we could with this and did a Gemara-style assessment. There's a bunch of different links that are worth looking at in here, but let me show you this threat assessment, which I think is pretty cool.
+
+Fintech had this problem first. You, Frank, are probably more familiar with some of this than I am. This was new tooling that I hadn't played with before, but I got to dive deep on it. That's why you see FINOS on GitHub is actually the original creator of this stuff. They modeled common cloud native controls that exist throughout the system. Think TLS and OCI and how those kinds of things work. And you can see some of these different types of things. Here is how the network access rules work. Here's how resource versioning works. Then what we did is we modeled what wasmCloud's capabilities are. We support untrusted code execution. We support the ability to retrieve untrusted code from OCI. We have a control plane that is managed over NATS. We do HTTP ingress. So a lot of the capabilities that are built in, like WASI HTTP, like NATS, that are built into the host today, and volume mounts, are actually all modeled in this. So first you model your capabilities, then you model your threats given that, and so confused deputy, elevation of privilege, and spoofing are all threats that we model here now.
+
+<img src="/img/community/2026-11-18/image014.webp" alt="docs/security/threat-catalog.yaml in the wasmCloud repo on GitHub" />
+
+What this enables is a really structured and mechanized way to do, I like to call them "claudits," but essentially telling a bot, the clankers of the world, where and what our boundaries are and what to analyze. So you can use this and look at host component plugins that you create. Every time we do a release, I actually do an automated security audit now, before we ever cut a new release, and that's been really powerful in making our project so much more secure. But it's also a really interesting approach because it puts this in such a very clearly defined context. Some of these call out exactly where in the code it is, and the things to look for, like credentials, right?
+
+**Bailey Hayes** [49:15](https://youtu.be/0rcFomxfvTk?t=2955)
+
+So when you structure what your threat boundaries are in a very structured way, LLMs are really good at that very specific context, rather than just saying, "go find a bug in my code." Instead, it's "I'm going to look at this. I'm going to look at these specific threats that I know are in the top 20 for this type of boundary." That's just so much better fidelity. All along I've been clauditing, but once I put this in place, I got really great returns on top of it. So that's one of the many things that we did along the way.
+
+We also got rid of personal access tokens. I don't know if people saw some of the new security vulnerabilities that are cooking right now in the Python space. But essentially, we no longer use personal access tokens or Actions secrets for that, and instead we now use, I don't know if you've seen some of this, Octo STS. I just did that over in this project. If you look, from the Octo STS bot, you'll see that now we use short-lived tokens that are specifically granted for specific workflow actions and are time-based. So you get a short-lived token, and this is how everything gets set up. No longer in any of our projects are we using personal access tokens.
+
+There were a ton of different automated control settings that we're now running as part of all of this. I guess the top-level thing to look at is our security insights file. It should be top level. There's this one, which is doing most of the scanning, the OSV-Scanner part for vulnerabilities. Here we go. Okay, so this outlines everything we do as a project for security, and there's a lot here. We automatically upload our baseline scan results to a place where OpenSSF bots can scan against us, so that's part of mechanizing the clankers. There's obviously OpenSSF Scorecard that we automatically run and update. We're running lots of different DAST and SAST. We're running fuzzers. We're running Dependabot. We're hardening our CI with zizmor. We're scanning all of our dependencies for licensing, all that kind of stuff. Doing audits for different languages. Yada yada yada. There are so many things, and if you want to dive into this, they're all here.
+
+<img src="/img/community/2026-11-18/image015.webp" alt="security-insights.yml in the wasmCloud repo on GitHub, listing the project's automated security tooling" />
+
+Again, I'm super appreciative of all the work that OpenSSF has put in over the last year to make this all automatable, and they even created skills that I use to basically do all this and build it all out. That was a lot more than your one question, Frank, and I'm sorry that turned into a monologue. The answer is: there are threats, and we have a really good threat model catalog for it. And it should be possible to securely audit your code for creating plugins that do credential brokering.
+
+**Frank Schaffa** [53:10](https://youtu.be/0rcFomxfvTk?t=3190)
+
+No, that was good. Thank you.
+
+**Liam Randall** [53:14](https://youtu.be/0rcFomxfvTk?t=3194)
+
+There's a bunch of nuance here that Bailey's glossing over. I'd maybe call out a couple of things. One of the things that we've seen in super high-performance computing is that the cloud providers have their own limits, like how quickly they can mint certificates and things like that. And at our scale, we're blowing past all reasonable limits. So when Bailey is designing these things, there's a lot that needs to be carried along with it: what is our unit of tenancy? Other platforms that are trying to hit even a fraction of what we're hitting are running into things like IP exhaustion and certificate limits. And we're not hitting those, because of the way that Bailey has architected this, to take the core value props of WebAssembly and enable them. It means just building very intentionally, so when you land this on GCP or on AWS, it can integrate into the rest of the environment very well. So Bailey, I know it's impossible to share all the detail and thought you're putting into this, but as somebody that's seen this go awry and fail in a thousand different ways, I think this is a really strong foundation that you're building here for the project. All the building blocks are built the right way. So thank you.
+
+**Bailey Hayes** [54:38](https://youtu.be/0rcFomxfvTk?t=3278)
+
+Yeah. Well, we're already over time, so I'll give a demo of all this next week, where I'll go into more of the thought around scale and stuff. I actually didn't even really touch on what any of the RFCs are actually doing under the hood, but every one of those does actually update that threat model, and where and how we touch these things. Obviously there's always risk when you're interacting with credentials, but I would say the greatest risk is the approach that everybody else is taking, which I will call whack-a-mole, where they just have hard-coded where they know the secrets are on proxies. They've asked their agents to pretty please use these placeholders for substitution, and when you're talking about non-deterministic inputs and outputs of agents, that's just not going to work at any kind of scale. They're trying to lock things down onesie-twosie style, and instead, what you need is architected protection for all of this. This needs to be built into the architecture. You have a pretty word for this, Liam. I forgot it.
+
+**Liam Randall** [55:52](https://youtu.be/0rcFomxfvTk?t=3352)
+
+Architectural security. That was it. And it's in the context of the question that I get most commonly on the security side. Right now I'm kind of going out on tour and doing all these security talks at conferences, Frank. People ask, "well, we're just going to have a smart oracle do this," or "why can't an LLM? Why can't I just ask an LLM for every rule?" And the problem is that you can't exchange architectural security for these non-deterministic control systems. I think the other way around works, where you embed non-deterministic advisors or oracles inside of architectural security. That's interesting. But the other way around is anathema. It's the exact opposite of what you want to do in delivering security that you can reason about, rely on, and then have some hope of formalizing or proving. It's a longer story that we drafted a white paper on. We haven't had it published, but we're shopping it around a little bit right now, an academic 12-pager kind of a deal. So we're working on putting something out that'll be citable in Google Scholar, for people to build on and continue to share the story.
+
+**Bailey Hayes** [57:16](https://youtu.be/0rcFomxfvTk?t=3436)
+
+Thank you for being good at storytelling, Liam. I appreciate it. I think that's really what we need now. So everybody here, that's your call to action: help get the word out. I think we're basically the best, especially once we land credential brokering. Literally, I don't know of anything else. I don't know what more you want. This is definitely the best sandbox.

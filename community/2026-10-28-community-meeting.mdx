@@ -1,116 +1,229 @@
 ---
 date: '2026-10-28'
+title: 'Wasm Sandbox Density at 176,000 per Host, Mitigating RCE, and the Wasm Forge Installer'
+description: 'A Wasm sandbox benchmark fits 176,000 scale-to-zero workloads on a 2 GB host, Liam Randall on mitigating RCE with capabilities, and a Wasm Forge demo.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm sandbox
+  - wasm runtime autoscaling
+  - webassembly kubernetes
+  - webassembly news
+  - ai sandbox
+  - sandbox code execution
+  - scale to zero
+  - host density benchmark
+  - arewefastyet
+  - memory reservation
+  - wasmtime
+  - remote code execution
+  - capability-based security
+  - nats authentication
+  - host plugin secrets
+  - workload daemonset
+  - wasmcloud operator
+chapters:
+  - { seconds: 16, label: "Welcome: the last call of October" }
+  - { seconds: 70, label: "wasmCloud 2.11 recap: guest memory, socket egress, gated hostPath volumes" }
+  - { seconds: 170, label: "NATS authentication across the control and data planes" }
+  - { seconds: 205, label: "Performance and density work for 2.12" }
+  - { seconds: 236, label: "A host plugin as your secrets provider" }
+  - { seconds: 296, label: "One host plugin sourcing secrets from another" }
+  - { seconds: 375, label: "Even workload distribution and a WorkloadDaemonSet CRD" }
+  - { seconds: 418, label: "Liam Randall: consistent benchmarks on arewefastyet" }
+  - { seconds: 487, label: "176,000 scale-to-zero sandboxes in 2 GB" }
+  - { seconds: 580, label: "Tuning point one: slots" }
+  - { seconds: 665, label: "Tuning point two: memory reserved per component" }
+  - { seconds: 810, label: "How fast from zero? About 30,000 workloads per second" }
+  - { seconds: 904, label: "Wasm vs. container sandbox start rates" }
+  - { seconds: 967, label: "Does density help attackers too?" }
+  - { seconds: 1097, label: "Assume compromise: architectural security with capabilities" }
+  - { seconds: 1314, label: "Rabel Mervin introduces Wasm Forge" }
+  - { seconds: 1514, label: "One command to install the operator and its dependencies" }
+  - { seconds: 1705, label: "forge doctor finds a broken NATS leafnode setting" }
+  - { seconds: 1840, label: "Dry runs and a clean uninstall" }
+  - { seconds: 1972, label: "Could Wasm Forge grow into workload debugging?" }
+  - { seconds: 2203, label: "Next: the community call from KubeCon NA in Salt Lake City" }
+  - { seconds: 2237, label: "KubeCon sessions: WebGPU and sandboxing on Kubernetes" }
+image: https://i.ytimg.com/vi/g86XqCPG8kU/maxresdefault.jpg
+duration: 2318
+showTitle: true
 slug: 2026-10-28-community-meeting
-title: 'Meeting Agenda - 2026-10-28'
+speakers:
+  - jeremy-fleitz
+  - liam-randall
+  - frank-schaffa
+  - rabel-mervin
+  - aditya-salunkhe
+about: wasmCloud
+mentions:
+  - AISandbox
+  - capabilityBasedSecurity
+  - denyByDefault
+  - blastRadius
+  - Wasmtime
+  - NATS
+  - Kubernetes
+  - runtimeOperator
+  - Rust
+  - Cosmonic
 ---
 
-## Agenda
+import YouTube from 'react-player/youtube';
 
-{/* Update before the start of the meeting with planned agenda items */}
+{/* Video hero — the whole point of this page */}
 
-- v2.11.0 shipped (Oct 20) The [release blog post](https://github.com/wasmCloud/wasmcloud.com/pull/1307) and the docs version bump are live.
-  - Highlights:
-    - Guest memory and socket egress are now enforced by default (breaking).
-    - `hostPath` volumes are now gated.
-    - Plugins can override WASI builtin interfaces.
-    - You can now attach native host control to a running host.
-    - New pool sizing and a max-process-memory limit.
-    - OCI pulls now share clients and coalesce duplicate pulls.
-    - Added k6 benchmarking.
-- Welcome to first-time contributor @angyaljanos, who validated connection quotas ([#5661](https://github.com/wasmCloud/wasmCloud/pull/5661)).
-- 🔐 NATS authentication and credentials (since 2.11)
-  - **The host can authenticate to NATS separately for each connection**, with tokens and passwords read from files ([#5733](https://github.com/wasmCloud/wasmCloud/pull/5733), [#5742](https://github.com/wasmCloud/wasmCloud/pull/5742)).
-  - **Operator:** new NATS client auth flags, a connection name and inbox prefixes ([#5735](https://github.com/wasmCloud/wasmCloud/pull/5735)).
-  - **Credential rotation** ([#5755](https://github.com/wasmCloud/wasmCloud/pull/5755)):
-    - `wasmcloud:nats` re-reads credentials on every connect.
-    - New JWT-as-token mode, for auth callout on servers without trusted operators.
-    - Embedders can reuse the host's NATS auth on their own connections.
-    - Operator liveness now fails if NATS keeps refusing the credential after a grace period.
-  - A host ID can be assigned before connecting ([#5734](https://github.com/wasmCloud/wasmCloud/pull/5734)).
-  - The host can shut down even while a NATS secret read is stalled ([#5741](https://github.com/wasmCloud/wasmCloud/pull/5741)).
-  - **For embedders:** `NatsConnectionOptions` and `NatsAuth` are now `#[non_exhaustive]`.
-- 📨 `wasmcloud:nats@0.1.3`: JetStream and KV ([#5751](https://github.com/wasmCloud/wasmCloud/pull/5751))
-  - Read the last message on a subject, read with timestamps, and see stream creation and stored times.
-  - Purge by subject (optionally keeping some messages) and delete by sequence. Both sit behind a new `stream-delete-allow` grant, which denies by default.
-  - KV `create-with-ttl` (expiring leases) and `delete-by-revision` (conditional release).
-- ⚡ Performance and density
-  - **Fixed the v2.11 service-bench regression (about 9%)** ([#5737](https://github.com/wasmCloud/wasmCloud/pull/5737)). It was caused by a scheduling change in wasmtime 48.0.6. p3 HTTP response bodies now go straight to hyper instead of being relayed frame by frame.
-  - **Better pool sizing** ([#5745](https://github.com/wasmCloud/wasmCloud/pull/5745)):
-    - New `--max-memories` and `--total-core-instances` flags.
-    - Pool totals now follow the memory count, so the core-instance limit no longer runs out at a quarter of the memories reserved.
-    - Messaging admission now reserves real pool resources. Before, a stock host admitted only 133 in-flight messages against a pool sized for 1000 instances.
-  - **A host density benchmark (`scale_density`) now runs in CI** ([#5708](https://github.com/wasmCloud/wasmCloud/pull/5708), [#5739](https://github.com/wasmCloud/wasmCloud/pull/5739)). Its results are published on [arewefastyet](https://github.com/wasmCloud/arewefastyet).
-  - On cgroup v1 hosts with no memory limit, the detected limit came out at about 8 EiB. It is now capped at RAM plus swap ([#5710](https://github.com/wasmCloud/wasmCloud/pull/5710)).
-- 🛠️ Fixes and hardening
-  - Values above the semaphore capacity are refused instead of crashing the host. This covers the NATS `max-in-flight` and `subscription-capacity` settings and the ingress and start limits ([#5718](https://github.com/wasmCloud/wasmCloud/pull/5718)).
-  - Plugin-served WASI overrides that aren't supported are refused when the plugin registers ([#5721](https://github.com/wasmCloud/wasmCloud/pull/5721)).
-  - **Community:** `wasmcloud:postgres` refuses a parameter whose type doesn't match, from Srinivas Chippagiri ([#5732](https://github.com/wasmCloud/wasmCloud/pull/5732)).
-  - **Community:** corrected the `reclaim_min_instances` docs (it disables reclaim), from Shreya Deshannavar ([#5569](https://github.com/wasmCloud/wasmCloud/pull/5569), [#5731](https://github.com/wasmCloud/wasmCloud/pull/5731)).
-  - OpenTelemetry HTTP span names now match each other ([#5579](https://github.com/wasmCloud/wasmCloud/pull/5579)).
-  - Dependency security fixes: zstd-sys (RUSTSEC-2026-0410) and ctutils. wasi-gfx 0.3.1 now comes from crates.io instead of a git patch.
-- 🏛️ Project health, security and governance
-  - **[THREAT_MODEL.md](https://github.com/wasmCloud/wasmCloud/pull/5685)** covers trust boundaries, security goals, the settings that weaken them, and what counts as a vulnerability.
-  - New **[Security Insights file](https://github.com/wasmCloud/wasmCloud/pull/5724)**.
-  - The OSPS Baseline scan now runs on `main` ([#5761](https://github.com/wasmCloud/wasmCloud/pull/5761)).
-  - **cargo-deny license checks in CI** ([#5722](https://github.com/wasmCloud/wasmCloud/pull/5722)). Four CNCF license-exception requests are open (cncf/foundation#1580–1583).
-  - New bug reporting guide and issue template ([#5760](https://github.com/wasmCloud/wasmCloud/pull/5760)). ADOPTERS.md is restored ([#5759](https://github.com/wasmCloud/wasmCloud/pull/5759)).
-  - **Org cleanup:** archive notices were added to about 20 legacy repos, including weld, wadm-operator, wasmcloud-js, provider-sdk-go and wasmcloud-test.
-  - Meeting pages for Oct 14 and Oct 21 are now on wasmcloud.com.
-- In flight and open for discussion
-  - **Feature request:** DaemonSet-style placement, which runs a workload on every host in a host group ([#5730](https://github.com/wasmCloud/wasmCloud/issues/5730)). Community input wanted.
-  - **Workload start throughput** (from Aditya Salunkhe and Liam Randall):
-  - **Finer memory pool controls:** [#5763](https://github.com/wasmCloud/wasmCloud/pull/5763), plus a configurable linear-memory reservation and guard ([#5738](https://github.com/wasmCloud/wasmCloud/pull/5738)).
-  - **Community:** the NATS blobstore should treat deleted objects as absent ([#5726](https://github.com/wasmCloud/wasmCloud/pull/5726)).
-  - Workload annotations exposed to component plugins ([#5750](https://github.com/wasmCloud/wasmCloud/pull/5750), draft).
-  - Security self-assessment ([#5762](https://github.com/wasmCloud/wasmCloud/pull/5762), draft).
-  - `wasmcloud:postgres` follow-up for string and byte parameters ([#5747](https://github.com/wasmCloud/wasmCloud/issues/5747)).
-  - Creating Host Component Plugins that can source secrets
+<YouTube url="https://www.youtube.com/watch?v=g86XqCPG8kU" />
 
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '1.5rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=g86XqCPG8kU" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+The October 28, 2026 wasmCloud community call looked at what fits inside a **Wasm sandbox**, and how many of them fit on one machine. Jeremy Fleitz recapped wasmCloud 2.11 and previewed 2.12: NATS authentication, a host plugin that serves secrets, and a WorkloadDaemonSet. Liam Randall showed 176,000 scale-to-zero sandboxes on a 5-core, 2 GB host and explained how capability-driven sandboxes blunt remote code execution. Rabel Mervin demoed Wasm Forge, a CLI that installs and diagnoses the wasmCloud operator.
 
 {/* truncate */}
 
+## Key Takeaways
+
+- **wasmCloud 2.11 tightened the defaults.** The [2.11 release](/blog/wasmcloud-2-11-release/) enforces guest memory and socket egress limits and lets operators keep sensitive host paths, such as `/etc`, from being mounted into a workload. It also brought pool sizing, memory limits, and k6 benchmarking. Jeremy thanked first-time contributor @angyaljanos for validating connection quotas ([#5661](https://github.com/wasmCloud/wasmCloud/pull/5661))
+- **2.12 secures NATS end to end.** The host can now authenticate to NATS on both the control plane and the data plane that workloads use to talk to each other ([#5733](https://github.com/wasmCloud/wasmCloud/pull/5733), [#5735](https://github.com/wasmCloud/wasmCloud/pull/5735), [#5755](https://github.com/wasmCloud/wasmCloud/pull/5755))
+- **A host plugin can be your secrets provider.** Jeremy's [#5716](https://github.com/wasmCloud/wasmCloud/pull/5716) lets a plugin, such as a Vault client, serve secrets to another host plugin like `wasmcloud-postgres`, or straight to a workload. After review from Bailey Hayes, the reference became a structured `secrets:` entry instead of a `<plugin-id>/<key>` string
+- **Workloads on every host.** The operator will spread workloads across hosts more evenly, and a new WorkloadDaemonSet CRD places a copy of a workload on every host in a host group, still scaling to zero ([#5730](https://github.com/wasmCloud/wasmCloud/issues/5730))
+- **176,000 scale-to-zero sandboxes in 2 GB.** On a 5-core Hetzner box limited to 2 GB of memory, the `scale_density` benchmark on [arewefastyet](https://wasmcloud.github.io/arewefastyet/) held about 176,000 scale-to-zero WASI P3 workloads, or about 4,000 warm. Liam's MacBook, capped at 16 GB, passed 1.25 million
+- **Two tuning points: slots and memory per component.** A slot is like a virtual CPU inside the sandbox, and languages that bundle an interpreter, like Go or TypeScript, use more slots than Rust. Wasmtime reserves 4 GB per component by default. Setting it lower saves memory, and Wasmtime then turns on extra bounds checks
+- **About 30,000 starts per second.** Asked by Frank Schaffa how fast the host ramps from zero, Liam said the small box starts about 30,000 workloads per second, now that starts run on every thread. He said a container sandboxing vendor he compared against approaches 10,000 per second on high-end hardware
+- **Patching is not enough.** Liam previewed a blog post on mitigating remote code execution. It runs a vulnerable Rust `zip` crate inside a capability-driven sandbox, where the setuid bits, path escapes, and network access the exploit needs don't exist
+- **Wasm Forge installs and diagnoses the operator.** Rabel's Rust CLI installs NATS, wadm, and the wasmCloud operator with one command, and adds `doctor`, dry run, and uninstall commands. It targets the v1 operator today, and Rabel plans to port it to wasmCloud v2
+
+## Chapters
+
+- [0:16 — Welcome: the last call of October](https://youtu.be/g86XqCPG8kU?t=16)
+- [1:10 — wasmCloud 2.11 recap: guest memory, socket egress, gated hostPath volumes](https://youtu.be/g86XqCPG8kU?t=70)
+- [2:50 — NATS authentication across the control and data planes](https://youtu.be/g86XqCPG8kU?t=170)
+- [3:25 — Performance and density work for 2.12](https://youtu.be/g86XqCPG8kU?t=205)
+- [3:56 — A host plugin as your secrets provider](https://youtu.be/g86XqCPG8kU?t=236)
+- [4:56 — One host plugin sourcing secrets from another](https://youtu.be/g86XqCPG8kU?t=296)
+- [6:15 — Even workload distribution and a WorkloadDaemonSet CRD](https://youtu.be/g86XqCPG8kU?t=375)
+- [6:58 — Liam Randall: consistent benchmarks on arewefastyet](https://youtu.be/g86XqCPG8kU?t=418)
+- [8:07 — 176,000 scale-to-zero sandboxes in 2 GB](https://youtu.be/g86XqCPG8kU?t=487)
+- [9:40 — Tuning point one: slots](https://youtu.be/g86XqCPG8kU?t=580)
+- [11:05 — Tuning point two: memory reserved per component](https://youtu.be/g86XqCPG8kU?t=665)
+- [13:30 — How fast from zero? About 30,000 workloads per second](https://youtu.be/g86XqCPG8kU?t=810)
+- [15:04 — Wasm vs. container sandbox start rates](https://youtu.be/g86XqCPG8kU?t=904)
+- [16:07 — Does density help attackers too?](https://youtu.be/g86XqCPG8kU?t=967)
+- [18:17 — Assume compromise: architectural security with capabilities](https://youtu.be/g86XqCPG8kU?t=1097)
+- [21:54 — Rabel Mervin introduces Wasm Forge](https://youtu.be/g86XqCPG8kU?t=1314)
+- [25:14 — One command to install the operator and its dependencies](https://youtu.be/g86XqCPG8kU?t=1514)
+- [28:25 — forge doctor finds a broken NATS leafnode setting](https://youtu.be/g86XqCPG8kU?t=1705)
+- [30:40 — Dry runs and a clean uninstall](https://youtu.be/g86XqCPG8kU?t=1840)
+- [32:52 — Could Wasm Forge grow into workload debugging?](https://youtu.be/g86XqCPG8kU?t=1972)
+- [36:43 — Next: the community call from KubeCon NA in Salt Lake City](https://youtu.be/g86XqCPG8kU?t=2203)
+- [37:17 — KubeCon sessions: WebGPU and sandboxing on Kubernetes](https://youtu.be/g86XqCPG8kU?t=2237)
+
 ## Meeting Notes
 
-{/* Add summary of topics during the meeting. Each Topic should have an H3 heading. A list is usually sufficient for the recap */}
+### wasmCloud 2.11 Recap and What Is Landing in 2.12
 
-### Topic 1
+Jeremy Fleitz hosted a small group, because the Bytecode Alliance Plumbers Summit was running at the same time. He started with [wasmCloud 2.11](/blog/wasmcloud-2-11-release/), which shipped on October 20 and was the main topic of the [October 21 call](/community/2026-10-21-community-meeting/). 2.11 changed how the host handles **guest memory** and enforces **socket egress** (see [network access and socket isolation](/docs/wash/developer-guide/network-access-and-socket-isolation/)). It also gates the volumes a host can mount, so an operator can keep a sensitive directory such as `/etc` from ever being mounted into a workload ([filesystems and volumes](/docs/kubernetes-operator/operator-manual/filesystems-and-volumes/)). Much of the remaining work went into pool sizing, memory limits, and k6 benchmarking. Jeremy also thanked first-time contributor @angyaljanos, who validated connection quotas ([#5661](https://github.com/wasmCloud/wasmCloud/pull/5661)).
 
-- Note 1
-- Note 2
+He then scrolled through the PRs merged since 2.11, which were headed for 2.12 the following Tuesday. Most of them fall into two groups:
 
-### Topic 2
+- **NATS authentication.** Bailey Hayes added full credential support for NATS, so the control plane and the data plane that workloads use to talk to each other can both be secured. The host can authenticate per connection with tokens and passwords read from files ([#5733](https://github.com/wasmCloud/wasmCloud/pull/5733), [#5742](https://github.com/wasmCloud/wasmCloud/pull/5742)), the operator gets NATS client auth flags ([#5735](https://github.com/wasmCloud/wasmCloud/pull/5735)), and credentials can be rotated ([#5755](https://github.com/wasmCloud/wasmCloud/pull/5755)). The [transport overview](/docs/overview/transport/) explains the role NATS plays in wasmCloud.
+- **Performance and density.** Victor Adossi led work on cold starts and on how much reuse the host gets from each sandbox. That includes new pool-sizing flags ([#5745](https://github.com/wasmCloud/wasmCloud/pull/5745)) and the `scale_density` host benchmark in CI ([#5708](https://github.com/wasmCloud/wasmCloud/pull/5708), [#5739](https://github.com/wasmCloud/wasmCloud/pull/5739)). The [concurrency and connections](/docs/kubernetes-operator/operator-manual/concurrency-and-connections/) guide covers the pool settings.
 
-- Note 1
-- Note 2
+### A Host Plugin as Your Secrets Provider
 
-## Weekly highlights
+2.11 made the built-in WASI interfaces overridable by plugins. Jeremy is building on that with a host plugin that acts as a **secrets provider** ([#5716](https://github.com/wasmCloud/wasmCloud/pull/5716)). Instead of keeping secrets in an ordinary Kubernetes Secret, you could write a plugin that calls HashiCorp Vault directly and name it as your source of secrets.
 
-### Issue of the Week
+After feedback from Bailey, the reference changed from a string to a real structure. In the example on screen, a `billing-db` entry under `secrets:` names a `vault-secrets` plugin and maps a `url` key to its path in the backend. The `wasmcloud-postgres` host plugin then reads its connection string with `secretFrom: [billing-db]`. One host plugin gets a secret from another without going through a workload at all, and a workload can still pull the same secret through the secrets interface. The feature shipped in [wasmCloud 2.12](/blog/wasmcloud-2-12-release/), and the [November 4 call](/community/2026-11-04-community-meeting/) showed a working version backed by etcd. For the plugin model, see [creating host plugins](/docs/runtime/creating-host-plugins/), [creating host component plugins](/docs/runtime/creating-host-component-plugins/), and [host interface configuration](/docs/kubernetes-operator/host-interface-configuration/).
 
-- [title](https://github.com/wasmcloud/wasmcloud/issues/)
-  - summary
+Jeremy also previewed two changes to the [runtime operator](/docs/kubernetes-operator/). Workloads will spread across hosts instead of piling onto one, and a new **WorkloadDaemonSet** CRD ([#5730](https://github.com/wasmCloud/wasmCloud/issues/5730)) points at a host group and keeps a copy of the workload on every host in it. Those copies still scale to zero. The [CRD reference](/docs/kubernetes-operator/crds/) documents the resource.
 
-### Documentation of the Week
+### 176,000 Scale-to-Zero Sandboxes on a 2 GB Host
 
-- [title](/docs/v1/intro)
-  - summary
+Liam Randall pointed the group to [arewefastyet](https://wasmcloud.github.io/arewefastyet/), the dashboard that came out of one of the project's goals for the year: consistent metrics for every build and commit, so the project can see where it is improving and where it is slipping. The page wouldn't load in Jeremy's browser, so Liam shared his own screen.
 
-## Community Updates
+The benchmark host is real hardware rented from Hetzner, limited to five cores and 2 GB of memory. On it, the `scale_density` chart showed about **176,000 scale-to-zero sandboxes** running WASI P3 components on the latest wasmCloud, against about 4,000 warm. On his MacBook, capped at 16 GB, Liam deployed more than 1.25 million scale-to-zero sandboxes. On the [October 21 call](/community/2026-10-21-community-meeting/), the figure for a single core had been 42,000.
 
-### Tune in…
+Liam explained the two tuning points behind those numbers:
 
-{/* Add any upcoming events/streams/etc */}
+- **Slots.** A slot is something like a virtual CPU inside the sandbox, and the number available depends on the OS. His MacBook had more than 30,000. A workload that has scaled to zero gives up its slot, which is why far more workloads fit scaled to zero than warm. A commit landing within a day or two raises the default warm capacity to roughly 6,000 to 9,000. A component takes one or more slots depending on its language: Go and TypeScript bundle their own runtime and use more, Rust uses fewer.
+- **Memory per component.** By default Wasmtime reserves 4 GB for each component, the full 32-bit address space, and at startup it reserves slots times memory. That is why a host can appear to grab 1.2 TB of memory. You can now set the reservation lower. Below 4 GB, pointer math could go wrong inside the sandbox, so [Wasmtime](https://wasmtime.dev/) turns on extra bounds checking automatically.
 
--
+The project will ship sensible defaults that work for general use, and then document profiles for the extremes: very small workloads such as triggers, callbacks, and crons, and very large ones. Those modes will show up as separate lines in the benchmarks. For running scale-to-zero workloads on Kubernetes today, see [autoscaling](/docs/kubernetes-operator/operator-manual/autoscaling/) and [lightweight deployments](/docs/kubernetes-operator/operator-manual/lightweight-deployments/).
 
-### Catch up…
+### How Fast From Zero?
 
-{/* Add any blog posts/articles that the community might find interesting */}
+Frank Schaffa asked how long it takes to ramp from zero to 176,000. Liam said the demo box starts about **30,000 workloads per second**, and the limit is the hardware. While tuning that path, the team found that starts ran on a single thread; they now run across every thread on the box, and Liam expects much higher numbers on faster machines. He said a container sandboxing company he was asked to compare against approaches 10,000 tiny sandboxes per second at the high end, on much faster hardware. He is working with Arm to get a large machine for KubeCon: "Has anybody ever sandboxed a million agents? What about 5 million?"
 
--
+### Mitigating Remote Code Execution With Capability-Driven Sandboxes
 
-## Recording
+Frank pointed out that this kind of density cuts both ways: an attacker with a cheap box could run 176,000 points of attack. Liam agreed that AI will keep cutting both ways, and previewed a blog post he expected to publish that day or the next on **mitigating RCE** with architectural security. Its core thesis is "you can't execute what you don't have."
 
-{/* Automated - No need to adjust this unless automation fails */}
+The draft uses recent vulnerabilities in the Rust `zip` crate. A crafted archive can write outside the target folder and set setuid, setgid, and sticky bits. Liam's point is that an exploit is only the first step in a kill chain, and CVSS scoring assumes the later steps, like writing to `/etc`, phoning home, or escalating to root, are possible. Inside a capability-driven [Wasm sandbox](/docs/kubernetes-operator/workload-security/), each of those moves fails for a different reason: the permission code is compiled out because the sandbox isn't a Unix target, the only writable path is a single preopened directory, egress is denied by default, and the guest has no root to become.
 
-<YouTube url="https://youtube.com/live/g86XqCPG8kU" />
+He tied this to how security teams changed their thinking about 20 years ago. Prevention is a good tactic but not a strategy, so you assume compromise and build layers of detection mapped to the kill chain. For platform engineers and developers the lesson is to assume all code is vulnerable. Keep patching and keep running static and dynamic analysis, but lock vulnerable code in isolated, capability-driven sandboxes so the resources an exploit depends on either don't exist or aren't made available. Liam said the example is already compiled as a Wasm app that runs on Cosmonic Desktop on Windows, Linux, or macOS, or on Kubernetes, with a native Rust crate that shows the detonation for comparison. He was also giving a talk on the subject in the Washington, D.C. area that weekend. wasmCloud's own security model is covered in [workload security](/docs/kubernetes-operator/workload-security/) and the [1.0 security post](/blog/wasmcloud-1.0-security/).
+
+### Wasm Forge: Installing and Diagnosing the wasmCloud Operator
+
+On his first wasmCloud Wednesday, Rabel Mervin demoed **Wasm Forge**, a CLI he built because installing the wasmCloud operator meant running a long list of commands, and because the errors were hard to diagnose as a beginner. It is written in Rust and uses kube-rs for server-side apply.
+
+On a local kind cluster, a single `forge` command with the dependencies flag validated that the cluster was reachable and the required permissions were in place, installed NATS with JetStream and wadm through Helm, and then installed the operator with its namespace, RBAC, CRDs, and aggregated API. The RBAC is hard-coded for now, and Rabel may make it configurable. Other commands:
+
+- **`forge doctor`** checks the cluster, the operator rollout, RBAC, CRDs, the aggregated API, and dependencies. When Rabel turned off NATS leafnodes, `doctor` stopped at the failing check and said where the problem was.
+- **Dry run** prints what would be installed before anything changes.
+- **Uninstall** removes the operator and the dependencies Forge installed.
+- **Verbose logging** gives more detail when troubleshooting.
+
+The demo installed the v1 operator (`wasmcloud-operator:0.5.0` and the `WasmCloudHostConfig` CRD), and Rabel plans to upgrade Wasm Forge to wasmCloud v2. The [migration guide](/docs/migration/) and the [v2 operator overview](/docs/kubernetes-operator/operator-manual/overview/) describe what changes, and [installation](/docs/installation/), [Helm values](/docs/kubernetes-operator/operator-manual/helm-values/), and [troubleshooting](/docs/troubleshooting/) cover the v2 setup a tool like this would automate. Jeremy asked whether Forge could grow into workload debugging, perhaps a `forge --monitor` that runs in the background and reports trace data for running workloads, much like an OTel collector. Rabel was open to it and pointed to the existing verbose mode. He asked users what their main pain points are, and Jeremy asked him to post the project link in the meeting comments so people can follow up.
+
+### KubeCon NA in Salt Lake City
+
+Aditya Salunkhe reminded Jeremy to mention KubeCon. The call two weeks later would come from KubeCon North America in Salt Lake City, at the usual time. Liam listed the wasmCloud sessions, also covered in the [KubeCon NA 2026 post](/blog/wasmcloud-at-kubecon-cloudnativecon-na-2026/):
+
+- **Monday:** Bailey Hayes and Mendy Berger at Cloud Native AI + Inference Day, 1:30 PM Salt Lake City time: "GPU Portability Was Broken but Now There's WebGPU"
+- **Wednesday, November 11, 4:10 PM:** Eric Gregory and Bailey lead the workshop "Sandboxing on Kubernetes with WebAssembly: A Hands-on Tutorial"
+
+The team planned to be between the Cosmonic booth and the wasmCloud kiosk Tuesday through Thursday.
+
+## WebAssembly News and Updates
+
+In **webassembly news** this week, the Bytecode Alliance held its Plumbers Summit, and the sandboxing conversation keeps moving from theory to numbers. [Wasmtime](https://wasmtime.dev/)'s configurable memory reservation lets a host trade a 4 GB address-space reservation for explicit bounds checks, which is how one small host fits six figures of isolated [WASI](https://wasi.dev/) workloads. The same capability model that makes those sandboxes cheap also makes them safe: the [WebAssembly Component Model](https://component-model.bytecodealliance.org/) gives a component only the interfaces it imports, so a bug in a dependency like a zip parser has nothing to reach. Both themes run into KubeCon NA, where wasmCloud maintainers are teaching sandboxing on Kubernetes and showing `wasi:webgpu` for portable AI inference.
+
+## What is wasmCloud?
+
+[wasmCloud](/) is a CNCF project for building applications out of [WebAssembly components](/docs/overview/workloads/components/) and running them across cloud, edge, and [Kubernetes](/docs/kubernetes-operator/) clusters. The [Wasm component model](/docs/overview/workloads/components/) lets you write business logic in Rust, Go, Python, TypeScript, C#, Java, and more. The platform supplies capabilities like HTTP, messaging, key-value storage, blob storage, secrets, and observability through [standard interfaces](/docs/overview/interfaces/) and a pluggable [host plugin](/docs/overview/hosts/plugins/) architecture backed by [Wasmtime](https://wasmtime.dev/). [`wash`](/docs/wash/) is the developer shell for building, running, deploying, and debugging. The [runtime operator](/docs/kubernetes-operator/) schedules Wasm workloads on Kubernetes the same way you schedule containers, with [WASI Preview 3](/blog/wasi-p3-on-wasmcloud/) support on by default. Together they give you a production platform for WebAssembly on Kubernetes and at the edge.
+
+## Topic Deep Dive: The Wasm Sandbox as an Architectural Security Boundary
+
+A **Wasm sandbox** is cheap enough to give every workload its own. On this call that meant 176,000 scale-to-zero sandboxes on a 5-core, 2 GB host, started at about 30,000 per second. The two settings behind it are slots, the virtual CPUs a component occupies while warm, and the per-component memory reservation, which Wasmtime backs with extra bounds checks once it drops below 4 GB. Because a scaled-to-zero workload gives up its slot, the number of sandboxes you can register is far higher than the number running at once. That gap is what [Wasm runtime autoscaling](/docs/kubernetes-operator/operator-manual/autoscaling/) on wasmCloud exploits. The [concurrency and connections](/docs/kubernetes-operator/operator-manual/concurrency-and-connections/) guide covers the pool settings that bound it.
+
+Liam's argument is that this density matters for security as much as for cost. If every piece of code gets its own deny-by-default sandbox, you can assume the code is vulnerable and still limit the blast radius. The `zip` crate example shows the pattern: the bug is fully loaded, but the setuid bits, the paths outside one preopened directory, the outbound socket, and the root account it needs aren't there. In wasmCloud those grants are explicit, from [socket and network isolation](/docs/wash/developer-guide/network-access-and-socket-isolation/) to gated [volumes](/docs/kubernetes-operator/operator-manual/filesystems-and-volumes/) to secrets served by a [host plugin](/docs/runtime/creating-host-plugins/) instead of a Kubernetes Secret. See [workload security](/docs/kubernetes-operator/workload-security/) for how the operator applies them.
+
+## Who Should Watch This
+
+**Platform engineers sizing hosts for agents or functions** should watch Liam's density walkthrough from [8:07](https://youtu.be/g86XqCPG8kU?t=487) and the start-rate discussion at [13:30](https://youtu.be/g86XqCPG8kU?t=810). **Security engineers and architects** will want the RCE and architectural security discussion from [16:07](https://youtu.be/g86XqCPG8kU?t=967). **Newcomers setting up wasmCloud on Kubernetes** can start with Rabel Mervin's Wasm Forge demo at [21:54](https://youtu.be/g86XqCPG8kU?t=1314), and **operators planning secrets and NATS hardening** should see Jeremy's 2.12 preview from [2:50](https://youtu.be/g86XqCPG8kU?t=170).
+
+## Up Next
+
+wasmCloud 2.12 was due the following Tuesday with NATS authentication, plugin-backed secrets, the WorkloadDaemonSet, and new pool controls. Liam's RCE blog post was due within a day, and Rabel planned to share the Wasm Forge repository and start the move to wasmCloud v2. The next week's call was expected to cover the 2.12 release, and the one after that would come from KubeCon NA in Salt Lake City, where the [density benchmark reached 9.65 million workloads on one Arm host](/community/2026-11-11-community-meeting/).
+
+**Next call:** [wasmCloud 2.12 for WebAssembly on Kubernetes: DaemonSets, Plugin Secrets, and 163,000 Workloads per Host](/community/2026-11-04-community-meeting/)
+
+## Get Involved
+
+wasmCloud is a CNCF project and contributions are welcome. Join the community:
+
+- [GitHub](https://github.com/wasmcloud/wasmcloud) — star the repo and check out open issues
+- [Slack](https://slack.wasmcloud.com/) — join the conversation
+- [Community Meetings](https://wasmcloud.com/community/) — every Wednesday at 1:00 PM ET
+- [wasmCloud Blog](https://wasmcloud.com/blog/) — latest news and releases
+
+## Full Transcript
+
+Read the complete transcript with speaker labels and timestamps:
+
+**[Read the full transcript →](/community/2026-10-28-community-meeting-transcript/)**
