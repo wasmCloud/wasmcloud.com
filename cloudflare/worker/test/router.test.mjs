@@ -51,6 +51,10 @@ test('splats carry the rest of the path; a specific rule above still wins', () =
   assert.deepEqual(hit('/docs/cli/unknown-subcommand'), [301, '/docs/v1/cli/unknown-subcommand']);
 });
 
+test('a splat is copied, never expanded as a replacement pattern', () => {
+  assert.deepEqual(hit("/docs/next/a$&b/$'c/$$"), [301, "/docs/v1/a$&b/$'c/$$"]);
+});
+
 test('a host-scoped rule exists only on its host', () => {
   assert.deepEqual(hit('/', 'docs.wasmcloud.com'), [301, 'https://wasmcloud.com/docs/overview/']);
   assert.deepEqual(hit('/docs/foo', 'docs.wasmcloud.com'), [301, 'https://wasmcloud.com/docs/foo']);
