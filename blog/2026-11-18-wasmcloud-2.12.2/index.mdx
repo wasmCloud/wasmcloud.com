@@ -1,0 +1,136 @@
+---
+title: 'wasmCloud 2.12.2: Host directories for plugins, and scanners that gate merges'
+authors: [ericgregory]
+date: '2026-11-18'
+description: 'wasmCloud 2.12.2 lets a host component plugin mount directories from the host, puts OSV-Scanner and CodeQL in front of every merge, counts page tables in the host memory guard, and places a waiting workload the moment a host turns ready.'
+slug: wasmcloud-2-12-2-release
+about: wasmCloud
+image: './images/2.12-blog-header.webp'
+mentions: [WebAssembly, Kubernetes, Wasmtime, wash, WASI, ComponentModel, NATS, OCIRegistry]
+---
+
+![wasmCloud 2.12.2 release banner](./images/2.12-blog-header.webp)
+
+[wasmCloud 2.12.2](https://github.com/wasmCloud/wasmCloud/releases/tag/v2.12.2) is now available. We don't always publish release blogs for patch releases, but this is a big one, bringing...
+
+- **Host directories for component plugins**: a host component plugin had no filesystem at all. It can now mount directories from the host, so a plugin can serve files it does not carry in its own image
+- **Scanners that gate merges**: OSV-Scanner runs over every lockfile and CodeQL runs on every pull request, both blocking, alongside a stated policy for malicious dependencies and remediation deadlines by severity
+- **Faster placement after a host arrives**: a workload that found no host could wait 30 seconds for the next reconcile, with its endpoint answering 503 in the meantime. It is now placed on the host event
+
+2.12.2 also counts page tables in the host's memory guard, which closes a case where the kernel OOM-killed a host the guard never saw approaching its limit.
+
+{/* truncate */}
+
+## At a glance
+
+| Area | 2.12.1 | 2.12.2 |
+|---|---|---|
+| A component plugin's filesystem | nothing | `volumes` and `volumeMounts` on a `host.plugins` entry |
+| `volumeMounts[].mountPath` | any string | absolute, no `.` or `..`, refused at admission and at start |
+| Dependency scanning | `cargo audit`, Dependabot | + OSV-Scanner over every Cargo and Go lockfile, gating merges |
+| CodeQL | weekly, merge queue, and PRs touching the workflow | every pull request and push to `main` too, with a ruleset blocking new alerts |
+| Malicious dependencies | no stated policy | removed, never suppressed; any OSV `MAL-` entry fails the gate |
+| Code scanning deadlines | unstated | the advisory timeline, by severity: 7 / 14 / 90 days |
+| Process memory footprint | `RssAnon + VmSwap` | + page tables (`VmPTE`, and `VmPMD` on 4.x kernels) |
+| Undetectable memory capacity | host started unguarded | host refuses to start without an explicit limit or `off` |
+| Placing a workload once a host is ready | up to 30s, or ~60s through a replica set | on the `Host` event, spread over 3s |
+| Release provenance assets | `wash.sigstore.json` | + `wash.intoto.jsonl` |
+| OSPS Baseline | published | published at maturity level 3 |
+| Allocator | system | system, or opt-in mimalloc / jemalloc at build time |
+
+## Host directories a plugin can read
+
+A [host component plugin](/docs/runtime/creating-host-component-plugins) runs in its own Wasm store. Previously, there was no way to give a plugin read access to files. Now a `host.plugins` entry takes `volumes` and `volumeMounts`, spelled the way a workload's are:
+
+```yaml
+host:
+  plugins:
+    - id: model-server
+      file: ./build/model_server.wasm
+      volumes:
+        - name: models
+          hostPath:
+            path: ./models
+      volumeMounts:
+        - name: models
+          mountPath: /models
+          readOnly: true
+```
+
+A plugin still has no filesystem unless its entry gives it one. An omitted or empty `volumeMounts` is the default and mounts nothing, and declaring `volumes` alone mounts nothing either.
+
+Only `hostPath` volumes work; an `emptyDir` is parsed so that it can be refused as unsupported rather than reported as an unknown field. `mountPath` must be absolute with no `.` or `..` segment, two mounts may not share a path, and unknown keys are refused rather than dropped, so a misspelled `readonly` fails the config instead of quietly leaving the mount writable. Both lists are checked when the config is read, with the error naming the entry, and again when the plugin loads, so a missing directory fails host startup rather than surfacing later.
+
+**Note:** A plugin's directories are *not* held to the workload `hostPaths.allowed` grant, because that list governs what workloads may mount and a plugin's volumes come from the host's own configuration. But the host's reserved paths still apply, so a plugin cannot mount the host's credentials, the scratch root, or a kernel filesystem. In the other direction, no workload `hostPath` volume may expose a directory a plugin mounts, since a workload able to write it could change what the plugin serves.
+
+:::warning[Not available through the Helm chart]
+Currently, the chart does not render these fields. A `runtime.hostGroups[].plugins` entry carrying `volumes` or `volumeMounts` fails rendering with a message naming the plugin, rather than quietly starting a plugin with no filesystem. In 2.12.2 this is a `wash host` and `wash dev` feature, with no chart value yet.
+:::
+
+## The supply chain, gated at merge
+
+A massive part of this release consists of CI and supply chain work, with much of the work moving checks from *reported* to *blocking*.
+
+**OSV-Scanner now runs over every lockfile in the repository** — 17 `Cargo.lock` files and the Go module sums — on every pull request, merge queue run, push to `main`, and daily, and a finding fails the audit gate. RustSec informational advisories (unmaintained or unsound crates) stay warnings, as they already were for `cargo audit`.
+
+Because OSV includes the [OpenSSF malicious-packages](https://github.com/ossf/malicious-packages) feed, that gate also covers dependency confusion and typosquats. The policy around it is now written down: a dependency known to be malicious is **removed**, never suppressed and never assessed as non-exploitable, and any OSV `MAL-` entry fails the gate, so a pull request cannot add a known malicious package and a package newly reported as malicious blocks merges until it is gone.
+
+**CodeQL now analyses every pull request**, rather than only the ones touching the workflow itself, and pushes to `main` as well — it already ran weekly and on merge queue runs. That full coverage is what lets a ruleset on `main` block a merge adding an alert of high or critical security severity, or of error severity. Code scanning alerts in released code now carry the same deadlines as advisories: critical within 7 days, high within 14, medium within 90, low best-effort. zizmor continues to lint workflows and composite actions.
+
+VEX bookkeeping got stricter in a way that is easy to under-appreciate: an advisory ignored in `.cargo/audit.toml` now needs the same ignore in `osv-scanner.toml`, and CI fails when the two lists drift. The check keys on an ignore whose reason starts with `VEX`, or whose advisory the VEX document assesses; linking the statement in that reason is convention rather than something CI verifies. Suppressions cannot quietly outlive the assessment that justified them.
+
+Two pinning fixes close smaller gaps: the release workflow's gitsign setup moved from a branch reference to a tagged release, and release container bases are pinned to verified digests.
+
+Finally, releases now attach the binary provenance bundle a second time as `wash.intoto.jsonl`. It is the same bundle as `wash.sigstore.json`, re-serialized compact; the `.intoto.jsonl` suffix is what OpenSSF Scorecard's Signed-Releases check looks for. Either file works as `--bundle`. The project also publishes [OSPS Baseline](https://baseline.openssf.org/) results at maturity level 3, and the README carries OpenSSF Best Practices, Baseline, Scorecard, and CLOMonitor badges.
+
+If you verify releases yourself, [Verify wasmCloud releases](/docs/verify-releases) covers the binaries, images, SBOMs, and the VEX assessment.
+
+## The memory guard counts page tables
+
+The `--max-process-memory` guard measured `RssAnon + VmSwap`, which leaves out the page tables the kernel allocates for the process and charges to it. A dense warm pool makes those large, because every pooled slot is a sparse region of its own.
+
+The figures recorded in the runtime are stark: about 9 KiB of page tables per instance at a 64 MiB layout, which reaches 13.7 GiB at 1.5 million warm instances. Left out of the count, a host that sized `max-process-memory` to its machine is OOM-killed with its guard still reading under the limit.
+
+On Linux the footprint now counts `VmPTE`, plus `VmPMD` on 4.x kernels. **The practical consequence is that the same workload reads higher on 2.12.2 than it did on 2.12.1**, so a host sitting near its threshold may begin refusing growth where it previously looked clear. That is the guard reporting what was always being used.
+
+Two related changes: the host now **fails closed** when it cannot detect memory capacity, refusing to start rather than running unguarded unless you pass an explicit `--max-process-memory` or `off`. Separately, if it starts but then cannot read its own footprint, five consecutive failed samples block admission until a valid reading returns. A new `--strict-process-memory` requires detectable capacity and a threshold below it, and rejects `off`. It validates configuration; a hard boundary still needs an OS or container limit.
+
+## Placement, rollouts, and host retirement
+
+A `Workload` that found no suitable host failed host selection and then waited. Once that condition stopped changing, the conditioned reconciler fell back to its 30-second interval, and nothing woke the workload, because the controller watched only `Workload`. Any period with no schedulable host — a rolling update that briefly leaves none, a deleted host pod — left replacement workloads unplaced for up to 30 seconds after the new `Host` turned `Ready`, or around 60 seconds through a replica set's grace period, with the gateway answering 503 for that hostname throughout.
+
+The workload controller now watches `Host` and enqueues the unplaced workloads a host can take, applying the same rules host selection applies: the `hostSelector`, the environment filter, and a pinned workload's own host. Pinned workloads are woken correctly now too, since the index tracks whether a workload is *placed* rather than whether a host is recorded. The wake-ups are spread over three seconds, because placing every waiting workload the instant the first host of a group turned ready put them all on that host with nothing to rebalance them afterwards.
+
+Alongside that: rollout creation and replica slots are idempotent, stale workload status writes are prevented, replica sets are indexed by owner and revision, host retirement runs in parallel, and healthy-workload polling is configurable.
+
+**A note for embedders:** the engine caches compiles by `Component.digest`, and a component with no digest skipped the cache entirely, recompiling on every start. Deployed workloads were never affected, because the washlet always fills the digest in. An embedder building `types::Component` or `types::Service` by hand and leaving `digest` unset was: in an internal agent-density bench, that meant 7 agent starts per second instead of about 1,800. A component with no digest is now cached under the hash of its bytes.
+
+## Allocators, and a note on host IDs
+
+`wash` gained opt-in `mimalloc` and `jemalloc` features. Defaults are unchanged and the runtime library never installs a global allocator. On a `c9g.16xlarge` with 300,000 warm workloads, both raised start throughput by roughly 45% (from about 33,600 starts/s on system glibc to between 48,300 and 50,000) with jemalloc using about 1% more memory per warm workload and mimalloc about 5%.
+
+Separately, the UUIDv7s the runtime mints for host, component, context, and store IDs are now seeded from OS entropy rather than the global `fastrand` generator. Previously, hosts on one node that initialized on the same clock tick could mint identical IDs, including the default host ID used in NATS control subjects, and an embedder seeding `fastrand` for reproducibility made those IDs repeat across processes. If you set [`--host-id`](/docs/wash/commands#wash-host) explicitly, nothing changes for you.
+
+## Before you upgrade
+
+- **Apply the CRDs.** 2.12.2 adds a pattern to `volumeMounts[].mountPath` on `Workload`, `WorkloadDeployment`, `WorkloadReplicaSet`, and `WorkloadDaemonSet`, refusing a relative or dotted path at admission. Helm installs a chart's `crds/` directory on `helm install` only, never on `helm upgrade`, so apply them first. Nothing breaks if you skip it — the host refuses such a path when the workload starts either way — but the rejection arrives at deploy instead of at `kubectl apply`.
+- **Check manifests for relative mount paths.** A `mountPath` that is not absolute, or that contains a `.` or `..` segment, is now refused. A manifest that previously applied may not.
+- **Re-check hosts sitting near their memory threshold**, since the footprint now includes page tables and will read higher.
+- **Check hosts where memory capacity may not be detectable.** A host that cannot detect capacity now refuses to start unless you pass an explicit `--max-process-memory` or `off`.
+
+```bash
+helm pull oci://ghcr.io/wasmcloud/charts/runtime-operator --version 2.12.2 --untar --untardir /tmp/wasmcloud-chart
+kubectl apply --server-side -f /tmp/wasmcloud-chart/runtime-operator/crds/
+helm upgrade wasmcloud oci://ghcr.io/wasmcloud/charts/runtime-operator --version 2.12.2 --namespace wasmcloud
+```
+
+Adjust the release name and namespace to your install, and pass `helm upgrade` the same values files you installed with.
+
+## Keep reading
+
+- [Host component plugins](/docs/runtime/creating-host-component-plugins), including [the directories a plugin can read](/docs/runtime/creating-host-component-plugins#host-directories-a-plugin-can-read)
+- [Filesystems and volumes](/docs/kubernetes-operator/operator-manual/filesystems-and-volumes) for the workload side
+- [Verify wasmCloud releases](/docs/verify-releases)
+- [The full changelog](https://github.com/wasmCloud/wasmCloud/releases/tag/v2.12.2)
+
+As always, if you have questions, join us in the [wasmCloud Slack](https://slack.wasmcloud.com/) or at the [weekly community meeting](/community).
