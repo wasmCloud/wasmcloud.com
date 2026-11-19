@@ -32,7 +32,7 @@ The application...
 [wasi-http]: https://github.com/WebAssembly/wasi-http
 [httpserver-provider]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-http-server
 [httpclient-provider]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/provider-http-client
-[wasmCloud]: https://wasmcloud.com/docs/v1/intro
+[wasmCloud]: https://wasmcloud.com/docs/v1/intro/
 [wash]:  https://wasmcloud.com/docs/v1/ecosystem/wash/
 [wasm-tools]: https://github.com/bytecodealliance/wasm-tools#installation
 

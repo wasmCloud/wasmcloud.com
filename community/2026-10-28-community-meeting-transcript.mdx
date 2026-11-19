@@ -1,0 +1,321 @@
+---
+date: '2026-10-28'
+title: 'Transcript: Wasm Sandbox Density at 176,000 per Host, Mitigating RCE, and the Wasm Forge Installer'
+description: 'Full transcript of the October 28, 2026 wasmCloud community call covering the 2.11 recap, NATS authentication and plugin-backed secrets in 2.12, 176,000 scale-to-zero Wasm sandboxes on one host, mitigating RCE with capabilities, and the Wasm Forge demo.'
+keywords:
+  - wasmcloud
+  - webassembly
+  - wasm component model
+  - wasm sandbox
+  - wasm runtime autoscaling
+  - webassembly kubernetes
+  - webassembly news
+  - ai sandbox
+  - sandbox code execution
+  - scale to zero
+  - host density benchmark
+  - arewefastyet
+  - memory reservation
+  - wasmtime
+  - remote code execution
+  - capability-based security
+  - nats authentication
+  - host plugin secrets
+  - workload daemonset
+  - wasmcloud operator
+image: https://i.ytimg.com/vi/g86XqCPG8kU/maxresdefault.jpg
+showTitle: true
+slug: 2026-10-28-community-meeting-transcript
+about: wasmCloud
+mentions:
+  - AISandbox
+  - capabilityBasedSecurity
+  - denyByDefault
+  - blastRadius
+  - Wasmtime
+  - NATS
+  - Kubernetes
+  - runtimeOperator
+  - Rust
+  - Cosmonic
+---
+
+import YouTube from 'react-player/youtube';
+
+**[← Back to watch page](/community/2026-10-28-community-meeting/)**
+
+<YouTube url="https://www.youtube.com/watch?v=g86XqCPG8kU" />
+
+<div style={{textAlign: 'right', marginTop: '0.25rem', marginBottom: '2rem'}}>
+  <small>
+    <a href="https://www.youtube.com/watch?v=g86XqCPG8kU" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+  </small>
+</div>
+
+{/* truncate */}
+
+## Transcript
+
+**Jeremy Fleitz** [0:16](https://youtu.be/g86XqCPG8kU?t=16)
+
+Okay. Welcome to wasmCloud, October 28, 2026. This is obviously the last wasmCloud community call for October. Hope everybody is doing very well. We have a light group of people today, just because we have the Bytecode Alliance Plumbers Summit going on right now at the exact same time. But we still have plenty to cover on our agenda, so I'm going to share my screen here, and I'll drop a link to the agenda. You can find us on the wasmCloud community page right here, and if you click under October 28th, you will see the links. Let me get to chat. Yeah, just dropped a link for you.
+
+<img src="/img/community/2026-10-28/image001.webp" alt="The October 28, 2026 agenda on the wasmCloud community page, opening with the v2.11.0 release highlights" />
+
+So just starting off with our last release, 2.11, which shipped last week, October 20. 2.12 is going to be coming out next Tuesday, and it has quite a few features inside it. But quickly starting off with 2.11, there were some updates to how we do guest memory and enforcing socket egress, as well as enforcing the volumes that are mounted inside the host. So you can protect certain volumes on the host so that they cannot be mounted inside a workload. If there's something sensitive, like an `/etc` directory, you can prevent that from being mounted. There's been a lot of focus on pool sizing and memory limits, and that also goes into all the performance changes that have been made, especially for 2.12. And then we also have k6 benchmarking that's set up as well. I do want to give a quick shout-out to new contributor angyaljanos, who submitted their first contribution to wasmCloud, which is very awesome, and we really appreciate that.
+
+So now, going from 2.11, what's been worked on since last week? If you go out to the pull requests for wasmCloud, I'm just looking at the closed ones, but you can quickly scroll through all of the ones that have been closing for the past week. That's going to be inside 2.12, and a lot of these are really around either NATS improvements or benchmarking and performance improvements. Starting off with NATS: Bailey got into wasmCloud the ability to fully pass in authentication credentials for NATS, so everything can now be completely secured on the back end. That includes both the control plane and the data plane for NATS, the data plane being the one used to talk between wasmCloud workloads. Sorry, I thought there was a question.
+
+The other main focus has been performance and density, and we've seen some significant improvements here, just on cold starts and the amount of reuse we can get inside our tight sandbox area. A lot of this has been championed mainly by Victor on our team.
+
+The one thing I did want to call out, too: back in 2.11, we exposed the ability for the WASI built-in interfaces to be overridable. So the thing I've been working on is the ability to have a host plugin that can be your secrets provider. The way this could work for somebody is, instead of having your secrets inside Kubernetes in a typical Kubernetes secret, you might want to have a Vault implementation where you call Vault directly from a host plugin. This capability allows you to create a host plugin that's customizable, and you can say that this plugin is my source for providing secrets.
+
+<img src="/img/community/2026-10-28/image002.webp" alt="Pull request #5716, feat(wash-runtime): resolve secret: config references at bind, with a host.plugins example for wasmcloud-postgres" />
+
+Now this has changed to an actual structure, so it's not some magical string representation you have to put in there. It's a true structure, which Bailey gave me feedback on. So it's going to look more like this, where I can create a secrets plugin. I can call it billing DB.
+
+<img src="/img/community/2026-10-28/image003.webp" alt="The structured secrets source in PR #5716: a billing-db entry backed by a vault-secrets plugin, referenced from wasmcloud-postgres with secretFrom" />
+
+**Jeremy Fleitz** [4:56](https://youtu.be/g86XqCPG8kU?t=296)
+
+It's going to be a Vault secrets plugin. And then I'm going to have a URL key, and this is where the backend source is going to come from. Then on the host, I can load it as a plugin. And this right here is saying that from the wasmCloud Postgres plugin, I can go ahead and pull my secret from my secrets plugin. So it's showing a host plugin using another host plugin to get my secret. It doesn't have to go through a workload at all. Now, this is exposed through secrets, so if I do have a secret that I want to pull directly into a workload, I can do that as well. So this allows us to use a host plugin from another host plugin, but I can also use that host plugin directly from a workload.
+
+So once again, we have plenty of stuff currently in flight for next week that's going to be landing. We also have some additional changes in the runtime operator around how we distribute the workloads. That way, instead of having all the workloads go entirely to one host, it distributes more cleanly, and you'll be able to specify that as well. We're also going to be introducing a workload DaemonSet type of CRD. Instead of just creating a workload deployment, which goes to one particular host, it'll allow you to create a DaemonSet that you point at a host group, and it'll make sure that each host inside the host group has a copy of that workload available to start. It's still scaling to zero, as always. So at this time, I'd like to see if Rabel is ready for a demo.
+
+**Liam Randall** [6:58](https://youtu.be/g86XqCPG8kU?t=418)
+
+Jeremy, real quick, before we do that, pull up the link I dropped in here for Are We Fast Yet. One of the big goals we set for ourselves this year, and that we've gotten over the line, is rolling out and investing in a set of consistent metrics that we can use to track, ideally, each and every build and commit across time, and understand when and where we're slipping and improving. Did it not come up when you clicked the link, Jeremy?
+
+**Jeremy Fleitz** [7:35](https://youtu.be/g86XqCPG8kU?t=455)
+
+No, I think we must have a release going on or something.
+
+**Liam Randall** [7:40](https://youtu.be/g86XqCPG8kU?t=460)
+
+No, well, let's just navigate it together here. Let's go to compare real fast. It's fine. And then select the bench. There should be an HTTP bench here. Nothing in the drop-down?
+
+**Jeremy Fleitz** [7:52](https://youtu.be/g86XqCPG8kU?t=472)
+
+No, yeah, that's weird.
+
+**Liam Randall** [7:54](https://youtu.be/g86XqCPG8kU?t=474)
+
+That's bizarre. Well, you've got to love the live demo. It's funny, because when I click on this, it comes up perfectly for me. Well, here...
+
+**Jeremy Fleitz** [8:05](https://youtu.be/g86XqCPG8kU?t=485)
+
+Why don't you share your screen?
+
+**Liam Randall** [8:07](https://youtu.be/g86XqCPG8kU?t=487)
+
+Okay, sure. YOLO. I think I need permissions. Oh, I have permissions. Look at you. Way to be the hostess with the mostest. There's a legacy joke on wasmCloud Wednesday: for maybe two or three years, every time Brooks wanted to share a screen, he needed to ask me for permissions. It was almost a running gag.
+
+So there's a lot here, and the first thing I want to point out is that we've invested in real hardware here from Hetzner, and this is a small box, limited to five cores with only two gigabytes of memory. So this is a tiny glimpse at what is now possible with CNCF wasmCloud and the various performance improvements we've made. This one is maybe a little hard to read, because you have two numbers here that are vastly different, but what we're showing is 176,000 scale-to-zero sandboxes using WASI P3 and the latest release of CNCF wasmCloud, and that's in only two gigabytes of memory. My testing on my MacBook absolutely blew this out of the water. Limiting this test to 16 gigabytes of memory, I was able to deploy over 1.25 million scale-to-zero sandboxes using the new performance tuning points that we have in here.
+
+<img src="/img/community/2026-10-28/image004.webp" alt="The arewefastyet scale_density dashboard: binding_limit shows 176.18K scale-to-zero workloads and 4.06K warm workloads" />
+
+Now, there are really a couple of different tuning points that we've surfaced in CNCF wasmCloud. The first is what are called slots. Think of a slot as almost like a virtual CPU inside the sandbox. You can ramp the slots up to different places depending on your OS. On my MacBook, I had 30,000-something slots, and when I scale something to zero, it's no longer using a slot. So the first thing to recognize is that there's going to be a gap between the number of workloads I can hold on a system that have scaled to zero and the number of workloads that I'm running warm at one time. Now, there's already a commit rolling in here that will land in the next day or two that ups the warm count on the current version of wasmCloud to 6,000 or 9,000, something along those lines, with the default settings. And if you use these new tuning points, you can ramp them up even higher.
+
+So the first tuning point is the number of virtual CPUs, or slots, that you have. A component will take one or more slots when you deploy it, depending on the language. Languages that bundle their own interpreter, like Go or TypeScript, use more slots, because you essentially have more going on inside the component. Languages like Rust use fewer slots. So when you're calculating this, there's a difference in thinking about components and what's actually running here, and that matters.
+
+The second thing you can tune is the amount of memory that is reserved for each individual workload or component that gets deployed. By default, the reservation is set at four gigabytes, which makes sense because that's an unsigned 32-bit integer, and you can now tune this down to be smaller. Where this matters is that, for performance reasons, when Wasmtime starts, it basically does slots times memory and grabs that amount of memory. So on your MacBook, or wherever you're running this, you'll see wasmCloud grab something like 1.2 terabytes of memory. And guess where that fails? It'll keep grabbing until you hit an unsigned 64-bit integer. So these are the tuning points we're operating under. Now, if you tune your memory per component under that four-gig limit, you have a scenario where the pointer math could go awry inside the sandbox, so it turns on some additional bounds checking in Wasmtime automatically under the hood.
+
+What we're going to do for you as a community is, first, ship some more sensible defaults that we think just work everywhere for general use cases. Then we're going to document the poles here. What if I want to run the tiniest things?
+
+**Liam Randall** [12:36](https://youtu.be/g86XqCPG8kU?t=756)
+
+Maybe I'm doing triggers or function callbacks or crons, or something where I've got something really small. And what if I want to run really big things? So we're going to give you some default tuning points, and then you'll see those various modes show up in our benchmarks. Jeremy, I know that was a lot in the benchmark discussion. Is there anything you would add, or anything you think I didn't communicate as clearly as I could have?
+
+**Jeremy Fleitz** [13:03](https://youtu.be/g86XqCPG8kU?t=783)
+
+No, I think you really covered it. But I just think the fact that we're able to have 176,000-plus workloads on one host is amazing.
+
+**Liam Randall** [13:12](https://youtu.be/g86XqCPG8kU?t=792)
+
+In two gig.
+
+**Jeremy Fleitz** [13:14](https://youtu.be/g86XqCPG8kU?t=794)
+
+In two gig. Yes.
+
+**Liam Randall** [13:15](https://youtu.be/g86XqCPG8kU?t=795)
+
+We have a great session at KubeCon where we're going to be doing a workshop about sandboxing AI. Stay tuned for what we're going to do with that demo on stage. I think that one's going to be interesting. Jeremy, I'll hand it back to you. Maybe we can see if Rabel is ready for his demo.
+
+**Frank Schaffa** [13:30](https://youtu.be/g86XqCPG8kU?t=810)
+
+Actually, Liam, before that: how long does it take to ramp up from zero to 176K?
+
+**Liam Randall** [13:38](https://youtu.be/g86XqCPG8kU?t=818)
+
+Frank, thank you so much. That's a great question. What we're seeing right now on that demo box is 30,000 components, or workloads, per second, and I think that is drastically limited by the specific hardware we're running on. I would expect that if I ran the same test on my MacBook, I would get significantly higher results, because we're now up against the physics of your box for kicking off that many requests. In grooming and optimizing that pipeline, we did find a few performance optimizations. Initially we were only doing the start on a single thread, and now we start across all of the threads on a box. So as we run these same benchmarks on larger and more performant hardware, I think that number could go way beyond 30,000 per second. What we're seeing now is the specific result from this box. This is like the cheapest box we could buy at Hetzner, because it's just another thing Cosmonic donates to the community. Frank, did I answer your question?
+
+**Frank Schaffa** [15:00](https://youtu.be/g86XqCPG8kU?t=900)
+
+Oh, absolutely. But even 30K is...
+
+**Liam Randall** [15:04](https://youtu.be/g86XqCPG8kU?t=904)
+
+Decent? More than decent. I did a comparison for a group just two days ago, and they asked me to compare this to one of the container sandboxing companies. At the extreme end, on super-performant hardware, the container sandboxing company approached 10,000 tiny sandboxes per second, and on the five-year-old rented hardware we have, we can hit 30,000. I'm working on getting some super-performant hardware through a partnership with Arm to demonstrate at KubeCon, because I'd like to be able to show the art of what's possible. What happens if we had 512 gigabytes of memory? How many sandboxes could we start on stage? Has anybody ever sandboxed a million agents? What about 5 million? We'll see. Stay tuned for what's happening.
+
+**Frank Schaffa** [16:07](https://youtu.be/g86XqCPG8kU?t=967)
+
+Yeah, but by the way, I see this as two-phase, because this is great for decent workloads, but just imagine, from an attack point of view, it also becomes crazy how far you can scale in terms of creating attack fronts.
+
+**Liam Randall** [16:32](https://youtu.be/g86XqCPG8kU?t=992)
+
+Well, I'm actually working on a blog post right now that I think will be super interesting in that regard. The title of the post is, what did I call it now? It's like "Mitigating RCE: Achieving Architectural Security with Sandboxes." The core thesis is that you can't execute what you don't have. I use one of the CVSS 10 vulnerabilities this week in the `zip` Rust crate, and then I walk through how, when we think about a cyber kill chain, it depends on successfully executing multiple steps, the first step being an exploit. So there's a zip file: you can craft a malicious zip that lets you write to different places than where you think you're writing, and write with different security bits than the ones you're trying to write with. But step two, and the inherent assumption in how we score CVSS vulnerabilities, is that those things exist. So when we put those vulnerabilities in a capability-driven sandbox like Wasm, what we're in fact achieving is mitigating the impact of stuff like RCE.
+
+**Frank Schaffa** [17:54](https://youtu.be/g86XqCPG8kU?t=1074)
+
+Yeah, no, absolutely. But I was thinking from the other point of view: you, as an attacker, now have a huge tool to allow you to do what? I mean, it's a cheap box, or 176K points of attack.
+
+**Liam Randall** [18:17](https://youtu.be/g86XqCPG8kU?t=1097)
+
+I see what you mean. Yes, I think AI will continue to cut both ways. But what I'm arguing in this blog post, which should hopefully land later today or tomorrow, is that defenders and platform engineers need to have the realization that security teams had a while ago. I speak this weekend in D.C., if anybody's around, and this is going to be what I'm talking about. About 20 years ago in security, we moved to this idea that prevention is a good tactic, but it's not a great strategy for keeping our org safe. A great strategy is assuming you're compromised and working on rapid detection. How do we do that? By having layers of detection that are mapped to the kill chain, and looking for ways we can find attackers. We obviously try to prevent, patch all the bugs. We try to detect remote code execution. We try to detect outbound channels and persistence and pivoting.
+
+<img src="/img/community/2026-10-28/image005.webp" alt="Liam's blog draft, Stopping Remote Code Execution with a Sandbox, showing the anatomy of an RCE kill chain and RUSTSEC-2026-0367 in the zip crate" />
+
+What's the lesson here for today's infrastructure operators, for platform engineers, and for developers? You need to assume that all code is vulnerable and all code is buggy, because it is, right? That doesn't mean stop patching, stop static analysis, dynamic analysis, and all the things that lead to better code. But when you assume that a zip file could take over your system, you start to think differently about building secure software, and you start to think about what it means to be architecturally secure. By that we simply mean that patching is not enough. We need to adopt capabilities, and we need to think about locking vulnerable code in isolated, capability-driven sandboxes. When we do that, we can take complex vulnerabilities like this new zip vuln, which has five different ways to impact and exploit your system, and mitigate them completely, because the resources it depends on to achieve the RCE, remote code execution, either don't exist or aren't made available in the sandbox.
+
+<img src="/img/community/2026-10-28/image006.webp" alt="The draft's table of six ways the attack fails inside the Cosmonic sandbox, comparing what the attack tries, what happens on the host, and what happens in the sandbox" />
+
+I have this already compiled as a Wasm app you can test on Cosmonic Desktop on Windows, Linux, or Mac, or on Cosmonic Control on Kubernetes. In my demo, I give you a little Rust crate that you can run on a local system to show the detonation actually happening, and then in my CI, I actually show you a test on wasmCloud as well. So hopefully this is something you can use to drive this pattern around isolation and composition. Frank...
+
+**Frank Schaffa** [21:13](https://youtu.be/g86XqCPG8kU?t=1273)
+
+No, absolutely. But I didn't want to derail the call, Jeremy.
+
+**Jeremy Fleitz** [21:21](https://youtu.be/g86XqCPG8kU?t=1281)
+
+No, these are good conversations.
+
+**Liam Randall** [21:23](https://youtu.be/g86XqCPG8kU?t=1283)
+
+I think it's a message that we're trying to communicate at a lot of levels, and I really appreciate you asking such a good tactical question. And candidly, if I had tried to plant a question, that is probably the question I would have planted anyway. So thank you. Not planned, Frank.
+
+**Jeremy Fleitz** [21:46](https://youtu.be/g86XqCPG8kU?t=1306)
+
+Okay, Rabel, do you think you're ready for a demo?
+
+**Rabel Mervin** [21:54](https://youtu.be/g86XqCPG8kU?t=1314)
+
+Yeah. First of all, hello everyone. This is my first wasmCloud Wednesday meeting. I'll be speaking about a teeny mini project I built, which is Wasm Forge. Wasm Forge actually started with a pretty common problem every developer faces, because I have to run a lot of commands. Installing the wasmCloud operator was a pretty big task for me, especially with version one. So this project is mainly focused on version one, and I need to upgrade it to version two of wasmCloud. With Wasm Forge, you just need to run a single command, and it will automatically download the dependencies it needs, the CRDs, and basically everything the wasmCloud operator needs to get installed inside the cluster. So let me share my screen. Is it visible?
+
+**Jeremy Fleitz** [23:48](https://youtu.be/g86XqCPG8kU?t=1428)
+
+We see Zoom.
+
+**Rabel Mervin** [23:54](https://youtu.be/g86XqCPG8kU?t=1434)
+
+Is it visible now?
+
+**Jeremy Fleitz** [24:07](https://youtu.be/g86XqCPG8kU?t=1447)
+
+We have three replicas of Aditya.
+
+**Aditya Salunkhe** [24:15](https://youtu.be/g86XqCPG8kU?t=1455)
+
+Can never have enough replicas of me.
+
+**Rabel Mervin** [24:15](https://youtu.be/g86XqCPG8kU?t=1455)
+
+Hello everyone, now it's visible.
+
+**Jeremy Fleitz** [24:38](https://youtu.be/g86XqCPG8kU?t=1478)
+
+It's still showing just your Zoom, like your desktop with Zoom. I don't know if there's a way to share a different screen or a window.
+
+**Rabel Mervin** [24:51](https://youtu.be/g86XqCPG8kU?t=1491)
+
+Yeah, got it. So I think now it's visible.
+
+**Jeremy Fleitz** [25:10](https://youtu.be/g86XqCPG8kU?t=1510)
+
+Ah, perfect. Yes.
+
+**Rabel Mervin** [25:14](https://youtu.be/g86XqCPG8kU?t=1514)
+
+So this is the project I built. I already created a demo cluster for the demo. Now I want to run a single command, and that will install everything the operator needs to run inside a cluster. Another problem I faced a lot of times is that the errors are very hard to diagnose. When I was a beginner, it was very, very difficult to find out where the actual problem was, so this project gives me a pretty easy way to diagnose things.
+
+So with the `forge` command, with the dependencies flag, it installs basically everything: NATS and JetStream, the wasmCloud Application Deployment Manager, and finally the operator. It also runs validation checks on whether the cluster is reachable or not. I'm using kube-rs for server-side apply of the configurations. As you can see here, the namespace is wasmcloud-operator, the CRDs have been installed, and I also added the RBAC, the role-based access control: cluster role, cluster role binding. For now it's hard-coded in the code base, and maybe in the future I can make it customizable. For CRDs I'm using the wasmCloud host config and the aggregated API, v1beta1, and the dependencies got installed, as you can see here.
+
+<img src="/img/community/2026-10-28/image007.webp" alt="Wasm Forge connecting to a kind cluster, passing validation checks, and installing NATS and wadm with Helm" />
+
+There is also a command called `forge doctor`, which is basically a diagnosis. Let me break it once. As you can see, when I set leafnodes to false, it gets an error. So when I set leafnodes enabled to false, it throws me an error, and with `forge doctor` I can easily diagnose where the error is. If there is any error in, for example, the cluster role, Forge stops at that particular area and tells me there is an error in the cluster role. So let me set it back to true now. Yes, another warning. So nowadays it's very easy for me to diagnose the errors. As a beginner, it's very, very useful.
+
+<img src="/img/community/2026-10-28/image008.webp" alt="forge doctor output for the wasmcloud-operator namespace: cluster, operator, RBAC, CRDs, aggregated API, and dependencies all passing, before Rabel disables NATS leafnodes" />
+
+There are a lot of other commands, too. For example, there is a dry run, which tells you what processes will be done before you actually change things. It's like a roadmap: this is what will be done, this is how your process will be.
+
+<img src="/img/community/2026-10-28/image009.webp" alt="A Wasm Forge dry run listing the namespace, service account, RBAC, service, and wasmcloud-operator 0.5.0 deployment it would apply" />
+
+You can also delete the whole thing. When you install, you can see the CRDs got installed. So now I'm going to delete it, and I just uninstall everything. So this is Wasm Forge. Moving forward, I would like to improve this project by implementing it for version two of wasmCloud. This project was built a few months ago, and I would like to get feedback from the community: what are the main pain points that wasmCloud users face? I would like to focus on addressing those main pain points. It's like a wrapper around the commands.
+
+**Jeremy Fleitz** [32:52](https://youtu.be/g86XqCPG8kU?t=1972)
+
+This is awesome. I really like this tool. Like you said, when I'm basically installing or setting up any new kind cluster, a Kubernetes cluster with wasmCloud, various challenges can happen, and you found a really easy way to automate this. You did say you're going to be looking at wasmCloud v2, but are you also thinking of expanding this into workload debugging as well?
+
+**Rabel Mervin** [33:25](https://youtu.be/g86XqCPG8kU?t=2005)
+
+Yeah, of course. I am thinking of a lot of things, but I can do that.
+
+**Jeremy Fleitz** [33:35](https://youtu.be/g86XqCPG8kU?t=2015)
+
+Awesome. Because it looks like it's mainly for getting the whole wasmCloud cluster up altogether. I could honestly see this, like when you did the dry run and even just doing `doctor`, and it spits out the current configuration and the current status. I think it would be kind of neat to have something like a `forge --monitor` that you can run in the background, and it just keeps going. It's almost like an OTel collector at that point, where it can spit out all the trace data of workloads that are running inside the cluster. I think that would be kind of neat to see.
+
+**Rabel Mervin** [34:21](https://youtu.be/g86XqCPG8kU?t=2061)
+
+Yeah, so it's more detail into what's happening inside. Am I right?
+
+**Jeremy Fleitz** [34:31](https://youtu.be/g86XqCPG8kU?t=2071)
+
+Yes. Yes.
+
+**Rabel Mervin** [34:31](https://youtu.be/g86XqCPG8kU?t=2071)
+
+Yeah. So I actually have a verbose command that gives a more detailed view into what's happening inside. To enable verbose logging for more detailed troubleshooting, there's `forge --verbose` that you can use.
+
+**Jeremy Fleitz** [35:02](https://youtu.be/g86XqCPG8kU?t=2102)
+
+Okay. Very cool. Thank you so much for this demo.
+
+**Rabel Mervin** [35:11](https://youtu.be/g86XqCPG8kU?t=2111)
+
+Thank you. Thank you.
+
+**Aditya Salunkhe** [35:16](https://youtu.be/g86XqCPG8kU?t=2116)
+
+Yeah, really loved it, Rabel. Nice project.
+
+**Rabel Mervin** [35:22](https://youtu.be/g86XqCPG8kU?t=2122)
+
+Thank you so much, Aditya. Any feedback? I would like to hear some more feedback, if there is any.
+
+**Jeremy Fleitz** [35:34](https://youtu.be/g86XqCPG8kU?t=2134)
+
+So do you have this as a public open source project? If somebody does have a question, if you can drop a link to your project in the comments, then anybody who has questions can reach out to you that way.
+
+**Rabel Mervin** [35:48](https://youtu.be/g86XqCPG8kU?t=2148)
+
+Yeah, sure.
+
+**Jeremy Fleitz** [35:50](https://youtu.be/g86XqCPG8kU?t=2150)
+
+Thank you. Okay, so I'm going to stop sharing here, and I'm just going to bring up our community call page again. Okay, so that really concludes all of our agenda items today. I'll open it up to the floor if anybody has any other topics they want to discuss today.
+
+**Aditya Salunkhe** [36:43](https://youtu.be/g86XqCPG8kU?t=2203)
+
+We could mention KubeCon NA.
+
+**Jeremy Fleitz** [36:46](https://youtu.be/g86XqCPG8kU?t=2206)
+
+Yes, I was going to say that. All right. So I said earlier in the call today that the Bytecode Alliance Plumbers Summit is going on right now, for the next couple of hours. But in two weeks, KubeCon North America in Salt Lake City is going to be happening. We will still have our community call; we'll just be taking it from Salt Lake City. Exact same bat time, same bat channel. So we'll definitely see you all there. And if anybody's there in person and wants to stop by the wasmCloud booth or the Cosmonic booth, that would be amazing.
+
+**Liam Randall** [37:17](https://youtu.be/g86XqCPG8kU?t=2237)
+
+I would point out that Bailey and Mendy are speaking on Monday at Cloud Native AI and Inference Day at 1:30 PM Salt Lake City time: "GPU Portability Was Broken, but Now There's WebGPU." And on Wednesday, 11/11, at 4:10, Eric and Bailey are leading a workshop called "Sandboxing on Kubernetes with WebAssembly: A Hands-on Tutorial." So if you're going to be at KubeCon, I encourage you to try to grab both. I think they're streamed as well. From a team perspective, the wasmCloud crew will be posted up between the Cosmonic booth and the wasmCloud kiosk on Tuesday, Wednesday, and Thursday, and we'll be bouncing around a variety of other talks and events throughout the week while we're there. I think most of us will get in on Sunday, and we'll be there through Thursday. So come by, say hello, and come talk about sandboxing with Wasm.
+
+**Jeremy Fleitz** [38:25](https://youtu.be/g86XqCPG8kU?t=2305)
+
+Perfect. Thank you, Liam, for saying that. Okay. Well, thanks, everybody, and we will see you next Wednesday.

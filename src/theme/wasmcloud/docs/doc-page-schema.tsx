@@ -6,6 +6,7 @@ import {
   buildEntityNodes,
   buildEntityRefs,
 } from '@theme/wasmcloud/structured-data/entities';
+import { withTrailingSlash } from '@theme/wasmcloud/structured-data/url';
 
 /**
  * Per M4 of the structured-data spike: emit `TechArticle` JSON-LD on every
@@ -121,7 +122,7 @@ export default function DocPageSchema(): JSX.Element | null {
   const fm = frontMatter as unknown as Record<string, unknown>;
 
   const siteUrl = siteConfig.url.replace(/\/$/, '');
-  const canonicalUrl = `${siteUrl}${metadata.permalink}`;
+  const canonicalUrl = withTrailingSlash(`${siteUrl}${metadata.permalink}`);
   const headline = (fm.title as string) || metadata.title || '';
   if (!headline) return null;
 
