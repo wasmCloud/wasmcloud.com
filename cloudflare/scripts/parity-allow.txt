@@ -1,0 +1,48 @@
+# Differences between wasmcloud.com (Netlify) and the Worker copy that are
+# understood and accepted. scripts/parity.py reports a failure matching a line
+# here as "explained" instead of failing the run.
+#
+#   <check glob> | <path glob> | <reason>
+#
+# Both globs are fnmatch patterns (`*` matches across slashes). The check is
+# the name in the report's Check column: status, location, content-type,
+# cache-control, body, "404 body", "header x-frame-options", "AI agent (*)",
+# "search crawler (*)", noindex, speed. First matching line wins.
+#
+# Keep this short and specific. Every line is a difference a visitor or a
+# crawler will see after cutover, so each needs a reason someone would accept
+# out loud, and `* | * | ...` defeats the point of the script.
+
+# netlify.toml relabels the docs' .md files (written by docusaurus-plugin-llms)
+# as text/plain so a browser shows them inline. The Worker serves Markdown as
+# text/markdown everywhere: it is what an agent asking for a .md URL checks,
+# and current browsers show it inline too. Same bytes, different label.
+content-type | /docs/*.md | Markdown is served as text/markdown, not relabelled text/plain
+
+# Production disagrees with itself here: some Netlify edge nodes send
+# Netlify's own default (max-age=31536000) instead of the netlify.toml value
+# (max-age=63072000; includeSubDomains). The Worker always sends the
+# netlify.toml value.
+header strict-transport-security | * | Netlify intermittently sends its default HSTS instead of the netlify.toml value
+
+# Two posts are dated 2026-04-15, so Docusaurus orders them by whichever the
+# build read first. Netlify's build and this one disagree, which swaps the two
+# in every listing. Same posts, same links, different order. Giving the two
+# posts distinct timestamps would remove these lines.
+body | /blog/archive/* | order of two same-date posts differs between builds
+body | /blog/page/2/* | order of two same-date posts differs between builds
+body | /blog/atom.xml | order of two same-date posts differs between builds
+body | /blog/rss.xml | order of two same-date posts differs between builds
+
+# Netlify's pretty_urls processing rewrites the one outbound link to
+# https://msgpack.org/index.html as https://msgpack.org/ and re-serialises the
+# tag. The Worker serves the link as the post wrote it. Both reach the same page.
+body | /blog/wasmcloud-0.78.0-componentized-rust/* | Netlify rewrites an outbound link ending in /index.html; the Worker leaves it as written
+body | /docs/0.82/hosts/lattice-protocols/rpc/* | Netlify rewrites an outbound link ending in /index.html; the Worker leaves it as written
+
+# Time to first byte on a fresh connection is about twice Netlify's (around
+# 100 ms against 20 to 100 ms, depending on the run): every request goes
+# through the Worker, which then fetches the file from the asset store.
+# cosmonic.com's Worker measures the same. Liam chose on 2026-11-19 to leave
+# it for now; the fix is to serve static files straight from the asset layer.
+speed | * | known: Worker-first asset serving is slower to first byte; left as is for now (Liam, 2026-11-19)

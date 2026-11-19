@@ -1,0 +1,68 @@
+// wasmcloud-www: wasmcloud.com on Cloudflare Workers.
+//
+// Today this Worker serves only the test copy at next.wasmcloud.com.
+// Production is still Netlify. See CLOUDFLARE-MIGRATION.md for the cutover
+// checklist, worker/src/index.js for what the Worker does and
+// scripts/netlify2cf.py for where its routing table comes from.
+//
+//   make cf        build build/assets and worker/routes.generated.json
+//   make cf-dev    run it locally on :8787
+//
+// Deploy with the pinned CLI, never a floating one:
+//   make cf-deploy
+// No account_id here on purpose: CI supplies CLOUDFLARE_ACCOUNT_ID, and a
+// local deploy uses whichever account `wrangler login` selected.
+{
+  "name": "wasmcloud-www",
+  "main": "worker/src/index.js",
+  "compatibility_date": "2026-11-01",
+
+  "assets": {
+    // A copy of the Docusaurus build without the Netlify _headers file, plus
+    // the Markdown twins under _md/. Built by `make cf`.
+    "directory": "./build/assets",
+    "binding": "ASSETS",
+    // The Worker sees every request: redirects and the AI-agent branch have
+    // to run before a file is served.
+    "run_worker_first": true,
+    // The asset layer serves exact files and nothing else. Trailing slashes,
+    // index.html and the 404 page are decided in the Worker so they can match
+    // Netlify's behaviour.
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+
+  // The test hostname only. The live hostnames (wasmcloud.com, www, docs) are
+  // added at cutover, one at a time. Wrangler will not replace a DNS record
+  // it did not create: attaching a live hostname means deleting its existing
+  // record first.
+  //
+  // To try the docs.wasmcloud.com redirects on the edge before cutover, add
+  // { "pattern": "docs-next.wasmcloud.com", "custom_domain": true } here:
+  // HOST_ALIASES below already answers that name as docs.wasmcloud.com.
+  "routes": [
+    { "pattern": "next.wasmcloud.com", "custom_domain": true }
+  ],
+  // On while the site is being staged: next.wasmcloud.com only answers once
+  // the wasmcloud.com zone is active on Cloudflare's nameservers, and until
+  // then the workers.dev URL is the only way to reach the Worker. Every
+  // response on it is noindex. Turn it off in the cutover pull request.
+  "workers_dev": true,
+  "preview_urls": true,
+
+  // One row per AI-agent request: path, agent, markdown or html, host.
+  "analytics_engine_datasets": [
+    { "binding": "AGENT_HITS", "dataset": "wasmcloud_www_agent_hits" }
+  ],
+
+  "vars": {
+    // Comma-separated hosts that get X-Robots-Tag: noindex, nofollow on every
+    // response. *.workers.dev is always treated as a test host.
+    "TEST_HOSTS": "next.wasmcloud.com,docs-next.wasmcloud.com",
+    // "test host=production host" pairs. A request to the left is answered
+    // exactly as the Worker would answer the right.
+    "HOST_ALIASES": "docs-next.wasmcloud.com=docs.wasmcloud.com"
+  },
+
+  "observability": { "enabled": true }
+}
