@@ -28,7 +28,7 @@ This component demonstrates a Wasm-based system for monitoring and reacting to k
 ## Prerequisites
 
 - `cargo` 1.75
-- [`wash`](https://wasmcloud.com/docs/installation/) 0.37.0
+- [`wash`](/docs/v1/installation/) 0.37.0
 
 ## Building
 

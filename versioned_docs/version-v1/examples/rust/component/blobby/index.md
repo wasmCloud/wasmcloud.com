@@ -28,7 +28,7 @@ the uploaded files on a filesystem or in an s3 compatible store).
 ## Prerequisites
 
 - `cargo` 1.75
-- [`wash`](https://wasmcloud.com/docs/installation/) 0.26.0
+- [`wash`](/docs/v1/installation/) 0.26.0
 
 ## Building
 

@@ -47,7 +47,7 @@ The component performs a series of blobstore operations:
 
 ### Prerequisites
 
-- [`wash`](https://wasmcloud.com/docs/installation/) 0.26.0+
+- [`wash`](/docs/v1/installation/) 0.26.0+
 - `cargo` 1.75+
 
 ```bash

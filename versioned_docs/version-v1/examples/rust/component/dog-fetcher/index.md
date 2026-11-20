@@ -26,7 +26,7 @@ response. Its purpose is to show how you can use `wasi:http/outgoing-handler` in
 ## Prerequisites
 
 - `cargo` 1.75
-- [`wash`](https://wasmcloud.com/docs/installation/) 0.27.0
+- [`wash`](/docs/v1/installation/) 0.27.0
 - `wasmtime` >=25.0.0 (if running with wasmtime)
 
 ## Building

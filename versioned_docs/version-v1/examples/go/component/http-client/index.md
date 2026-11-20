@@ -49,7 +49,7 @@ Before starting, ensure that you have the following installed in addition to the
 
 - [`tinygo`](https://tinygo.org/getting-started/install/) for compiling Go (always use the latest version)
 - [`wasm-tools`](https://github.com/bytecodealliance/wasm-tools#installation) for Go bindings
-- [wasmCloud Shell (`wash`)](https://wasmcloud.com/docs/installation/) for building and running the components and wasmCloud environment
+- [wasmCloud Shell (`wash`)](/docs/v1/installation/) for building and running the components and wasmCloud environment
 
 ## 👟 Run the example
 

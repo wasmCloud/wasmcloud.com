@@ -25,7 +25,7 @@ This is a simple Rust Wasm example that increments a key in a keyvalue store in 
 ## Prerequisites
 
 - `cargo` 1.75
-- [`wash`](https://wasmcloud.com/docs/installation/) 0.36.1
+- [`wash`](/docs/v1/installation/) 0.36.1
 
 ## Building
 
