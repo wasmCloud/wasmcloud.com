@@ -41,6 +41,7 @@ test('302s stay 302s, external redirects keep their host, fragments survive', ()
     [302, '/blog/2024-09-24-wasmcloud-innovation-day-2024-in-review/']);
   assert.deepEqual(hit('/slack'), [301, 'https://slack.wasmcloud.com']);
   assert.deepEqual(hit('/docs/cli/app'), [301, '/docs/v1/cli/wash/#wash-app']);
+  assert.deepEqual(hit('/docs/v1/wash/get-started'), [301, '/docs/v1/installation/']);
 });
 
 test('splats carry the rest of the path; a specific rule above still wins', () => {
