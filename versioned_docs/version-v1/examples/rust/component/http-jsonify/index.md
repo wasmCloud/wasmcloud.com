@@ -25,7 +25,7 @@ This is a simple Rust Wasm example that converts an incoming HTTP request to a J
 ## Prerequisites
 
 - `cargo` >=1.75
-- [`wash`](https://wasmcloud.com/docs/installation/) >=0.27.0
+- [`wash`](/docs/v1/installation/) >=0.27.0
 - `wasmtime` >=19.0.0 (if running with wasmtime)
 
 ## BUilding

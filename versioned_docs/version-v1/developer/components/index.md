@@ -20,7 +20,7 @@ mentions:
 platforms: [wasmCloud]
 ---
 
-To perform the steps in this guide, you'll need to have completed [installation](/docs/installation/) of `wash`. You'll be able to pick your own language, or follow the "bring your own component" guide to develop a component in any language that supports Wasm components. For a conceptual overview of wasmCloud components, see the [component concepts](/docs/v1/concepts/components/) documentation.
+To perform the steps in this guide, you'll need to have completed [installation](/docs/v1/installation/) of `wash`. You'll be able to pick your own language, or follow the "bring your own component" guide to develop a component in any language that supports Wasm components. For a conceptual overview of wasmCloud components, see the [component concepts](/docs/v1/concepts/components/) documentation.
 
 The following pages will take you through the process of developing application components:
 

@@ -24,7 +24,7 @@ This is a simple Rust Wasm example that responds with a "Hello World" message fo
 ## Prerequisites
 
 - `cargo` 1.82
-- [`wash`](https://wasmcloud.com/docs/installation/) 0.36.1
+- [`wash`](/docs/v1/installation/) 0.36.1
 - `wasmtime` >=25.0.0 (if running with wasmtime)
 
 ## Building

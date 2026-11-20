@@ -42,7 +42,7 @@ Check out our [Blog Post on `wash dev`](https://wasmcloud.com/blog/2025-01-21-wa
 ## `wash dev` Quickstart
 
 :::info[Prerequisites]
-This tutorial assumes you already have `wash` installed. If you don't, refer to the [**installation instructions**](/docs/installation.mdx) first.
+This tutorial assumes you already have `wash` installed. If you don't, refer to the [**installation instructions**](/docs/v1/installation/) first.
 :::
 
 Here's a quick guide to getting started with wasmCloud and `wash dev`.

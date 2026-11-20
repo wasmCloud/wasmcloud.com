@@ -28,7 +28,7 @@ This folder contains a simple WebAssembly component written in [Rust][rust], whi
 ## Prerequisites
 
 - `cargo` 1.80
-- [`wash`](https://wasmcloud.com/docs/installation/) 0.29.0
+- [`wash`](/docs/v1/installation/) 0.29.0
 
 ## Building
 

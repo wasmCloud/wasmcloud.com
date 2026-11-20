@@ -42,7 +42,7 @@ This is a Wasm component example, which, using NATS KeyValue and Messaging provi
 
 *   `cargo` 1.78
 
-*   [`wash`](https://wasmcloud.com/docs/installation/) 0.29.2
+*   [`wash`](/docs/v1/installation/) 0.29.2
 
 *   `wadm` 0.12.2 (only if multiple links used)
 

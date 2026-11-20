@@ -62,7 +62,7 @@ This component (the image processor) and the HTTP task manager component communi
 ## Prerequisites
 
 - `cargo` >= 1.81
-- [`wash`](https://wasmcloud.com/docs/installation/) >=0.32.0
+- [`wash`](/docs/v1/installation/) >=0.32.0
 
 ## Build
 
