@@ -51,6 +51,9 @@ const FILES_BY_LOWER = new Map((generated.files || []).map((f) => [f.toLowerCase
 const CANONICAL_ORIGIN = `https://${PRIMARY}`;
 // Netlify's default for everything it serves.
 const DEFAULT_CACHE_CONTROL = 'public,max-age=0,must-revalidate';
+// The statuses that are a file being served: a Cache-Control from a header
+// block applies to these and to nothing else.
+const CACHEABLE = new Set([200, 206, 304]);
 
 export default {
   async fetch(request, env, ctx) {
@@ -130,6 +133,10 @@ export default {
       // is always served as text/markdown: it is what an agent asking for a
       // .md URL checks for. See "Known differences" in CLOUDFLARE-MIGRATION.md.
       if (markdown && name.toLowerCase() === 'content-type') continue;
+      // A caching rule describes the file at a path (/assets/* is immutable).
+      // A 404 or a redirect answered at that path is not the file, and a
+      // browser must not keep one for a year.
+      if (name.toLowerCase() === 'cache-control' && !CACHEABLE.has(res.status)) continue;
       res.headers.set(name, value);
     }
     if (isTestHost(url.hostname, env)) res.headers.set('X-Robots-Tag', 'noindex, nofollow');
@@ -157,7 +164,12 @@ async function route(c) {
   // reachable through the agent branch, never by asking for it.
   if (/^\/_md(\/|$)/.test(c.path)) return notFound(c);
 
-  const hit = await pickRule(RULES, c.path, c.host, async () => findAsset(c, c.path));
+  // A page's Markdown URL (/docs/examples/index.md) counts as a file for an
+  // unforced rule, as the page itself does: without this the splat rule
+  // /docs/examples/* sent it to the v1 page's Markdown, although
+  // /docs/examples/ is a live page that advertises that URL.
+  const hit = await pickRule(RULES, c.path, c.host,
+    async () => findAsset(c, c.path) || hasMarkdownTwin(c, c.path));
   if (hit) return redirect(c, hit.target, hit.rule.status);
   return serveLocal(c);
 }
@@ -232,6 +244,14 @@ function resolveAsset(path, has) {
 function findAsset(c, path) {
   return resolveAsset(path, (p) => (FILES.has(p) ? p : null))
     || resolveAsset(path.toLowerCase(), (p) => FILES_BY_LOWER.get(p) || null);
+}
+
+/** Is `path` the `.md` URL of a page that has a build-time Markdown twin? */
+function hasMarkdownTwin(c, path) {
+  return mdPageCandidates(path).some((page) => {
+    const assetPath = findAsset(c, page);
+    return Boolean(assetPath) && TWINS.has(assetPath);
+  });
 }
 
 /** The URL Netlify treats as an HTML file's own: /a/index.html -> /a/, /a.html -> /a. */

@@ -588,6 +588,12 @@ const config = (async (): Promise<Config> => {
           },
         }),
       },
+      // iOS home-screen / Safari icon (static/apple-touch-icon.png, 180x180,
+      // opaque). iOS also probes /apple-touch-icon.png directly.
+      {
+        tagName: 'link',
+        attributes: { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+      },
       // Google Fonts: skipped in the offline build so air-gapped browsers do
       // not request fonts.googleapis.com / fonts.gstatic.com. Falls back to
       // the OS sans-serif via the CSS stack already declared in
