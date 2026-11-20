@@ -179,7 +179,14 @@ exact pattern at a time, in `BUILD_NOISE` in `scripts/parity.py`.
   the same as cosmonic.com's Worker. Every request goes through the Worker,
   which then fetches the file from the asset store (about 60 ms of it).
   Serving static files straight from the asset layer (`run_worker_first` as a
-  list of paths) is the fix; left as is for now.
+  list of paths) was tried for `/assets/*` on 2026-11-20 and rejected: a path
+  under an excluded prefix never reaches the Worker, so a missing bundle
+  answered an empty 404 carrying the year-long `Cache-Control` from
+  `_headers`, and the asset layer does not answer Range requests with a 206.
+  Instead, files under `/assets/` (all content-hashed) are sent
+  `Cache-Control: public, max-age=31536000, immutable` (`netlify.toml`), so a
+  returning visitor does not ask for them again. The Worker leaves that
+  header off anything that is not the file (a 404, a redirect).
 - Netlify sometimes sends its own default `Strict-Transport-Security`
   (`max-age=31536000`) instead of the `netlify.toml` value. The Worker always
   sends the `netlify.toml` value.

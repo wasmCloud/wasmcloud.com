@@ -45,7 +45,11 @@ test('302s stay 302s, external redirects keep their host, fragments survive', ()
 
 test('splats carry the rest of the path; a specific rule above still wins', () => {
   assert.deepEqual(hit('/docs/next/foo/bar'), [301, '/docs/v1/foo/bar']);
-  assert.deepEqual(hit('/docs/next'), [301, '/docs/v1/']);
+  // A splat rule also matches its bare stem, with an empty splat.
+  assert.deepEqual(hit('/docs/tour'), [301, '/docs/v1/tour/']);
+  // /docs/next has its own rule above the splat: /docs/v1/ is not a page.
+  assert.deepEqual(hit('/docs/next'), [301, '/docs/v1/intro/']);
+  assert.deepEqual(hit('/docs/v1/'), [301, '/docs/v1/intro/']);
   assert.deepEqual(hit('/docs/tour/hello-world/'), [301, '/docs/v1/tour/hello-world/']);
   // /docs/cli/app has its own rule above the /docs/cli/* splat.
   assert.deepEqual(hit('/docs/cli/unknown-subcommand'), [301, '/docs/v1/cli/unknown-subcommand']);
@@ -153,4 +157,22 @@ test('token estimate is UTF-8 bytes over four, rounded up', () => {
   assert.equal(markdownTokens(''), 0);
   assert.equal(markdownTokens('abcde'), 2);
   assert.equal(markdownTokens('é'), 1);
+});
+
+test('a page\'s .md URL is not captured by an unforced splat rule', async () => {
+  // /docs/examples/ is a live page; /docs/examples/* is the rule for the v1
+  // pages that used to sit under it. The Worker tells pickRule a file exists
+  // when the .md URL stands for a page with a Markdown twin (index.js).
+  assert.ok(table.twins.includes('/docs/examples/index.html'));
+  assert.deepEqual(mdPageCandidates('/docs/examples/index.md'), ['/docs/examples/', '/docs/examples/index.html']);
+  const withoutTwin = await pickRule(table.rules, '/docs/examples/index.md', 'wasmcloud.com', async () => false);
+  assert.equal(withoutTwin.target, '/docs/v1/examples/index.md');
+  assert.equal(await pickRule(table.rules, '/docs/examples/index.md', 'wasmcloud.com', async () => true), null);
+});
+
+test('hashed files under /assets/ are immutable, and nothing else is', () => {
+  const cache = (path) => new Map(headersFor(table.headers, path).map(([n, v]) => [n.toLowerCase(), v])).get('cache-control');
+  assert.equal(cache('/assets/js/main.a1143984.js'), 'public, max-age=31536000, immutable');
+  assert.equal(cache('/docs/overview/'), undefined);
+  assert.equal(cache('/img/logo.svg'), undefined);
 });
