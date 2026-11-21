@@ -9,8 +9,8 @@ import {
 import { withTrailingSlash } from '@theme/wasmcloud/structured-data/url';
 
 /**
- * Per M4 of the structured-data spike: emit `TechArticle` JSON-LD on every
- * doc page (current + versioned). Defaults are sensible enough that
+ * Per M4 of the structured-data spike: emit `TechArticle` + `Article`
+ * JSON-LD on every doc page (current + versioned). Defaults are sensible enough that
  * existing docs gain valid schema without frontmatter changes; the
  * frontmatter fields (`proficiency`, `dependencies`, `languages`,
  * `platforms`, `about`, `mentions`) enrich the emitted payload when
@@ -199,8 +199,13 @@ export default function DocPageSchema(): JSX.Element | null {
         ? `${siteUrl}${fmImage.startsWith('/') ? '' : '/'}${fmImage.replace(/^\.\/+/, '')}`
         : FALLBACK_IMAGE;
 
+  // Typed as both `TechArticle` and its parent `Article`. The pair is
+  // redundant to an RDF parser, but checkers that match the type name
+  // literally (the Ahrefs "Article page missing Article schema" audit,
+  // and Google's Article docs, which list Article / NewsArticle /
+  // BlogPosting only) do not credit a bare `TechArticle`.
   const article: Record<string, unknown> = {
-    '@type': 'TechArticle',
+    '@type': ['TechArticle', 'Article'],
     '@id': `${canonicalUrl}#article`,
     headline,
     ...(description && { description }),

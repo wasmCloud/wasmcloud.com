@@ -109,7 +109,8 @@ const config = (async (): Promise<Config> => {
         {
           blog: {
             blogTitle: 'Blog',
-            blogDescription: 'The latest wasmCloud news, updates, and announcements.',
+            blogDescription:
+              'wasmCloud release notes, engineering deep dives, and project news on running WebAssembly components across Kubernetes, cloud, and edge.',
             blogSidebarCount: 0,
             beforeDefaultRehypePlugins: [rehypeShikiPlugin],
             rehypePlugins: [rehypeNameToId],
@@ -331,7 +332,8 @@ const config = (async (): Promise<Config> => {
           showReadingTime: false,
           editUrl: 'https://github.com/wasmCloud/wasmcloud.com-dev/edit/main/',
           blogTitle: 'Community Calls',
-          blogDescription: 'Weekly wasmCloud Wednesday agendas, notes, and recordings.',
+          blogDescription:
+            'Agendas, notes, recordings, and transcripts from wasmCloud Wednesday, the weekly community call for WebAssembly component and wasmCloud contributors.',
           blogSidebarCount: 'ALL',
           blogSidebarTitle: 'Past Meetings',
           beforeDefaultRehypePlugins: [rehypeShikiPlugin],

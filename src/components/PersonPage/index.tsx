@@ -607,7 +607,7 @@ export default function PersonPage({ data }: { data: PersonPageData }): JSX.Elem
 
   const description = person.bio
     ? person.bio
-    : `${person.name} — ${person.byline_title ?? 'wasmCloud contributor'}.`;
+    : `${person.name} — ${person.byline_title ?? 'wasmCloud contributor'}. Profile, links, and contributions to wasmCloud, the CNCF project for running WebAssembly components.`;
 
   // Split the name into first + last tokens for OpenGraph `profile:*`
   // metadata. Single-token names use the whole name as first_name and
