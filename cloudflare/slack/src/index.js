@@ -5,8 +5,12 @@
 // wasmcloud.com redirects here (netlify.toml), so the invite link lives in
 // one place: to change it, edit src/index.html and deploy.
 //
-// What it copies from Netlify: the page at / and /index.html, byte for byte;
-// plain http to https; a 404 for every other path.
+// What it keeps from Netlify: the page at / and /index.html, with the same
+// meta refresh to the invite; plain http to https; a 404 for every other
+// path. The page itself has since gained what a crawler expects of a
+// subdomain's home page (lang, description, canonical, social tags, an h1
+// and the wasmCloud Organization JSON-LD, which mirrors the node in
+// docusaurus.config.ts): site audits read it as one.
 
 import page from './index.html';
 

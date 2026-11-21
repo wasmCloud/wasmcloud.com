@@ -179,8 +179,10 @@ function validatePayload(payload, ctx) {
       node.forEach((n, i) => visit(n, `${path}[${i}]`));
       return;
     }
-    const type = node['@type'];
-    if (typeof type === 'string' && ARTICLE_TYPES.has(type)) {
+    // `@type` may be a string or an array (doc pages are typed
+    // ['TechArticle', 'Article']); label the node by its first Article type.
+    const type = [node['@type']].flat().find((t) => ARTICLE_TYPES.has(t));
+    if (type) {
       if (!node.headline) errors.push(`${ctx} ${path} ${type}: missing headline`);
       if (!node.datePublished && !node.dateModified) {
         errors.push(`${ctx} ${path} ${type}: missing datePublished and dateModified`);

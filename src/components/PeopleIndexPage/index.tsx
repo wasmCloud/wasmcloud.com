@@ -122,7 +122,7 @@ export default function PeopleIndexPage({
     '@id': `${siteUrl}/people/#directory`,
     name: 'wasmCloud Maintainers',
     description:
-      'Currently active wasmCloud maintainers — the people building and stewarding the project.',
+      'Meet the currently active wasmCloud maintainers: the people building and stewarding the open source CNCF project for running WebAssembly components.',
     url: `${siteUrl}/people/`,
     isPartOf: { '@id': `${siteUrl}/#website` },
     mainEntity: {
@@ -140,7 +140,7 @@ export default function PeopleIndexPage({
   return (
     <Layout
       title="Maintainers"
-      description="Currently active wasmCloud maintainers — the people building and stewarding the project."
+      description="Meet the currently active wasmCloud maintainers: the people building and stewarding the open source CNCF project for running WebAssembly components."
     >
       <Head>
         <script type="application/ld+json">{JSON.stringify(collectionLd)}</script>
