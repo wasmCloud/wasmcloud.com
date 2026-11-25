@@ -275,7 +275,7 @@ link_config = { values = { address = "127.0.0.1:8083" } }
 Here, we specify a few things to make sure a custom HTTP server provider is picked:
 
 - `[[dev.overrides.imports]]` - this section is for overriding the dependencies `wash dev` would normally automatically generate
-- `interface_spec` - This is the interface that we should be be generating a provider for
+- `interface_spec` - This is the interface that we should be generating a provider for
 - `image_ref` - The custom reference to the provider we'd like to run
 - `link_config` - Optional configuration that should be attached to the provider's links.
   - In this case, we configure the address we want our custom HTTP server provider to listen on.

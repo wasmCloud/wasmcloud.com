@@ -56,7 +56,7 @@ Building this project relies on the following installed software:
 | Name   | Description                                                                                                 |
 | ------ | ----------------------------------------------------------------------------------------------------------- |
 | `wash` | [Wasmcloud Shell][wash] controls your [wasmcloud][wasmcloud] host instances and enables building components |
-| `npm`  | [Node Package Manager (NPM)][npm] which manages packages for for the NodeJS ecosystem                       |
+| `npm`  | [Node Package Manager (NPM)][npm] which manages packages for the NodeJS ecosystem                       |
 | `node` | [NodeJS runtime][nodejs] (see `.nvmrc` for version)                                                         |
 
 [wash]: https://github.com/wasmCloud/wasmCloud/tree/main/crates/wash-cli
