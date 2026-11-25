@@ -1,0 +1,83 @@
+name: publish-results
+
+# Evaluates this repo against the OSPS Baseline with the grc.store scanner.
+# Every run is a dry run: results land in the pvtr-results, pvtr-sarif and
+# pvtr-bundles artifacts and nothing is published. To publish to
+# https://grc.store/targets/wasmcloud/wasmcloud.com, the `wasmcloud` namespace
+# must first register wasmCloud/wasmcloud.com as a target and trust it as a
+# publisher on refs/heads/main.
+
+on:
+  workflow_dispatch:
+    inputs:
+      maturity:
+        description: "Maturity level to evaluate."
+        type: choice
+        options: ['2', '3']
+        default: '2'
+  schedule:
+    # Weekly Monday at 06:57 UTC.
+    - cron: "57 6 * * 1"
+  # No push trigger: the hub accepts one log per target every ten minutes
+  # and fails the run on the rest. Run after a merge with
+  # `gh workflow run publish-results.yml`.
+
+permissions: {}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # Read the latest release tag.
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: Latest release tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Releases are the offline docs, tagged docs-vX.Y.Z.
+        run: |
+          set -euo pipefail
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || echo docs-v0.0.0)
+          echo "version=${tag#docs-v}" >> "$GITHUB_OUTPUT"
+
+  results:
+    needs: version
+    permissions:
+      contents: read # The scanner reads this repo through the job token.
+      id-token: write # Trusted publishing to the hub and the Sigstore signing identity.
+      # The called workflow's report job declares it, and GitHub checks every
+      # called job at startup, even one that is skipped.
+      security-events: write
+    # By tag, not SHA: the hub compares the signing certificate's workflow
+    # ref to this exact tag.
+    uses: revanite-io/pvtr-publish-results/.github/workflows/publish.yml@v1 # zizmor: ignore[unpinned-uses] the hub requires the tag
+    with:
+      target: wasmcloud/wasmcloud.com@${{ needs.version.outputs.version }}
+      license: CC0-1.0
+      # TODO: publish once the grc.store `wasmcloud` namespace registers
+      # wasmCloud/wasmcloud.com as a target and trusts it as a publisher on
+      # refs/heads/main: replace the line below with
+      # the commented one, and add back a boolean `dry-run` workflow_dispatch
+      # input as in wasmCloud/typescript. Only the level 2 evaluation is published.
+      dry-run: true
+      # dry-run: ${{ inputs.dry-run == true || inputs.maturity == '3' }}
+    secrets:
+      # Inline because the plugin reads its token only from config vars. The
+      # job token can't read some settings (branch rulesets, org MFA); those
+      # controls report Needs Review.
+      config: |
+        targets:
+          wasmcloud-com:
+            plugin: openssf/github-repo
+            policy:
+              catalogs:
+                - osps-baseline
+              applicability:
+                - maturity-${{ inputs.maturity || '2' }}
+            vars:
+              owner: wasmCloud
+              repo: wasmcloud.com
+              token: ${{ secrets.GITHUB_TOKEN }}
